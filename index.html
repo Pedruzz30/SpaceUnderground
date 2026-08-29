@@ -31,7 +31,6 @@
           <a class="nav-link" href="#services">Studio</a>
           <a class="nav-link" href="#work">Work</a>
           <a class="nav-link" href="#labs">Labs</a>
-          <a class="nav-link" href="#pricing">Pricing</a>
           <a class="nav-link" href="#about">About</a>
           <a class="nav-link" href="#contact">Contact</a>
           <a class="button button--primary nav-cta" href="#contact">
@@ -319,80 +318,6 @@
         </div>
       </section>
 
-      <section class="section pricing" id="pricing" aria-labelledby="pricing-title">
-        <div class="container">
-          <header class="section-heading section-heading--row reveal" data-reveal>
-            <div>
-              <p class="section-label"><span>06</span> Packages / Pricing</p>
-              <h2 id="pricing-title">Where to <em>start.</em></h2>
-            </div>
-            <p class="section-intro">Three entry points, built to the same standard. Every project is quoted after we understand the scope — these are starting points, not ceilings.</p>
-          </header>
-
-          <div class="pricing-grid">
-            <article class="pricing-card reveal" data-reveal aria-labelledby="package-essential-title">
-              <div class="pricing-card__top">
-                <span class="pricing-card__number">01</span>
-                <span class="pricing-card__tag">Essential</span>
-              </div>
-              <h3 id="package-essential-title">Landing Page</h3>
-              <p class="pricing-card__price"><small>From</small>R$ 800</p>
-              <ul class="pricing-card__features">
-                <li>Single page — hero, about, services, contact</li>
-                <li>Responsive design</li>
-                <li>Simple contact form</li>
-              </ul>
-              <p class="pricing-card__timeline">Timeline <span>5–7 days</span></p>
-              <a class="button pricing-card__cta" href="#contact" data-package="package-essential">
-                <span>Request a Proposal</span>
-                <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
-              </a>
-            </article>
-
-            <article class="pricing-card pricing-card--featured reveal" data-reveal aria-labelledby="package-professional-title">
-              <div class="pricing-card__top">
-                <span class="pricing-card__number">02</span>
-                <span class="pricing-card__tag">Professional</span>
-                <span class="pricing-card__badge">Most popular</span>
-              </div>
-              <h3 id="package-professional-title">Institutional Website</h3>
-              <p class="pricing-card__price"><small>From</small>R$ 2.000</p>
-              <ul class="pricing-card__features">
-                <li>Multiple pages — Home, About, Services, Portfolio / Blog, Contact</li>
-                <li>Custom design, no templates</li>
-                <li>Basic SEO and performance optimization</li>
-              </ul>
-              <p class="pricing-card__timeline">Timeline <span>2–3 weeks</span></p>
-              <a class="button button--primary pricing-card__cta" href="#contact" data-package="package-professional">
-                <span>Request a Proposal</span>
-                <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
-              </a>
-            </article>
-
-            <article class="pricing-card reveal" data-reveal aria-labelledby="package-authorial-title">
-              <div class="pricing-card__top">
-                <span class="pricing-card__number">03</span>
-                <span class="pricing-card__tag">Authorial</span>
-              </div>
-              <h3 id="package-authorial-title">Complete Digital Experience</h3>
-              <p class="pricing-card__price"><small>From</small>R$ 5.000</p>
-              <p class="pricing-card__inherit">Everything in Professional, plus</p>
-              <ul class="pricing-card__features">
-                <li>Custom animations and interactions</li>
-                <li>Light visual identity / branding</li>
-              </ul>
-              <p class="pricing-card__timeline">Timeline <span>4–6 weeks</span></p>
-              <a class="button pricing-card__cta" href="#contact" data-package="package-authorial">
-                <span>Request a Proposal</span>
-                <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
-              </a>
-            </article>
-          </div>
-
-          <p class="pricing__coordinate" aria-hidden="true">PRICING IN BRL · SCOPE DEFINES FINAL QUOTE<br>23°33' S · 46°38' W — EST. 2026</p>
-        </div>
-      </section>
-
       <section class="why" id="why" aria-labelledby="why-title">
         <div class="container why__inner">
           <div class="why__heading reveal" data-reveal>
@@ -472,21 +397,63 @@
                 <label for="project-need">What do you need?</label>
                 <select id="project-need" name="project_type" required>
                   <option value="">Select one option</option>
-                  <optgroup label="Packages">
-                    <option value="package-essential">Essential — Landing Page</option>
-                    <option value="package-professional">Professional — Institutional Website</option>
-                    <option value="package-authorial">Authorial — Complete Digital Experience</option>
-                  </optgroup>
-                  <optgroup label="Custom scope">
-                    <option value="landing-page">Landing Page</option>
-                    <option value="portfolio">Portfolio</option>
-                    <option value="institutional-website">Institutional Website</option>
-                    <option value="e-commerce">E-commerce</option>
-                    <option value="web-system">Web System</option>
-                    <option value="other">Other</option>
-                  </optgroup>
+                  <option value="landing-page">Landing Page</option>
+                  <option value="portfolio">Portfolio</option>
+                  <option value="institutional-website">Institutional Website</option>
+                  <option value="e-commerce">E-commerce</option>
+                  <option value="web-system">Web System</option>
+                  <option value="other">Other</option>
                 </select>
                 <small>Select a project type.</small>
+              </div>
+              <div class="product-picker form-field--wide" data-product-picker aria-label="Project type selector">
+                <div class="product-picker__header">
+                  <p>Choose the build</p>
+                  <span data-product-count>00 / 06</span>
+                </div>
+                <div class="product-options">
+                  <button class="product-option" type="button" data-product-option data-value="landing-page" data-budget="R$ 2.500 average" data-timeline="1-3 weeks" aria-pressed="false">
+                    <span class="product-option__index">01</span>
+                    <strong>Landing Page</strong>
+                    <small>Campaign, offer or launch page.</small>
+                    <i>CONVERSION</i>
+                  </button>
+                  <button class="product-option" type="button" data-product-option data-value="portfolio" data-budget="R$ 3.500 average" data-timeline="2-4 weeks" aria-pressed="false">
+                    <span class="product-option__index">02</span>
+                    <strong>Portfolio</strong>
+                    <small>Personal, creative or brand presence.</small>
+                    <i>IDENTITY</i>
+                  </button>
+                  <button class="product-option" type="button" data-product-option data-value="institutional-website" data-budget="R$ 6.000 average" data-timeline="3-6 weeks" aria-pressed="false">
+                    <span class="product-option__index">03</span>
+                    <strong>Institutional Website</strong>
+                    <small>Multi-page company experience.</small>
+                    <i>STRUCTURE</i>
+                  </button>
+                  <button class="product-option" type="button" data-product-option data-value="e-commerce" data-budget="R$ 10.000 average" data-timeline="5-9 weeks" aria-pressed="false">
+                    <span class="product-option__index">04</span>
+                    <strong>E-commerce</strong>
+                    <small>Storefront built around discovery.</small>
+                    <i>COMMERCE</i>
+                  </button>
+                  <button class="product-option" type="button" data-product-option data-value="web-system" data-budget="R$ 18.000 average" data-timeline="6-12 weeks" aria-pressed="false">
+                    <span class="product-option__index">05</span>
+                    <strong>Web System</strong>
+                    <small>Dashboard, platform or internal tool.</small>
+                    <i>SYSTEM</i>
+                  </button>
+                  <button class="product-option" type="button" data-product-option data-value="other" data-budget="To define" data-timeline="To define" aria-pressed="false">
+                    <span class="product-option__index">06</span>
+                    <strong>Other</strong>
+                    <small>Something that does not fit the map yet.</small>
+                    <i>CUSTOM</i>
+                  </button>
+                </div>
+                <div class="product-summary" data-product-summary>
+                  <span>NO PRODUCT SELECTED</span>
+                  <strong>Choose a build type to calibrate the request.</strong>
+                  <p data-product-summary-text>Budget and timeline hints will appear here. You can still edit the fields manually.</p>
+                </div>
               </div>
               <div class="form-field form-field--wide">
                 <label for="project-message">Tell us about the project</label>
@@ -496,10 +463,26 @@
               <div class="form-field">
                 <label for="project-budget">Estimated budget</label>
                 <input id="project-budget" name="budget" type="text" inputmode="text" placeholder="Example: $3k - $8k">
+                <div class="field-options" aria-label="Budget presets">
+                  <button type="button" data-budget-choice="R$ 2.500 average">AVG R$ 2.500</button>
+                  <button type="button" data-budget-choice="R$ 3.500 average">AVG R$ 3.500</button>
+                  <button type="button" data-budget-choice="R$ 6.000 average">AVG R$ 6.000</button>
+                  <button type="button" data-budget-choice="R$ 10.000 average">AVG R$ 10.000</button>
+                  <button type="button" data-budget-choice="R$ 18.000 average">AVG R$ 18.000</button>
+                  <button type="button" data-budget-choice="To define">TO DEFINE</button>
+                </div>
               </div>
               <div class="form-field">
                 <label for="project-timeline">Desired timeline</label>
                 <input id="project-timeline" name="timeline" type="text" placeholder="Example: 4-6 weeks">
+                <div class="field-options" aria-label="Timeline presets">
+                  <button type="button" data-timeline-choice="1-3 weeks">1-3 WEEKS</button>
+                  <button type="button" data-timeline-choice="2-4 weeks">2-4 WEEKS</button>
+                  <button type="button" data-timeline-choice="3-6 weeks">3-6 WEEKS</button>
+                  <button type="button" data-timeline-choice="5-9 weeks">5-9 WEEKS</button>
+                  <button type="button" data-timeline-choice="6-12 weeks">6-12 WEEKS</button>
+                  <button type="button" data-timeline-choice="To define">TO DEFINE</button>
+                </div>
               </div>
             </div>
             <button class="contact-button project-form__submit" type="submit">
@@ -523,7 +506,6 @@
               <a href="#services">Studio</a>
               <a href="#work">Work</a>
               <a href="#labs">Labs</a>
-              <a href="#pricing">Pricing</a>
               <a href="#about">About</a>
               <a href="#contact">Contact</a>
             </div>
@@ -550,7 +532,7 @@
         </button>
         <div class="project-dialog__content">
           <p class="section-label"><span data-dialog-index>001</span> Project concept</p>
-          <p class="project-dialog__meta"><span data-dialog-category>SaaS Platform</span> / <span data-dialog-year>2026</span></p>
+          <p class="project-dialog__meta"><span data-dialog-category>Concept Project / Software Interface</span> / <span data-dialog-year>2026</span></p>
           <h2 id="project-dialog-title" data-dialog-title>Signal OS</h2>
           <p class="project-dialog__description" data-dialog-description>A real-time operations platform turning complex data into clear, decisive action.</p>
           <div class="project-dialog__scope">

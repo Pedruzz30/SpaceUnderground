@@ -17,6 +17,7 @@ const clippedLines = document.querySelectorAll(".statement-line, .contact-line")
 const yearTargets = document.querySelectorAll("[data-year]");
 const projectDialog = document.querySelector("[data-project-dialog]");
 const projectOpeners = document.querySelectorAll("[data-project]");
+const projectForm = document.querySelector("[data-project-form]");
 
 let menuOpen = false;
 let previousFocus = null;
@@ -162,9 +163,9 @@ const sectionNavMap = new Map([
   ["home", "home"],
   ["services", "services"],
   ["work", "work"],
+  ["labs", "labs"],
   ["philosophy", "about"],
   ["process", "about"],
-  ["pricing", "pricing"],
   ["why", "about"],
   ["about", "about"],
   ["contact", "contact"],
@@ -198,22 +199,6 @@ if ("IntersectionObserver" in window && observedSections.length) {
   observedSections.forEach((section) => sectionObserver.observe(section));
 }
 
-const packageLinks = document.querySelectorAll("[data-package]");
-const projectNeedField = document.getElementById("project-need");
-
-packageLinks.forEach((link) => {
-  link.addEventListener("click", () => {
-    if (!projectNeedField) return;
-
-    const selected = link.dataset.package;
-    const isKnown = [...projectNeedField.options].some((option) => option.value === selected);
-    if (!isKnown) return;
-
-    projectNeedField.value = selected;
-    projectNeedField.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-});
-
 yearTargets.forEach((target) => {
   target.textContent = String(new Date().getFullYear());
 });
@@ -221,31 +206,31 @@ yearTargets.forEach((target) => {
 const projectPreviews = {
   signal: {
     index: "001",
-    category: "SaaS Platform",
+    category: "Concept Project / Software Interface",
     year: "2026",
     title: "Signal OS",
-    description: "A real-time operations platform turning complex data into clear, decisive action.",
-    scope: ["Product strategy", "UX / UI design", "Front-end system"],
+    description: "A speculative interface study for real-time operations. Prepared as a case-study slot for future client work or Space Labs products.",
+    scope: ["TYPE — SOFTWARE", "TECH — HTML / CSS / JS", "STATUS — EXPERIMENT"],
     code: "SGNL_001",
     monogram: "S/",
   },
   form: {
     index: "002",
-    category: "Editorial Portfolio",
-    year: "2025",
+    category: "Concept Project / Portfolio",
+    year: "2026",
     title: "Form & Void",
-    description: "An architecture portfolio where restraint, rhythm and spatial thinking lead the experience.",
-    scope: ["Creative direction", "Editorial UX", "Creative development"],
+    description: "A portfolio concept where restraint, rhythm and spatial thinking lead the experience. Ready to be replaced by a real client case.",
+    scope: ["TYPE — PORTFOLIO", "TECH — HTML / CSS / JS", "STATUS — CONCEPT"],
     code: "FRMV_002",
     monogram: "F/V",
   },
   nox: {
     index: "003",
-    category: "E-commerce",
-    year: "2025",
+    category: "Experiment / E-commerce",
+    year: "2026",
     title: "NOX Objects",
-    description: "A tactile storefront for limited-run objects sitting between design, art and utility.",
-    scope: ["Commerce strategy", "Art direction", "Storefront development"],
+    description: "A tactile storefront experiment for limited-run objects. The component already supports real project metadata later.",
+    scope: ["TYPE — E-COMMERCE", "TECH — HTML / CSS / JS", "STATUS — CONCEPT"],
     code: "NOX_003",
     monogram: "N/",
   },
@@ -315,6 +300,167 @@ if (projectDialog) {
     const inside = event.clientX >= bounds.left && event.clientX <= bounds.right
       && event.clientY >= bounds.top && event.clientY <= bounds.bottom;
     if (!inside) closeProjectDialog();
+  });
+}
+
+if (projectForm) {
+  const formStatus = projectForm.querySelector("[data-form-status]");
+  const fields = [...projectForm.querySelectorAll("input, select, textarea")];
+  const projectNeedField = projectForm.querySelector("#project-need");
+  const budgetField = projectForm.querySelector("#project-budget");
+  const timelineField = projectForm.querySelector("#project-timeline");
+  const budgetChoices = [...projectForm.querySelectorAll("[data-budget-choice]")];
+  const timelineChoices = [...projectForm.querySelectorAll("[data-timeline-choice]")];
+  const productOptions = [...projectForm.querySelectorAll("[data-product-option]")];
+  const productCount = projectForm.querySelector("[data-product-count]");
+  const productSummary = projectForm.querySelector("[data-product-summary]");
+  const productSummaryTitle = productSummary?.querySelector("strong");
+  const productSummaryKicker = productSummary?.querySelector("span");
+  const productSummaryText = projectForm.querySelector("[data-product-summary-text]");
+
+  const productDetails = {
+    "landing-page": {
+      label: "Landing Page",
+      text: "Best for campaigns, launches and focused offers. Usually includes strategy, page structure, responsive interface and a conversion-ready contact path.",
+    },
+    portfolio: {
+      label: "Portfolio",
+      text: "Best for professionals, creators and brands that need a memorable digital identity with selected work, story and contact flow.",
+    },
+    "institutional-website": {
+      label: "Institutional Website",
+      text: "Best for companies that need a complete presence with multiple pages, clear navigation, service content and a scalable structure.",
+    },
+    "e-commerce": {
+      label: "E-commerce",
+      text: "Best for product catalogs and stores where discovery, usability, checkout intent and visual direction need to work together.",
+    },
+    "web-system": {
+      label: "Web System",
+      text: "Best for dashboards, internal platforms and custom tools where workflow, data and interface behavior matter more than decoration.",
+    },
+    other: {
+      label: "Other",
+      text: "Best for unusual scopes, early product ideas or builds that need a technical conversation before being named properly.",
+    },
+  };
+
+  const setFieldState = (field) => {
+    const wrapper = field.closest(".form-field");
+    if (!wrapper) return;
+    wrapper.classList.toggle("is-invalid", field.matches(":invalid") && field.dataset.touched === "true");
+  };
+
+  const setChoiceState = (choices, value, attribute) => {
+    choices.forEach((choice) => {
+      choice.classList.toggle("is-selected", choice.dataset[attribute] === value);
+    });
+  };
+
+  const setProductChoice = (value, { autofill = true } = {}) => {
+    const selectedOption = productOptions.find((option) => option.dataset.value === value);
+    const details = productDetails[value];
+
+    productOptions.forEach((option) => {
+      const isSelected = option === selectedOption;
+      option.classList.toggle("is-selected", isSelected);
+      option.setAttribute("aria-pressed", String(isSelected));
+    });
+
+    if (projectNeedField && projectNeedField.value !== value) {
+      projectNeedField.value = value;
+    }
+
+    if (productCount) {
+      const selectedIndex = selectedOption ? productOptions.indexOf(selectedOption) + 1 : 0;
+      productCount.textContent = `${String(selectedIndex).padStart(2, "0")} / ${String(productOptions.length).padStart(2, "0")}`;
+    }
+
+    if (productSummaryKicker) productSummaryKicker.textContent = details ? "PRODUCT SELECTED" : "NO PRODUCT SELECTED";
+    if (productSummaryTitle) productSummaryTitle.textContent = details ? details.label : "Choose a build type to calibrate the request.";
+    if (productSummaryText) productSummaryText.textContent = details ? details.text : "Budget and timeline hints will appear here. You can still edit the fields manually.";
+
+    if (autofill && selectedOption) {
+      if (budgetField) budgetField.value = selectedOption.dataset.budget || "";
+      if (timelineField) timelineField.value = selectedOption.dataset.timeline || "";
+    }
+
+    setChoiceState(budgetChoices, budgetField?.value || "", "budgetChoice");
+    setChoiceState(timelineChoices, timelineField?.value || "", "timelineChoice");
+
+    if (projectNeedField) setFieldState(projectNeedField);
+  };
+
+  productOptions.forEach((option) => {
+    option.addEventListener("click", () => {
+      if (formStatus) formStatus.textContent = "";
+      projectNeedField.dataset.touched = "true";
+      setProductChoice(option.dataset.value);
+    });
+  });
+
+  projectNeedField?.addEventListener("change", () => {
+    setProductChoice(projectNeedField.value, { autofill: false });
+  });
+
+  budgetChoices.forEach((choice) => {
+    choice.addEventListener("click", () => {
+      if (!budgetField) return;
+      budgetField.value = choice.dataset.budgetChoice || "";
+      setChoiceState(budgetChoices, budgetField.value, "budgetChoice");
+      if (formStatus) formStatus.textContent = "";
+    });
+  });
+
+  timelineChoices.forEach((choice) => {
+    choice.addEventListener("click", () => {
+      if (!timelineField) return;
+      timelineField.value = choice.dataset.timelineChoice || "";
+      setChoiceState(timelineChoices, timelineField.value, "timelineChoice");
+      if (formStatus) formStatus.textContent = "";
+    });
+  });
+
+  fields.forEach((field) => {
+    field.addEventListener("blur", () => {
+      field.dataset.touched = "true";
+      setFieldState(field);
+    });
+
+    field.addEventListener("input", () => {
+      if (field.dataset.touched === "true") setFieldState(field);
+      if (formStatus) formStatus.textContent = "";
+      if (field === budgetField) setChoiceState(budgetChoices, field.value, "budgetChoice");
+      if (field === timelineField) setChoiceState(timelineChoices, field.value, "timelineChoice");
+    });
+
+    field.addEventListener("change", () => {
+      if (field.dataset.touched === "true") setFieldState(field);
+      if (formStatus) formStatus.textContent = "";
+    });
+  });
+
+  projectForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    fields.forEach((field) => {
+      field.dataset.touched = "true";
+      setFieldState(field);
+    });
+
+    if (!projectForm.checkValidity()) {
+      if (formStatus) formStatus.textContent = "Check the highlighted fields.";
+      projectForm.querySelector(":invalid")?.focus();
+      return;
+    }
+
+    if (formStatus) formStatus.textContent = "Request staged. Backend connection pending.";
+    projectForm.reset();
+    setProductChoice("", { autofill: false });
+    fields.forEach((field) => {
+      delete field.dataset.touched;
+      setFieldState(field);
+    });
   });
 }
 
