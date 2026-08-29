@@ -307,8 +307,14 @@ if (projectForm) {
   const formStatus = projectForm.querySelector("[data-form-status]");
   const fields = [...projectForm.querySelectorAll("input, select, textarea")];
   const projectNeedField = projectForm.querySelector("#project-need");
+  const nameField = projectForm.querySelector("#project-name");
+  const emailField = projectForm.querySelector("#project-email");
+  const messageField = projectForm.querySelector("#project-message");
   const budgetField = projectForm.querySelector("#project-budget");
   const timelineField = projectForm.querySelector("#project-timeline");
+  const gotchaField = projectForm.querySelector("[name='_gotcha']");
+  const submitButton = projectForm.querySelector("[type='submit']");
+  const submitButtonText = submitButton?.querySelector("span");
   const budgetChoices = [...projectForm.querySelectorAll("[data-budget-choice]")];
   const timelineChoices = [...projectForm.querySelectorAll("[data-timeline-choice]")];
   const productOptions = [...projectForm.querySelectorAll("[data-product-option]")];
@@ -351,6 +357,13 @@ if (projectForm) {
     wrapper.classList.toggle("is-invalid", field.matches(":invalid") && field.dataset.touched === "true");
   };
 
+  const setManualFieldState = (field, isInvalid) => {
+    if (!field) return;
+    const wrapper = field.closest(".form-field");
+    if (!wrapper) return;
+    wrapper.classList.toggle("is-invalid", isInvalid);
+  };
+
   const setChoiceState = (choices, value, attribute) => {
     choices.forEach((choice) => {
       choice.classList.toggle("is-selected", choice.dataset[attribute] === value);
@@ -378,7 +391,13 @@ if (projectForm) {
 
     if (productSummaryKicker) productSummaryKicker.textContent = details ? "PRODUCT SELECTED" : "NO PRODUCT SELECTED";
     if (productSummaryTitle) productSummaryTitle.textContent = details ? details.label : "Choose a build type to calibrate the request.";
-    if (productSummaryText) productSummaryText.textContent = details ? details.text : "Budget and timeline hints will appear here. You can still edit the fields manually.";
+    if (productSummaryText) {
+      const budget = selectedOption?.dataset.budget || "To define";
+      const timeline = selectedOption?.dataset.timeline || "To define";
+      productSummaryText.textContent = details
+        ? `${details.text} Budget range: ${budget}. Estimated time: ${timeline}.`
+        : "Budget range and timeline hints will appear here. You can still edit the fields manually.";
+    }
 
     if (autofill && selectedOption) {
       if (budgetField) budgetField.value = selectedOption.dataset.budget || "";
@@ -440,27 +459,79 @@ if (projectForm) {
     });
   });
 
-  projectForm.addEventListener("submit", (event) => {
-    event.preventDefault();
+  const validateProjectForm = () => {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidFields = [
+      [nameField, !nameField?.value.trim()],
+      [emailField, !emailPattern.test(emailField?.value.trim() || "")],
+      [projectNeedField, !projectNeedField?.value],
+      [messageField, !messageField?.value.trim()],
+    ].filter(([, isInvalid]) => isInvalid);
 
-    fields.forEach((field) => {
-      field.dataset.touched = "true";
-      setFieldState(field);
+    [nameField, emailField, projectNeedField, messageField].forEach((field) => {
+      setManualFieldState(field, invalidFields.some(([invalidField]) => invalidField === field));
     });
 
-    if (!projectForm.checkValidity()) {
-      if (formStatus) formStatus.textContent = "Check the highlighted fields.";
-      projectForm.querySelector(":invalid")?.focus();
+    return invalidFields.map(([field]) => field);
+  };
+
+  const setSubmitState = (isSending) => {
+    if (!submitButton) return;
+    submitButton.disabled = isSending;
+    submitButton.classList.toggle("is-sending", isSending);
+    if (submitButtonText) submitButtonText.textContent = isSending ? "Enviando..." : "Send Project Request";
+  };
+
+  projectForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    if (gotchaField?.value) {
+      if (formStatus) formStatus.textContent = "Recebemos sua mensagem! Retornamos em até 1 dia útil.";
+      projectForm.reset();
+      setProductChoice("", { autofill: false });
       return;
     }
 
-    if (formStatus) formStatus.textContent = "Request staged. Backend connection pending.";
-    projectForm.reset();
-    setProductChoice("", { autofill: false });
     fields.forEach((field) => {
-      delete field.dataset.touched;
-      setFieldState(field);
+      field.dataset.touched = "true";
     });
+
+    const invalidFields = validateProjectForm();
+
+    if (invalidFields.length) {
+      if (formStatus) formStatus.textContent = "Verifique os campos destacados antes de enviar.";
+      invalidFields[0]?.focus();
+      return;
+    }
+
+    setSubmitState(true);
+    if (formStatus) formStatus.textContent = "Enviando sua solicitação...";
+
+    try {
+      const response = await fetch(projectForm.action, {
+        method: "POST",
+        body: new FormData(projectForm),
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      if (!response.ok) throw new Error("Form submission failed.");
+
+      if (formStatus) formStatus.textContent = "Recebemos sua mensagem! Retornamos em até 1 dia útil.";
+      projectForm.reset();
+      setProductChoice("", { autofill: false });
+      fields.forEach((field) => {
+        delete field.dataset.touched;
+        setManualFieldState(field, false);
+      });
+    } catch (error) {
+      if (formStatus) {
+        formStatus.textContent = "Não foi possível enviar. Escreva direto para hello.SpaceUnderGround@gmail.com";
+      }
+    } finally {
+      setSubmitState(false);
+    }
   });
 }
 

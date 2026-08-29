@@ -9,10 +9,10 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="Css/main.css?v=20260829-form-complete">
+    <link rel="stylesheet" href="Css/main.css?v=20260829-formspree-live">
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
-    <script type="module" src="Js/main.js?v=20260829-form-complete"></script>
+    <script type="module" src="Js/main.js?v=20260829-formspree-live"></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
@@ -377,8 +377,12 @@
           <div class="contact__bottom reveal" data-reveal>
             <p>Tell us what you're building. The first reply is human, direct and practical.</p>
           </div>
-          <form class="project-form reveal" id="project-request" data-reveal data-project-form action="#" method="post" novalidate>
+          <form class="project-form reveal" id="project-request" data-reveal data-project-form action="https://formspree.io/f/mjyvkpay" method="POST" novalidate>
             <div class="project-form__grid">
+              <div class="visually-hidden" aria-hidden="true">
+                <label for="project-gotcha">Leave this field empty</label>
+                <input id="project-gotcha" name="_gotcha" type="text" tabindex="-1" autocomplete="off">
+              </div>
               <div class="form-field">
                 <label for="project-name">Name</label>
                 <input id="project-name" name="name" type="text" autocomplete="name" required>
@@ -412,31 +416,31 @@
                   <span data-product-count>00 / 06</span>
                 </div>
                 <div class="product-options">
-                  <button class="product-option" type="button" data-product-option data-value="landing-page" data-budget="R$ 2.500 average" data-timeline="1-3 weeks" aria-pressed="false">
+                  <button class="product-option" type="button" data-product-option data-value="landing-page" data-budget="R$ 800 – R$ 1.500" data-timeline="1-3 weeks" aria-pressed="false">
                     <span class="product-option__index">01</span>
                     <strong>Landing Page</strong>
                     <small>Campaign, offer or launch page.</small>
                     <i>CONVERSION</i>
                   </button>
-                  <button class="product-option" type="button" data-product-option data-value="portfolio" data-budget="R$ 3.500 average" data-timeline="2-4 weeks" aria-pressed="false">
+                  <button class="product-option" type="button" data-product-option data-value="portfolio" data-budget="R$ 1.200 – R$ 2.500" data-timeline="2-4 weeks" aria-pressed="false">
                     <span class="product-option__index">02</span>
                     <strong>Portfolio</strong>
                     <small>Personal, creative or brand presence.</small>
                     <i>IDENTITY</i>
                   </button>
-                  <button class="product-option" type="button" data-product-option data-value="institutional-website" data-budget="R$ 6.000 average" data-timeline="3-6 weeks" aria-pressed="false">
+                  <button class="product-option" type="button" data-product-option data-value="institutional-website" data-budget="R$ 2.500 – R$ 4.500" data-timeline="3-6 weeks" aria-pressed="false">
                     <span class="product-option__index">03</span>
                     <strong>Institutional Website</strong>
                     <small>Multi-page company experience.</small>
                     <i>STRUCTURE</i>
                   </button>
-                  <button class="product-option" type="button" data-product-option data-value="e-commerce" data-budget="R$ 10.000 average" data-timeline="5-9 weeks" aria-pressed="false">
+                  <button class="product-option" type="button" data-product-option data-value="e-commerce" data-budget="R$ 4.000 – R$ 8.000" data-timeline="5-9 weeks" aria-pressed="false">
                     <span class="product-option__index">04</span>
                     <strong>E-commerce</strong>
                     <small>Storefront built around discovery.</small>
                     <i>COMMERCE</i>
                   </button>
-                  <button class="product-option" type="button" data-product-option data-value="web-system" data-budget="R$ 18.000 average" data-timeline="6-12 weeks" aria-pressed="false">
+                  <button class="product-option" type="button" data-product-option data-value="web-system" data-budget="R$ 6.000 – R$ 12.000" data-timeline="6-12 weeks" aria-pressed="false">
                     <span class="product-option__index">05</span>
                     <strong>Web System</strong>
                     <small>Dashboard, platform or internal tool.</small>
@@ -452,7 +456,7 @@
                 <div class="product-summary" data-product-summary>
                   <span>NO PRODUCT SELECTED</span>
                   <strong>Choose a build type to calibrate the request.</strong>
-                  <p data-product-summary-text>Budget and timeline hints will appear here. You can still edit the fields manually.</p>
+                  <p data-product-summary-text>Budget range and timeline hints will appear here. You can still edit the fields manually.</p>
                 </div>
               </div>
               <div class="form-field form-field--wide">
@@ -462,13 +466,13 @@
               </div>
               <div class="form-field">
                 <label for="project-budget">Estimated budget</label>
-                <input id="project-budget" name="budget" type="text" inputmode="text" placeholder="Example: $3k - $8k">
+                <input id="project-budget" name="budget" type="text" inputmode="text" placeholder="Exemplo: R$ 1.500 – R$ 3.000">
                 <div class="field-options" aria-label="Budget presets">
-                  <button type="button" data-budget-choice="R$ 2.500 average">AVG R$ 2.500</button>
-                  <button type="button" data-budget-choice="R$ 3.500 average">AVG R$ 3.500</button>
-                  <button type="button" data-budget-choice="R$ 6.000 average">AVG R$ 6.000</button>
-                  <button type="button" data-budget-choice="R$ 10.000 average">AVG R$ 10.000</button>
-                  <button type="button" data-budget-choice="R$ 18.000 average">AVG R$ 18.000</button>
+                  <button type="button" data-budget-choice="R$ 800 – R$ 1.500">R$ 800 – R$ 1.500</button>
+                  <button type="button" data-budget-choice="R$ 1.200 – R$ 2.500">R$ 1.200 – R$ 2.500</button>
+                  <button type="button" data-budget-choice="R$ 2.500 – R$ 4.500">R$ 2.500 – R$ 4.500</button>
+                  <button type="button" data-budget-choice="R$ 4.000 – R$ 8.000">R$ 4.000 – R$ 8.000</button>
+                  <button type="button" data-budget-choice="R$ 6.000 – R$ 12.000">R$ 6.000 – R$ 12.000</button>
                   <button type="button" data-budget-choice="To define">TO DEFINE</button>
                 </div>
               </div>
