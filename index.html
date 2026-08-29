@@ -9,10 +9,10 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="Css/main.css">
+    <link rel="stylesheet" href="Css/main.css?v=20260829-form-complete">
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
-    <script type="module" src="Js/main.js"></script>
+    <script type="module" src="Js/main.js?v=20260829-form-complete"></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
@@ -33,7 +33,7 @@
           <a class="nav-link" href="#labs">Labs</a>
           <a class="nav-link" href="#about">About</a>
           <a class="nav-link" href="#contact">Contact</a>
-          <a class="button button--primary nav-cta" href="#contact">
+          <a class="button button--primary nav-cta" href="#project-request">
             <span>Start a Project</span>
             <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
           </a>
@@ -65,7 +65,7 @@
             <div class="hero__lower reveal" data-reveal>
               <p class="hero__lede">Digital experiences, websites, systems and products built below the obvious.</p>
               <div class="hero__actions">
-                <a class="button button--primary" href="#contact">
+                <a class="button button--primary" href="#project-request">
                   <span>Start a Project</span>
                   <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
                 </a>
@@ -112,31 +112,31 @@
           </header>
 
           <div class="service-list">
-            <a class="service-item reveal" data-reveal href="#contact">
+            <a class="service-item reveal" data-reveal href="#project-request">
               <span class="service-item__number">01</span>
               <h3>Landing Pages</h3>
               <p>Conversion-focused digital experiences designed around a specific product, service or campaign.</p>
               <span class="service-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19 19 5M8 5h11v11"/></svg></span>
             </a>
-            <a class="service-item reveal" data-reveal href="#contact">
+            <a class="service-item reveal" data-reveal href="#project-request">
               <span class="service-item__number">02</span>
               <h3>Portfolio Websites</h3>
               <p>Custom digital portfolios for professionals, creators and brands.</p>
               <span class="service-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19 19 5M8 5h11v11"/></svg></span>
             </a>
-            <a class="service-item reveal" data-reveal href="#contact">
+            <a class="service-item reveal" data-reveal href="#project-request">
               <span class="service-item__number">03</span>
               <h3>Institutional Websites</h3>
               <p>Complete multi-page digital experiences for companies and businesses.</p>
               <span class="service-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19 19 5M8 5h11v11"/></svg></span>
             </a>
-            <a class="service-item reveal" data-reveal href="#contact">
+            <a class="service-item reveal" data-reveal href="#project-request">
               <span class="service-item__number">04</span>
               <h3>E-commerce</h3>
               <p>Online stores designed around product discovery, usability and conversion.</p>
               <span class="service-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19 19 5M8 5h11v11"/></svg></span>
             </a>
-            <a class="service-item reveal" data-reveal href="#contact">
+            <a class="service-item reveal" data-reveal href="#project-request">
               <span class="service-item__number">05</span>
               <h3>Web Systems</h3>
               <p>Custom dashboards, internal platforms and business tools.</p>
@@ -242,7 +242,7 @@
             <p class="section-label"><span>03</span> Space / Labs</p>
             <h2 id="labs-title">Products built <em>underground.</em></h2>
             <p>Independent software, experiments and digital products developed inside Space Underground.</p>
-            <a class="text-link" href="#contact"><span>Explore Labs</span><i aria-hidden="true"></i></a>
+            <a class="text-link" href="#project-request"><span>Explore Labs</span><i aria-hidden="true"></i></a>
           </div>
           <article class="labs-product reveal" data-reveal aria-label="First Space Labs product status">
             <div class="labs-product__top">
@@ -377,7 +377,7 @@
           <div class="contact__bottom reveal" data-reveal>
             <p>Tell us what you're building. The first reply is human, direct and practical.</p>
           </div>
-          <form class="project-form reveal" data-reveal data-project-form action="#" method="post" novalidate>
+          <form class="project-form reveal" id="project-request" data-reveal data-project-form action="#" method="post" novalidate>
             <div class="project-form__grid">
               <div class="form-field">
                 <label for="project-name">Name</label>
@@ -544,7 +544,7 @@
             </ul>
           </div>
           <p class="project-dialog__note">Concept presentation by Space Underground. Ask us about the thinking, system and possibilities behind it.</p>
-          <a class="button button--primary" href="#contact" data-dialog-contact>
+          <a class="button button--primary" href="#project-request" data-dialog-contact>
             <span>Discuss This Project</span>
             <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
           </a>
