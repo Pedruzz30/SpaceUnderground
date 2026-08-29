@@ -164,6 +164,7 @@ const sectionNavMap = new Map([
   ["work", "work"],
   ["philosophy", "about"],
   ["process", "about"],
+  ["pricing", "pricing"],
   ["why", "about"],
   ["about", "about"],
   ["contact", "contact"],
@@ -196,6 +197,22 @@ if ("IntersectionObserver" in window && observedSections.length) {
 
   observedSections.forEach((section) => sectionObserver.observe(section));
 }
+
+const packageLinks = document.querySelectorAll("[data-package]");
+const projectNeedField = document.getElementById("project-need");
+
+packageLinks.forEach((link) => {
+  link.addEventListener("click", () => {
+    if (!projectNeedField) return;
+
+    const selected = link.dataset.package;
+    const isKnown = [...projectNeedField.options].some((option) => option.value === selected);
+    if (!isKnown) return;
+
+    projectNeedField.value = selected;
+    projectNeedField.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+});
 
 yearTargets.forEach((target) => {
   target.textContent = String(new Date().getFullYear());
