@@ -177,64 +177,65 @@
             <article class="project project--featured reveal" data-reveal>
               <div class="project__visual project__visual--signal">
                 <div class="visual-index">CASE / 001</div>
-                <div class="signal-ui signal-ui--website" data-signal-frame>
+                <div class="signal-ui signal-ui--website is-preview-sleeping" data-live-project data-project-url="https://pedruzz30.github.io/TattooSite/" data-project-preview-url="https://pedruzz30.github.io/TattooSite/?embed=spaceunderground" data-project-poster="./tattoo-preview-poster.png">
                   <div class="signal-ui__rail">
                     <span class="signal-logo">S/</span>
                     <span class="signal-ui__rail-track">
-                      <button type="button" data-signal-mode="site" aria-label="Focus website preview"><i></i></button>
-                      <button type="button" data-signal-mode="detail" aria-label="Zoom website preview"><i></i></button>
-                      <button class="is-active" type="button" data-signal-mode="default" aria-label="Default website preview"><i></i></button>
-                      <button type="button" data-signal-mode="origin" aria-label="Highlight studio origin"><i></i></button>
-                      <button type="button" data-signal-mode="reset" aria-label="Reset website preview"><i></i></button>
+                      <button type="button" data-signal-mode="site" aria-label="Mode: site preview" aria-pressed="false" data-tooltip="MODE / SITE"><i></i></button>
+                      <button type="button" data-signal-mode="detail" aria-label="Mode: detail preview" aria-pressed="false" data-tooltip="MODE / DETAIL"><i></i></button>
+                      <button class="is-active" type="button" data-signal-mode="overview" aria-label="Mode: overview" aria-pressed="true" data-tooltip="MODE / OVERVIEW"><i></i></button>
+                      <button type="button" data-signal-mode="origin" aria-label="Mode: studio origin" aria-pressed="false" data-tooltip="MODE / ORIGIN"><i></i></button>
+                      <button type="button" data-signal-mode="reset" aria-label="Reset live preview" aria-pressed="false" data-tooltip="MODE / RESET"><i></i></button>
                     </span>
                   </div>
                   <div class="signal-ui__case">
                     <div class="signal-ui__stage">
                       <div class="signal-ui__editorial">
-                        <span class="signal-ui__eyebrow">INK TATTOO</span>
-                        <strong>ARTE SOB<br>A PELE.</strong>
-                        <p>Blackwork, fine line e realismo<br>criados para acompanhar o corpo e<br>atravessar o tempo.</p>
-                        <button class="signal-ui__ghost-cta" type="button" data-signal-open><i aria-hidden="true"></i>Ver projeto</button>
+                        <span class="signal-ui__eyebrow">CLIENT / 001</span>
+                        <strong>INK TATTOO</strong>
+                        <small>DIGITAL IDENTITY & PORTFOLIO</small>
+                        <p>A dark editorial experience built around tattoo culture, motion and visual depth.</p>
+                        <button class="signal-ui__ghost-cta" type="button" data-signal-open><i aria-hidden="true"></i>VIEW LIVE</button>
                       </div>
                       <div class="signal-ui__browser">
                         <div class="signal-ui__toolbar">
                           <span class="signal-ui__dots">
                             <button type="button" data-signal-action="reload" aria-label="Reload website preview"><i></i></button>
-                            <button type="button" data-signal-mode="site" aria-label="Focus website preview"><i></i></button>
+                            <button type="button" data-signal-mode="site" aria-label="Mode: site preview" aria-pressed="false"><i></i></button>
                             <button type="button" data-signal-open aria-label="Open INK Tattoo website"><i></i></button>
                           </span>
-                          <button class="signal-ui__address" type="button" data-signal-open><i aria-hidden="true"></i>pedruzz30.github.io/TattooSite/</button>
+                          <button class="signal-ui__address" type="button" data-signal-open><i aria-hidden="true"></i>INK TATTOO / PRODUCTION</button>
                           <button class="signal-ui__expand" type="button" data-signal-open aria-label="Open INK Tattoo website in a new tab"></button>
                         </div>
                         <div class="signal-ui__website-viewport">
+                          <img class="signal-ui__poster" src="./tattoo-preview-poster.png" alt="" loading="lazy" decoding="async">
                           <div class="signal-ui__website-surface">
-                            <iframe src="https://pedruzz30.github.io/TattooSite/" title="INK Tattoo Website Preview" loading="lazy" tabindex="-1"></iframe>
+                            <iframe src="about:blank" data-src="https://pedruzz30.github.io/TattooSite/?embed=spaceunderground" title="INK Tattoo live website preview" loading="lazy" tabindex="-1"></iframe>
                           </div>
                         </div>
                       </div>
                     </div>
                     <div class="signal-ui__summary">
-                      <div class="signal-ui__direction">
+                      <button class="signal-ui__direction signal-ui__module" type="button" data-signal-mode="overview" aria-label="Restore overview mode" aria-pressed="true">
                         <span>EXPERIENCE SYSTEM / 01</span>
                         <strong>INK TATTOO</strong>
                         <small>PORTFÓLIO</small>
-                      </div>
+                      </button>
                       <ol class="signal-ui__pillars">
-                        <li><span>01</span><div><strong>ART DIRECTION</strong><small>MONOCHROME DEPTH</small></div></li>
-                        <li><span>02</span><div><strong>INTERACTION</strong><small>FLUID MOTION</small></div></li>
-                        <li><span>03</span><div><strong>EXPERIENCE</strong><small>EDITORIAL RHYTHM</small></div></li>
+                        <li><button class="signal-ui__module" type="button" data-signal-mode="detail" aria-label="Inspect art direction" aria-pressed="false"><span>01</span><div><strong>ART DIRECTION</strong><small>MONOCHROME DEPTH</small></div></button></li>
+                        <li><button class="signal-ui__module" type="button" data-signal-mode="site" aria-label="Inspect interaction" aria-pressed="false"><span>02</span><div><strong>INTERACTION</strong><small>FLUID MOTION</small></div></button></li>
+                        <li><button class="signal-ui__module" type="button" data-signal-mode="detail" aria-label="Inspect experience rhythm" aria-pressed="false"><span>03</span><div><strong>EXPERIENCE</strong><small>EDITORIAL RHYTHM</small></div></button></li>
                       </ol>
-                      <div class="signal-ui__signature">
-                        <span>STUDIO ORIGIN</span>
+                      <button class="signal-ui__signature signal-ui__module" type="button" data-signal-mode="origin" aria-label="Inspect studio origin" aria-pressed="false">
+                        <span data-preview-status>PREVIEW / SLEEP</span>
                         <strong>RJ / BR</strong>
+                        <small>22°54'S<br>43°12'W</small>
                         <i></i>
-                      </div>
+                      </button>
                     </div>
                   </div>
                 </div>
-                <a class="project__visual-link" href="https://pedruzz30.github.io/TattooSite/" target="_blank" rel="noopener noreferrer" aria-label="View INK Tattoo website (opens in a new tab)">
-                  <span class="project__hover-mark" aria-hidden="true">VIEW</span>
-                </a>
+                <a class="project__visual-link" href="https://pedruzz30.github.io/TattooSite/" target="_blank" rel="noopener noreferrer" aria-label="View INK Tattoo website (opens in a new tab)"></a>
               </div>
               <div class="project__details">
                 <div>

@@ -1,10 +1,6 @@
-/* Responsive ------------------------------------------------------ */
+﻿/* Responsive ------------------------------------------------------ */
 
 @media (max-width: 1180px) {
-  .signal-ui__website-surface {
-    --website-scale: 0.56;
-  }
-
   .hero__inner {
     grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.55fr);
   }
@@ -149,9 +145,6 @@
     grid-template-columns: minmax(220px, 0.8fr) minmax(220px, 0.6fr) auto;
   }
 
-  .signal-ui__website-surface {
-    --website-scale: 0.48;
-  }
 
   .projects__pair { gap: 2rem; }
 
@@ -292,77 +285,6 @@
     aspect-ratio: 1.15;
   }
 
-  .signal-ui {
-    top: 13%;
-    right: -15%;
-    bottom: 4%;
-    left: 5%;
-    grid-template-columns: 10% minmax(0, 1fr);
-  }
-
-  .signal-ui__rail {
-    gap: 0.65rem;
-    padding-block: 0.85rem;
-  }
-
-  .signal-ui__rail-track {
-    gap: 0.8rem;
-  }
-
-  .signal-ui__rail i {
-    width: 30%;
-  }
-
-  .signal-ui__stage {
-    grid-template-columns: 30% minmax(0, 70%);
-  }
-
-  .signal-ui__editorial {
-    padding: 1rem 0.7rem 0.85rem;
-  }
-
-  .signal-ui__editorial > p,
-  .signal-ui__ghost-cta {
-    display: none;
-  }
-
-  .signal-ui__browser {
-    width: 100%;
-    margin-top: 14px;
-  }
-
-  .signal-ui__summary {
-    min-height: clamp(62px, 18vw, 76px);
-    padding-right: 14%;
-    grid-template-columns: minmax(0, 1fr) minmax(72px, 0.5fr);
-  }
-
-  .signal-ui__pillars {
-    display: none;
-  }
-
-  .signal-ui__direction,
-  .signal-ui__signature {
-    padding: 0.65rem 0.75rem;
-  }
-
-  .signal-ui__direction > span,
-  .signal-ui__direction > small,
-  .signal-ui__signature > span {
-    font-size: clamp(0.3rem, 1.3vw, 0.4rem);
-  }
-
-  .signal-ui__direction > strong {
-    font-size: clamp(0.65rem, 2.8vw, 0.88rem);
-  }
-
-  .signal-ui__signature > strong {
-    font-size: clamp(0.58rem, 2.3vw, 0.76rem);
-  }
-
-  .signal-ui__website-surface {
-    --website-scale: 0.4;
-  }
 
   .project__details,
   .project__details--stacked {
@@ -585,11 +507,6 @@
   }
 }
 
-@media (max-width: 520px) {
-  .signal-ui__website-surface {
-    --website-scale: 0.34;
-  }
-}
 
 @media (max-width: 440px) {
   .brand__name { font-size: 0.62rem; }
@@ -620,9 +537,6 @@
 
   .project__meta span { display: block; padding: 0.25rem 0 0; }
 
-  .signal-ui__website-surface {
-    --website-scale: 0.3;
-  }
 
   .statement__coordinate--a { display: none; }
 

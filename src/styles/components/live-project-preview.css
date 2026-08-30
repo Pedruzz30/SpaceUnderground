@@ -1,0 +1,886 @@
+﻿/* Live project preview -------------------------------------------- */
+
+/* Project 001 mockup */
+
+.project__visual--signal {
+  background: #1b1c1b;
+}
+
+.project__visual--signal::before {
+  position: absolute;
+  inset: 0;
+  opacity: 0.32;
+  background-image: linear-gradient(rgba(198, 255, 0, 0.13) 1px, transparent 1px), linear-gradient(90deg, rgba(198, 255, 0, 0.13) 1px, transparent 1px);
+  background-size: 48px 48px;
+  content: "";
+}
+
+.signal-ui {
+  --preview-scale: 0.56;
+  --preview-site-scale: 0.62;
+  --preview-detail-scale: 0.7;
+  --preview-perspective: 1300px;
+  --preview-rest-transform: perspective(var(--preview-perspective)) rotateX(4deg) rotateY(-8deg) rotateZ(-1.5deg);
+  --preview-hover-transform: perspective(var(--preview-perspective)) rotateX(1deg) rotateY(-3deg) rotateZ(0deg) scale(1.025);
+  position: absolute;
+  z-index: 11;
+  top: 8%;
+  right: 3%;
+  bottom: 0;
+  left: 5%;
+  display: grid;
+  overflow: hidden;
+  grid-template-columns: 8% minmax(0, 1fr);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transform: var(--preview-rest-transform);
+  transform-origin: center;
+  transform-style: preserve-3d;
+  background: #0c0d0c;
+  box-shadow: 0 45px 85px rgba(0, 0, 0, 0.5);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+  transition: transform 900ms var(--ease), border-color 420ms ease, box-shadow 600ms ease;
+  pointer-events: none;
+}
+
+.signal-ui::before,
+.signal-ui::after {
+  position: absolute;
+  z-index: 6;
+  content: "";
+  pointer-events: none;
+}
+
+.signal-ui::before {
+  inset: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.035);
+  clip-path: polygon(0 0, 34px 0, 34px 1px, 1px 1px, 1px 34px, 0 34px, 0 0, calc(100% - 34px) 0, 100% 0, 100% 34px, calc(100% - 1px) 34px, calc(100% - 1px) 1px, calc(100% - 34px) 1px);
+}
+
+.signal-ui::after {
+  top: 0;
+  left: 16%;
+  width: 18%;
+  height: 1px;
+  opacity: 0;
+  transform: translateX(-35%);
+  background: linear-gradient(90deg, transparent, rgba(198, 255, 0, 0.78), transparent);
+  transition: opacity 240ms ease, transform 680ms var(--ease);
+}
+
+.signal-ui--website {
+  display: grid;
+}
+
+.signal-ui button {
+  padding: 0;
+  border: 0;
+  appearance: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.signal-ui button:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.signal-ui.is-preview-active {
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+.signal-ui.is-preview-loading::after,
+.signal-ui.is-calibrating::after {
+  opacity: 1;
+  transform: translateX(95%);
+}
+
+.signal-ui__rail {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: clamp(0.8rem, 2vw, 1.6rem);
+  padding-block: clamp(1rem, 2.6vw, 2.2rem);
+  border-right: 1px solid #252625;
+  background: #111211;
+}
+
+.signal-logo {
+  color: var(--accent);
+  font-family: var(--display);
+  font-size: clamp(0.65rem, 1.5vw, 1.25rem);
+  font-weight: 700;
+}
+
+.signal-ui__rail-track {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  flex-direction: column;
+  gap: clamp(0.8rem, 2vw, 1.55rem);
+  margin-block: auto;
+}
+
+.signal-ui__rail button {
+  position: relative;
+  display: grid;
+  width: 100%;
+  place-items: center;
+  pointer-events: auto;
+}
+
+.signal-ui__rail button::after {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 0.7rem);
+  z-index: 4;
+  padding: 0.32rem 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  opacity: 0;
+  transform: translate(-4px, -50%);
+  background: rgba(10, 11, 10, 0.92);
+  color: #dfe0da;
+  content: attr(data-tooltip);
+  font-family: var(--mono);
+  font-size: 0.54rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  pointer-events: none;
+  transition: opacity 220ms ease, transform 220ms ease;
+  white-space: nowrap;
+}
+
+.signal-ui__rail button:hover::after,
+.signal-ui__rail button:focus-visible::after {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.signal-ui__rail i {
+  width: 23%;
+  aspect-ratio: 1;
+  border: 1px solid #494a48;
+  transition: border-color 260ms ease, background 260ms ease, box-shadow 260ms ease, transform 260ms ease;
+}
+
+.signal-ui__rail button:hover i,
+.signal-ui__rail button:focus-visible i {
+  border-color: rgba(198, 255, 0, 0.72);
+  transform: scale(1.08);
+}
+
+.signal-ui__rail button.is-active i {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 24px rgba(198, 255, 0, 0.2);
+}
+
+.signal-ui__case {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+  transform-style: preserve-3d;
+}
+
+.signal-ui__stage {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: 24% minmax(0, 76%);
+  background-color: #0d0e0d;
+  background-image: linear-gradient(rgba(198, 255, 0, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(198, 255, 0, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  transition: grid-template-columns 560ms var(--ease);
+}
+
+.signal-ui__editorial {
+  display: flex;
+  min-width: 0;
+  justify-content: flex-start;
+  flex-direction: column;
+  padding: clamp(1.5rem, 4vw, 3.8rem) clamp(0.8rem, 2vw, 2rem) clamp(1rem, 2.5vw, 2.2rem);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(13, 14, 13, 0.72);
+  transition: opacity 420ms ease;
+}
+
+.signal-ui__eyebrow {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: clamp(0.44rem, 0.62vw, 0.62rem);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: 0.08em;
+}
+
+.signal-ui__editorial > strong {
+  margin-top: clamp(0.8rem, 1.8vw, 1.75rem);
+  color: #eceee8;
+  font-family: var(--display);
+  font-size: clamp(1.05rem, 2.35vw, 2.35rem);
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: -0.06em;
+}
+
+.signal-ui__editorial > small {
+  margin-top: clamp(0.5rem, 1vw, 0.9rem);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: clamp(0.43rem, 0.56vw, 0.56rem);
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.06em;
+}
+
+.signal-ui__editorial > p {
+  margin-top: auto;
+  color: #bbbdb7;
+  font-family: var(--body);
+  font-size: clamp(0.45rem, 0.64vw, 0.64rem);
+  line-height: 1.55;
+}
+
+.signal-ui__ghost-cta {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: clamp(0.75rem, 1.4vw, 1.3rem);
+  padding: 0.55rem 0.85rem;
+  border: 1px solid #42443f;
+  border-radius: 999px;
+  color: #d5d6d0;
+  font-family: var(--body);
+  font-size: clamp(0.43rem, 0.56vw, 0.56rem);
+  line-height: 1;
+  pointer-events: auto;
+  transition: border-color 260ms ease, color 260ms ease, transform 260ms ease;
+}
+
+.signal-ui__ghost-cta:hover,
+.signal-ui__ghost-cta:focus-visible {
+  border-color: rgba(198, 255, 0, 0.75);
+  color: #f4f5ef;
+  transform: translateX(4px);
+}
+
+.signal-ui__ghost-cta > i {
+  width: 13px;
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, #aaa 1px, transparent 1.5px) 0 0 / 4px 4px;
+}
+
+.signal-ui__browser {
+  display: grid;
+  width: 96%;
+  min-width: 0;
+  min-height: 0;
+  margin-top: clamp(16px, 2.1vw, 30px);
+  grid-template-rows: clamp(34px, 3.5vw, 54px) minmax(0, 1fr);
+  justify-self: start;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-bottom: 0;
+  border-radius: clamp(8px, 1.25vw, 16px) clamp(8px, 1.25vw, 16px) 0 0;
+  background: #0a0b0a;
+  transform: translateZ(0);
+  transform-style: preserve-3d;
+  transition: border-color 420ms ease, transform 560ms var(--ease), box-shadow 560ms ease;
+}
+
+.signal-ui__toolbar {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  padding-inline: clamp(0.65rem, 1.4vw, 1.35rem);
+  grid-template-columns: 1fr auto 1fr;
+  color: #eceee7;
+  font-family: var(--body);
+  font-size: clamp(0.56rem, 0.76vw, 0.74rem);
+  font-weight: 700;
+  line-height: 1.1;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.72);
+}
+
+.signal-ui__dots {
+  display: flex;
+  gap: clamp(4px, 0.48vw, 7px);
+}
+
+.signal-ui__dots button {
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+}
+
+.signal-ui__dots i {
+  width: clamp(5px, 0.55vw, 8px);
+  aspect-ratio: 1;
+  border: 1px solid #777a75;
+  border-radius: 50%;
+  transition: border-color 260ms ease, background 260ms ease, transform 260ms ease;
+}
+
+.signal-ui__dots button:hover i,
+.signal-ui__dots button:focus-visible i {
+  border-color: var(--accent);
+  background: rgba(198, 255, 0, 0.2);
+  transform: scale(1.18);
+}
+
+.signal-ui__address {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.55rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: auto;
+  transition: color 260ms ease;
+}
+
+.signal-ui__address:hover,
+.signal-ui__address:focus-visible {
+  color: #d7d8d2;
+}
+
+.signal-ui__address > i {
+  position: relative;
+  width: 7px;
+  height: 6px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 1px;
+  background: #858782;
+}
+
+.signal-ui__address > i::before {
+  position: absolute;
+  bottom: 4px;
+  left: 1px;
+  width: 5px;
+  height: 5px;
+  border: 1px solid #858782;
+  border-bottom: 0;
+  border-radius: 5px 5px 0 0;
+  content: "";
+}
+
+.signal-ui__expand {
+  position: relative;
+  width: 11px;
+  height: 11px;
+  justify-self: end;
+  pointer-events: auto;
+  transition: transform 260ms ease;
+}
+
+.signal-ui__expand:hover,
+.signal-ui__expand:focus-visible {
+  transform: scale(1.12);
+}
+
+.signal-ui__expand::before,
+.signal-ui__expand::after {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-color: #777a75;
+  content: "";
+}
+
+.signal-ui__expand::before {
+  top: 0;
+  right: 0;
+  border-top: 1px solid;
+  border-right: 1px solid;
+}
+
+.signal-ui__expand::after {
+  bottom: 0;
+  left: 0;
+  border-bottom: 1px solid;
+  border-left: 1px solid;
+}
+
+.signal-ui__website-viewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  margin-inline: 2.2%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 0;
+  background: #080808;
+  transition: border-color 420ms ease;
+}
+
+.signal-ui__poster {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+  transition: opacity 420ms ease;
+}
+
+.signal-ui__website-surface {
+  --website-scale: var(--preview-scale);
+  width: calc(100% / var(--website-scale));
+  height: calc(100% / var(--website-scale));
+  opacity: 0;
+  transform: scale(var(--website-scale));
+  transform-origin: top left;
+  transition: opacity 420ms ease, transform 560ms var(--ease), width 560ms var(--ease), height 560ms var(--ease);
+  will-change: transform;
+}
+
+.signal-ui__website-surface iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #080808;
+  pointer-events: none;
+}
+
+.signal-ui.is-preview-loading .signal-ui__poster,
+.signal-ui.is-preview-sleeping .signal-ui__poster,
+.signal-ui.is-preview-fallback .signal-ui__poster {
+  opacity: 1;
+}
+
+.signal-ui.is-preview-live .signal-ui__poster {
+  opacity: 0;
+}
+
+.signal-ui.is-preview-live .signal-ui__website-surface,
+.signal-ui.is-preview-loading .signal-ui__website-surface {
+  opacity: 1;
+}
+
+.signal-ui.is-preview-fallback .signal-ui__website-surface,
+.signal-ui.is-preview-sleeping .signal-ui__website-surface {
+  opacity: 0;
+}
+
+.signal-ui__summary {
+  display: grid;
+  min-height: clamp(78px, 8vw, 116px);
+  align-items: stretch;
+  grid-template-columns: minmax(135px, 0.8fr) minmax(0, 2.3fr) minmax(90px, 0.55fr);
+  border-top: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(17, 18, 17, 0.97);
+}
+
+.signal-ui__module,
+.signal-ui__pillars,
+.signal-ui__signature {
+  display: flex;
+  min-width: 0;
+  justify-content: center;
+  flex-direction: column;
+  padding: clamp(0.75rem, 1.5vw, 1.4rem);
+}
+
+.signal-ui__direction,
+.signal-ui__pillars {
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.signal-ui__module {
+  height: 100%;
+  min-height: 0;
+  align-items: flex-start;
+  text-align: left;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.62);
+  pointer-events: auto;
+  transition: border-color 260ms ease, color 260ms ease, background 260ms ease;
+}
+
+.signal-ui__module:hover,
+.signal-ui__module:focus-visible,
+.signal-ui__module.is-active {
+  background: rgba(198, 255, 0, 0.018);
+  color: var(--accent);
+}
+
+.signal-ui__direction > span,
+.signal-ui__signature > span {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: clamp(0.52rem, 0.68vw, 0.66rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.045em;
+}
+
+.signal-ui__direction > strong {
+  margin-top: 0.45rem;
+  color: #ffffff;
+  font-family: var(--display);
+  font-size: clamp(0.98rem, 1.45vw, 1.45rem);
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+}
+
+.signal-ui__direction > small {
+  margin-top: 0.55rem;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: clamp(0.52rem, 0.68vw, 0.66rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.045em;
+}
+
+.signal-ui__pillars {
+  display: grid;
+  align-items: center;
+  padding: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+}
+
+.signal-ui__pillars li {
+  display: block;
+  height: 100%;
+  min-width: 0;
+}
+
+.signal-ui__pillars li:not(:last-child) {
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.signal-ui__pillars .signal-ui__module {
+  display: grid;
+  width: 100%;
+  align-content: center;
+  padding: clamp(0.65rem, 1.25vw, 1.2rem);
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: clamp(0.45rem, 0.85vw, 0.8rem);
+}
+
+.signal-ui__pillars .signal-ui__module > span {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: clamp(0.52rem, 0.66vw, 0.64rem);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.signal-ui__pillars strong,
+.signal-ui__pillars small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signal-ui__pillars strong {
+  color: #ffffff;
+  font-family: var(--mono);
+  font-size: clamp(0.52rem, 0.68vw, 0.66rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.035em;
+}
+
+.signal-ui__pillars small {
+  margin-top: 0.3rem;
+  color: #d1d3cc;
+  font-family: var(--mono);
+  font-size: clamp(0.5rem, 0.66vw, 0.64rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.035em;
+}
+
+.signal-ui__signature {
+  align-items: center;
+  text-align: center;
+}
+
+.signal-ui__signature.signal-ui__module {
+  align-items: center;
+  text-align: center;
+}
+
+.signal-ui__signature > span {
+  color: #d0d2cb;
+}
+
+.signal-ui.is-preview-live .signal-ui__signature > span {
+  color: var(--accent);
+}
+
+.signal-ui.is-preview-fallback .signal-ui__signature > span {
+  color: #aeb0aa;
+}
+
+.signal-ui__signature > strong {
+  margin-top: 0.45rem;
+  color: #ffffff;
+  font-family: var(--display);
+  font-size: clamp(0.96rem, 1.22vw, 1.22rem);
+  font-weight: 600;
+}
+
+.signal-ui__signature > small {
+  display: block;
+  max-height: 0;
+  margin-top: 0;
+  overflow: hidden;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: clamp(0.5rem, 0.66vw, 0.64rem);
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: 0.035em;
+  opacity: 0;
+  transition: max-height 420ms var(--ease), margin-top 420ms var(--ease), opacity 320ms ease;
+}
+
+.signal-ui.is-view-origin .signal-ui__signature > small,
+.signal-ui__signature:hover > small,
+.signal-ui__signature:focus-visible > small {
+  max-height: 3rem;
+  margin-top: 0.35rem;
+  opacity: 1;
+}
+
+.signal-ui__signature i {
+  position: relative;
+  display: block;
+  width: clamp(28px, 3vw, 48px);
+  height: 1px;
+  margin-top: 0.65rem;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+
+.signal-ui__signature i::after {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--accent);
+  content: "";
+}
+
+.signal-ui.is-view-site .signal-ui__stage {
+  grid-template-columns: 18% minmax(0, 82%);
+}
+
+.signal-ui.is-view-site .signal-ui__editorial {
+  opacity: 0.55;
+}
+
+.signal-ui.is-view-site .signal-ui__website-surface {
+  --website-scale: var(--preview-site-scale);
+}
+
+.signal-ui.is-view-site .signal-ui__browser {
+  border-color: rgba(198, 255, 0, 0.26);
+  transform: translateZ(8px);
+}
+
+.signal-ui.is-view-detail .signal-ui__website-surface {
+  --website-scale: var(--preview-detail-scale);
+}
+
+.signal-ui.is-view-detail .signal-ui__editorial {
+  opacity: 0.72;
+}
+
+.signal-ui.is-view-detail .signal-ui__browser {
+  border-color: rgba(255, 255, 255, 0.34);
+  transform: translateZ(10px);
+  box-shadow: 0 20px 36px rgba(0, 0, 0, 0.24);
+}
+
+.signal-ui.is-view-origin .signal-ui__signature > span,
+.signal-ui.is-view-origin .signal-ui__signature > strong {
+  color: var(--accent);
+}
+
+.signal-ui.is-view-origin .signal-ui__signature i {
+  box-shadow: 0 0 24px rgba(198, 255, 0, 0.25);
+}
+
+.project__visual:hover .signal-ui {
+  border-color: rgba(198, 255, 0, 0.34);
+  box-shadow: 0 54px 96px rgba(0, 0, 0, 0.56);
+  transform: var(--preview-hover-transform);
+}
+
+.project__visual--signal:has(.signal-ui__module:hover) .signal-ui__website-viewport,
+.project__visual--signal:has(.signal-ui__module:focus-visible) .signal-ui__website-viewport {
+  border-color: rgba(198, 255, 0, 0.22);
+}
+
+.project__visual--signal .project__hover-mark {
+  --view-x: 0px;
+  --view-y: 0px;
+  z-index: 20;
+  transform: translate(var(--view-x), calc(15px + var(--view-y))) scale(0.8);
+}
+
+.project__visual--signal:hover .project__hover-mark {
+  transform: translate(var(--view-x), var(--view-y)) scale(1);
+}
+
+@media (max-width: 1180px) {
+  .signal-ui {
+    --preview-scale: 0.56;
+    --preview-site-scale: 0.61;
+    --preview-detail-scale: 0.68;
+  }
+}
+
+@media (max-width: 980px) {
+  .signal-ui {
+    --preview-scale: 0.48;
+    --preview-site-scale: 0.54;
+    --preview-detail-scale: 0.6;
+  }
+}
+
+@media (max-width: 760px) {
+  .signal-ui {
+    top: 13%;
+    right: -15%;
+    bottom: 4%;
+    left: 5%;
+    grid-template-columns: 10% minmax(0, 1fr);
+  }
+
+  .signal-ui__rail {
+    gap: 0.65rem;
+    padding-block: 0.85rem;
+  }
+
+  .signal-ui__rail-track {
+    gap: 0.8rem;
+  }
+
+  .signal-ui__rail i {
+    width: 30%;
+  }
+
+  .signal-ui__stage {
+    grid-template-columns: 30% minmax(0, 70%);
+  }
+
+  .signal-ui__editorial {
+    padding: 1rem 0.7rem 0.85rem;
+  }
+
+  .signal-ui__editorial > p,
+  .signal-ui__ghost-cta {
+    display: none;
+  }
+
+  .signal-ui__browser {
+    width: 100%;
+    margin-top: 14px;
+  }
+
+  .signal-ui__summary {
+    min-height: clamp(62px, 18vw, 76px);
+    padding-right: 14%;
+    grid-template-columns: minmax(0, 1fr) minmax(72px, 0.5fr);
+  }
+
+  .signal-ui__pillars {
+    display: none;
+  }
+
+  .signal-ui__direction,
+  .signal-ui__signature {
+    padding: 0.65rem 0.75rem;
+  }
+
+  .signal-ui__direction > span,
+  .signal-ui__direction > small,
+  .signal-ui__signature > span {
+    font-size: clamp(0.44rem, 2.05vw, 0.56rem);
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+  }
+
+  .signal-ui__direction > strong {
+    font-size: clamp(0.9rem, 3.75vw, 1.12rem);
+    line-height: 0.98;
+  }
+
+  .signal-ui__signature > strong {
+    font-size: clamp(0.78rem, 3.1vw, 0.96rem);
+  }
+
+  .signal-ui {
+    --preview-scale: 0.4;
+    --preview-site-scale: 0.44;
+    --preview-detail-scale: 0.5;
+  }
+}
+
+@media (max-width: 520px) {
+  .signal-ui {
+    --preview-scale: 0.34;
+    --preview-site-scale: 0.38;
+    --preview-detail-scale: 0.42;
+  }
+}
+
+@media (max-width: 440px) {
+  .signal-ui {
+    --preview-scale: 0.3;
+    --preview-site-scale: 0.34;
+    --preview-detail-scale: 0.38;
+  }
+}
+
+@media (max-width: 759px) {
+  .signal-ui__website-surface {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signal-ui,
+  .project__visual:hover .signal-ui {
+    transform: none;
+  }
+
+  .signal-ui,
+  .signal-ui__stage,
+  .signal-ui__editorial,
+  .signal-ui__website-surface,
+  .signal-ui__poster,
+  .signal-ui__ghost-cta,
+  .signal-ui__dots i,
+  .signal-ui__rail i {
+    transition: none;
+  }
+
+  .signal-ui::after,
+  .signal-ui__signature > small {
+    transition: none;
+  }
+}
