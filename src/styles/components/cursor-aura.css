@@ -1,0 +1,23 @@
+.cursor-aura {
+  position: fixed;
+  z-index: 999;
+  top: 0;
+  left: 0;
+  width: 240px;
+  height: 240px;
+  border: 1px solid rgba(198, 255, 0, 0.13);
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate3d(-50%, -50%, 0) scale(0.65);
+  transition: opacity 300ms ease, transform 500ms var(--ease), border-color 300ms ease;
+  pointer-events: none;
+}
+
+body.has-pointer .cursor-aura {
+  opacity: 0.5;
+}
+
+body.is-link-hover .cursor-aura {
+  border-color: rgba(198, 255, 0, 0.35);
+  transform: translate3d(-50%, -50%, 0) scale(0.35);
+}

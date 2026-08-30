@@ -1,0 +1,203 @@
+/* Header ---------------------------------------------------------- */
+
+.site-header {
+  position: fixed;
+  z-index: 100;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--header-height);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+  transition: height 350ms var(--ease), background-color 350ms ease, transform 350ms var(--ease);
+}
+
+.site-header::before {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: rgba(8, 8, 8, 0.94);
+  content: "";
+  transition: opacity 350ms ease;
+}
+
+.site-header.is-scrolled {
+  height: var(--header-compact-height);
+}
+
+.site-header.is-scrolled::before {
+  opacity: 1;
+}
+
+.header__inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.brand {
+  position: relative;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex: 0 0 auto;
+}
+
+.brand__mark {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 2px;
+  transform: rotate(0deg);
+  transition: transform 550ms var(--ease);
+}
+
+.brand:hover .brand__mark {
+  transform: rotate(90deg);
+}
+
+.brand__mark i {
+  display: block;
+  border: 1px solid currentColor;
+}
+
+.brand__mark i:first-child,
+.brand__mark i:last-child {
+  background: currentColor;
+}
+
+.brand__name {
+  font-family: var(--display);
+  font-size: 0.69rem;
+  font-weight: 700;
+  line-height: 0.94;
+  letter-spacing: 0.04em;
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 2.1vw, 2.4rem);
+}
+
+.nav-link {
+  position: relative;
+  padding-block: 0.7rem;
+  color: #b3b3b3;
+  font-size: 0.78rem;
+  font-weight: 500;
+  transition: color 220ms ease;
+}
+
+.nav-link::after {
+  position: absolute;
+  right: 0;
+  bottom: 0.45rem;
+  left: 0;
+  height: 1px;
+  transform: scaleX(0);
+  transform-origin: right;
+  background: var(--accent);
+  content: "";
+  transition: transform 350ms var(--ease);
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--text);
+}
+
+.nav-link:hover::after,
+.nav-link.is-active::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+.button {
+  display: inline-flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 1.4rem;
+  padding: 0.85rem 1.25rem 0.85rem 1.45rem;
+  border: 1px solid transparent;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: color 300ms ease, background 300ms ease, border-color 300ms ease, transform 300ms var(--ease);
+}
+
+.button svg {
+  width: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  transition: transform 350ms var(--ease);
+}
+
+.button:hover svg {
+  transform: translateX(5px);
+}
+
+.button:active {
+  transform: translateY(2px);
+}
+
+.button--primary {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.button--primary:hover {
+  background: var(--accent-hover);
+}
+
+.nav-cta {
+  min-height: 44px;
+  margin-left: 0.5rem;
+  padding: 0.65rem 1rem 0.65rem 1.15rem;
+}
+
+.menu-toggle {
+  display: none;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.menu-toggle span {
+  position: absolute;
+  width: 23px;
+  height: 1px;
+  background: currentColor;
+  transition: transform 350ms var(--ease), top 350ms var(--ease);
+}
+
+.menu-toggle span:first-child { transform: translateY(-4px); }
+.menu-toggle span:last-child { transform: translateY(4px); }
+.menu-toggle[aria-expanded="true"] span:first-child { transform: rotate(45deg); }
+.menu-toggle[aria-expanded="true"] span:last-child { transform: rotate(-45deg); }
+
+@media (min-width: 981px) {
+  .site-header:not(.is-scrolled) .nav-cta {
+    border-color: #3a3a3a;
+    background: transparent;
+    color: var(--text);
+  }
+
+  .site-header:not(.is-scrolled) .nav-cta:hover {
+    border-color: var(--text);
+    background: var(--text);
+    color: var(--ink);
+  }
+}

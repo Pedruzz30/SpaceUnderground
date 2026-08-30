@@ -1,0 +1,75 @@
+/* Motion ---------------------------------------------------------- */
+
+.js .reveal {
+  opacity: 0;
+  transform: translateY(36px);
+  transition: opacity 800ms ease, transform 900ms var(--ease);
+}
+
+.js .reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.service-item.reveal:nth-child(2),
+.timeline__item.reveal:nth-child(2),
+.principles li.reveal:nth-child(2) { transition-delay: 70ms; }
+.service-item.reveal:nth-child(3),
+.timeline__item.reveal:nth-child(3),
+.principles li.reveal:nth-child(3) { transition-delay: 140ms; }
+.service-item.reveal:nth-child(4),
+.timeline__item.reveal:nth-child(4),
+.principles li.reveal:nth-child(4) { transition-delay: 210ms; }
+
+@keyframes titleIn {
+  to { transform: translateY(0); }
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 5px rgba(198, 255, 0, 0.09); }
+  50% { opacity: 0.65; box-shadow: 0 0 0 9px rgba(198, 255, 0, 0); }
+}
+
+@keyframes scan {
+  0%, 8% { top: 8%; opacity: 0; }
+  18% { opacity: 0.7; }
+  82% { opacity: 0.7; }
+  92%, 100% { top: 92%; opacity: 0; }
+}
+
+@keyframes orbitOne {
+  to { transform: translate(-50%, -50%) rotateX(68deg) rotateZ(384deg); }
+}
+
+@keyframes orbitTwo {
+  to { transform: translate(-50%, -50%) rotateY(58deg) rotateZ(-375deg); }
+}
+
+@keyframes monolithFloat {
+  0%, 100% { transform: translate(-50%, -50%) rotate(19deg) skewY(-4deg) translateY(-7px); }
+  50% { transform: translate(-50%, -50%) rotate(21deg) skewY(-4deg) translateY(9px); }
+}
+
+@keyframes scrollDrop {
+  0% { top: -100%; }
+  50%, 100% { top: 100%; }
+}
+
+@keyframes labsPulse {
+  0%, 100% { opacity: 0.22; transform: scale(0.96); }
+  50% { opacity: 0.7; transform: scale(1.04); }
+}
+
+@keyframes sealSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes dialogIn {
+  from { opacity: 0; transform: translateY(24px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

@@ -1,0 +1,129 @@
+/* Work ------------------------------------------------------------ */
+
+.work {
+  overflow: hidden;
+  background: var(--bg-secondary);
+}
+
+.projects {
+  display: grid;
+  gap: clamp(6rem, 11vw, 11rem);
+}
+
+.project__visual {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  isolation: isolate;
+}
+
+.project__visual-link {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  display: block;
+  cursor: pointer;
+}
+
+.project__visual-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.project__visual::after {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  border: 1px solid transparent;
+  content: "";
+  transition: border-color 400ms ease;
+  pointer-events: none;
+}
+
+.project__visual:hover::after {
+  border-color: rgba(198, 255, 0, 0.55);
+}
+
+.project--featured .project__visual {
+  aspect-ratio: 1.9;
+}
+
+.visual-index {
+  position: absolute;
+  z-index: 7;
+  top: 1.2rem;
+  left: 1.2rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+}
+
+.project__hover-mark {
+  position: absolute;
+  z-index: 9;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  display: grid;
+  width: 76px;
+  height: 76px;
+  place-items: center;
+  border-radius: 50%;
+  opacity: 0;
+  transform: translateY(15px) scale(0.8);
+  background: var(--accent);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  transition: opacity 350ms ease, transform 450ms var(--ease);
+}
+
+.project__visual:hover .project__hover-mark {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.project__details {
+  display: grid;
+  align-items: start;
+  grid-template-columns: minmax(240px, 0.8fr) minmax(260px, 0.55fr) auto;
+  gap: 2rem;
+  padding-top: 1.75rem;
+}
+
+.project__meta {
+  margin-bottom: 0.65rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.61rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.project__meta span {
+  padding-left: 0.75rem;
+  color: var(--accent);
+}
+
+.project__details h3 {
+  font-family: var(--display);
+  font-size: clamp(2rem, 3.1vw, 3.7rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+
+.project__details > p {
+  max-width: 410px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.88rem;
+  line-height: 1.7;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.project__details .text-link {
+  justify-self: end;
+}

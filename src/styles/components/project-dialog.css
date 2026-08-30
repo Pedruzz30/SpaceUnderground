@@ -1,0 +1,248 @@
+/* Project preview dialog ----------------------------------------- */
+
+.project-dialog {
+  width: min(1040px, calc(100% - 2rem));
+  max-width: none;
+  max-height: calc(100svh - 2rem);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid #414141;
+  background: var(--bg-secondary);
+  color: var(--text);
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.7);
+}
+
+.project-dialog[open] {
+  animation: dialogIn 500ms var(--ease) both;
+}
+
+.project-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.8);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: backdropIn 350ms ease both;
+}
+
+.project-dialog__surface {
+  position: relative;
+  display: grid;
+  min-height: 650px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+}
+
+.project-dialog__close {
+  position: absolute;
+  z-index: 5;
+  top: 1.25rem;
+  right: 1.25rem;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid #414141;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 250ms ease, background 250ms ease, transform 350ms var(--ease);
+}
+
+.project-dialog__close span {
+  position: absolute;
+  width: 19px;
+  height: 1px;
+  transform: rotate(45deg);
+  background: currentColor;
+}
+
+.project-dialog__close span:last-child {
+  transform: rotate(-45deg);
+}
+
+.project-dialog__close:hover {
+  border-color: var(--accent);
+  transform: rotate(90deg);
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.project-dialog__content {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  padding: clamp(3.5rem, 6vw, 6.5rem);
+}
+
+.project-dialog__meta {
+  margin-top: auto;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.61rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.project-dialog__meta span:last-child {
+  color: var(--accent);
+}
+
+.project-dialog__content h2 {
+  margin-top: 0.8rem;
+  font-family: var(--display);
+  font-size: clamp(3.7rem, 7vw, 7.5rem);
+  font-weight: 500;
+  line-height: 0.88;
+  letter-spacing: -0.08em;
+}
+
+.project-dialog__description {
+  max-width: 590px;
+  margin-top: 2rem;
+  color: #bcbcb7;
+  font-family: var(--display);
+  font-size: clamp(1.1rem, 1.7vw, 1.55rem);
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+}
+
+.project-dialog__scope {
+  display: grid;
+  width: 100%;
+  margin-top: 2.5rem;
+  padding-block: 1.5rem;
+  grid-template-columns: 0.55fr 1fr;
+  gap: 2rem;
+  border-block: 1px solid var(--border);
+}
+
+.project-dialog__scope > p,
+.project-dialog__scope li,
+.project-dialog__note {
+  font-size: 0.75rem;
+}
+
+.project-dialog__scope > p {
+  color: #727272;
+  font-family: var(--mono);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.project-dialog__scope ul {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.project-dialog__scope li {
+  position: relative;
+  padding-left: 1rem;
+  color: #c5c5c0;
+}
+
+.project-dialog__scope li::before {
+  position: absolute;
+  top: 0.7em;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  background: var(--accent);
+  content: "";
+}
+
+.project-dialog__note {
+  max-width: 520px;
+  margin-top: 1.5rem;
+  color: #7f7f7f;
+  line-height: 1.65;
+}
+
+.project-dialog__content .button {
+  margin-top: 2rem;
+}
+
+.project-dialog__visual {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  border-left: 1px solid var(--border);
+  background-color: #0c0c0c;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: 52px 52px;
+}
+
+.project-dialog__visual::before,
+.project-dialog__visual::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1px;
+  height: 100%;
+  transform: translate(-50%, -50%) rotate(32deg);
+  background: rgba(198, 255, 0, 0.16);
+  content: "";
+}
+
+.project-dialog__visual::after {
+  transform: translate(-50%, -50%) rotate(-58deg);
+}
+
+.project-dialog__visual strong {
+  position: relative;
+  z-index: 2;
+  color: transparent;
+  font-family: var(--display);
+  font-size: clamp(6rem, 10vw, 10rem);
+  font-weight: 700;
+  letter-spacing: -0.1em;
+  -webkit-text-stroke: 1.5px var(--accent);
+}
+
+.project-dialog__orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+}
+
+.project-dialog__orbit--one {
+  width: 80%;
+  transform: translate(-50%, -50%) rotateX(67deg) rotateZ(18deg);
+}
+
+.project-dialog__orbit--two {
+  width: 58%;
+  border-style: dashed;
+  border-color: rgba(198, 255, 0, 0.28);
+  transform: translate(-50%, -50%) rotateY(67deg) rotateZ(-18deg);
+}
+
+.project-dialog__code,
+.project-dialog__visual > p {
+  position: absolute;
+  z-index: 2;
+  color: #777;
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  font-style: normal;
+  line-height: 1.7;
+  letter-spacing: 0.09em;
+}
+
+.project-dialog__code {
+  top: 1.6rem;
+  left: 1.6rem;
+}
+
+.project-dialog__code i {
+  color: var(--accent);
+  font-style: normal;
+}
+
+.project-dialog__visual > p {
+  right: 1.6rem;
+  bottom: 1.6rem;
+  text-align: right;
+}

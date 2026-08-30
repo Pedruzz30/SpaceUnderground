@@ -1,0 +1,172 @@
+/* About ----------------------------------------------------------- */
+
+.about {
+  background: var(--bg);
+}
+
+.about__inner {
+  display: grid;
+  grid-template-columns: minmax(340px, 0.85fr) minmax(420px, 1.15fr);
+  gap: clamp(4rem, 10vw, 11rem);
+  align-items: center;
+}
+
+.about__visual {
+  position: relative;
+  aspect-ratio: 0.92;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.about__grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 12.5% 12.5%;
+}
+
+.about__stamp {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: 38%;
+  aspect-ratio: 1;
+  place-content: center;
+  border: 1px solid var(--accent);
+  transform: translate(-50%, -50%) rotate(-8deg);
+  background: var(--bg);
+  color: var(--accent);
+  text-align: center;
+}
+
+.about__stamp::before,
+.about__stamp::after {
+  position: absolute;
+  inset: 9%;
+  border: 1px solid rgba(198, 255, 0, 0.25);
+  content: "";
+}
+
+.about__stamp::after {
+  inset: 18%;
+}
+
+.about__stamp strong {
+  font-family: var(--display);
+  font-size: clamp(2.2rem, 5vw, 5.5rem);
+  line-height: 1;
+}
+
+.about__stamp span {
+  position: relative;
+  z-index: 2;
+  font-family: var(--mono);
+  font-size: clamp(0.35rem, 0.57vw, 0.55rem);
+  letter-spacing: 0.1em;
+}
+
+.about__orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+}
+
+.about__orbit--one {
+  width: 78%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%) rotateX(72deg) rotateZ(-23deg);
+}
+
+.about__orbit--two {
+  width: 61%;
+  aspect-ratio: 1;
+  border-style: dashed;
+  transform: translate(-50%, -50%) rotateY(72deg) rotateZ(23deg);
+}
+
+.about__point {
+  position: absolute;
+  z-index: 4;
+  top: 15%;
+  right: 22%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 16px rgba(198, 255, 0, 0.6);
+}
+
+.about__visual > p {
+  position: absolute;
+  z-index: 3;
+  bottom: 4%;
+  left: 5%;
+  color: #656565;
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  line-height: 1.6;
+  letter-spacing: 0.09em;
+}
+
+.about__copy .section-label {
+  margin-bottom: 2rem;
+}
+
+.about__copy h2 {
+  margin-bottom: clamp(2.5rem, 5vw, 5rem);
+}
+
+.about__lead {
+  max-width: 720px;
+  font-family: var(--display);
+  font-size: clamp(1.35rem, 2.3vw, 2.35rem);
+  line-height: 1.35;
+  letter-spacing: -0.035em;
+}
+
+.about__notes {
+  display: grid;
+  margin-top: 3.5rem;
+  padding-top: 2rem;
+  grid-template-columns: 1fr 0.8fr;
+  gap: 3rem;
+  border-top: 1px solid var(--border);
+}
+
+.about__notes > p {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.8;
+}
+
+.about__notes dl {
+  display: grid;
+  align-content: start;
+  gap: 0.8rem;
+}
+
+.about__notes dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.06em;
+}
+
+.about__notes dt { color: #7d7d7d; }
+.about__notes dd { color: #b6b6b2; }
+.about__notes dd span {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
