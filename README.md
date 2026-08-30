@@ -25,6 +25,8 @@ index.html              A pagina inteira. Uma <section> por bloco, cada uma com 
 
 public/                 Copiado cru para a raiz do dist/, sem processamento.
   favicon.svg
+  og-image.png          Preview 1200x630 das meta tags og:image / twitter:image.
+                        Gerado na estetica do hero; se o titulo mudar, regere.
 
 src/styles/
   main.css              So @import. A ORDEM DOS IMPORTS E A ORDEM DA CASCATA.
@@ -60,8 +62,6 @@ src/scripts/
   signal-frame.js       Controles do iframe ao vivo na secao Labs.
   project-form.js       Formulario: picker de produto, autofill, validacao, envio.
   pointer-effects.js    Aura do cursor e tilt 3D do hero (so mouse).
-
-assets/                 Imagens do projeto.
 ```
 
 ## Onde mexer para cada coisa
@@ -93,8 +93,21 @@ assets/                 Imagens do projeto.
 - **O `<script>` é `type="module"`**, então roda depois do HTML parseado. Não
   precisa de `DOMContentLoaded`.
 
+## Publicação: atenção à origem do Pages
+
+Em **Settings → Pages → Build and deployment**, a origem precisa estar em
+**"GitHub Actions"**. Se estiver em "Deploy from a branch", o GitHub roda um
+builder automático *além* deste workflow; os dois publicam a cada push e vale o
+que terminar por último. Quando o automático vence, ele serve a raiz do
+repositório em vez do `dist/` — o site vai ao ar sem os bundles.
+
+O job `verify` do workflow existe para isso: ele baixa a URL publicada e falha
+com essa instrução se detectar que o código-fonte está sendo servido.
+
 ## Pendências conhecidas
 
-- `assets/tattoo-preview.png` (1,5 MB) não é referenciado por nenhum arquivo.
-  Provavelmente sobrou de uma versão anterior da seção Labs, que hoje usa um
-  `<iframe>` ao vivo. Pode ser apagado se ninguém for usar.
+- **O iframe do Labs carrega ~365 KB do TattooSite antes do visitante rolar a
+  página**, apesar do `loading="lazy"`. É 88% do peso total da página (o site
+  em si são ~114 KB). A correção seria uma fachada: poster estático mais um
+  botão que só então injeta o `<iframe>`. Não feito porque muda o que o
+  visitante vê na seção Labs.
