@@ -46,8 +46,8 @@
 }
 
 @keyframes monolithFloat {
-  0%, 100% { transform: translate(-50%, -50%) rotate(19deg) skewY(-4deg) translateY(-7px); }
-  50% { transform: translate(-50%, -50%) rotate(21deg) skewY(-4deg) translateY(9px); }
+  0%, 100% { transform: translate(var(--monolith-x, -50%), var(--monolith-y, -50%)) rotate(var(--monolith-rotation, 19deg)) translateY(-7px); }
+  50% { transform: translate(var(--monolith-x, -50%), var(--monolith-y, -50%)) rotate(calc(var(--monolith-rotation, 19deg) + 2deg)) translateY(9px); }
 }
 
 @keyframes scrollDrop {
