@@ -204,15 +204,15 @@ yearTargets.forEach((target) => {
 });
 
 const projectPreviews = {
-  signal: {
+  ink: {
     index: "001",
-    category: "Concept Project / Software Interface",
+    category: "Live Project / Portfolio Website",
     year: "2026",
-    title: "Signal OS",
-    description: "A speculative interface study for real-time operations. Prepared as a case-study slot for future client work or Space Labs products.",
-    scope: ["TYPE — SOFTWARE", "TECH — HTML / CSS / JS", "STATUS — EXPERIMENT"],
-    code: "SGNL_001",
-    monogram: "S/",
+    title: "INK Tattoo",
+    description: "Portfolio website developed for a tattoo studio, focused on a dark, immersive and editorial visual experience.",
+    scope: ["TYPE — PORTFOLIO WEBSITE", "TECH — HTML / CSS / JAVASCRIPT", "STATUS — LIVE"],
+    code: "INK_001",
+    monogram: "INK",
   },
   form: {
     index: "002",

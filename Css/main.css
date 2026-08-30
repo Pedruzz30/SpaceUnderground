@@ -1257,17 +1257,41 @@ body.is-link-hover .cursor-aura {
   z-index: 2;
   top: 11%;
   right: 8%;
-  bottom: -10%;
-  left: 15%;
+  bottom: 0;
+  left: 12%;
   display: grid;
   overflow: hidden;
-  grid-template-columns: 9% 1fr;
+  grid-template-columns: 8% 1fr;
   border: 1px solid rgba(255, 255, 255, 0.2);
   transform: perspective(1300px) rotateX(4deg) rotateY(-8deg) rotateZ(-1.5deg);
   transform-origin: center;
   background: #0c0d0c;
   box-shadow: 0 45px 85px rgba(0, 0, 0, 0.5);
   transition: transform 900ms var(--ease);
+}
+
+.signal-ui__case {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.signal-ui__media {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.signal-ui__preview {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+  object-position: center;
 }
 
 .project__visual:hover .signal-ui {
@@ -1278,24 +1302,170 @@ body.is-link-hover .cursor-aura {
   display: flex;
   align-items: center;
   flex-direction: column;
-  gap: 8%;
-  padding-block: 9%;
+  gap: clamp(0.8rem, 2vw, 1.6rem);
+  padding-block: clamp(1rem, 2.6vw, 2.2rem);
   border-right: 1px solid #252625;
   background: #111211;
 }
 
 .signal-logo {
-  margin-bottom: 30%;
+  margin-bottom: 0;
   color: var(--accent);
   font-family: var(--display);
   font-size: clamp(0.65rem, 1.5vw, 1.25rem);
   font-weight: 700;
 }
 
+.signal-ui__rail-track {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  flex-direction: column;
+  gap: clamp(0.8rem, 2vw, 1.55rem);
+  margin-block: auto;
+}
+
 .signal-ui__rail i {
   width: 23%;
   aspect-ratio: 1;
   border: 1px solid #494a48;
+}
+
+.signal-ui__rail i.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 24px rgba(198, 255, 0, 0.2);
+}
+
+.signal-ui__summary {
+  display: grid;
+  min-height: clamp(78px, 8vw, 116px);
+  align-items: stretch;
+  grid-template-columns: minmax(135px, 0.8fr) minmax(0, 2.3fr) minmax(90px, 0.55fr);
+  border-top: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(17, 18, 17, 0.97);
+}
+
+.signal-ui__direction,
+.signal-ui__pillars,
+.signal-ui__signature {
+  display: flex;
+  min-width: 0;
+  justify-content: center;
+  flex-direction: column;
+  padding: clamp(0.75rem, 1.5vw, 1.4rem);
+}
+
+.signal-ui__direction,
+.signal-ui__pillars {
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.signal-ui__direction > span,
+.signal-ui__signature > span {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: clamp(0.38rem, 0.52vw, 0.5rem);
+  letter-spacing: 0.1em;
+}
+
+.signal-ui__direction > strong {
+  margin-top: 0.45rem;
+  color: #efefeb;
+  font-family: var(--display);
+  font-size: clamp(0.82rem, 1.25vw, 1.25rem);
+  font-weight: 500;
+  line-height: 0.92;
+  letter-spacing: -0.05em;
+}
+
+.signal-ui__pillars {
+  display: grid;
+  align-items: center;
+  padding: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+}
+
+.signal-ui__pillars li {
+  display: grid;
+  height: 100%;
+  min-width: 0;
+  align-content: center;
+  padding: clamp(0.65rem, 1.25vw, 1.2rem);
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: clamp(0.45rem, 0.85vw, 0.8rem);
+}
+
+.signal-ui__pillars li:not(:last-child) {
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.signal-ui__pillars li > span {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: clamp(0.35rem, 0.48vw, 0.46rem);
+}
+
+.signal-ui__pillars strong,
+.signal-ui__pillars small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signal-ui__pillars strong {
+  color: #d8d9d3;
+  font-family: var(--mono);
+  font-size: clamp(0.38rem, 0.52vw, 0.5rem);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+
+.signal-ui__pillars small {
+  margin-top: 0.3rem;
+  color: #6f716c;
+  font-family: var(--mono);
+  font-size: clamp(0.31rem, 0.42vw, 0.4rem);
+  letter-spacing: 0.07em;
+}
+
+.signal-ui__signature {
+  align-items: center;
+  text-align: center;
+}
+
+.signal-ui__signature > span {
+  color: #777974;
+}
+
+.signal-ui__signature > strong {
+  margin-top: 0.45rem;
+  color: #dfe0da;
+  font-family: var(--display);
+  font-size: clamp(0.75rem, 1vw, 1rem);
+  font-weight: 500;
+}
+
+.signal-ui__signature i {
+  position: relative;
+  display: block;
+  width: clamp(28px, 3vw, 48px);
+  height: 1px;
+  margin-top: 0.65rem;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+
+.signal-ui__signature i::after {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--accent);
+  content: "";
 }
 
 .signal-avatar {
@@ -2048,6 +2218,7 @@ body.is-link-hover .cursor-aura {
 
 .about__notes dl {
   display: grid;
+  align-content: start;
   gap: 0.8rem;
 }
 
@@ -3276,10 +3447,52 @@ body.is-link-hover .cursor-aura {
   }
 
   .signal-ui {
-    top: 15%;
-    right: -18%;
-    bottom: 3%;
-    left: 7%;
+    top: 13%;
+    right: -15%;
+    bottom: 4%;
+    left: 5%;
+    grid-template-columns: 10% 1fr;
+  }
+
+  .signal-ui__rail {
+    gap: 0.65rem;
+    padding-block: 0.85rem;
+  }
+
+  .signal-ui__rail-track {
+    gap: 0.8rem;
+  }
+
+  .signal-ui__rail i {
+    width: 30%;
+  }
+
+  .signal-ui__summary {
+    min-height: clamp(62px, 18vw, 76px);
+    padding-right: 14%;
+    grid-template-columns: minmax(0, 1fr) minmax(72px, 0.5fr);
+  }
+
+  .signal-ui__pillars {
+    display: none;
+  }
+
+  .signal-ui__direction,
+  .signal-ui__signature {
+    padding: 0.65rem 0.75rem;
+  }
+
+  .signal-ui__direction > span,
+  .signal-ui__signature > span {
+    font-size: clamp(0.3rem, 1.3vw, 0.4rem);
+  }
+
+  .signal-ui__direction > strong {
+    font-size: clamp(0.65rem, 2.8vw, 0.88rem);
+  }
+
+  .signal-ui__signature > strong {
+    font-size: clamp(0.58rem, 2.3vw, 0.76rem);
   }
 
   .project__details,
