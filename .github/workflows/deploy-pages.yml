@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
   pages: write
   id-token: write
@@ -53,14 +54,51 @@ jobs:
         uses: actions/deploy-pages@v4
 
   # Confere o site que ficou realmente publicado. Sem isso o deploy pode
-  # "passar" e o site ficar quebrado no ar sem ninguem perceber -- foi o que
-  # aconteceu quando o builder automatico do Pages venceu a corrida contra
-  # este workflow e publicou o codigo-fonte no lugar do dist/.
+  # "passar" e o site ficar quebrado no ar sem ninguem perceber.
   verify:
     name: Verificar o site publicado
     runs-on: ubuntu-latest
     needs: deploy
     steps:
+      # Checagem deterministica, feita primeiro porque diagnostica a causa raiz.
+      #
+      # Quando a origem do Pages esta em "Deploy from a branch", o GitHub roda um
+      # builder proprio ("pages build and deployment") ALEM deste workflow. Os
+      # dois publicam no mesmo commit e vale o que terminar por ultimo -- o
+      # automatico costuma vencer por poucos segundos e serve a raiz do
+      # repositorio no lugar do dist/.
+      #
+      # Nao da para checar isso so olhando o site: existe uma janela de alguns
+      # segundos em que o conteudo certo esta no ar antes de ser sobrescrito.
+      # Por isso a pergunta aqui e "o builder concorrente rodou?", nao "o que
+      # esta no ar agora?".
+      - name: Detectar builder concorrente do Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          resposta=$(curl -sf --max-time 30 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/actions/runs?head_sha=$SHA&per_page=100") || {
+              echo "::warning::Nao foi possivel consultar a API de runs; pulando esta checagem."
+              exit 0
+            }
+
+          # Contagem em shell puro de proposito: um jq que falhasse deixaria
+          # a variavel vazia e o check passaria em silencio, que e exatamente
+          # o tipo de falha que este job existe para impedir.
+          rivais=$(printf '%s' "$resposta" | grep -c '"pages build and deployment"' || true)
+
+          if [ "${rivais:-0}" -gt 0 ]; then
+            echo "::error::Existe um builder automatico do Pages publicando neste mesmo commit, competindo com este workflow. Quem termina por ultimo vence, entao o site pode ir ao ar servindo o codigo-fonte no lugar do dist/. Corrija em Settings > Pages > Build and deployment: mude Source para 'GitHub Actions'."
+            exit 1
+          fi
+
+          echo "Nenhum builder concorrente. Este workflow e o unico publicando."
+
       - name: Conferir que o Pages esta servindo o build
         env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
@@ -85,10 +123,8 @@ jobs:
             exit 1
           fi
 
-          # O index.html publicado referencia o codigo-fonte? Entao quem
-          # publicou foi o builder automatico do GitHub, nao este workflow.
           if printf '%s' "$html" | grep -qE 'src/(styles|scripts)/main\.(css|js)'; then
-            echo "::error::O Pages esta servindo o codigo-fonte, nao o dist/. Em Settings > Pages > Build and deployment, mude Source para 'GitHub Actions' para desligar o builder automatico."
+            echo "::error::O Pages esta servindo o codigo-fonte, nao o dist/."
             exit 1
           fi
 

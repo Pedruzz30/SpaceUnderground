@@ -101,8 +101,12 @@ builder automático *além* deste workflow; os dois publicam a cada push e vale 
 que terminar por último. Quando o automático vence, ele serve a raiz do
 repositório em vez do `dist/` — o site vai ao ar sem os bundles.
 
-O job `verify` do workflow existe para isso: ele baixa a URL publicada e falha
-com essa instrução se detectar que o código-fonte está sendo servido.
+O job `verify` do workflow existe para isso. Ele pergunta à API se um run
+chamado "pages build and deployment" existe para o commit — pergunta
+determinística, porque olhar o site não serve: há uma janela de alguns segundos
+em que o conteúdo certo está no ar antes de ser sobrescrito, e um check feito
+nessa janela passa e engana. Depois disso ele ainda confere que bundles,
+favicon e og-image respondem 200 na URL publicada.
 
 ## Pendências conhecidas
 
