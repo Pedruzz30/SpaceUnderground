@@ -135,7 +135,7 @@ jobs:
           fi
 
           falhou=0
-          for path in $assets favicon.svg og-image.png; do
+          for path in $assets .nojekyll favicon.svg og-image.png NoteBookSpaceU.png tattoo-preview-poster.png; do
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url$path")
             if [ "$code" = "200" ]; then
               echo "  ok   $code  $path"
