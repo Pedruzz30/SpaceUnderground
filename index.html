@@ -9,10 +9,10 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="Css/main.css?v=20260829-ink-tattoo">
+    <link rel="stylesheet" href="Css/main.css?v=20260829-ink-live-frame-controls">
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Manrope:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
-    <script type="module" src="Js/main.js?v=20260829-ink-tattoo"></script>
+    <script type="module" src="Js/main.js?v=20260829-ink-frame-controls"></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">Skip to content</a>
@@ -158,23 +158,49 @@
 
           <div class="projects">
             <article class="project project--featured reveal" data-reveal>
-              <a class="project__visual project__visual--signal" href="#project-preview" data-project="ink" aria-label="View project details: INK Tattoo">
-                  <div class="visual-index">CASE / 001</div>
-                <div class="signal-ui" aria-hidden="true">
+              <div class="project__visual project__visual--signal">
+                <div class="visual-index">CASE / 001</div>
+                <div class="signal-ui signal-ui--website" data-signal-frame>
                   <div class="signal-ui__rail">
                     <span class="signal-logo">S/</span>
                     <span class="signal-ui__rail-track">
-                      <i></i><i class="is-active"></i><i></i><i></i>
+                      <button type="button" data-signal-mode="site" aria-label="Focus website preview"><i></i></button>
+                      <button type="button" data-signal-mode="detail" aria-label="Zoom website preview"><i></i></button>
+                      <button class="is-active" type="button" data-signal-mode="default" aria-label="Default website preview"><i></i></button>
+                      <button type="button" data-signal-mode="origin" aria-label="Highlight studio origin"><i></i></button>
+                      <button type="button" data-signal-mode="reset" aria-label="Reset website preview"><i></i></button>
                     </span>
                   </div>
                   <div class="signal-ui__case">
-                    <div class="signal-ui__media">
-                      <img class="signal-ui__preview" src="assets/tattoo-preview.png" alt="" width="1836" height="924" loading="lazy" decoding="async">
+                    <div class="signal-ui__stage">
+                      <div class="signal-ui__editorial">
+                        <span class="signal-ui__eyebrow">INK TATTOO</span>
+                        <strong>ARTE SOB<br>A PELE.</strong>
+                        <p>Blackwork, fine line e realismo<br>criados para acompanhar o corpo e<br>atravessar o tempo.</p>
+                        <button class="signal-ui__ghost-cta" type="button" data-signal-open><i aria-hidden="true"></i>Ver projeto</button>
+                      </div>
+                      <div class="signal-ui__browser">
+                        <div class="signal-ui__toolbar">
+                          <span class="signal-ui__dots">
+                            <button type="button" data-signal-action="reload" aria-label="Reload website preview"><i></i></button>
+                            <button type="button" data-signal-mode="site" aria-label="Focus website preview"><i></i></button>
+                            <button type="button" data-signal-open aria-label="Open INK Tattoo website"><i></i></button>
+                          </span>
+                          <button class="signal-ui__address" type="button" data-signal-open><i aria-hidden="true"></i>pedruzz30.github.io/TattooSite/</button>
+                          <button class="signal-ui__expand" type="button" data-signal-open aria-label="Open INK Tattoo website in a new tab"></button>
+                        </div>
+                        <div class="signal-ui__website-viewport">
+                          <div class="signal-ui__website-surface">
+                            <iframe src="https://pedruzz30.github.io/TattooSite/" title="INK Tattoo Website Preview" loading="lazy" tabindex="-1"></iframe>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                     <div class="signal-ui__summary">
                       <div class="signal-ui__direction">
                         <span>EXPERIENCE SYSTEM / 01</span>
-                        <strong>DARK BY<br>DESIGN.</strong>
+                        <strong>INK TATTOO</strong>
+                        <small>PORTFÓLIO</small>
                       </div>
                       <ol class="signal-ui__pillars">
                         <li><span>01</span><div><strong>ART DIRECTION</strong><small>MONOCHROME DEPTH</small></div></li>
@@ -189,8 +215,10 @@
                     </div>
                   </div>
                 </div>
-                <span class="project__hover-mark" aria-hidden="true">VIEW</span>
-              </a>
+                <a class="project__visual-link" href="https://pedruzz30.github.io/TattooSite/" target="_blank" rel="noopener noreferrer" aria-label="View INK Tattoo website (opens in a new tab)">
+                  <span class="project__hover-mark" aria-hidden="true">VIEW</span>
+                </a>
+              </div>
               <div class="project__details">
                 <div>
                   <p class="project__meta">LIVE PROJECT <span>YEAR — 2026</span></p>
