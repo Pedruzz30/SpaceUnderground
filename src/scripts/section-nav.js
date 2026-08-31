@@ -10,6 +10,7 @@ export function initSectionNav() {
     ["labs", "labs"],
     ["philosophy", "about"],
     ["process", "about"],
+    ["plans", "plans"],
     ["why", "about"],
     ["about", "about"],
     ["contact", "contact"],
@@ -20,14 +21,28 @@ export function initSectionNav() {
     .filter(Boolean);
 
   if ("IntersectionObserver" in window && observedSections.length) {
+    // Quanto de cada secao ocupa a faixa observada, em pixels. Comparar por
+    // intersectionRatio nao serve: o ratio e relativo a altura da propria secao,
+    // entao uma secao baixa sempre venceria uma alta ocupando a mesma faixa.
+    const bandHeights = new Map();
+
     const sectionObserver = new IntersectionObserver((entries) => {
-      const visible = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      entries.forEach((entry) => {
+        bandHeights.set(entry.target.id, entry.isIntersecting ? entry.intersectionRect.height : 0);
+      });
 
-      if (!visible) return;
+      let visibleId = "";
+      let widest = 0;
+      bandHeights.forEach((height, id) => {
+        if (height > widest) {
+          widest = height;
+          visibleId = id;
+        }
+      });
 
-      const currentNavId = sectionNavMap.get(visible.target.id);
+      if (!visibleId) return;
+
+      const currentNavId = sectionNavMap.get(visibleId);
 
       navLinks.forEach((link) => {
         const isCurrent = link.getAttribute("href") === `#${currentNavId}`;
@@ -37,7 +52,9 @@ export function initSectionNav() {
       });
     }, {
       rootMargin: "-30% 0px -55% 0px",
-      threshold: [0, 0.15, 0.4],
+      // Escada mais densa: uma secao alta satura em ratio baixo e precisa
+      // disparar mesmo assim (a #plans, por exemplo, nunca passa de ~0.12).
+      threshold: [0, 0.02, 0.05, 0.1, 0.25, 0.5, 0.75, 1],
     });
 
     observedSections.forEach((section) => sectionObserver.observe(section));

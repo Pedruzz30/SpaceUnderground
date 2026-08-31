@@ -1,0 +1,137 @@
+/* Plans / Engagement ---------------------------------------------- */
+
+.plans {
+  background: var(--bg-secondary);
+}
+
+.plans__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(2rem, 5vw, 6rem);
+  align-items: start;
+}
+
+.project--compact .project__visual { aspect-ratio: 1.05; }
+
+.plans__grid .project__details {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.1rem;
+  padding-top: 1.4rem;
+}
+
+.plans__grid .project__details > p,
+.plans__grid .project__details .text-link {
+  grid-column: 1;
+  grid-row: auto;
+}
+
+.plans__grid .project__details .text-link {
+  justify-self: start;
+}
+
+.plans__grid .project__details h3 {
+  font-size: clamp(1.5rem, 2vw, 2.2rem);
+}
+
+.plans__grid .project__details > p {
+  font-size: 0.8rem;
+}
+
+/* Card fechado de cada plano */
+
+.project__visual--plan {
+  background: #0f100f;
+}
+
+.project__visual--plan::before {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background-image: linear-gradient(color-mix(in srgb, var(--accent) 8%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--accent) 8%, transparent) 1px, transparent 1px);
+  background-size: 40px 40px;
+  content: "";
+}
+
+.plan-card {
+  position: absolute;
+  inset: 8% 7%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: clamp(0.9rem, 2vw, 1.5rem);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  background: rgba(13, 14, 13, 0.82);
+  transition: transform 850ms var(--ease), border-color 420ms ease;
+}
+
+.project__visual:hover .plan-card {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  transform: translateY(-2%) scale(1.015);
+}
+
+.plan-card__top,
+.plan-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: clamp(0.42rem, 0.72vw, 0.6rem);
+  letter-spacing: 0.08em;
+}
+
+.plan-card__top {
+  padding-bottom: clamp(0.7rem, 1.4vw, 1.1rem);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.plan-card__top strong {
+  color: var(--accent);
+  font-family: var(--display);
+  font-size: clamp(0.95rem, 2vw, 1.5rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.plan-card__body {
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.plan-card__eyebrow {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: clamp(0.42rem, 0.72vw, 0.6rem);
+  letter-spacing: 0.14em;
+}
+
+.plan-card__name {
+  margin-top: 0.35rem;
+  color: var(--text);
+  font-family: var(--display);
+  font-size: clamp(1.8rem, 4.4vw, 3.1rem);
+  font-weight: 500;
+  line-height: 0.95;
+  letter-spacing: -0.055em;
+}
+
+.plan-card__range {
+  margin-top: clamp(0.6rem, 1.2vw, 1rem);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: clamp(0.55rem, 1vw, 0.82rem);
+  letter-spacing: 0.02em;
+}
+
+.plan-card__footer {
+  padding-top: clamp(0.7rem, 1.4vw, 1.1rem);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.plan-card__footer span:last-child {
+  color: var(--accent);
+  white-space: nowrap;
+}

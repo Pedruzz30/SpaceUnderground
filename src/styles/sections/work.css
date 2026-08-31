@@ -146,39 +146,6 @@
 
 .project--portrait .project__visual { aspect-ratio: 0.81; }
 
-.projects__trio {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(2rem, 5vw, 6rem);
-  align-items: start;
-}
-
-.project--compact .project__visual { aspect-ratio: 1.05; }
-
-.projects__trio .project__details {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1.1rem;
-  padding-top: 1.4rem;
-}
-
-.projects__trio .project__details > p,
-.projects__trio .project__details .text-link {
-  grid-column: 1;
-  grid-row: auto;
-}
-
-.projects__trio .project__details .text-link {
-  justify-self: start;
-}
-
-.projects__trio .project__details h3 {
-  font-size: clamp(1.5rem, 2vw, 2.2rem);
-}
-
-.projects__trio .project__details > p {
-  font-size: 0.8rem;
-}
-
 .project__details--stacked {
   grid-template-columns: 1fr auto;
 }
@@ -295,101 +262,139 @@
   transform: rotate(180deg);
 }
 
-/* Cards de plano (CASE / 003 – 005) */
 
-.project__visual--plan {
-  background: #0f100f;
+/* Indice de cases -------------------------------------------------- */
+/* Par em texto dos quadradinhos do rail: mesma fonte de verdade
+   (data-project-slot), mesmo estado ativo, e da nome aos slots reservados. */
+
+.case-index {
+  margin-top: clamp(3rem, 5vw, 5.5rem);
 }
 
-.project__visual--plan::before {
-  position: absolute;
-  inset: 0;
-  opacity: 0.5;
-  background-image: linear-gradient(color-mix(in srgb, var(--accent) 8%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--accent) 8%, transparent) 1px, transparent 1px);
-  background-size: 40px 40px;
-  content: "";
-}
-
-.plan-card {
-  position: absolute;
-  inset: 8% 7%;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  padding: clamp(0.9rem, 2vw, 1.5rem);
-  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
-  background: rgba(13, 14, 13, 0.82);
-  transition: transform 850ms var(--ease), border-color 420ms ease;
-}
-
-.project__visual:hover .plan-card {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  transform: translateY(-2%) scale(1.015);
-}
-
-.plan-card__top,
-.plan-card__footer {
+.case-index__head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 2rem;
+  padding-bottom: 1rem;
   color: var(--muted);
   font-family: var(--mono);
-  font-size: clamp(0.42rem, 0.72vw, 0.6rem);
-  letter-spacing: 0.08em;
+  font-size: 0.61rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
 }
 
-.plan-card__top {
-  padding-bottom: clamp(0.7rem, 1.4vw, 1.1rem);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.plan-card__top strong {
+.case-index__head span:first-child {
   color: var(--accent);
-  font-family: var(--display);
-  font-size: clamp(0.95rem, 2vw, 1.5rem);
-  font-weight: 500;
-  line-height: 1;
-  letter-spacing: -0.03em;
 }
 
-.plan-card__body {
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  min-width: 0;
+.case-index__list {
+  border-top: 1px solid var(--border);
+  list-style: none;
 }
 
-.plan-card__eyebrow {
+.case-index__list li {
+  border-bottom: 1px solid var(--border);
+}
+
+.case-index__row {
+  display: grid;
+  width: 100%;
+  align-items: center;
+  padding: clamp(1rem, 1.7vw, 1.5rem) 0;
+  border: 0;
+  grid-template-columns: 4.5rem 13rem minmax(0, 1fr) 5rem 7rem 1.5rem;
+  gap: 1.5rem;
+  appearance: none;
+  background: none;
   color: var(--muted);
   font-family: var(--mono);
-  font-size: clamp(0.42rem, 0.72vw, 0.6rem);
-  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-transform: uppercase;
+  transition: color 260ms ease, padding-left 320ms var(--ease);
 }
 
-.plan-card__name {
-  margin-top: 0.35rem;
+button.case-index__row {
+  cursor: pointer;
+}
+
+button.case-index__row:hover,
+button.case-index__row:focus-visible {
+  padding-left: 0.75rem;
+  color: var(--text);
+}
+
+button.case-index__row:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.case-index__id {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.case-index__name {
+  overflow: hidden;
   color: var(--text);
   font-family: var(--display);
-  font-size: clamp(1.8rem, 4.4vw, 3.1rem);
-  font-weight: 500;
-  line-height: 0.95;
-  letter-spacing: -0.055em;
-}
-
-.plan-card__range {
-  margin-top: clamp(0.6rem, 1.2vw, 1rem);
-  color: var(--accent);
-  font-family: var(--mono);
-  font-size: clamp(0.55rem, 1vw, 0.82rem);
-  letter-spacing: 0.02em;
-}
-
-.plan-card__footer {
-  padding-top: clamp(0.7rem, 1.4vw, 1.1rem);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.plan-card__footer span:last-child {
-  color: var(--accent);
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  text-transform: none;
   white-space: nowrap;
+}
+
+.case-index__type,
+.case-index__year {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-index__status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.case-index__status i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.case-index__go {
+  justify-self: end;
+  opacity: 0;
+  transform: translate(-4px, 4px);
+  transition: opacity 260ms ease, transform 320ms var(--ease);
+}
+
+button.case-index__row:hover .case-index__go,
+button.case-index__row:focus-visible .case-index__go {
+  opacity: 1;
+  transform: translate(0, 0);
+}
+
+/* Linha do projeto que esta no frame agora. */
+.case-index__row.is-active {
+  color: var(--text);
+}
+
+.case-index__row.is-active .case-index__name,
+.case-index__row.is-active .case-index__status {
+  color: var(--accent);
+}
+
+.case-index__row.is-reserved {
+  color: #5a5a5a;
+}
+
+.case-index__row.is-reserved .case-index__id,
+.case-index__row.is-reserved .case-index__name {
+  color: #5a5a5a;
 }

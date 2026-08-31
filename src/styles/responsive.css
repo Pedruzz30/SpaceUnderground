@@ -65,7 +65,8 @@
     font-family: var(--mono);
     font-size: 0.55rem;
     letter-spacing: 0.1em;
-    content: "NAVIGATION / 00—06";
+    /* 7 links no menu: Home > Contact */
+    content: "NAVIGATION / 00—07";
   }
 
   .site-nav.is-open {
@@ -98,6 +99,8 @@
   .site-nav.is-open .nav-link:nth-child(3) { transition-delay: 80ms; }
   .site-nav.is-open .nav-link:nth-child(4) { transition-delay: 120ms; }
   .site-nav.is-open .nav-link:nth-child(5) { transition-delay: 160ms; }
+  .site-nav.is-open .nav-link:nth-child(6) { transition-delay: 200ms; }
+  .site-nav.is-open .nav-link:nth-child(7) { transition-delay: 240ms; }
 
   .nav-link::after { display: none; }
 
@@ -146,7 +149,7 @@
   }
 
 
-  .projects__trio { gap: 2rem; }
+  .plans__grid { gap: 2rem; }
 
   .why__inner,
   .about__inner {
@@ -304,23 +307,44 @@
     justify-self: start;
   }
 
-  .projects__trio {
+  .plans__grid {
     grid-template-columns: 1fr;
     gap: 6.5rem;
   }
 
   .project--compact .project__visual { aspect-ratio: 1.05; }
 
-  .projects__trio .project__details h3 {
+  .plans__grid .project__details h3 {
     font-size: clamp(2rem, 3.1vw, 3.7rem);
   }
 
-  .projects__trio .project__details > p {
+  .plans__grid .project__details > p {
     font-size: 0.88rem;
   }
 
   .project--portrait .project__visual { aspect-ratio: 0.93; }
   .project__hover-mark { display: none; }
+
+  /* A grade de 6 colunas do indice nao cabe: vira duas linhas por case. */
+  .case-index__row {
+    grid-template-columns: 3.2rem minmax(0, 1fr) auto;
+    gap: 0.5rem 1rem;
+  }
+
+  .case-index__type {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+
+  .case-index__year,
+  .case-index__go {
+    display: none;
+  }
+
+  /* A legenda quebrava em duas linhas abaixo de 360px; o rotulo basta. */
+  .case-index__head span:last-child {
+    display: none;
+  }
 
   .statement {
     padding-block: 7rem;

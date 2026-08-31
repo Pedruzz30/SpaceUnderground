@@ -295,7 +295,12 @@ function createLivePreview(frame, mobileMedia) {
 // PROJECT VIEWER: um frame, varios projetos. Os dados vem de project-registry.js.
 function createProjectViewer(frame, preview) {
   const article = frame.closest(".project") || frame;
-  const slots = [...frame.querySelectorAll("[data-project-slot]")];
+  // Os seletores vivem em dois lugares: os quadradinhos do rail (dentro do frame)
+  // e as linhas do indice de cases (irmao do card). Ambos usam data-project-slot.
+  const root = frame.closest("section") || article;
+  const caseIndex = root.querySelector("[data-case-index]");
+  const accentTargets = [article, caseIndex].filter(Boolean);
+  const slots = [...root.querySelectorAll("[data-project-slot]")];
 
   const pick = (attribute, scope = article) => [...scope.querySelectorAll(`[${attribute}]`)];
   const fields = {
@@ -335,7 +340,7 @@ function createProjectViewer(frame, preview) {
     });
 
     // 2. accent do projeto vale para o card inteiro (frame, grid e detalhes)
-    article.style.setProperty("--accent", project.accent);
+    accentTargets.forEach((target) => target.style.setProperty("--accent", project.accent));
 
     // 3. metadados
     write(fields.index, `CASE / ${project.id}`);
@@ -394,6 +399,9 @@ function createProjectViewer(frame, preview) {
       event.stopPropagation();
       if (slot.hasAttribute("data-slot-reserved")) return;
       apply(slot.dataset.projectSlot || defaultProjectKey, { force: true });
+      if (!slot.closest(".signal-ui")) {
+        article.querySelector(".project__visual")?.scrollIntoView({ block: "center" });
+      }
     });
   });
 
