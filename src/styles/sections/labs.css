@@ -1,4 +1,4 @@
-﻿/* Labs ------------------------------------------------------------ */
+/* Labs ------------------------------------------------------------ */
 
 .labs {
   position: relative;
@@ -64,6 +64,20 @@
   color: #b9b9b4;
   font-size: clamp(1rem, 1.3vw, 1.2rem);
   line-height: 1.7;
+}
+
+/* Estado do Labs, no lugar do antigo "Explore Labs". Nao e link e nao deve
+   parecer um: enquanto nao existe produto, nao existe destino. */
+.labs__copy .labs__status {
+  justify-self: start;
+  line-height: 1;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 .labs-product {

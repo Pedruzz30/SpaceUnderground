@@ -244,6 +244,12 @@
   animation: monolithFloat 7s ease-in-out infinite;
 }
 
+/* <picture> so escolhe o formato (AVIF/WebP/PNG); quem posiciona a arte
+   continua sendo .monolith, entao ele nao pode virar caixa de layout. */
+.monolith picture {
+  display: contents;
+}
+
 .monolith__image {
   display: block;
   width: 100%;
@@ -252,47 +258,6 @@
   object-position: center;
   pointer-events: none;
   user-select: none;
-}
-
-.monolith__face {
-  position: absolute;
-}
-
-.monolith__face--front {
-  inset: 0 17% 0 0;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  background: linear-gradient(118deg, #0d0d0d 0%, #4a4a48 42%, #161616 73%, #777773 100%);
-  box-shadow: inset -12px 0 25px rgba(0, 0, 0, 0.6), inset 8px 0 16px rgba(255, 255, 255, 0.06);
-}
-
-.monolith__face--side {
-  top: 5%;
-  right: 0;
-  bottom: -5%;
-  width: 17%;
-  background: linear-gradient(90deg, #090909, #3b3b39);
-  clip-path: polygon(0 0, 100% 8%, 100% 100%, 0 95%);
-}
-
-.monolith__face--top {
-  top: -6%;
-  right: 8.5%;
-  left: 0;
-  height: 7%;
-  background: #83837d;
-  clip-path: polygon(0 100%, 88% 0, 100% 100%);
-}
-
-.monolith__cut {
-  position: absolute;
-  z-index: 2;
-  top: 42%;
-  right: 17%;
-  left: 0;
-  height: 15%;
-  border-top: 1px solid rgba(198, 255, 0, 0.5);
-  border-bottom: 1px solid rgba(198, 255, 0, 0.3);
-  background: rgba(0, 0, 0, 0.62);
 }
 
 .art-label {

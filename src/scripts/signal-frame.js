@@ -8,6 +8,14 @@ const LOAD_TIMEOUT = 8000;
 const STATE_CLASS_NAMES = ["is-preview-loading", "is-preview-live", "is-preview-sleeping", "is-preview-fallback"];
 const VIEW_CLASS_NAMES = ["is-view-site", "is-view-detail", "is-view-origin"];
 
+// Texto do [data-preview-status], no canto do frame.
+const STATE_LABELS = {
+  loading: "PREVIEW / INITIALIZING",
+  live: "● LIVE PREVIEW",
+  sleeping: "PREVIEW / SLEEP",
+  fallback: "PREVIEW / FALLBACK",
+};
+
 let activePreview = null;
 
 function openProject(url) {
@@ -43,15 +51,7 @@ function setPreviewStatus(frame, label) {
 function setPreviewState(frame, state) {
   frame.classList.remove(...STATE_CLASS_NAMES);
   frame.classList.add(`is-preview-${state}`);
-
-  const labels = {
-    loading: frame.dataset.previewLoadingLabel || "PREVIEW / INITIALIZING",
-    live: frame.dataset.previewLiveLabel || "● LIVE PREVIEW",
-    sleeping: frame.dataset.previewSleepingLabel || "PREVIEW / SLEEP",
-    fallback: frame.dataset.previewFallbackLabel || "PREVIEW / FALLBACK",
-  };
-
-  setPreviewStatus(frame, labels[state] || labels.sleeping);
+  setPreviewStatus(frame, STATE_LABELS[state] || STATE_LABELS.sleeping);
 }
 
 function createCalibration(frame) {
@@ -86,9 +86,13 @@ function createLivePreview(frame, mobileMedia) {
   const visual = frame.closest(".project__visual");
   const hoverMark = visual?.querySelector(".project__hover-mark");
   const iframe = frame.querySelector("iframe");
-  const poster = frame.querySelector("[data-preview-poster], .signal-ui__poster");
+  const poster = frame.querySelector(".signal-ui__poster");
+  // <source> do <picture> do poster, por formato. Trocar so o img.src deixaria
+  // o navegador servindo o AVIF/WebP do case anterior.
+  const posterSources = new Map(
+    [...frame.querySelectorAll("[data-poster-source]")].map((node) => [node.dataset.posterSource, node]),
+  );
   const modeButtons = [...frame.querySelectorAll("[data-signal-mode]")];
-  const reloadButtons = [...frame.querySelectorAll("[data-signal-action='reload']")];
   const openButtons = [...frame.querySelectorAll("[data-signal-open]")];
 
   // Fonte corrente do frame. Trocar de projeto so reescreve estas tres variaveis.
@@ -96,6 +100,18 @@ function createLivePreview(frame, mobileMedia) {
   let previewUrl = resolveUrl(frame.dataset.projectPreviewUrl || iframe?.dataset.src || projectUrl);
   let previewOrigin = originOf(previewUrl);
   let posterUrl = frame.dataset.projectPoster || "";
+
+  const applyPoster = (next) => {
+    if (!poster || !next) return;
+    // Aceita tanto a string antiga quanto o objeto com os tres formatos.
+    const formats = typeof next === "string" ? { png: next } : next;
+    posterSources.forEach((node, format) => {
+      if (formats[format]) node.srcset = formats[format];
+    });
+    if (formats.width) poster.width = formats.width;
+    if (formats.height) poster.height = formats.height;
+    if (formats.png) poster.src = formats.png;
+  };
 
   let sleepTimer = 0;
   let loadTimer = 0;
@@ -175,7 +191,7 @@ function createLivePreview(frame, mobileMedia) {
       iframe.dataset.src = previewUrl;
       if (title) iframe.title = title;
     }
-    if (poster && posterUrl) poster.src = posterUrl;
+    applyPoster(posterUrl);
   };
 
   iframe?.addEventListener("load", () => {
@@ -212,16 +228,6 @@ function createLivePreview(frame, mobileMedia) {
       setMode(frame, button.dataset.signalMode || "overview", modeButtons);
       calibrate();
       if (!mobileMedia.matches) load();
-    });
-  });
-
-  reloadButtons.forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      calibrate();
-      unload();
-      if (!mobileMedia.matches) window.requestAnimationFrame(() => load());
     });
   });
 
@@ -276,7 +282,7 @@ function createLivePreview(frame, mobileMedia) {
   });
 
   setMode(frame, "overview", modeButtons);
-  if (poster && posterUrl) poster.src = posterUrl;
+  applyPoster(posterUrl);
   setPreviewState(frame, "sleeping");
   preloadObserver.observe(frame);
   activeObserver.observe(frame);
@@ -405,7 +411,7 @@ function createProjectViewer(frame, preview) {
     });
   });
 
-  apply(frame.dataset.projectViewerStart || defaultProjectKey);
+  apply(defaultProjectKey);
 }
 
 export function initSignalFrame() {

@@ -41,8 +41,10 @@
   pointer-events: none;
 }
 
+/* O contorno segue o accent do item: nos cases o PROJECT VIEWER reescreve
+   --accent no <article> (project-registry.js); nos planos vale o token global. */
 .project__visual:hover::after {
-  border-color: rgba(198, 255, 0, 0.55);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 .project--featured .project__visual {
@@ -79,16 +81,6 @@
   font-family: var(--mono);
   font-size: 0.58rem;
   transition: opacity 350ms ease, transform 450ms var(--ease);
-}
-
-.project__hover-mark--link {
-  text-decoration: none;
-  pointer-events: auto;
-}
-
-.project__hover-mark--link:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
 }
 
 .project__visual:hover .project__hover-mark {
@@ -144,8 +136,6 @@
   justify-self: end;
 }
 
-.project--portrait .project__visual { aspect-ratio: 0.81; }
-
 .project__details--stacked {
   grid-template-columns: 1fr auto;
 }
@@ -159,109 +149,6 @@
   grid-column: 2;
   grid-row: 1;
 }
-
-
-/* Project 002 mockup */
-
-.project__visual--form {
-  background: #d5d3ca;
-}
-
-.form-poster {
-  position: absolute;
-  inset: 7%;
-  overflow: hidden;
-  background: #e8e5da;
-  color: #121212;
-  transition: transform 800ms var(--ease);
-}
-
-.project__visual:hover .form-poster {
-  transform: scale(1.025);
-}
-
-.form-poster::after {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 1px;
-  background: rgba(0, 0, 0, 0.13);
-  content: "";
-}
-
-.form-poster__label {
-  position: absolute;
-  z-index: 3;
-  top: 4%;
-  left: 5%;
-  font-family: var(--display);
-  font-size: clamp(0.75rem, 1.5vw, 1.4rem);
-  font-weight: 700;
-}
-
-.form-shape {
-  position: absolute;
-  z-index: 1;
-  top: 17%;
-  left: 14%;
-  width: 72%;
-  aspect-ratio: 0.82;
-  transform: rotate(-9deg);
-  border: 1px solid #111;
-  border-radius: 50% 50% 4% 4%;
-  background: #171717;
-  box-shadow: 16px 18px 0 var(--accent);
-}
-
-.form-shape::before {
-  position: absolute;
-  inset: 15%;
-  border: 1px solid #777;
-  border-radius: 50%;
-  content: "";
-}
-
-.form-shape i {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 34%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  background: #dedbd0;
-}
-
-.form-poster__type {
-  position: absolute;
-  z-index: 2;
-  right: 4%;
-  bottom: 5%;
-  font-family: var(--display);
-  font-size: clamp(2.2rem, 5.9vw, 6.4rem);
-  font-weight: 600;
-  line-height: 0.7;
-  letter-spacing: -0.1em;
-  text-align: right;
-}
-
-.form-poster__type em {
-  color: var(--accent);
-  -webkit-text-stroke: 1px #111;
-}
-
-.form-poster small {
-  position: absolute;
-  bottom: 4%;
-  left: 5%;
-  font-family: var(--mono);
-  font-size: clamp(0.3rem, 0.58vw, 0.5rem);
-  letter-spacing: 0.1em;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-}
-
 
 /* Indice de cases -------------------------------------------------- */
 /* Par em texto dos quadradinhos do rail: mesma fonte de verdade

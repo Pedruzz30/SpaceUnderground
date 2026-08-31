@@ -1,6 +1,12 @@
 // Registro unico dos projetos exibidos no PROJECT VIEWER da secao Selected Work.
-// O frame CASE / 001 e reutilizavel: um projeto por vez, sempre no mesmo iframe.
-// Para publicar um slot reservado, troque `reserved: true` pelos dados reais.
+// O frame e reutilizavel: um projeto por vez, sempre no mesmo iframe.
+// Para publicar um slot reservado, troque `reserved: true` pelos dados reais
+// (e tire o data-slot-reserved do botao do rail e da linha do indice no HTML).
+// `accent` vira --accent no <article> e no .case-index, entao o card inteiro
+// assume a cor do projeto: por isso o CSS desse escopo usa var(--accent).
+// `poster` traz os tres formatos do <picture> (AVIF/WebP/PNG) mais as dimensoes
+// reais do arquivo. Gerados por scripts/optimize-images.mjs; se trocar o PNG,
+// rode o script de novo e atualize width/height aqui.
 
 export const projects = {
   ink: {
@@ -11,10 +17,10 @@ export const projects = {
     description: "A dark editorial experience built around tattoo culture, motion and visual depth.",
     url: "https://pedruzz30.github.io/TattooSite/",
     previewUrl: "https://pedruzz30.github.io/TattooSite/?embed=spaceunderground",
-    poster: "./tattoo-preview-poster.png",
+    poster: { avif: "./tattoo-preview-poster.avif", webp: "./tattoo-preview-poster.webp", png: "./tattoo-preview-poster.png", width: 1440, height: 900 },
     accent: "#c6ff00",
     system: "EXPERIENCE SYSTEM / 01",
-    label: "PORTFÓLIO",
+    label: "PORTFOLIO",
     address: "INK TATTOO / PRODUCTION",
     type: "PORTFOLIO WEBSITE",
     tech: "HTML / CSS / JAVASCRIPT",
@@ -37,7 +43,7 @@ export const projects = {
     description: "Strategic digital presence designed around performance, credibility and conversion.",
     url: "https://pedruzz30.github.io/LucasNutri/",
     previewUrl: "https://pedruzz30.github.io/LucasNutri/?embed=spaceunderground",
-    poster: "./LucasNutri.png",
+    poster: { avif: "./LucasNutri.avif", webp: "./LucasNutri.webp", png: "./LucasNutri.png", width: 1849, height: 931 },
     accent: "#ff9d00",
     system: "PERFORMANCE SYSTEM / 02",
     label: "PERFORMANCE",
@@ -60,7 +66,6 @@ export const projects = {
   "slot-005": { id: "005", name: "Reserved", reserved: true },
 };
 
-// Ordem dos quadrados na coluna esquerda do frame.
-export const projectOrder = ["ink", "lucas", "slot-003", "slot-004", "slot-005"];
-
+// Case que abre a pagina. A ORDEM dos slots nao mora aqui: e a ordem dos
+// <button data-project-slot> no rail do index.html (e das linhas do indice).
 export const defaultProjectKey = "ink";

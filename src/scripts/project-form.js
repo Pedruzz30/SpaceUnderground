@@ -1,4 +1,5 @@
-// Formulário de solicitação: seleção de produto, autofill de orçamento/prazo, validação e envio ao Formspree.
+// Formulario de solicitacao: selecao de produto, autofill de orcamento/prazo, validacao e envio ao Formspree.
+// Todo texto que o visitante le fica em ingles (politica EN-first); os comentarios seguem em portugues.
 
 export function initProjectForm() {
   const projectForm = document.querySelector("[data-project-form]");
@@ -51,17 +52,23 @@ export function initProjectForm() {
       },
     };
 
+    const markInvalid = (field, wrapper, isInvalid) => {
+      wrapper.classList.toggle("is-invalid", isInvalid);
+      if (isInvalid) field.setAttribute("aria-invalid", "true");
+      else field.removeAttribute("aria-invalid");
+    };
+
     const setFieldState = (field) => {
       const wrapper = field.closest(".form-field");
       if (!wrapper) return;
-      wrapper.classList.toggle("is-invalid", field.matches(":invalid") && field.dataset.touched === "true");
+      markInvalid(field, wrapper, field.matches(":invalid") && field.dataset.touched === "true");
     };
 
     const setManualFieldState = (field, isInvalid) => {
       if (!field) return;
       const wrapper = field.closest(".form-field");
       if (!wrapper) return;
-      wrapper.classList.toggle("is-invalid", isInvalid);
+      markInvalid(field, wrapper, isInvalid);
     };
 
     const setChoiceState = (choices, value, attribute) => {
@@ -179,14 +186,14 @@ export function initProjectForm() {
       if (!submitButton) return;
       submitButton.disabled = isSending;
       submitButton.classList.toggle("is-sending", isSending);
-      if (submitButtonText) submitButtonText.textContent = isSending ? "Enviando..." : "Send Project Request";
+      if (submitButtonText) submitButtonText.textContent = isSending ? "Sending..." : "Send Project Request";
     };
 
     projectForm.addEventListener("submit", async (event) => {
       event.preventDefault();
 
       if (gotchaField?.value) {
-        if (formStatus) formStatus.textContent = "Recebemos sua mensagem! Retornamos em até 1 dia útil.";
+        if (formStatus) formStatus.textContent = "Request received. We reply within 1 business day.";
         projectForm.reset();
         setProductChoice("", { autofill: false });
         return;
@@ -199,13 +206,13 @@ export function initProjectForm() {
       const invalidFields = validateProjectForm();
 
       if (invalidFields.length) {
-        if (formStatus) formStatus.textContent = "Verifique os campos destacados antes de enviar.";
+        if (formStatus) formStatus.textContent = "Check the highlighted fields before sending.";
         invalidFields[0]?.focus();
         return;
       }
 
       setSubmitState(true);
-      if (formStatus) formStatus.textContent = "Enviando sua solicitação...";
+      if (formStatus) formStatus.textContent = "Sending your request...";
 
       try {
         const response = await fetch(projectForm.action, {
@@ -218,7 +225,7 @@ export function initProjectForm() {
 
         if (!response.ok) throw new Error("Form submission failed.");
 
-        if (formStatus) formStatus.textContent = "Recebemos sua mensagem! Retornamos em até 1 dia útil.";
+        if (formStatus) formStatus.textContent = "Request received. We reply within 1 business day.";
         projectForm.reset();
         setProductChoice("", { autofill: false });
         fields.forEach((field) => {
@@ -227,7 +234,7 @@ export function initProjectForm() {
         });
       } catch (error) {
         if (formStatus) {
-          formStatus.textContent = "Não foi possível enviar. Escreva direto para hello.SpaceUnderGround@gmail.com";
+          formStatus.textContent = "Could not send. Write us directly at hello.SpaceUnderGround@gmail.com";
         }
       } finally {
         setSubmitState(false);
