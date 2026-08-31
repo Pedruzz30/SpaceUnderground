@@ -1,4 +1,7 @@
-// Modal de preview dos projetos. Para adicionar um projeto novo, acrescente uma chave em projectPreviews e um [data-project] no HTML.
+// Modal unico da secao Selected Work. Alimenta dois tipos de conteudo:
+//   type: "project" (padrao) — cases reais / conceitos
+//   type: "plan"             — niveis de preco, com CTA que rola ate o formulario
+// Para adicionar um item, acrescente uma chave em projectPreviews e um [data-project] no HTML.
 
 export function initProjectDialog() {
   const projectDialog = document.querySelector("[data-project-dialog]");
@@ -25,45 +28,66 @@ export function initProjectDialog() {
       code: "FRMV_002",
       monogram: "F/V",
     },
-    nox: {
+    "plan-plus": {
+      type: "plan",
       index: "003",
-      category: "Experiment / E-commerce",
+      kind: "Pricing plan",
+      category: "PLAN / LANDING PAGES & PORTFOLIOS",
       year: "2026",
-      title: "NOX Objects",
-      description: "A tactile storefront experiment for limited-run objects. The component already supports real project metadata later.",
-      scope: ["TYPE — E-COMMERCE", "TECH — HTML / CSS / JS", "STATUS — CONCEPT"],
-      code: "NOX_003",
-      monogram: "N/",
+      title: "Plano Plus",
+      description: "For getting online with clarity — fast, focused, done right.",
+      scope: ["SCOPE — LANDING PAGES · PORTFOLIOS", "RANGE — R$ 800 – R$ 2.500", "STATUS — AVAILABLE"],
+      code: "PLUS_003",
+      included: {
+        items: ["Single responsive page", "Contact form integration", "1 revision round"],
+        timeline: "1–4 weeks",
+      },
+      monogram: "P+",
     },
-    "nox-004": {
+    "plan-pro": {
+      type: "plan",
       index: "004",
-      category: "Experiment / E-commerce",
+      kind: "Pricing plan",
+      category: "PLAN / INSTITUTIONAL WEBSITES",
       year: "2026",
-      title: "NOX Objects",
-      description: "A tactile storefront experiment for limited-run objects. The component already supports real project metadata later.",
-      scope: ["TYPE — E-COMMERCE", "TECH — HTML / CSS / JS", "STATUS — CONCEPT"],
-      code: "NOX_004",
-      monogram: "N/",
+      title: "Plano Pro",
+      description: "For businesses ready to show up as more than a page.",
+      scope: ["SCOPE — MULTI-PAGE INSTITUTIONAL SITES", "RANGE — R$ 2.500 – R$ 4.500", "STATUS — AVAILABLE"],
+      code: "PRO_004",
+      included: {
+        items: ["Multi-page structure", "Custom design, no templates", "Basic SEO & performance", "2 revision rounds"],
+        timeline: "3–6 weeks",
+      },
+      monogram: "P•",
     },
-    "nox-005": {
+    "plan-max": {
+      type: "plan",
       index: "005",
-      category: "Experiment / E-commerce",
+      kind: "Pricing plan",
+      category: "PLAN / E-COMMERCE & SYSTEMS",
       year: "2026",
-      title: "NOX Objects",
-      description: "A tactile storefront experiment for limited-run objects. The component already supports real project metadata later.",
-      scope: ["TYPE — E-COMMERCE", "TECH — HTML / CSS / JS", "STATUS — CONCEPT"],
-      code: "NOX_005",
-      monogram: "N/",
+      title: "Plano Max",
+      description: "For the ones who need the full system behind the front.",
+      scope: ["SCOPE — E-COMMERCE · WEB SYSTEMS · CUSTOM BUILDS", "RANGE — FROM R$ 5.000", "STATUS — AVAILABLE"],
+      code: "MAX_005",
+      included: {
+        items: ["Custom e-commerce or web system", "Scalable architecture", "Third-party integrations", "Revisions scoped per project"],
+        timeline: "6–12 weeks",
+      },
+      monogram: "P×",
     },
-    "nox-006": {
-      index: "006",
-      category: "Experiment / E-commerce",
-      year: "2026",
-      title: "NOX Objects",
-      description: "A tactile storefront experiment for limited-run objects. The component already supports real project metadata later.",
-      scope: ["TYPE — E-COMMERCE", "TECH — HTML / CSS / JS", "STATUS — CONCEPT"],
-      code: "NOX_006",
-      monogram: "N/",
+  };
+
+  const dialogDefaults = {
+    project: {
+      kind: "Project concept",
+      note: "Concept presentation by Space Underground. Ask us about the thinking, system and possibilities behind it.",
+      cta: "Discuss This Project",
+    },
+    plan: {
+      kind: "Pricing plan",
+      note: "Investment range by project level. The final quote is set once the scope is defined — talk to the studio for a proposal.",
+      cta: "Solicitar Proposta",
     },
   };
 
@@ -76,6 +100,12 @@ export function initProjectDialog() {
       description: projectDialog.querySelector("[data-dialog-description]"),
       code: projectDialog.querySelector("[data-dialog-code]"),
       monogram: projectDialog.querySelector("[data-dialog-monogram]"),
+      kind: projectDialog.querySelector("[data-dialog-kind]"),
+      note: projectDialog.querySelector("[data-dialog-note]"),
+      cta: projectDialog.querySelector("[data-dialog-cta]"),
+      included: projectDialog.querySelector("[data-dialog-included]"),
+      includedItems: [...projectDialog.querySelectorAll("[data-dialog-included-item]")],
+      timeline: projectDialog.querySelector("[data-dialog-timeline]"),
       scope: [...projectDialog.querySelectorAll("[data-dialog-scope]")],
     };
     const dialogClose = projectDialog.querySelector("[data-dialog-close]");
@@ -100,8 +130,13 @@ export function initProjectDialog() {
         const preview = projectPreviews[opener.dataset.project];
         if (!preview) return;
 
+        const preset = dialogDefaults[preview.type] || dialogDefaults.project;
+
         event.preventDefault();
         dialogFields.index.textContent = preview.index;
+        dialogFields.kind.textContent = preview.kind || preset.kind;
+        dialogFields.note.textContent = preview.note || preset.note;
+        dialogFields.cta.textContent = preview.cta || preset.cta;
         dialogFields.category.textContent = preview.category;
         dialogFields.year.textContent = preview.year;
         dialogFields.title.textContent = preview.title;
@@ -111,6 +146,15 @@ export function initProjectDialog() {
         dialogFields.scope.forEach((field, index) => {
           field.textContent = preview.scope[index] || "";
         });
+
+        // Bloco "What's included": so os planos preenchem; li vazio some via li:empty.
+        if (dialogFields.included) {
+          dialogFields.included.hidden = !preview.included;
+          dialogFields.includedItems.forEach((item, index) => {
+            item.textContent = preview.included?.items[index] || "";
+          });
+          if (dialogFields.timeline) dialogFields.timeline.textContent = preview.included?.timeline || "";
+        }
 
         previousBodyOverflow = document.body.style.overflow;
         document.body.style.overflow = "hidden";
@@ -123,7 +167,14 @@ export function initProjectDialog() {
     });
 
     dialogClose?.addEventListener("click", closeProjectDialog);
-    dialogContact?.addEventListener("click", closeProjectDialog);
+    dialogContact?.addEventListener("click", (event) => {
+      const target = document.querySelector(dialogContact.getAttribute("href") || "");
+      closeProjectDialog();
+      if (!target) return;
+      // scrollIntoView herda o scroll-behavior do CSS (suave, ou direto em reduced-motion).
+      event.preventDefault();
+      window.requestAnimationFrame(() => target.scrollIntoView({ block: "start" }));
+    });
     projectDialog.addEventListener("close", restoreDialogState);
     projectDialog.addEventListener("click", (event) => {
       if (event.target !== projectDialog) return;

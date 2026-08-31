@@ -165,6 +165,7 @@
   display: grid;
   overflow: hidden;
   place-items: center;
+  grid-template-rows: 1fr auto;
   border-left: 1px solid var(--border);
   background-color: #0c0c0c;
   background-image: linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
@@ -222,7 +223,8 @@
 .project-dialog__code,
 .project-dialog__visual > p {
   position: absolute;
-  z-index: 2;
+  /* acima do veu do bloco "What's included", que ocupa a faixa de baixo do painel */
+  z-index: 4;
   color: #777;
   font-family: var(--mono);
   font-size: 0.55rem;
@@ -245,4 +247,75 @@
   right: 1.6rem;
   bottom: 1.6rem;
   text-align: right;
+}
+
+/* Painel direito: bloco "What's included" dos planos.
+   Fica abaixo da marca, sobre um veu escuro para nao brigar com a grade e as orbitas. */
+
+.project-dialog__included {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  width: 100%;
+  align-self: end;
+  justify-self: stretch;
+  gap: 0.9rem;
+  padding: clamp(1.4rem, 2.4vw, 1.9rem) clamp(1.6rem, 2.6vw, 2rem) clamp(4.4rem, 6vw, 5.2rem);
+  border-top: 1px solid var(--border);
+  background: rgba(9, 9, 9, 0.9);
+  text-align: left;
+}
+
+.project-dialog__included[hidden] {
+  display: none;
+}
+
+.project-dialog__included-label {
+  color: #727272;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.project-dialog__included ul {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.project-dialog__included li {
+  position: relative;
+  padding-left: 1rem;
+  color: #c5c5c0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.project-dialog__included li:empty {
+  display: none;
+}
+
+.project-dialog__included li::before {
+  position: absolute;
+  top: 0.62em;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  background: var(--accent);
+  content: "";
+}
+
+.project-dialog__timeline {
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+  color: #727272;
+  font-family: var(--mono);
+  font-size: 0.63rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.project-dialog__timeline i {
+  color: var(--accent);
+  font-style: normal;
 }

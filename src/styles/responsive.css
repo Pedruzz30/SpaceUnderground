@@ -146,7 +146,6 @@
   }
 
 
-  .projects__pair { gap: 2rem; }
   .projects__trio { gap: 2rem; }
 
   .why__inner,
@@ -305,11 +304,6 @@
     justify-self: start;
   }
 
-  .projects__pair {
-    grid-template-columns: 1fr;
-    gap: 6.5rem;
-  }
-
   .projects__trio {
     grid-template-columns: 1fr;
     gap: 6.5rem;
@@ -325,10 +319,7 @@
     font-size: 0.88rem;
   }
 
-  .projects__pair--offset > .project--landscape { grid-column: 1; }
-  .project--landscape { margin-top: 0; }
   .project--portrait .project__visual { aspect-ratio: 0.93; }
-  .project--landscape .project__visual { aspect-ratio: 1.05; }
   .project__hover-mark { display: none; }
 
   .statement {
@@ -460,6 +451,13 @@
 
   .project-dialog__visual strong {
     font-size: clamp(5rem, 25vw, 7rem);
+  }
+
+  /* Nos planos o painel deixa de ser so decoracao: entra depois do texto do modal. */
+  .project-dialog__surface:has(.project-dialog__included:not([hidden])) .project-dialog__visual {
+    order: 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 0;
   }
 
   .project-dialog__content {
