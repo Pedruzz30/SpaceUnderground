@@ -1,3 +1,5 @@
+import { projects, defaultProjectKey } from "./project-registry.js";
+
 const LIVE_PREVIEW_SELECTOR = "[data-live-project]";
 const MOBILE_QUERY = "(max-width: 759px)";
 const FINE_POINTER_QUERY = "(hover: hover) and (pointer: fine)";
@@ -12,9 +14,30 @@ function openProject(url) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
+// So aceita http(s); qualquer outra coisa vira string vazia e o frame cai em fallback.
+function resolveUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  try {
+    const resolved = new URL(raw, document.baseURI);
+    return ["http:", "https:"].includes(resolved.protocol) ? resolved.href : "";
+  } catch {
+    return "";
+  }
+}
+
+function originOf(url) {
+  try {
+    return url ? new URL(url).origin : "";
+  } catch {
+    return "";
+  }
+}
+
 function setPreviewStatus(frame, label) {
   const status = frame.querySelector("[data-preview-status]");
-  if (status) status.textContent = label;
+  if (status && status.textContent !== label) status.textContent = label;
 }
 
 function setPreviewState(frame, state) {
@@ -22,10 +45,10 @@ function setPreviewState(frame, state) {
   frame.classList.add(`is-preview-${state}`);
 
   const labels = {
-    loading: "PREVIEW / INITIALIZING",
-    live: "● LIVE PREVIEW",
-    sleeping: "PREVIEW / SLEEP",
-    fallback: "PREVIEW / FALLBACK",
+    loading: frame.dataset.previewLoadingLabel || "PREVIEW / INITIALIZING",
+    live: frame.dataset.previewLiveLabel || "● LIVE PREVIEW",
+    sleeping: frame.dataset.previewSleepingLabel || "PREVIEW / SLEEP",
+    fallback: frame.dataset.previewFallbackLabel || "PREVIEW / FALLBACK",
   };
 
   setPreviewStatus(frame, labels[state] || labels.sleeping);
@@ -50,24 +73,30 @@ function setMode(frame, mode, modeButtons) {
   if (nextMode === "origin") frame.classList.add("is-view-origin");
 
   modeButtons.forEach((button) => {
+    const isReset = button.dataset.signalMode === "reset";
     const isActive = button.dataset.signalMode === nextMode;
     button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-pressed", String(isActive));
+    if (isReset) button.removeAttribute("aria-pressed");
+    else button.setAttribute("aria-pressed", String(isActive));
   });
 }
 
 function createLivePreview(frame, mobileMedia) {
   const finePointerMedia = window.matchMedia(FINE_POINTER_QUERY);
-  const visual = frame.closest(".project__visual--signal");
+  const visual = frame.closest(".project__visual");
   const hoverMark = visual?.querySelector(".project__hover-mark");
   const iframe = frame.querySelector("iframe");
-  const poster = frame.querySelector(".signal-ui__poster");
+  const poster = frame.querySelector("[data-preview-poster], .signal-ui__poster");
   const modeButtons = [...frame.querySelectorAll("[data-signal-mode]")];
   const reloadButtons = [...frame.querySelectorAll("[data-signal-action='reload']")];
   const openButtons = [...frame.querySelectorAll("[data-signal-open]")];
-  const projectUrl = frame.dataset.projectUrl || iframe?.dataset.src || "";
-  const previewUrl = frame.dataset.projectPreviewUrl || iframe?.dataset.src || projectUrl;
-  const posterUrl = frame.dataset.projectPoster;
+
+  // Fonte corrente do frame. Trocar de projeto so reescreve estas tres variaveis.
+  let projectUrl = frame.dataset.projectUrl || iframe?.dataset.src || "";
+  let previewUrl = resolveUrl(frame.dataset.projectPreviewUrl || iframe?.dataset.src || projectUrl);
+  let previewOrigin = originOf(previewUrl);
+  let posterUrl = frame.dataset.projectPoster || "";
+
   let sleepTimer = 0;
   let loadTimer = 0;
   let hasLoaded = false;
@@ -95,22 +124,28 @@ function createLivePreview(frame, mobileMedia) {
     setPreviewState(frame, "sleeping");
   };
 
-  const load = () => {
+  const load = ({ preload = false } = {}) => {
     clearSleepTimer();
     if (!iframe || mobileMedia.matches) {
       setPreviewState(frame, "sleeping");
       return;
     }
 
+    if (!previewUrl) {
+      setPreviewState(frame, "fallback");
+      return;
+    }
+
     if (activePreview && activePreview !== frame) {
+      if (preload && activePreview.classList.contains("is-preview-active")) return;
       activePreview.dispatchEvent(new CustomEvent("live-preview:release"));
     }
 
     activePreview = frame;
 
-    if (iframe.src === previewUrl && hasLoaded) {
-      setPreviewState(frame, "live");
-      return;
+    if (iframe.src === previewUrl) {
+      if (hasLoaded) setPreviewState(frame, "live");
+      if (hasLoaded || frame.classList.contains("is-preview-loading")) return;
     }
 
     hasLoaded = false;
@@ -129,6 +164,20 @@ function createLivePreview(frame, mobileMedia) {
     sleepTimer = window.setTimeout(unload, SLEEP_DELAY);
   };
 
+  // Descarrega o projeto atual e aponta o mesmo iframe para o proximo.
+  const setSource = ({ url, previewUrl: nextPreviewUrl, poster: nextPoster, title }) => {
+    unload();
+    projectUrl = url || "";
+    previewUrl = resolveUrl(nextPreviewUrl || url);
+    previewOrigin = originOf(previewUrl);
+    posterUrl = nextPoster || "";
+    if (iframe) {
+      iframe.dataset.src = previewUrl;
+      if (title) iframe.title = title;
+    }
+    if (poster && posterUrl) poster.src = posterUrl;
+  };
+
   iframe?.addEventListener("load", () => {
     if (!iframe || iframe.src === "about:blank") return;
     clearLoadTimer();
@@ -144,8 +193,9 @@ function createLivePreview(frame, mobileMedia) {
 
   window.addEventListener("message", (event) => {
     if (!iframe || event.source !== iframe.contentWindow) return;
-    if (event.origin !== "https://pedruzz30.github.io") return;
-    if (event.data?.type !== "tattoo-preview:ready") return;
+    if (!previewOrigin || event.origin !== previewOrigin) return;
+    const type = event.data?.type;
+    if (typeof type !== "string" || !type.endsWith("preview:ready")) return;
 
     clearLoadTimer();
     hasLoaded = true;
@@ -171,7 +221,7 @@ function createLivePreview(frame, mobileMedia) {
       event.stopPropagation();
       calibrate();
       unload();
-      if (!mobileMedia.matches) window.requestAnimationFrame(load);
+      if (!mobileMedia.matches) window.requestAnimationFrame(() => load());
     });
   });
 
@@ -203,7 +253,7 @@ function createLivePreview(frame, mobileMedia) {
 
   const preloadObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
-      if (entry.isIntersecting) load();
+      if (entry.isIntersecting) load({ preload: true });
     });
   }, { rootMargin: "800px 0px" });
 
@@ -222,7 +272,7 @@ function createLivePreview(frame, mobileMedia) {
 
   mobileMedia.addEventListener("change", (event) => {
     if (event.matches) unload();
-    else load();
+    else if (frame.classList.contains("is-preview-active")) load();
   });
 
   setMode(frame, "overview", modeButtons);
@@ -230,11 +280,130 @@ function createLivePreview(frame, mobileMedia) {
   setPreviewState(frame, "sleeping");
   preloadObserver.observe(frame);
   activeObserver.observe(frame);
+
+  return {
+    setSource,
+    calibrate,
+    setMode: (mode) => setMode(frame, mode, modeButtons),
+    refresh: ({ force = false } = {}) => {
+      if (mobileMedia.matches) return;
+      if (force || frame.classList.contains("is-preview-active")) load();
+    },
+  };
+}
+
+// PROJECT VIEWER: um frame, varios projetos. Os dados vem de project-registry.js.
+function createProjectViewer(frame, preview) {
+  const article = frame.closest(".project") || frame;
+  const slots = [...frame.querySelectorAll("[data-project-slot]")];
+
+  const pick = (attribute, scope = article) => [...scope.querySelectorAll(`[${attribute}]`)];
+  const fields = {
+    index: pick("data-viewer-index"),
+    eyebrow: pick("data-viewer-eyebrow"),
+    client: pick("data-viewer-client"),
+    category: pick("data-viewer-category"),
+    description: pick("data-viewer-description"),
+    address: pick("data-viewer-address"),
+    system: pick("data-viewer-system"),
+    label: pick("data-viewer-label"),
+    origin: pick("data-viewer-origin"),
+    coordinates: pick("data-viewer-coordinates"),
+    name: pick("data-viewer-name"),
+    year: pick("data-viewer-year"),
+    specs: pick("data-viewer-specs"),
+    links: pick("data-viewer-link"),
+    open: pick("data-viewer-open"),
+    modules: [...article.querySelectorAll("[data-viewer-module]")],
+  };
+
+  const write = (nodes, value) => nodes.forEach((node) => { node.textContent = value; });
+
+  let activeKey = "";
+
+  const apply = (key, { force = false } = {}) => {
+    const project = projects[key];
+    if (!project || project.reserved || key === activeKey) return;
+    activeKey = key;
+
+    // 1. descarrega o projeto atual antes de qualquer troca de conteudo
+    preview.setSource({
+      url: project.url,
+      previewUrl: project.previewUrl,
+      poster: project.poster,
+      title: `${project.name} live website preview`,
+    });
+
+    // 2. accent do projeto vale para o card inteiro (frame, grid e detalhes)
+    article.style.setProperty("--accent", project.accent);
+
+    // 3. metadados
+    write(fields.index, `CASE / ${project.id}`);
+    write(fields.eyebrow, `CLIENT / ${project.id}`);
+    write(fields.client, project.client);
+    write(fields.category, project.category);
+    write(fields.description, project.description);
+    write(fields.address, project.address);
+    write(fields.system, project.system);
+    write(fields.label, project.label);
+    write(fields.origin, project.origin);
+    write(fields.coordinates, project.coordinates.join("\n"));
+    write(fields.name, project.name);
+    write(fields.year, `YEAR — ${project.year}`);
+    write(fields.specs, `TYPE — ${project.type}\nTECH — ${project.tech}\nSTATUS — ${project.status}`);
+
+    const openLabel = `View ${project.name} website (opens in a new tab)`;
+    fields.links.forEach((link) => {
+      link.href = project.url;
+      link.setAttribute("aria-label", openLabel);
+    });
+    fields.open.forEach((button) => {
+      button.setAttribute("aria-label", `Open ${project.name} website in a new tab`);
+    });
+
+    fields.modules.forEach((button) => {
+      const module = project.modules[Number(button.dataset.viewerModule)];
+      if (!module) return;
+      const [number, title, caption] = module;
+      const numberNode = button.querySelector("span");
+      const titleNode = button.querySelector("strong");
+      const captionNode = button.querySelector("small");
+      if (numberNode) numberNode.textContent = number;
+      if (titleNode) titleNode.textContent = title;
+      if (captionNode) captionNode.textContent = caption;
+      button.setAttribute("aria-label", `Inspect ${title.toLowerCase()}`);
+    });
+
+    // 4. estado dos quadrados da coluna esquerda
+    slots.forEach((slot) => {
+      if (slot.hasAttribute("data-slot-reserved")) return;
+      const isActive = slot.dataset.projectSlot === key;
+      slot.classList.toggle("is-active", isActive);
+      slot.setAttribute("aria-pressed", String(isActive));
+    });
+
+    // 5. volta para overview e recarrega o iframe unico
+    preview.setMode("overview");
+    preview.calibrate();
+    preview.refresh({ force });
+  };
+
+  slots.forEach((slot) => {
+    slot.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (slot.hasAttribute("data-slot-reserved")) return;
+      apply(slot.dataset.projectSlot || defaultProjectKey, { force: true });
+    });
+  });
+
+  apply(frame.dataset.projectViewerStart || defaultProjectKey);
 }
 
 export function initSignalFrame() {
   const mobileMedia = window.matchMedia(MOBILE_QUERY);
   document.querySelectorAll(LIVE_PREVIEW_SELECTOR).forEach((frame) => {
-    createLivePreview(frame, mobileMedia);
+    const preview = createLivePreview(frame, mobileMedia);
+    if (frame.hasAttribute("data-project-viewer")) createProjectViewer(frame, preview);
   });
 }

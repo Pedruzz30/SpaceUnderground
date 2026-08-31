@@ -126,6 +126,10 @@
   letter-spacing: -0.055em;
 }
 
+.project__details > p[data-viewer-specs] {
+  white-space: pre-line;
+}
+
 .project__details > p {
   max-width: 410px;
   color: var(--muted);
@@ -147,9 +151,52 @@
   align-items: start;
 }
 
+/* Coluna direita, alinhada com o viewer acima. */
+.projects__pair--offset {
+  row-gap: 0;
+}
+
+.projects__pair--offset > .project--landscape {
+  grid-column: 2;
+  margin-top: 0;
+}
+
 .project--portrait .project__visual { aspect-ratio: 0.81; }
 .project--landscape { margin-top: clamp(6rem, 12vw, 12rem); }
 .project--landscape .project__visual { aspect-ratio: 1.21; }
+
+.projects__trio {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(2rem, 5vw, 6rem);
+  align-items: start;
+}
+
+.project--compact .project__visual { aspect-ratio: 1.05; }
+
+.projects__trio .project__details {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.1rem;
+  padding-top: 1.4rem;
+}
+
+.projects__trio .project__details > p,
+.projects__trio .project__details .text-link {
+  grid-column: 1;
+  grid-row: auto;
+}
+
+.projects__trio .project__details .text-link {
+  justify-self: start;
+}
+
+.projects__trio .project__details h3 {
+  font-size: clamp(1.5rem, 2vw, 2.2rem);
+}
+
+.projects__trio .project__details > p {
+  font-size: 0.8rem;
+}
 
 .project__details--stacked {
   grid-template-columns: 1fr auto;

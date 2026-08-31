@@ -35,6 +35,36 @@ export function initProjectDialog() {
       code: "NOX_003",
       monogram: "N/",
     },
+    "nox-004": {
+      index: "004",
+      category: "Experiment / E-commerce",
+      year: "2026",
+      title: "NOX Objects",
+      description: "A tactile storefront experiment for limited-run objects. The component already supports real project metadata later.",
+      scope: ["TYPE — E-COMMERCE", "TECH — HTML / CSS / JS", "STATUS — CONCEPT"],
+      code: "NOX_004",
+      monogram: "N/",
+    },
+    "nox-005": {
+      index: "005",
+      category: "Experiment / E-commerce",
+      year: "2026",
+      title: "NOX Objects",
+      description: "A tactile storefront experiment for limited-run objects. The component already supports real project metadata later.",
+      scope: ["TYPE — E-COMMERCE", "TECH — HTML / CSS / JS", "STATUS — CONCEPT"],
+      code: "NOX_005",
+      monogram: "N/",
+    },
+    "nox-006": {
+      index: "006",
+      category: "Experiment / E-commerce",
+      year: "2026",
+      title: "NOX Objects",
+      description: "A tactile storefront experiment for limited-run objects. The component already supports real project metadata later.",
+      scope: ["TYPE — E-COMMERCE", "TECH — HTML / CSS / JS", "STATUS — CONCEPT"],
+      code: "NOX_006",
+      monogram: "N/",
+    },
   };
 
   if (projectDialog) {

@@ -147,6 +147,7 @@
 
 
   .projects__pair { gap: 2rem; }
+  .projects__trio { gap: 2rem; }
 
   .why__inner,
   .about__inner {
@@ -309,6 +310,22 @@
     gap: 6.5rem;
   }
 
+  .projects__trio {
+    grid-template-columns: 1fr;
+    gap: 6.5rem;
+  }
+
+  .project--compact .project__visual { aspect-ratio: 1.05; }
+
+  .projects__trio .project__details h3 {
+    font-size: clamp(2rem, 3.1vw, 3.7rem);
+  }
+
+  .projects__trio .project__details > p {
+    font-size: 0.88rem;
+  }
+
+  .projects__pair--offset > .project--landscape { grid-column: 1; }
   .project--landscape { margin-top: 0; }
   .project--portrait .project__visual { aspect-ratio: 0.93; }
   .project--landscape .project__visual { aspect-ratio: 1.05; }
