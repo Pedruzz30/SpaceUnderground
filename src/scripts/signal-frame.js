@@ -3,12 +3,11 @@ import { projects, defaultProjectKey } from "./project-registry.js";
 const LIVE_PREVIEW_SELECTOR = "[data-live-project]";
 const MOBILE_QUERY = "(max-width: 759px)";
 const FINE_POINTER_QUERY = "(hover: hover) and (pointer: fine)";
-const SLEEP_DELAY = 10000;
+const SLEEP_DELAY = 4000;
 const LOAD_TIMEOUT = 8000;
 const STATE_CLASS_NAMES = ["is-preview-loading", "is-preview-live", "is-preview-sleeping", "is-preview-fallback"];
 const VIEW_CLASS_NAMES = ["is-view-site", "is-view-detail", "is-view-origin"];
 
-// Texto do [data-preview-status], no canto do frame.
 const STATE_LABELS = {
   loading: "PREVIEW / INITIALIZING",
   live: "● LIVE PREVIEW",
@@ -22,7 +21,6 @@ function openProject(url) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
-// So aceita http(s); qualquer outra coisa vira string vazia e o frame cai em fallback.
 function resolveUrl(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -60,7 +58,7 @@ function createCalibration(frame) {
   return () => {
     window.clearTimeout(timer);
     frame.classList.add("is-calibrating");
-    timer = window.setTimeout(() => frame.classList.remove("is-calibrating"), 720);
+    timer = window.setTimeout(() => frame.classList.remove("is-calibrating"), 420);
   };
 }
 
@@ -79,6 +77,8 @@ function setMode(frame, mode, modeButtons) {
     if (isReset) button.removeAttribute("aria-pressed");
     else button.setAttribute("aria-pressed", String(isActive));
   });
+
+  return nextMode;
 }
 
 function createLivePreview(frame, mobileMedia) {
@@ -87,27 +87,29 @@ function createLivePreview(frame, mobileMedia) {
   const hoverMark = visual?.querySelector(".project__hover-mark");
   const iframe = frame.querySelector("iframe");
   const poster = frame.querySelector(".signal-ui__poster");
-  // <source> do <picture> do poster, por formato. Trocar so o img.src deixaria
-  // o navegador servindo o AVIF/WebP do case anterior.
   const posterSources = new Map(
     [...frame.querySelectorAll("[data-poster-source]")].map((node) => [node.dataset.posterSource, node]),
   );
   const modeButtons = [...frame.querySelectorAll("[data-signal-mode]")];
   const openButtons = [...frame.querySelectorAll("[data-signal-open]")];
 
-  // Fonte corrente do frame. Trocar de projeto so reescreve estas tres variaveis.
   let projectUrl = frame.dataset.projectUrl || iframe?.dataset.src || "";
   let previewUrl = resolveUrl(frame.dataset.projectPreviewUrl || iframe?.dataset.src || projectUrl);
   let previewOrigin = originOf(previewUrl);
   let posterUrl = frame.dataset.projectPoster || "";
 
+  // Cada troca atualiza e limpa os formatos do <picture> de forma deterministica.
+  // Assim posters SVG nao reaproveitam AVIF/WebP do projeto anterior e nenhum
+  // MutationObserver global precisa acompanhar src/srcset.
   const applyPoster = (next) => {
     if (!poster || !next) return;
-    // Aceita tanto a string antiga quanto o objeto com os tres formatos.
     const formats = typeof next === "string" ? { png: next } : next;
+
     posterSources.forEach((node, format) => {
-      if (formats[format]) node.srcset = formats[format];
+      if (formats[format]) node.setAttribute("srcset", formats[format]);
+      else node.removeAttribute("srcset");
     });
+
     if (formats.width) poster.width = formats.width;
     if (formats.height) poster.height = formats.height;
     if (formats.png) poster.src = formats.png;
@@ -134,15 +136,17 @@ function createLivePreview(frame, mobileMedia) {
     clearSleepTimer();
     clearLoadTimer();
     if (!iframe) return;
-    iframe.src = "about:blank";
+    if (iframe.src !== "about:blank") iframe.src = "about:blank";
     hasLoaded = false;
     if (activePreview === frame) activePreview = null;
     setPreviewState(frame, "sleeping");
   };
 
-  const load = ({ preload = false } = {}) => {
+  // Preview ao vivo agora e opt-in: so e carregado quando o visitante escolhe
+  // explicitamente o modo SITE. Selecionar um case exibe apenas o poster leve.
+  const load = () => {
     clearSleepTimer();
-    if (!iframe || mobileMedia.matches) {
+    if (!iframe || mobileMedia.matches || !frame.classList.contains("is-view-site")) {
       setPreviewState(frame, "sleeping");
       return;
     }
@@ -153,7 +157,6 @@ function createLivePreview(frame, mobileMedia) {
     }
 
     if (activePreview && activePreview !== frame) {
-      if (preload && activePreview.classList.contains("is-preview-active")) return;
       activePreview.dispatchEvent(new CustomEvent("live-preview:release"));
     }
 
@@ -170,8 +173,7 @@ function createLivePreview(frame, mobileMedia) {
 
     clearLoadTimer();
     loadTimer = window.setTimeout(() => {
-      if (hasLoaded) return;
-      setPreviewState(frame, "fallback");
+      if (!hasLoaded) setPreviewState(frame, "fallback");
     }, LOAD_TIMEOUT);
   };
 
@@ -180,7 +182,6 @@ function createLivePreview(frame, mobileMedia) {
     sleepTimer = window.setTimeout(unload, SLEEP_DELAY);
   };
 
-  // Descarrega o projeto atual e aponta o mesmo iframe para o proximo.
   const setSource = ({ url, previewUrl: nextPreviewUrl, poster: nextPoster, title }) => {
     unload();
     projectUrl = url || "";
@@ -225,9 +226,11 @@ function createLivePreview(frame, mobileMedia) {
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      setMode(frame, button.dataset.signalMode || "overview", modeButtons);
+      const nextMode = setMode(frame, button.dataset.signalMode || "overview", modeButtons);
       calibrate();
-      if (!mobileMedia.matches) load();
+
+      if (nextMode === "site" && !mobileMedia.matches) load();
+      else if (hasLoaded || iframe?.src !== "about:blank") scheduleSleep();
     });
   });
 
@@ -257,52 +260,41 @@ function createLivePreview(frame, mobileMedia) {
     });
   }
 
-  const preloadObserver = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) load({ preload: true });
-    });
-  }, { rootMargin: "800px 0px" });
-
+  // O observer agora so cuida de liberar memoria ao sair da area. Ele nao
+  // pre-carrega nem inicia iframes automaticamente.
   const activeObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (entry.isIntersecting) {
         clearSleepTimer();
         frame.classList.add("is-preview-active");
-        if (!mobileMedia.matches) load();
       } else {
         frame.classList.remove("is-preview-active");
         scheduleSleep();
       }
     });
-  }, { threshold: 0.18 });
+  }, { threshold: 0.12 });
 
   mobileMedia.addEventListener("change", (event) => {
     if (event.matches) unload();
-    else if (frame.classList.contains("is-preview-active")) load();
   });
 
   setMode(frame, "overview", modeButtons);
   applyPoster(posterUrl);
   setPreviewState(frame, "sleeping");
-  preloadObserver.observe(frame);
   activeObserver.observe(frame);
 
   return {
     setSource,
     calibrate,
     setMode: (mode) => setMode(frame, mode, modeButtons),
-    refresh: ({ force = false } = {}) => {
-      if (mobileMedia.matches) return;
-      if (force || frame.classList.contains("is-preview-active")) load();
+    refresh: () => {
+      if (!mobileMedia.matches && frame.classList.contains("is-view-site")) load();
     },
   };
 }
 
-// PROJECT VIEWER: um frame, varios projetos. Os dados vem de project-registry.js.
 function createProjectViewer(frame, preview) {
   const article = frame.closest(".project") || frame;
-  // Os seletores vivem em dois lugares: os quadradinhos do rail (dentro do frame)
-  // e as linhas do indice de cases (irmao do card). Ambos usam data-project-slot.
   const root = frame.closest("section") || article;
   const caseIndex = root.querySelector("[data-case-index]");
   const accentTargets = [article, caseIndex].filter(Boolean);
@@ -329,15 +321,13 @@ function createProjectViewer(frame, preview) {
   };
 
   const write = (nodes, value) => nodes.forEach((node) => { node.textContent = value; });
-
   let activeKey = "";
 
-  const apply = (key, { force = false } = {}) => {
+  const apply = (key) => {
     const project = projects[key];
     if (!project || project.reserved || key === activeKey) return;
     activeKey = key;
 
-    // 1. descarrega o projeto atual antes de qualquer troca de conteudo
     preview.setSource({
       url: project.url,
       previewUrl: project.previewUrl,
@@ -345,10 +335,8 @@ function createProjectViewer(frame, preview) {
       title: `${project.name} live website preview`,
     });
 
-    // 2. accent do projeto vale para o card inteiro (frame, grid e detalhes)
     accentTargets.forEach((target) => target.style.setProperty("--accent", project.accent));
 
-    // 3. metadados
     write(fields.index, `CASE / ${project.id}`);
     write(fields.eyebrow, `CLIENT / ${project.id}`);
     write(fields.client, project.client);
@@ -385,7 +373,6 @@ function createProjectViewer(frame, preview) {
       button.setAttribute("aria-label", `Inspect ${title.toLowerCase()}`);
     });
 
-    // 4. estado dos quadrados da coluna esquerda
     slots.forEach((slot) => {
       if (slot.hasAttribute("data-slot-reserved")) return;
       const isActive = slot.dataset.projectSlot === key;
@@ -393,10 +380,10 @@ function createProjectViewer(frame, preview) {
       slot.setAttribute("aria-pressed", String(isActive));
     });
 
-    // 5. volta para overview e recarrega o iframe unico
+    // Trocar de case agora sempre volta ao poster/overview. O iframe permanece
+    // descarregado ate o visitante pedir explicitamente o modo SITE.
     preview.setMode("overview");
     preview.calibrate();
-    preview.refresh({ force });
   };
 
   slots.forEach((slot) => {
@@ -404,7 +391,7 @@ function createProjectViewer(frame, preview) {
       event.preventDefault();
       event.stopPropagation();
       if (slot.hasAttribute("data-slot-reserved")) return;
-      apply(slot.dataset.projectSlot || defaultProjectKey, { force: true });
+      apply(slot.dataset.projectSlot || defaultProjectKey);
       if (!slot.closest(".signal-ui")) {
         article.querySelector(".project__visual")?.scrollIntoView({ block: "center" });
       }
