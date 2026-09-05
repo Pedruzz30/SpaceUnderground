@@ -1,12 +1,7 @@
 // Fonte unica de verdade dos planos da secao 06 / Plans.
-// Preco, prazo, escopo e o que esta incluso moram AQUI e em lugar nenhum mais:
-// o card (plans-renderer.js) e o modal (project-dialog.js) leem deste arquivo.
-//
-// `scopeShort` e a versao curta que cabe no rodape do card; `scope` e a linha
-// completa dos detalhes e do modal. Sao a mesma informacao em dois tamanhos,
-// nao dois dados diferentes — mudar preco significa mudar `range` e mais nada.
-//
-// A ORDEM das chaves e a ordem dos cards na grade e do PLAN / 00x.
+// Os campos-base continuam alimentando o HTML estatico gerado em build time.
+// `commercial` concentra a apresentacao comercial atual, aplicada no browser
+// antes do dialog e do formulario conectarem seus listeners.
 
 export const plans = {
   plus: {
@@ -24,6 +19,21 @@ export const plans = {
     timeline: "1–4 weeks",
     year: "2026",
     code: "PLUS_001",
+    commercial: {
+      category: "PLANO / PRESENÇA DIGITAL",
+      range: "R$ 800 – R$ 2.500",
+      scope: "LANDING PAGES · PORTFÓLIOS",
+      scopeShort: "LANDING PAGES · PORTFÓLIOS",
+      status: "DISPONÍVEL",
+      description: "Para colocar sua presença digital no ar com clareza, identidade e foco em conversão.",
+      included: [
+        "Design responsivo sob medida",
+        "Estrutura focada em conversão",
+        "Formulário ou CTA integrado",
+        "1 rodada de ajustes",
+      ],
+      timeline: "1–4 semanas",
+    },
   },
 
   pro: {
@@ -41,6 +51,21 @@ export const plans = {
     timeline: "3–6 weeks",
     year: "2026",
     code: "PRO_002",
+    commercial: {
+      category: "PLANO / SITE COMPLETO",
+      range: "R$ 2.500 – R$ 4.500",
+      scope: "SITES INSTITUCIONAIS · EXPERIÊNCIAS MULTIPÁGINA",
+      scopeShort: "SITES INSTITUCIONAIS",
+      status: "DISPONÍVEL",
+      description: "Para empresas que precisam de uma presença digital completa, profissional e preparada para crescer.",
+      included: [
+        "Estrutura com múltiplas páginas",
+        "Design personalizado, sem template genérico",
+        "SEO técnico e performance básica",
+        "2 rodadas de ajustes",
+      ],
+      timeline: "3–6 semanas",
+    },
   },
 
   max: {
@@ -63,11 +88,32 @@ export const plans = {
     timeline: "6–12 weeks",
     year: "2026",
     code: "MAX_003",
+    commercial: {
+      category: "PLANO / SOFTWARE SOB MEDIDA",
+      range: "A PARTIR DE R$ 5.000",
+      scope: "SISTEMAS · AUTOMAÇÃO · IA · INTEGRAÇÕES",
+      scopeShort: "SISTEMAS · AUTOMAÇÃO · IA",
+      status: "SOB CONSULTA",
+      description: "Para operações que precisam de software sob medida: sistemas, automações, integrações e inteligência artificial aplicada ao negócio.",
+      included: [
+        "Arquitetura e desenvolvimento sob medida",
+        "Banco de dados, autenticação e integrações",
+        "Automações e fluxos inteligentes",
+        "IA aplicada quando fizer sentido ao produto",
+      ],
+      timeline: "6–12+ semanas",
+      accent: "#f59e0b",
+    },
   },
 };
 
-// Linhas do bloco de escopo, iguais no card e no modal. Uma funcao so para os
-// dois consumidores: se o formato mudar, muda nos dois ao mesmo tempo.
+// Linhas do bloco de escopo, iguais no card e no modal.
 export function planScopeLines(plan) {
   return [`SCOPE — ${plan.scope}`, `RANGE — ${plan.range}`, `STATUS — ${plan.status}`];
+}
+
+// A visao comercial sobrepoe apenas os campos que mudam no posicionamento.
+// O registro-base fica intacto para manter compatibilidade com o renderer atual.
+export function commercialPlan(plan) {
+  return { ...plan, ...(plan.commercial || {}) };
 }
