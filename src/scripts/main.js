@@ -1,6 +1,5 @@
 // Ponto de entrada. Cada modulo cuida de uma parte da pagina e se
 // inicializa sozinho; a ORDEM abaixo e a mesma do arquivo original.
-import { initLocalization } from "./localization.js";
 import { initCapabilitiesSection } from "./capabilities-section.js";
 import { initCommercialPositioning } from "./commercial-positioning.js";
 import { initScrollProgress } from "./scroll-progress.js";
@@ -16,8 +15,9 @@ import { initPointerEffects } from "./pointer-effects.js";
 
 document.documentElement.classList.add("js");
 
-// Localiza o conteudo estatico antes dos modulos que escrevem textos dinamicos.
-initLocalization();
+// A localizacao do HTML e feita no build pelo vite.config.js. Nao mantemos
+// MutationObserver de traducao no navegador: ele era redundante, podia
+// retransladar textos ja em pt-BR e gerar trabalho continuo no DOM.
 
 // Insere a camada de posicionamento Sites > Sistemas > Automacao > IA antes
 // do sistema de reveal e da navegacao observarem as secoes da pagina.

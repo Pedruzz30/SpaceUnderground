@@ -9,10 +9,10 @@ const STATE_CLASS_NAMES = ["is-preview-loading", "is-preview-live", "is-preview-
 const VIEW_CLASS_NAMES = ["is-view-site", "is-view-detail", "is-view-origin"];
 
 const STATE_LABELS = {
-  loading: "PREVIEW / INITIALIZING",
-  live: "● LIVE PREVIEW",
-  sleeping: "PREVIEW / SLEEP",
-  fallback: "PREVIEW / FALLBACK",
+  loading: "PRÉVIA / INICIALIZANDO",
+  live: "● PRÉVIA AO VIVO",
+  sleeping: "PRÉVIA / EM ESPERA",
+  fallback: "PRÉVIA / ALTERNATIVA",
 };
 
 let activePreview = null;
@@ -98,9 +98,6 @@ function createLivePreview(frame, mobileMedia) {
   let previewOrigin = originOf(previewUrl);
   let posterUrl = frame.dataset.projectPoster || "";
 
-  // Cada troca atualiza e limpa os formatos do <picture> de forma deterministica.
-  // Assim posters SVG nao reaproveitam AVIF/WebP do projeto anterior e nenhum
-  // MutationObserver global precisa acompanhar src/srcset.
   const applyPoster = (next) => {
     if (!poster || !next) return;
     const formats = typeof next === "string" ? { png: next } : next;
@@ -142,8 +139,6 @@ function createLivePreview(frame, mobileMedia) {
     setPreviewState(frame, "sleeping");
   };
 
-  // Preview ao vivo agora e opt-in: so e carregado quando o visitante escolhe
-  // explicitamente o modo SITE. Selecionar um case exibe apenas o poster leve.
   const load = () => {
     clearSleepTimer();
     if (!iframe || mobileMedia.matches || !frame.classList.contains("is-view-site")) {
@@ -260,8 +255,6 @@ function createLivePreview(frame, mobileMedia) {
     });
   }
 
-  // O observer agora so cuida de liberar memoria ao sair da area. Ele nao
-  // pre-carrega nem inicia iframes automaticamente.
   const activeObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (entry.isIntersecting) {
@@ -332,13 +325,13 @@ function createProjectViewer(frame, preview) {
       url: project.url,
       previewUrl: project.previewUrl,
       poster: project.poster,
-      title: `${project.name} live website preview`,
+      title: `Prévia ao vivo de ${project.name}`,
     });
 
     accentTargets.forEach((target) => target.style.setProperty("--accent", project.accent));
 
     write(fields.index, `CASE / ${project.id}`);
-    write(fields.eyebrow, `CLIENT / ${project.id}`);
+    write(fields.eyebrow, `CLIENTE / ${project.id}`);
     write(fields.client, project.client);
     write(fields.category, project.category);
     write(fields.description, project.description);
@@ -348,16 +341,16 @@ function createProjectViewer(frame, preview) {
     write(fields.origin, project.origin);
     write(fields.coordinates, project.coordinates.join("\n"));
     write(fields.name, project.name);
-    write(fields.year, `YEAR — ${project.year}`);
-    write(fields.specs, `TYPE — ${project.type}\nTECH — ${project.tech}\nSTATUS — ${project.status}`);
+    write(fields.year, `ANO — ${project.year}`);
+    write(fields.specs, `TIPO — ${project.type}\nTECNOLOGIA — ${project.tech}\nSTATUS — ${project.status}`);
 
-    const openLabel = `View ${project.name} website (opens in a new tab)`;
+    const openLabel = `Ver ${project.name} (abre em uma nova aba)`;
     fields.links.forEach((link) => {
       link.href = project.url;
       link.setAttribute("aria-label", openLabel);
     });
     fields.open.forEach((button) => {
-      button.setAttribute("aria-label", `Open ${project.name} website in a new tab`);
+      button.setAttribute("aria-label", `Abrir ${project.name} em uma nova aba`);
     });
 
     fields.modules.forEach((button) => {
@@ -370,7 +363,7 @@ function createProjectViewer(frame, preview) {
       if (numberNode) numberNode.textContent = number;
       if (titleNode) titleNode.textContent = title;
       if (captionNode) captionNode.textContent = caption;
-      button.setAttribute("aria-label", `Inspect ${title.toLowerCase()}`);
+      button.setAttribute("aria-label", `Inspecionar ${title.toLowerCase()}`);
     });
 
     slots.forEach((slot) => {
@@ -380,8 +373,6 @@ function createProjectViewer(frame, preview) {
       slot.setAttribute("aria-pressed", String(isActive));
     });
 
-    // Trocar de case agora sempre volta ao poster/overview. O iframe permanece
-    // descarregado ate o visitante pedir explicitamente o modo SITE.
     preview.setMode("overview");
     preview.calibrate();
   };

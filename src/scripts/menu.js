@@ -22,7 +22,7 @@ export function initMenu() {
     navigation.classList.toggle("is-open", open);
     navigation.style.visibility = open ? "visible" : "";
     menuToggle.setAttribute("aria-expanded", String(open));
-    menuToggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    menuToggle.setAttribute("aria-label", open ? "Fechar menu" : "Abrir menu");
     document.body.classList.toggle("menu-open", open);
     document.body.style.overflow = open ? "hidden" : "";
 
