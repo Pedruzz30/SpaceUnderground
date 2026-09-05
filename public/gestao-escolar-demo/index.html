@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#07130d">
+  <title>Despensa Digital — Demo</title>
+  <style>
+    :root{color-scheme:dark;--bg:#07130d;--panel:#0d1d14;--panel2:#10281b;--line:#1d3b29;--green:#22c55e;--green2:#86efac;--text:#e7f8ed;--muted:#83a78f;--warn:#f59e0b;--red:#ef4444;--sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Cascadia Mono",Consolas,monospace}
+    *{box-sizing:border-box}body{margin:0;min-width:320px;background:radial-gradient(circle at 82% 10%,rgba(34,197,94,.08),transparent 28%),var(--bg);color:var(--text);font-family:var(--sans)}button{font:inherit;color:inherit}.app{display:grid;grid-template-columns:210px 1fr;min-height:100vh}.side{border-right:1px solid var(--line);background:#08160e;padding:18px 14px;display:flex;flex-direction:column;gap:20px}.brand{display:flex;gap:10px;align-items:center;padding:4px}.brand__mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(34,197,94,.45);background:rgba(34,197,94,.08);font:700 13px var(--mono);color:var(--green2)}.brand strong{display:block;font-size:13px}.brand small{color:var(--muted);font:9px var(--mono);letter-spacing:.08em}.nav{display:grid;gap:4px}.nav button{border:0;background:transparent;text-align:left;padding:10px;border-radius:8px;color:#9bb7a3;cursor:pointer;font-size:12px}.nav button.active,.nav button:hover{background:rgba(34,197,94,.09);color:var(--green2)}.nav button span{display:inline-block;width:20px;color:var(--green)}.sidefoot{margin-top:auto;border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font:9px/1.7 var(--mono)}.main{min-width:0}.top{height:66px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;gap:14px;background:rgba(7,19,13,.78);backdrop-filter:blur(10px);position:sticky;top:0;z-index:4}.top h1{margin:0;font-size:16px}.top p{margin:3px 0 0;color:var(--muted);font-size:10px}.status{display:flex;align-items:center;gap:8px;color:var(--green2);font:9px var(--mono);letter-spacing:.08em}.dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}.content{padding:20px;display:grid;gap:14px}.actions{display:flex;flex-wrap:wrap;gap:7px}.actions button{border:1px solid var(--line);background:var(--panel);padding:9px 11px;border-radius:8px;font:9px var(--mono);letter-spacing:.04em;cursor:pointer}.actions button:hover{border-color:var(--green);background:rgba(34,197,94,.08)}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.card{border:1px solid var(--line);background:linear-gradient(145deg,rgba(16,40,27,.86),rgba(8,22,14,.92));border-radius:10px;padding:14px}.stat small,.kicker{display:block;color:var(--muted);font:8px var(--mono);letter-spacing:.1em;text-transform:uppercase}.stat strong{display:block;margin:10px 0 5px;font-size:25px;font-weight:600}.stat span{font-size:9px;color:#9ab5a2}.stat.alert strong{color:#fbbf24}.grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(250px,.8fr);gap:10px}.panel{border:1px solid var(--line);background:rgba(10,27,17,.88);border-radius:10px;overflow:hidden}.panel head,.panel .head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid var(--line)}.head strong{font-size:12px}.head span{color:var(--muted);font:8px var(--mono)}table{width:100%;border-collapse:collapse;font-size:10px}th{text-align:left;color:var(--muted);font:8px var(--mono);font-weight:400;letter-spacing:.08em;padding:9px 12px;border-bottom:1px solid var(--line)}td{padding:11px 12px;border-bottom:1px solid rgba(29,59,41,.62)}tr:last-child td{border-bottom:0}.qty{font:600 11px var(--mono)}.badge{display:inline-flex;align-items:center;gap:5px;font:8px var(--mono);padding:4px 7px;border-radius:999px;background:rgba(34,197,94,.09);color:var(--green2)}.badge.low{background:rgba(245,158,11,.1);color:#fbbf24}.badge.out{background:rgba(239,68,68,.1);color:#fca5a5}.feed{padding:12px;display:grid;gap:9px}.event{display:grid;grid-template-columns:8px 1fr;gap:9px}.event i{width:7px;height:7px;margin-top:4px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(34,197,94,.5)}.event strong{display:block;font-size:10px}.event small{display:block;margin-top:3px;color:var(--muted);font-size:8px;line-height:1.45}.sync{padding:12px;border-top:1px solid var(--line);display:grid;gap:8px}.syncrow{display:flex;justify-content:space-between;gap:10px;font:8px var(--mono);color:var(--muted)}.syncrow b{color:var(--green2);font-weight:500}.bars{height:75px;display:flex;align-items:end;gap:5px;padding:0 12px 12px}.bars i{flex:1;min-width:5px;background:linear-gradient(180deg,var(--green),rgba(34,197,94,.18));height:var(--h);border-radius:3px 3px 0 0}.footer{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font:8px var(--mono);padding:0 2px}.toast{position:fixed;right:18px;bottom:18px;max-width:340px;padding:11px 13px;border:1px solid var(--green);background:#0b2114;color:var(--green2);border-radius:8px;font:9px/1.5 var(--mono);opacity:0;transform:translateY(8px);pointer-events:none;transition:.2s}.toast.show{opacity:1;transform:none}body.embed .side{display:none}body.embed .app{grid-template-columns:1fr}body.embed .top{position:relative}
+    @media(max-width:900px){.stats{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}.app{grid-template-columns:170px 1fr}}
+    @media(max-width:620px){.side{display:none}.app{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.content{padding:12px}.top{padding:0 12px}.grid{display:block}.panel{margin-bottom:10px}.footer{flex-direction:column}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="brand__mark">DD</div><div><strong>Despensa Digital</strong><small>GESTÃO ESCOLAR</small></div></div>
+    <nav class="nav" aria-label="Navegação da demonstração">
+      <button class="active"><span>◫</span>Visão geral</button><button><span>▦</span>Estoque</button><button><span>↕</span>Movimentações</button><button><span>◎</span>Notas fiscais IA</button><button><span>⇄</span>Sincronização</button><button><span>⚙</span>Configurações</button>
+    </nav>
+    <div class="sidefoot">SUPABASE / EDGE FUNCTIONS<br>GEMINI / GOOGLE DRIVE<br>DEMO DE PORTFÓLIO</div>
+  </aside>
+  <main class="main">
+    <header class="top"><div><h1>Painel de Operações</h1><p>Estoque de cozinha e limpeza · Setembro de 2026</p></div><div class="status"><span class="dot"></span>SISTEMA OPERACIONAL</div></header>
+    <div class="content">
+      <div class="actions"><button data-action="entry">+ Registrar entrada</button><button data-action="exit">− Registrar saída</button><button data-action="invoice">◎ Ler nota fiscal com IA</button><button data-action="sync">⇄ Sincronizar Mapa de Merenda</button></div>
+      <section class="stats">
+        <article class="card stat"><small>Itens cadastrados</small><strong>148</strong><span>94 cozinha · 54 limpeza</span></article>
+        <article class="card stat"><small>Movimentações no mês</small><strong id="moves">326</strong><span>Entradas e saídas auditadas</span></article>
+        <article class="card stat alert"><small>Estoque baixo</small><strong id="alerts">7</strong><span>Alertas automáticos ativos</span></article>
+        <article class="card stat"><small>Notas lidas por IA</small><strong id="invoices">18</strong><span>Gemini + conferência humana</span></article>
+      </section>
+      <section class="grid">
+        <article class="panel">
+          <div class="head"><div><span class="kicker">ESTOQUE / COZINHA</span><strong>Itens monitorados</strong></div><span>ATUALIZAÇÃO EM TEMPO REAL</span></div>
+          <table><thead><tr><th>Produto</th><th>Unidade</th><th>Estoque</th><th>Status</th></tr></thead><tbody>
+            <tr><td>Arroz tipo 1</td><td>kg</td><td class="qty" data-stock="arroz">86</td><td><span class="badge">NORMAL</span></td></tr>
+            <tr><td>Feijão preto</td><td>kg</td><td class="qty">42</td><td><span class="badge">NORMAL</span></td></tr>
+            <tr><td>Óleo de soja</td><td>un</td><td class="qty">9</td><td><span class="badge low">BAIXO</span></td></tr>
+            <tr><td>Leite em pó</td><td>kg</td><td class="qty">4</td><td><span class="badge low">BAIXO</span></td></tr>
+            <tr><td>Detergente</td><td>un</td><td class="qty">0</td><td><span class="badge out">EM FALTA</span></td></tr>
+          </tbody></table>
+          <div class="head"><strong>Consumo dos últimos 7 dias</strong><span>COZINHA</span></div>
+          <div class="bars" aria-label="Gráfico ilustrativo"><i style="--h:48%"></i><i style="--h:72%"></i><i style="--h:56%"></i><i style="--h:84%"></i><i style="--h:63%"></i><i style="--h:91%"></i><i style="--h:68%"></i></div>
+        </article>
+        <aside class="panel"><div class="head"><strong>Automações</strong><span>EDGE FUNCTIONS</span></div><div class="feed" id="feed">
+          <div class="event"><i></i><div><strong>Mapa de Merenda sincronizado</strong><small>Movimentações de cozinha enviadas ao Google Drive · 21:42</small></div></div>
+          <div class="event"><i></i><div><strong>Alerta de estoque enviado</strong><small>Óleo de soja abaixo do mínimo configurado · 20:18</small></div></div>
+          <div class="event"><i></i><div><strong>Nota fiscal processada</strong><small>12 itens reconhecidos por IA e enviados para conferência · 18:05</small></div></div>
+        </div><div class="sync"><div class="syncrow"><span>SUPABASE</span><b>ONLINE</b></div><div class="syncrow"><span>GOOGLE DRIVE</span><b id="syncstate">SINCRONIZADO</b></div><div class="syncrow"><span>ALERTAS</span><b>ATIVOS</b></div><div class="syncrow"><span>IA / GEMINI</span><b>PRONTA</b></div></div></aside>
+      </section>
+      <div class="footer"><span>CASE 004 / SISTEMA WEB DE GESTÃO</span><span>DEMONSTRAÇÃO SEM DADOS REAIS</span></div>
+    </div>
+  </main>
+</div><div class="toast" id="toast" role="status"></div>
+<script>
+(()=>{const $=s=>document.querySelector(s),toast=$('#toast'),feed=$('#feed');let timer;const say=t=>{toast.textContent=t;toast.classList.add('show');clearTimeout(timer);timer=setTimeout(()=>toast.classList.remove('show'),1900)};const addEvent=(title,detail)=>{const el=document.createElement('div');el.className='event';el.innerHTML='<i></i><div><strong></strong><small></small></div>';el.querySelector('strong').textContent=title;el.querySelector('small').textContent=detail;feed.prepend(el)};document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>{const a=b.dataset.action,moves=$('#moves'),stock=$('[data-stock="arroz"]');if(a==='entry'){stock.textContent=String(Number(stock.textContent)+12);moves.textContent=String(Number(moves.textContent)+1);addEvent('Entrada registrada','Arroz tipo 1 · +12 kg · agora');say('Entrada simulada registrada e auditada.')}if(a==='exit'){stock.textContent=String(Math.max(0,Number(stock.textContent)-6));moves.textContent=String(Number(moves.textContent)+1);addEvent('Saída registrada','Arroz tipo 1 · −6 kg · agora');say('Saída simulada registrada.')}if(a==='invoice'){const n=$('#invoices');n.textContent=String(Number(n.textContent)+1);addEvent('Nota fiscal processada por IA','14 itens reconhecidos · aguardando conferência');say('Gemini simulou a leitura da nota fiscal.')}if(a==='sync'){const s=$('#syncstate');s.textContent='SINCRONIZANDO...';addEvent('Sincronização iniciada','Mapa de Merenda · Google Drive');say('Sincronizando movimentações...');setTimeout(()=>s.textContent='SINCRONIZADO',900)}}));if(new URLSearchParams(location.search).has('embed'))document.body.classList.add('embed');try{if(parent!==window)parent.postMessage({type:'gestao-preview:ready'},location.origin)}catch{}})();
+</script>
+</body></html>
