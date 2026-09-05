@@ -7,6 +7,15 @@ export function initPosterLocalization() {
       const current = poster.getAttribute("src") || "";
       if (current.includes("jarvis-preview-poster") && current !== "./jarvis-preview-poster-pt.svg") {
         poster.setAttribute("src", "./jarvis-preview-poster-pt.svg");
+        return;
+      }
+
+      // Posters SVG nao usam os <source> AVIF/WebP do <picture>. Limpar aqui
+      // impede que o navegador reaproveite a imagem otimizada do case anterior.
+      if (current.endsWith(".svg")) {
+        poster.parentElement?.querySelectorAll("[data-poster-source]").forEach((source) => {
+          source.removeAttribute("srcset");
+        });
       }
     }
 
@@ -14,6 +23,9 @@ export function initPosterLocalization() {
     sources.forEach((source) => {
       const current = source.getAttribute("srcset") || "";
       if (current.includes("jarvis-preview-poster")) source.removeAttribute("srcset");
+
+      const picturePoster = source.parentElement?.querySelector(".signal-ui__poster");
+      if ((picturePoster?.getAttribute("src") || "").endsWith(".svg")) source.removeAttribute("srcset");
     });
   };
 
