@@ -25,5 +25,8 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Validar JavaScript estático
+        run: find public -type f -name '*.js' -print0 | xargs -0 -r -n1 node --check
+
       - name: Validar build
         run: npm run build
