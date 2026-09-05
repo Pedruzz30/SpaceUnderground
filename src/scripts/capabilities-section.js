@@ -11,7 +11,7 @@ export function initCapabilitiesSection() {
     <div class="container">
       <header class="section-heading section-heading--row reveal" data-reveal>
         <div>
-          <p class="section-label"><span>02</span> Capacidades</p>
+          <p class="section-label"><span>CAP</span> Capacidades</p>
           <h2 id="capabilities-title">Do site ao <em>sistema inteligente.</em></h2>
         </div>
         <p class="section-intro">Projetamos desde experiências digitais focadas em conversão até sistemas, automações e aplicações com inteligência artificial.</p>
