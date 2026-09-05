@@ -22,6 +22,14 @@ function replaceWithButton(node) {
   return button;
 }
 
+function resetOptimizedPosterSources(project) {
+  const fallback = project.poster?.png || "";
+  if (!fallback.endsWith(".svg")) return;
+  document.querySelectorAll("[data-project-viewer] [data-poster-source]").forEach((source) => {
+    source.srcset = "";
+  });
+}
+
 function hydrateSlot(projectKey, project) {
   if (!project.slot) return;
   const placeholders = [...document.querySelectorAll(`[data-project-slot="${project.slot}"]`)];
@@ -36,6 +44,10 @@ function hydrateSlot(projectKey, project) {
     node.classList.remove("is-reserved");
     node.setAttribute("aria-pressed", "false");
     node.style.setProperty("--slot-accent", project.accent);
+
+    // Registrado antes do Project Viewer: para posters SVG, limpa os <source>
+    // AVIF/WebP do case anterior antes que o viewer atualize o <img> fallback.
+    node.addEventListener("click", () => resetOptimizedPosterSources(project));
 
     if (!isIndexRow) {
       node.setAttribute("aria-label", `Mostrar projeto ${project.id} — ${project.name}`);
