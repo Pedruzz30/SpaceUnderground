@@ -1,22 +1,18 @@
 // Modal unico da pagina. Quem abre sao os cards da secao 06 / Plans; os cases
 // reais nao passam por aqui, eles ficam no PROJECT VIEWER (signal-frame.js).
 //
-// Os dados NAO moram neste arquivo: preco, prazo, escopo e o que esta incluso
-// vem do plans-registry.js, o mesmo que gera os cards. Para mudar um plano,
-// mexa la — aqui e so a montagem do modal.
+// Os dados moram em plans-registry.js. A camada `commercial` sobrepoe a
+// apresentacao comercial sem quebrar o HTML estatico gerado em build time.
 
-import { plans, planScopeLines } from "./plans-registry.js";
+import { plans, commercialPlan, planScopeLines } from "./plans-registry.js";
 
-// Textos que valem para qualquer plano, independentes de qual foi aberto.
 const PLAN_PRESET = {
-  namespace: "PLAN",
-  kind: "Pricing plan",
-  note: "Investment range by project level. The final quote is set once the scope is defined — talk to the studio for a proposal.",
-  cta: "Request a Proposal",
+  namespace: "PLANO",
+  kind: "Plano comercial",
+  note: "A faixa exibida serve como referência inicial. A proposta final é definida depois que entendemos escopo, integrações e complexidade do projeto.",
+  cta: "Solicitar uma Proposta",
 };
 
-// Indexado por [data-project] do HTML, que o plans-renderer escreve a partir
-// da chave `key` do registro.
 const previewsByKey = new Map(Object.values(plans).map((plan) => [plan.key, plan]));
 
 export function initProjectDialog() {
@@ -63,8 +59,10 @@ export function initProjectDialog() {
     if (node) node.textContent = value;
   };
 
-  const fillDialog = (plan) => {
-    const scope = planScopeLines(plan);
+  const fillDialog = (basePlan) => {
+    const plan = commercialPlan(basePlan);
+    const scope = planScopeLines(plan)
+      .map((line) => line.replace("SCOPE —", "ESCOPO —").replace("RANGE —", "INVESTIMENTO —").replace("STATUS —", "STATUS —"));
 
     write(dialogFields.index, plan.id);
     write(dialogFields.namespace, PLAN_PRESET.namespace);
@@ -81,13 +79,17 @@ export function initProjectDialog() {
       field.textContent = scope[index] || "";
     });
 
-    // Bloco "What's included": <li> vazio some via li:empty, entao a lista do
-    // HTML pode ser maior que a do plano sem deixar buraco.
     if (dialogFields.included) {
       dialogFields.included.hidden = !plan.included?.length;
+      const label = dialogFields.included.querySelector(".project-dialog__included-label");
+      if (label) label.textContent = "O que está incluído";
       dialogFields.includedItems.forEach((item, index) => {
         item.textContent = plan.included?.[index] || "";
       });
+      const timelineLabel = dialogFields.included.querySelector(".project-dialog__timeline");
+      if (timelineLabel) {
+        timelineLabel.childNodes[0].textContent = "Prazo típico — ";
+      }
       write(dialogFields.timeline, plan.timeline || "");
     }
   };
@@ -115,7 +117,6 @@ export function initProjectDialog() {
     const target = document.querySelector(dialogContact.getAttribute("href") || "");
     closeProjectDialog();
     if (!target) return;
-    // scrollIntoView herda o scroll-behavior do CSS (suave, ou direto em reduced-motion).
     event.preventDefault();
     window.requestAnimationFrame(() => target.scrollIntoView({ block: "start" }));
   });

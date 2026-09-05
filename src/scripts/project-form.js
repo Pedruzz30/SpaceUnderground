@@ -1,5 +1,5 @@
-// Formulario de solicitacao: selecao de produto, autofill de orcamento/prazo, validacao e envio ao Formspree.
-// Todo texto que o visitante le fica em ingles (politica EN-first); os comentarios seguem em portugues.
+// Formulario de solicitacao: selecao de produto, autofill de orcamento/prazo,
+// validacao e envio ao Formspree. Textos visiveis ficam em portugues.
 
 export function initProjectForm() {
   const projectForm = document.querySelector("[data-project-form]");
@@ -28,27 +28,35 @@ export function initProjectForm() {
     const productDetails = {
       "landing-page": {
         label: "Landing Page",
-        text: "Best for campaigns, launches and focused offers. Usually includes strategy, page structure, responsive interface and a conversion-ready contact path.",
+        text: "Ideal para campanhas, lançamentos, ofertas e serviços que precisam de uma página objetiva e focada em conversão.",
       },
       portfolio: {
-        label: "Portfolio",
-        text: "Best for professionals, creators and brands that need a memorable digital identity with selected work, story and contact flow.",
+        label: "Portfólio",
+        text: "Ideal para profissionais, criadores e marcas que precisam apresentar trabalho, identidade e contato de forma memorável.",
       },
       "institutional-website": {
-        label: "Institutional Website",
-        text: "Best for companies that need a complete presence with multiple pages, clear navigation, service content and a scalable structure.",
+        label: "Site Institucional",
+        text: "Ideal para empresas que precisam de presença completa, múltiplas páginas, navegação clara e estrutura preparada para crescer.",
       },
       "e-commerce": {
         label: "E-commerce",
-        text: "Best for product catalogs and stores where discovery, usability, checkout intent and visual direction need to work together.",
+        text: "Ideal para catálogos e lojas virtuais em que descoberta de produtos, experiência de compra e conversão precisam funcionar juntas.",
       },
       "web-system": {
-        label: "Web System",
-        text: "Best for dashboards, internal platforms and custom tools where workflow, data and interface behavior matter more than decoration.",
+        label: "Sistema Web",
+        text: "Ideal para dashboards, plataformas, portais e ferramentas internas em que fluxo, dados, permissões e operação são parte central do produto.",
+      },
+      automation: {
+        label: "Automação / Integrações",
+        text: "Ideal para conectar serviços, automatizar tarefas recorrentes, sincronizar dados, criar alertas e reduzir trabalho manual.",
+      },
+      "ai-solution": {
+        label: "IA / Assistente Inteligente",
+        text: "Ideal para assistentes, agentes, voz, visão, memória, classificação inteligente ou IA integrada a um sistema existente.",
       },
       other: {
-        label: "Other",
-        text: "Best for unusual scopes, early product ideas or builds that need a technical conversation before being named properly.",
+        label: "Projeto Personalizado",
+        text: "Ideal para uma necessidade fora dos formatos comuns e que precisa de uma conversa técnica antes de definir arquitetura e investimento.",
       },
     };
 
@@ -96,14 +104,14 @@ export function initProjectForm() {
         productCount.textContent = `${String(selectedIndex).padStart(2, "0")} / ${String(productOptions.length).padStart(2, "0")}`;
       }
 
-      if (productSummaryKicker) productSummaryKicker.textContent = details ? "PRODUCT SELECTED" : "NO PRODUCT SELECTED";
-      if (productSummaryTitle) productSummaryTitle.textContent = details ? details.label : "Choose a build type to calibrate the request.";
+      if (productSummaryKicker) productSummaryKicker.textContent = details ? "PROJETO SELECIONADO" : "NENHUM PROJETO SELECIONADO";
+      if (productSummaryTitle) productSummaryTitle.textContent = details ? details.label : "Escolha um tipo de projeto para calibrar a solicitação.";
       if (productSummaryText) {
-        const budget = selectedOption?.dataset.budget || "To define";
-        const timeline = selectedOption?.dataset.timeline || "To define";
+        const budget = selectedOption?.dataset.budget || "A definir";
+        const timeline = selectedOption?.dataset.timeline || "A definir";
         productSummaryText.textContent = details
-          ? `${details.text} Budget range: ${budget}. Estimated time: ${timeline}.`
-          : "Budget range and timeline hints will appear here. You can still edit the fields manually.";
+          ? `${details.text} Investimento de referência: ${budget}. Prazo estimado: ${timeline}.`
+          : "Faixa de investimento e prazo estimado aparecerão aqui. Você ainda poderá editar os campos manualmente.";
       }
 
       if (autofill && selectedOption) {
@@ -120,7 +128,7 @@ export function initProjectForm() {
     productOptions.forEach((option) => {
       option.addEventListener("click", () => {
         if (formStatus) formStatus.textContent = "";
-        projectNeedField.dataset.touched = "true";
+        if (projectNeedField) projectNeedField.dataset.touched = "true";
         setProductChoice(option.dataset.value);
       });
     });
@@ -186,14 +194,14 @@ export function initProjectForm() {
       if (!submitButton) return;
       submitButton.disabled = isSending;
       submitButton.classList.toggle("is-sending", isSending);
-      if (submitButtonText) submitButtonText.textContent = isSending ? "Sending..." : "Send Project Request";
+      if (submitButtonText) submitButtonText.textContent = isSending ? "Enviando..." : "Enviar Solicitação";
     };
 
     projectForm.addEventListener("submit", async (event) => {
       event.preventDefault();
 
       if (gotchaField?.value) {
-        if (formStatus) formStatus.textContent = "Request received. We reply within 1 business day.";
+        if (formStatus) formStatus.textContent = "Solicitação recebida. Respondemos em até 1 dia útil.";
         projectForm.reset();
         setProductChoice("", { autofill: false });
         return;
@@ -206,13 +214,13 @@ export function initProjectForm() {
       const invalidFields = validateProjectForm();
 
       if (invalidFields.length) {
-        if (formStatus) formStatus.textContent = "Check the highlighted fields before sending.";
+        if (formStatus) formStatus.textContent = "Confira os campos destacados antes de enviar.";
         invalidFields[0]?.focus();
         return;
       }
 
       setSubmitState(true);
-      if (formStatus) formStatus.textContent = "Sending your request...";
+      if (formStatus) formStatus.textContent = "Enviando sua solicitação...";
 
       try {
         const response = await fetch(projectForm.action, {
@@ -223,9 +231,9 @@ export function initProjectForm() {
           },
         });
 
-        if (!response.ok) throw new Error("Form submission failed.");
+        if (!response.ok) throw new Error("Falha ao enviar o formulário.");
 
-        if (formStatus) formStatus.textContent = "Request received. We reply within 1 business day.";
+        if (formStatus) formStatus.textContent = "Solicitação recebida. Respondemos em até 1 dia útil.";
         projectForm.reset();
         setProductChoice("", { autofill: false });
         fields.forEach((field) => {
@@ -234,7 +242,7 @@ export function initProjectForm() {
         });
       } catch (error) {
         if (formStatus) {
-          formStatus.textContent = "Could not send. Write us directly at hello.SpaceUnderGround@gmail.com";
+          formStatus.textContent = "Não foi possível enviar. Escreva diretamente para hello.SpaceUnderGround@gmail.com";
         }
       } finally {
         setSubmitState(false);
