@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">JARVIS — ambiente de IA para desktop</title>
+  <desc id="desc">Prévia dourada do protótipo JARVIS da SPACE UNDERGROUND, com núcleo holográfico e painéis de sistema.</desc>
+  <defs>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#3a2908" stroke-width="1" opacity=".55"/>
+    </pattern>
+    <radialGradient id="core" cx="38%" cy="32%">
+      <stop offset="0" stop-color="#fff7cc"/>
+      <stop offset=".18" stop-color="#fbbf24"/>
+      <stop offset=".55" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#5b3004"/>
+    </radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1440" height="900" fill="#0f0a02"/>
+  <rect width="1440" height="900" fill="url(#grid)"/>
+  <g font-family="ui-monospace,Consolas,monospace">
+    <text x="48" y="48" fill="#a68b56" font-size="18">SPACE / LAB_001</text>
+    <text x="48" y="92" fill="#fbbf24" font-size="40" letter-spacing="10">J A R V I S</text>
+    <text x="48" y="120" fill="#a68b56" font-size="15">AMBIENTE DE IA PARA DESKTOP</text>
+    <text x="1392" y="54" fill="#fde68a" font-size="24" text-anchor="end">21:42:17</text>
+    <text x="1392" y="82" fill="#a68b56" font-size="13" text-anchor="end">SEX, 04 SET 2026</text>
+    <line x1="48" y1="138" x2="1392" y2="138" stroke="#5a3a08"/>
+
+    <g transform="translate(720 312)" fill="none" stroke="#f59e0b">
+      <circle r="170" stroke-width="2"/>
+      <circle r="138" stroke-dasharray="10 9" opacity=".7"/>
+      <circle r="104" opacity=".9"/>
+      <circle r="72" stroke="#fbbf24"/>
+      <circle r="48" stroke="#fbbf24" stroke-width="2"/>
+      <circle r="25" fill="url(#core)" stroke="#fde68a" stroke-width="2" filter="url(#glow)"/>
+      <path d="M-158 0H-120M120 0H158M0-158V-120M0 120V158" opacity=".7"/>
+    </g>
+
+    <g fill="#a68b56" font-size="13">
+      <text x="140" y="260">NÚCLEO / ATIVO</text>
+      <text x="140" y="296">LINK DE VOZ / PRONTO</text>
+      <text x="140" y="332">NÓ LOCAL / SEGURO</text>
+      <text x="1300" y="260" text-anchor="end">LATÊNCIA / 18MS</text>
+      <text x="1300" y="296" text-anchor="end">MODO / DEMO</text>
+      <text x="1300" y="332" text-anchor="end">BUILD / 2026.09</text>
+    </g>
+
+    <text x="720" y="502" fill="#fbbf24" font-size="18" text-anchor="middle">OUVINDO</text>
+    <text x="720" y="528" fill="#a68b56" font-size="11" text-anchor="middle">CLIQUE NO NÚCLEO PARA INTERAGIR</text>
+
+    <g font-size="10" text-anchor="middle">
+      <g fill="#171004" stroke="#6d4708">
+        <rect x="154" y="550" width="208" height="36"/>
+        <rect x="385" y="550" width="208" height="36"/>
+        <rect x="616" y="550" width="208" height="36"/>
+        <rect x="847" y="550" width="208" height="36"/>
+        <rect x="1078" y="550" width="208" height="36"/>
+      </g>
+      <g fill="#fde68a">
+        <text x="258" y="573">EXECUTAR DIAGNÓSTICO</text>
+        <text x="489" y="573">RELATÓRIO DO TEMPO</text>
+        <text x="720" y="573">ABRIR PAINEL</text>
+        <text x="951" y="573">ADICIONAR TAREFA</text>
+        <text x="1182" y="573">CONTROLE DO SPOTIFY</text>
+      </g>
+    </g>
+
+    <g>
+      <g fill="#171004" stroke="#5a3a08">
+        <rect x="48" y="612" width="426" height="116"/>
+        <rect x="507" y="612" width="426" height="116"/>
+        <rect x="966" y="612" width="426" height="116"/>
+        <rect x="48" y="744" width="426" height="116"/>
+        <rect x="507" y="744" width="426" height="116"/>
+        <rect x="966" y="744" width="426" height="116"/>
+      </g>
+      <g stroke="#f59e0b" stroke-width="2">
+        <line x1="48" y1="612" x2="112" y2="612"/><line x1="507" y1="612" x2="571" y2="612"/><line x1="966" y1="612" x2="1030" y2="612"/>
+        <line x1="48" y1="744" x2="112" y2="744"/><line x1="507" y1="744" x2="571" y2="744"/><line x1="966" y1="744" x2="1030" y2="744"/>
+      </g>
+      <g fill="#a68b56" font-size="10">
+        <text x="62" y="634">01 / MÍDIA</text><text x="460" y="634" text-anchor="end" fill="#fde68a">CONTROLE DO SPOTIFY</text>
+        <text x="521" y="634">02 / AMBIENTE</text><text x="919" y="634" text-anchor="end" fill="#fde68a">RELATÓRIO DO TEMPO</text>
+        <text x="980" y="634">03 / SISTEMA</text><text x="1378" y="634" text-anchor="end" fill="#fde68a">MEDIDORES DO SISTEMA</text>
+        <text x="62" y="766">04 / PRODUTIVIDADE</text><text x="460" y="766" text-anchor="end" fill="#fde68a">TAREFAS</text>
+        <text x="521" y="766">05 / INTELIGÊNCIA</text><text x="919" y="766" text-anchor="end" fill="#fde68a">CHAT DO JARVIS</text>
+        <text x="980" y="766">06 / ARMAZENAMENTO</text><text x="1378" y="766" text-anchor="end" fill="#fde68a">ARQUIVOS</text>
+      </g>
+      <g fill="#fde68a" font-size="15">
+        <text x="62" y="676">Night Drive Protocol</text>
+        <text x="521" y="682" font-size="30">24°</text>
+        <text x="980" y="676">CPU 34% · RAM 52% · GPU 27%</text>
+        <text x="62" y="808">Revisar fila de automações</text>
+        <text x="521" y="808">JARVIS: Todos os sistemas estão operacionais.</text>
+        <text x="980" y="808">PROJECT_ALPHA</text>
+      </g>
+      <g fill="#a68b56" font-size="11">
+        <text x="62" y="704">Rádio SPACE UNDERGROUND</text>
+        <text x="521" y="708">RIO DE JANEIRO · CÉU LIMPO</text>
+        <text x="62" y="836">Sincronizar telemetria</text>
+        <text x="980" y="836">AUTOMATIONS · MEMORY_LOG</text>
+      </g>
+    </g>
+    <line x1="48" y1="878" x2="1392" y2="878" stroke="#5a3a08"/>
+    <text x="48" y="896" fill="#a68b56" font-size="10">JARVIS / RESPOSTA</text>
+    <text x="720" y="896" fill="#fbbf24" font-size="10" text-anchor="middle">PROTÓTIPO / SIMULAÇÃO FRONTEND</text>
+    <text x="1392" y="896" fill="#a68b56" font-size="10" text-anchor="end">SPACE UNDERGROUND</text>
+  </g>
+</svg>
