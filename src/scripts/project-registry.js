@@ -69,7 +69,7 @@ export const projects = {
     description: "Ambiente inteligente para Windows que combina IA conversacional, voz, memória, automação, segurança por permissões e controle do sistema em tempo real.",
     url: "./jarvis-case/",
     previewUrl: "./jarvis-demo/?embed=spaceunderground",
-    poster: { avif: "./jarvis-preview-poster.avif", webp: "./jarvis-preview-poster.webp", png: "./jarvis-preview-poster.png", width: 1440, height: 900 },
+    poster: { png: "./jarvis-preview-poster-pt.svg", width: 1440, height: 900 },
     accent: "#f59e0b",
     system: "SISTEMA DE INTELIGÊNCIA / 03",
     label: "IA / AUTOMAÇÃO",
@@ -142,6 +142,4 @@ export const projects = {
   },
 };
 
-// Case que abre a pagina. A ORDEM dos slots nao mora aqui: e a ordem dos
-// <button data-project-slot> no rail do index.html (e das linhas do indice).
 export const defaultProjectKey = "ink";
