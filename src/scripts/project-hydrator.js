@@ -22,6 +22,14 @@ function replaceWithButton(node) {
   return button;
 }
 
+function resetOptimizedPosterSources(project) {
+  const fallback = project.poster?.png || "";
+  if (!fallback.endsWith(".svg")) return;
+  document.querySelectorAll("[data-project-viewer] [data-poster-source]").forEach((source) => {
+    source.srcset = "";
+  });
+}
+
 function hydrateSlot(projectKey, project) {
   if (!project.slot) return;
   const placeholders = [...document.querySelectorAll(`[data-project-slot="${project.slot}"]`)];
@@ -37,14 +45,18 @@ function hydrateSlot(projectKey, project) {
     node.setAttribute("aria-pressed", "false");
     node.style.setProperty("--slot-accent", project.accent);
 
+    // Registrado antes do Project Viewer: para posters SVG, limpa os <source>
+    // AVIF/WebP do case anterior antes que o viewer atualize o <img> fallback.
+    node.addEventListener("click", () => resetOptimizedPosterSources(project));
+
     if (!isIndexRow) {
-      node.setAttribute("aria-label", `Show project ${project.id} — ${project.name}`);
+      node.setAttribute("aria-label", `Mostrar projeto ${project.id} — ${project.name}`);
       const tip = node.querySelector(".signal-ui__slot-tip");
-      if (tip) tip.innerHTML = `<em>PROJECT / ${project.id}</em>${project.name}`;
+      if (tip) tip.innerHTML = `<em>PROJETO / ${project.id}</em>${project.name}`;
       return;
     }
 
-    node.setAttribute("aria-label", `Show project ${project.id} — ${project.name}`);
+    node.setAttribute("aria-label", `Mostrar projeto ${project.id} — ${project.name}`);
     const write = (selector, value) => {
       const target = node.querySelector(selector);
       if (target) target.textContent = value;
@@ -55,7 +67,7 @@ function hydrateSlot(projectKey, project) {
     write(SELECTORS.go, "↗");
 
     const status = node.querySelector(SELECTORS.status);
-    if (status) status.innerHTML = "<i aria-hidden=\"true\"></i>Prototype";
+    if (status) status.innerHTML = `<i aria-hidden="true"></i>${project.status}`;
   });
 }
 
@@ -67,11 +79,11 @@ function hydrateLabs(project) {
   labs.style.setProperty("--labs-accent", project.accent);
   product.style.setProperty("--accent", project.accent);
   product.classList.add("labs-product--jarvis");
-  product.setAttribute("aria-label", "JARVIS — Space Underground experimental AI lab");
+  product.setAttribute("aria-label", "JARVIS — laboratório experimental de IA da Space Underground");
 
   const top = product.querySelectorAll(".labs-product__top span");
   if (top[0]) top[0].textContent = "LAB_001 / JARVIS";
-  if (top[1]) top[1].textContent = "STATUS — PROTOTYPE / ACTIVE";
+  if (top[1]) top[1].textContent = "STATUS — PROTÓTIPO / ATIVO";
 
   const oldCopy = product.querySelector(":scope > p");
   if (oldCopy) oldCopy.remove();
@@ -80,16 +92,16 @@ function hydrateLabs(project) {
     const identity = document.createElement("div");
     identity.className = "labs-product__identity";
     identity.innerHTML = `
-      <span>EXPERIMENTAL AI OPERATING ENVIRONMENT</span>
+      <span>AMBIENTE OPERACIONAL EXPERIMENTAL DE IA</span>
       <strong>JARVIS</strong>
-      <p>Artificial intelligence, voice interaction, automation and desktop control.</p>
-      <a href="${project.url}" target="_blank" rel="noopener noreferrer">OPEN LAB <i aria-hidden="true">↗</i></a>
+      <p>Inteligência artificial, interação por voz, automação e controle do computador.</p>
+      <a href="${project.url}" target="_blank" rel="noopener noreferrer">ABRIR LAB <i aria-hidden="true">↗</i></a>
     `;
     product.insertBefore(identity, product.querySelector(".labs-product__signal"));
   }
 
   const labsStatus = labs.querySelector(".labs__status");
-  if (labsStatus) labsStatus.textContent = "Prototype / Active";
+  if (labsStatus) labsStatus.textContent = "Protótipo / Ativo";
 }
 
 export function initProjectHydrator() {
@@ -101,6 +113,6 @@ export function initProjectHydrator() {
 
   const workIntro = document.querySelector("#work .section-intro");
   if (workIntro) {
-    workIntro.textContent = "Selected client work and experimental systems presented in a single frame. Switch between cases below; reserved slots are next in line.";
+    workIntro.textContent = "Projetos de clientes e sistemas experimentais apresentados em um único frame. Alterne entre os cases abaixo.";
   }
 }
