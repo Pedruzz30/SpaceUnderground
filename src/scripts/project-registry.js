@@ -1,7 +1,7 @@
 // Registro unico dos projetos exibidos no PROJECT VIEWER da secao Selected Work.
 // O frame e reutilizavel: um projeto por vez, sempre no mesmo iframe.
-// Para publicar um slot reservado, troque `reserved: true` pelos dados reais
-// (e tire o data-slot-reserved do botao do rail e da linha do indice no HTML).
+// Projetos publicados podem apontar para um slot HTML reservado com `slot`;
+// project-hydrator.js transforma esse placeholder em um controle real no boot.
 // `accent` vira --accent no <article> e no .case-index, entao o card inteiro
 // assume a cor do projeto: por isso o CSS desse escopo usa var(--accent).
 // `poster` traz os tres formatos do <picture> (AVIF/WebP/PNG) mais as dimensoes
@@ -61,7 +61,33 @@ export const projects = {
     coordinates: ["22°54'S", "43°12'W"],
   },
 
-  "slot-003": { id: "003", name: "Reserved", reserved: true },
+  jarvis: {
+    id: "003",
+    slot: "slot-003",
+    name: "JARVIS AI",
+    client: "SPACE UNDERGROUND LABS",
+    category: "AI DESKTOP SYSTEM & AUTOMATION",
+    description: "An intelligent desktop environment combining artificial intelligence, voice interaction, automation and real-time system control.",
+    url: "./jarvis-demo/",
+    previewUrl: "./jarvis-demo/?embed=spaceunderground",
+    poster: { avif: "./jarvis-preview-poster.avif", webp: "./jarvis-preview-poster.webp", png: "./jarvis-preview-poster.png", width: 1440, height: 900 },
+    accent: "#f59e0b",
+    system: "INTELLIGENCE SYSTEM / 03",
+    label: "AI / AUTOMATION",
+    address: "JARVIS AI / PROTOTYPE",
+    type: "AI DESKTOP APPLICATION",
+    tech: "PYTHON / PYQT6 / AI / AUTOMATION",
+    status: "PROTOTYPE",
+    year: "2026",
+    modules: [
+      ["01", "INTELLIGENCE", "AI ASSISTANT"],
+      ["02", "AUTOMATION", "SYSTEM CONTROL"],
+      ["03", "INTERFACE", "HOLOGRAPHIC HUD"],
+    ],
+    origin: "RJ / BR",
+    coordinates: ["22°54'S", "43°12'W"],
+  },
+
   "slot-004": { id: "004", name: "Reserved", reserved: true },
   "slot-005": { id: "005", name: "Reserved", reserved: true },
 };
