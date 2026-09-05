@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 
 import { readPlansBlock } from "./scripts/plans-block.mjs";
+import { localizeHtmlSource } from "./src/scripts/localization.js";
 import { renderPlanCards } from "./src/scripts/plans-renderer.js";
 import {
   OG_IMAGE,
@@ -38,7 +39,7 @@ function renderJsonLd() {
     email: SITE_EMAIL,
     image: absoluteUrl(OG_IMAGE),
     address: { "@type": "PostalAddress", addressCountry: "BR" },
-    areaServed: "Worldwide",
+    areaServed: "Mundial",
   };
 
   // </script> dentro do JSON fecharia a tag antes da hora.
@@ -97,11 +98,11 @@ function render404() {
   const home = escapeHtml(SITE_URL);
 
   return `<!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>404 — Signal lost | ${escapeHtml(SITE_NAME)}</title>
+    <title>404 — Sinal perdido | ${escapeHtml(SITE_NAME)}</title>
     <meta name="robots" content="noindex">
     <meta name="theme-color" content="#080808">
     <link rel="icon" href="${escapeHtml(absoluteUrl("favicon.svg"))}" type="image/svg+xml">
@@ -169,11 +170,11 @@ function render404() {
   </head>
   <body>
     <main>
-      <p class="code">Error 404 — Signal lost</p>
-      <h1>This page never <em>existed.</em></h1>
-      <p>The address you followed points nowhere. Everything that is live sits on the surface — go back and start there.</p>
-      <a href="${home}">Return home <span aria-hidden="true">&rarr;</span></a>
-      <p class="mark">${escapeHtml(SITE_NAME)} — Independent digital studio</p>
+      <p class="code">Erro 404 — Sinal perdido</p>
+      <h1>Esta página nunca <em>existiu.</em></h1>
+      <p>O endereço acessado não leva a lugar nenhum. Tudo o que está no ar fica na superfície — volte ao início e comece por lá.</p>
+      <a href="${home}">Voltar ao início <span aria-hidden="true">&rarr;</span></a>
+      <p class="mark">${escapeHtml(SITE_NAME)} — Estúdio digital independente</p>
     </main>
   </body>
 </html>
@@ -212,9 +213,13 @@ function spaceUndergroundBuild() {
           );
         }
 
+        // A localizacao acontece no build, depois da checagem da fonte original,
+        // para que o HTML publicado ja chegue em pt-BR sem flash de ingles.
+        const localizedHtml = localizeHtmlSource(html);
+
         // Os marcadores sao instrucao para quem edita o repo, nao conteudo:
         // saem do HTML publicado. Os cards entre eles ficam.
-        return html
+        return localizedHtml
           .replace("<!--@seo-->", renderSeoHead())
           .replace(/[ \t]*<!-- @plans:start[\s\S]*?-->\n?/, "")
           .replace(/[ \t]*<!-- @plans:end -->\n?/, "");
