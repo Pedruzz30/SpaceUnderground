@@ -3,6 +3,7 @@
 import { initLocalization } from "./localization.js";
 import { initPosterLocalization } from "./poster-localization.js";
 import { initCapabilitiesSection } from "./capabilities-section.js";
+import { initCommercialPositioning } from "./commercial-positioning.js";
 import { initScrollProgress } from "./scroll-progress.js";
 import { initMenu } from "./menu.js";
 import { initReveal } from "./reveal.js";
@@ -25,6 +26,10 @@ initPosterLocalization();
 // Insere a camada de posicionamento Sites > Sistemas > Automacao > IA antes
 // do sistema de reveal e da navegacao observarem as secoes da pagina.
 initCapabilitiesSection();
+
+// Reposiciona a area comercial e expande o formulario antes de dialog/form
+// capturarem os elementos e conectarem seus listeners.
+initCommercialPositioning();
 
 // Publica cases que ainda sao placeholders no HTML antes que o Project Viewer
 // leia os slots e conecte os listeners.
