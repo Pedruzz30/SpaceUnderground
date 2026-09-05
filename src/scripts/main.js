@@ -1,5 +1,6 @@
 // Ponto de entrada. Cada modulo cuida de uma parte da pagina e se
 // inicializa sozinho; a ORDEM abaixo e a mesma do arquivo original.
+import { initLocalization } from "./localization.js";
 import { initScrollProgress } from "./scroll-progress.js";
 import { initMenu } from "./menu.js";
 import { initReveal } from "./reveal.js";
@@ -12,6 +13,11 @@ import { initProjectForm } from "./project-form.js";
 import { initPointerEffects } from "./pointer-effects.js";
 
 document.documentElement.classList.add("js");
+
+// Localiza o conteudo estatico antes dos modulos que escrevem textos dinamicos.
+// Um MutationObserver dentro do modulo cobre tambem updates posteriores do viewer,
+// formulario, planos e estados de interface.
+initLocalization();
 
 // Publica cases que ainda sao placeholders no HTML antes que o Project Viewer
 // leia os slots e conecte os listeners.
