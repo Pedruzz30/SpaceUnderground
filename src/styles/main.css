@@ -15,6 +15,7 @@
 @import "./components/headings.css";
 @import "./sections/hero.css";
 @import "./sections/services.css";
+@import "./sections/capabilities.css";
 @import "./sections/work.css";
 @import "./components/live-project-preview.css";
 @import "./sections/labs.css";

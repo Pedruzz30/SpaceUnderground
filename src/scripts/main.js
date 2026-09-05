@@ -2,6 +2,7 @@
 // inicializa sozinho; a ORDEM abaixo e a mesma do arquivo original.
 import { initLocalization } from "./localization.js";
 import { initPosterLocalization } from "./poster-localization.js";
+import { initCapabilitiesSection } from "./capabilities-section.js";
 import { initScrollProgress } from "./scroll-progress.js";
 import { initMenu } from "./menu.js";
 import { initReveal } from "./reveal.js";
@@ -20,6 +21,10 @@ document.documentElement.classList.add("js");
 // formulario, planos e estados de interface.
 initLocalization();
 initPosterLocalization();
+
+// Insere a camada de posicionamento Sites > Sistemas > Automacao > IA antes
+// do sistema de reveal e da navegacao observarem as secoes da pagina.
+initCapabilitiesSection();
 
 // Publica cases que ainda sao placeholders no HTML antes que o Project Viewer
 // leia os slots e conecte os listeners.

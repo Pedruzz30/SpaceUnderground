@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0f0a02">
+  <meta name="description" content="Estudo de caso do JARVIS AI: assistente desktop em Python com IA, voz, memória, automação, segurança e integrações.">
+  <title>JARVIS AI — Estudo de Caso | SPACE UNDERGROUND</title>
+  <link rel="stylesheet" href="./case.css">
+  <script src="./case.js" defer></script>
+</head>
+<body>
+  <div class="scanlines" aria-hidden="true"></div>
+  <header class="case-header">
+    <a class="case-brand" href="../" aria-label="Voltar para SPACE UNDERGROUND"><span>S/</span><b>SPACE UNDERGROUND</b></a>
+    <nav aria-label="Navegação do estudo de caso">
+      <a href="#visao">Visão</a><a href="#arquitetura">Arquitetura</a><a href="#modulos">Módulos</a><a href="#seguranca">Segurança</a>
+    </nav>
+    <a class="case-header__demo" href="../jarvis-demo/">Abrir demo <span>↗</span></a>
+  </header>
+
+  <main>
+    <section class="hero" id="visao">
+      <div class="hero__grid" aria-hidden="true"></div>
+      <div class="hero__copy">
+        <p class="eyebrow"><span class="pulse"></span> CASE / 003 · LAB_001 · PROTÓTIPO</p>
+        <h1>JARVIS <em>AI</em></h1>
+        <p class="hero__lead">Assistente inteligente de desktop para Windows que combina IA conversacional, voz, automação do sistema, memória persistente, segurança por permissões e integrações externas.</p>
+        <div class="hero__actions"><a class="button button--primary" href="../jarvis-demo/">Experimentar demo web <b>↗</b></a><a class="button" href="#arquitetura">Explorar arquitetura</a></div>
+        <div class="hero__meta"><span>PYTHON 3.12</span><span>PYQT6</span><span>GEMINI LIVE</span><span>AUTOMAÇÃO</span><span>VOICE / VISION</span></div>
+      </div>
+      <div class="hero__visual" aria-label="Visualização abstrata da arquitetura do JARVIS">
+        <div class="orbital orbital--a"></div><div class="orbital orbital--b"></div><div class="orbital orbital--c"></div>
+        <div class="core"><span>J</span><small>CORE</small></div>
+        <span class="node node--1">REFLEX</span><span class="node node--2">MEMÓRIA</span><span class="node node--3">TOOLS</span><span class="node node--4">VOICE</span>
+        <div class="hero__state"><i></i> SISTEMA / ONLINE</div>
+      </div>
+    </section>
+
+    <section class="metrics section-grid">
+      <article><span>01</span><strong>6</strong><p>modos de personalidade configuráveis</p></article>
+      <article><span>02</span><strong>3</strong><p>níveis centrais de permissão e segurança</p></article>
+      <article><span>03</span><strong>8</strong><p>domínios de memória local separados</p></article>
+      <article><span>04</span><strong>20+</strong><p>scripts de teste documentados no projeto</p></article>
+    </section>
+
+    <section class="case-section case-section--split">
+      <div><p class="section-label">01 / CONTEXTO</p><h2>O problema não era criar um chatbot.</h2></div>
+      <div class="prose"><p>O objetivo do JARVIS é transformar o computador em um ambiente assistido: o usuário fala ou escreve, o sistema entende a intenção, consulta memória quando necessário e executa ferramentas reais no Windows.</p><p>Para isso, o projeto separa conversação, reflexos rápidos, ações do sistema, segurança, memória, eventos e integrações. Comandos simples podem ser resolvidos localmente sem consumir uma chamada de LLM, enquanto tarefas complexas passam pelo núcleo de IA.</p></div>
+    </section>
+
+    <section class="architecture" id="arquitetura">
+      <header class="section-heading"><p class="section-label">02 / ARQUITETURA</p><h2>Do comando à ação.</h2><p>Clique nos blocos para entender o papel de cada camada.</p></header>
+      <div class="architecture__workspace">
+        <div class="architecture__flow" role="list">
+          <button class="arch-node is-active" data-arch="input" role="listitem"><span>01</span><b>Entrada</b><small>Voz · Texto · Gateway</small></button>
+          <i>→</i>
+          <button class="arch-node" data-arch="reflex" role="listitem"><span>02</span><b>Reflex</b><small>Baixa latência</small></button>
+          <i>→</i>
+          <button class="arch-node arch-node--core" data-arch="core" role="listitem"><span>03</span><b>JARVIS Core</b><small>Gemini Live</small></button>
+          <i>→</i>
+          <button class="arch-node" data-arch="tools" role="listitem"><span>04</span><b>Tools</b><small>Ações Python</small></button>
+          <i>→</i>
+          <button class="arch-node" data-arch="system" role="listitem"><span>05</span><b>Sistema</b><small>Windows · Web · APIs</small></button>
+        </div>
+        <div class="architecture__support">
+          <button class="support-node" data-arch="memory"><b>MEMÓRIA</b><small>JSON por domínio</small></button>
+          <button class="support-node" data-arch="permissions"><b>PERMISSÕES</b><small>Auto · Confirmar · Bloquear</small></button>
+          <button class="support-node" data-arch="events"><b>EVENTOS</b><small>EventBus · Notificações</small></button>
+          <button class="support-node" data-arch="autopilot"><b>AUTOPILOT</b><small>Monitoramento em background</small></button>
+        </div>
+        <aside class="architecture__detail" id="arch-detail" aria-live="polite"><span>CAMADA / 01</span><h3>Entrada multimodal</h3><p>Comandos chegam por voz, chat no HUD ou adapters externos. A interface centraliza a experiência sem concentrar toda a lógica do sistema.</p><div><b>Voz</b><b>Texto</b><b>CLI</b><b>Telegram</b><b>Alexa*</b></div></aside>
+      </div>
+    </section>
+
+    <section class="case-section" id="modulos">
+      <header class="section-heading"><p class="section-label">03 / MÓDULOS</p><h2>Um assistente composto por sistemas independentes.</h2></header>
+      <div class="module-grid">
+        <article><span>01</span><h3>IA & Reflex</h3><p>Gemini Live interpreta tarefas complexas; a camada Reflex intercepta comandos frequentes antes do LLM para reduzir latência e custo.</p></article>
+        <article><span>02</span><h3>Automação do Windows</h3><p>Controle de aplicativos, janelas, volume, arquivos e outras ações do sistema por módulos Python registrados como tools.</p></article>
+        <article><span>03</span><h3>Memória por domínios</h3><p>Perfil, projetos, estudos, rotinas, preferências, sistema, e-commerce e histórico permanecem separados em arquivos JSON locais.</p></article>
+        <article><span>04</span><h3>Browser Copilot</h3><p>Playwright permite navegar, pesquisar, resumir páginas e preencher formulários, com confirmação antes de ações sensíveis.</p></article>
+        <article><span>05</span><h3>Autopilot</h3><p>Monitora eventos em segundo plano com modos de operação e regras claras sobre o que pode ser feito automaticamente.</p></article>
+        <article><span>06</span><h3>Voz & Barge-in</h3><p>Reconhecimento e síntese de voz com suporte a interrupção: o usuário pode cortar a fala do assistente e assumir a conversa.</p></article>
+        <article><span>07</span><h3>HUD & Widgets</h3><p>Interface PyQt6 com painéis flutuantes para câmera, notificações, personalidade, comércio, automação e chat.</p></article>
+        <article><span>08</span><h3>Integrações</h3><p>Spotify, Telegram, Google, Mercado Livre, câmera IP, RGB e serviços externos conectados ao núcleo por módulos específicos.</p></article>
+      </div>
+    </section>
+
+    <section class="stack-section">
+      <div><p class="section-label">04 / STACK</p><h2>Tecnologia orientada à execução.</h2></div>
+      <div class="stack-grid"><span>Python 3.12</span><span>PyQt6</span><span>Gemini Live</span><span>Vosk</span><span>Edge TTS</span><span>OpenCV</span><span>MediaPipe</span><span>Playwright</span><span>PyAutoGUI</span><span>psutil</span><span>Flask</span><span>Socket.IO</span><span>Spotify API</span><span>Telegram</span><span>Google APIs</span><span>JSON local</span></div>
+    </section>
+
+    <section class="security" id="seguranca">
+      <header class="section-heading"><p class="section-label">05 / SEGURANÇA</p><h2>Automação sem perder controle.</h2><p>O Permission Manager centraliza decisões antes de executar ações sensíveis.</p></header>
+      <div class="security__levels"><article><span>A</span><h3>Auto permitido</h3><p>Ações de baixo risco podem executar sem interromper o fluxo.</p></article><article><span>B</span><h3>Exige confirmação</h3><p>Operações sensíveis dependem de autorização explícita do usuário.</p></article><article><span>C</span><h3>Bloqueado</h3><p>Ações críticas permanecem proibidas por política, mesmo em modo autônomo.</p></article></div>
+      <div class="security__rules"><p>Nunca cancela pedidos ou reembolsa automaticamente.</p><p>Nunca altera preços automaticamente.</p><p>Nunca envia mensagens a clientes sem confirmação explícita.</p><p>Não expõe tokens ou dados sensíveis em logs.</p></div>
+    </section>
+
+    <section class="status-section">
+      <div><p class="section-label">06 / ESTADO DO PROJETO</p><h2>Protótipo avançado, com fronteiras documentadas.</h2><p class="status-section__intro">O case diferencia o que está concluído do que foi implementado mas ainda precisa de validação em execução.</p></div>
+      <div class="status-table">
+        <div><span>Reflex / Memória / Personalidade</span><b class="ok">CONCLUÍDO</b></div>
+        <div><span>Autopilot / Permission Manager</span><b class="ok">CONCLUÍDO</b></div>
+        <div><span>HUD / Chat / Widgets</span><b class="ok">CONCLUÍDO</b></div>
+        <div><span>Mercado Livre / Central de E-commerce</span><b class="ok">CONCLUÍDO</b></div>
+        <div><span>Assistant Gateway — 10 fases + voz</span><b class="warn">IMPLEMENTADO / NÃO VALIDADO EM EXECUÇÃO</b></div>
+        <div><span>Exposição pública para Alexa / webhooks</span><b class="future">DECISÃO DE INFRAESTRUTURA PENDENTE</b></div>
+      </div>
+    </section>
+
+    <section class="demo-cta">
+      <div><p class="section-label">07 / DEMONSTRAÇÃO</p><h2>Veja a linguagem do sistema em movimento.</h2><p>A demo web reproduz o HUD, estados do orbe, diagnósticos, tarefas, chat e painéis sem conectar ao computador real.</p></div>
+      <a class="button button--primary" href="../jarvis-demo/">Abrir JARVIS Demo <b>↗</b></a>
+    </section>
+  </main>
+
+  <footer><span>CASE / 003 · JARVIS AI · 2026</span><a href="../">SPACE UNDERGROUND</a></footer>
+</body>
+</html>
