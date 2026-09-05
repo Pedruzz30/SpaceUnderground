@@ -25,6 +25,17 @@ const escapeHtml = (value) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+// O tradutor legado tem duas regras sobrepostas ("PLAN /" e "PLAN"). Como a
+// localizacao estatica ainda e aplicada uma unica vez no build, normalizamos a
+// unica colisao conhecida aqui. O navegador nao executa mais o tradutor.
+function normalizeLocalizedHtml(html) {
+  const normalized = String(html).replaceAll("PLANOO", "PLANO");
+  if (normalized.includes("PLANOO")) {
+    throw new Error("A localizacao gerou texto recursivo de plano.");
+  }
+  return normalized;
+}
+
 // JSON-LD com fatos que estao na pagina e mais nada: sem endereco de rua, sem
 // telefone, sem numero de funcionarios, sem nota/review. Se um dado nao aparece
 // no site, ele nao entra aqui.
@@ -42,12 +53,9 @@ function renderJsonLd() {
     areaServed: "Mundial",
   };
 
-  // </script> dentro do JSON fecharia a tag antes da hora.
   return `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>`;
 }
 
-// Todo o bloco de SEO da <head> sai do site.config.js. Nenhuma URL publica
-// e escrita a mao no index.html — trocar de dominio e trocar SITE_URL.
 function renderSeoHead() {
   const ogImage = absoluteUrl(OG_IMAGE);
 
@@ -91,9 +99,6 @@ function renderSitemap() {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
 
-// 404 do GitHub Pages: e servida em qualquer caminho inexistente, entao a URL
-// do navegador pode estar em /qualquer/coisa/funda. Por isso ela nao pode
-// depender de caminho relativo nenhum — estilo inline, zero JS, link absoluto.
 function render404() {
   const home = escapeHtml(SITE_URL);
 
@@ -181,16 +186,6 @@ function render404() {
 `;
 }
 
-// Duas responsabilidades, as duas resolvidas antes do HTML ir ao ar:
-//
-//   SEO    — injetado a partir do site.config.js (o index.html nao guarda URL
-//            publica nenhuma escrita a mao).
-//   Planos — apenas CONFERIDOS. Os cards ficam versionados no index.html,
-//            escritos por `npm run plans`; aqui so checamos que continuam
-//            iguais ao plans-registry.js. Assim o arquivo-fonte segue completo
-//            e legivel sozinho, sem abrir mao da fonte unica de verdade.
-//
-// Falhar aqui quebra o build de proposito — melhor que publicar preco errado.
 function spaceUndergroundBuild() {
   return {
     name: "space-underground-build",
@@ -198,13 +193,10 @@ function spaceUndergroundBuild() {
     transformIndexHtml: {
       order: "pre",
       handler(html, context) {
-        // Vale so para a pagina principal; a 404 e emitida pronta.
         if (context.filename && !context.filename.endsWith("index.html")) return html;
 
         if (!html.includes("<!--@seo-->")) throw new Error("index.html perdeu o marcador <!--@seo-->.");
 
-        // Os cards ja estao no arquivo; aqui so verificamos que ninguem editou
-        // preco no HTML e que o registry nao mudou sem rodar `npm run plans`.
         const { current } = readPlansBlock(html, context.filename || "index.html");
         if (current !== renderPlanCards()) {
           throw new Error(
@@ -213,12 +205,10 @@ function spaceUndergroundBuild() {
           );
         }
 
-        // A localizacao acontece no build, depois da checagem da fonte original,
-        // para que o HTML publicado ja chegue em pt-BR sem flash de ingles.
-        const localizedHtml = localizeHtmlSource(html);
+        // A localizacao da fonte EN-first continua sendo feita uma unica vez no
+        // build. A camada runtime foi removida para eliminar mutacoes recursivas.
+        const localizedHtml = normalizeLocalizedHtml(localizeHtmlSource(html));
 
-        // Os marcadores sao instrucao para quem edita o repo, nao conteudo:
-        // saem do HTML publicado. Os cards entre eles ficam.
         return localizedHtml
           .replace("<!--@seo-->", renderSeoHead())
           .replace(/[ \t]*<!-- @plans:start[\s\S]*?-->\n?/, "")
@@ -238,7 +228,6 @@ function spaceUndergroundBuild() {
       }
     },
 
-    // Mesmos arquivos no `npm run dev`, para conferir sem precisar buildar.
     configureServer(server) {
       const routes = {
         "/robots.txt": ["text/plain", renderRobots],
