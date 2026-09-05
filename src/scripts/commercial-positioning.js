@@ -1,4 +1,4 @@
-import { plans, commercialPlan, planScopeLines } from "./plans-registry.js";
+import { plans, commercialPlan } from "./plans-registry.js";
 
 const PRODUCT_OPTIONS = [
   {
@@ -69,10 +69,16 @@ const PRODUCT_OPTIONS = [
     index: "08",
     name: "Projeto Personalizado",
     description: "Uma necessidade que precisa de diagnóstico técnico antes de ganhar um formato.",
-    tag: "CUSTOM",
+    tag: "PERSONALIZADO",
     budget: "A definir",
     timeline: "A definir",
   },
+];
+
+const scopeLines = (plan) => [
+  `ESCOPO — ${plan.scope}`,
+  `INVESTIMENTO — ${plan.range}`,
+  `STATUS — ${plan.status}`,
 ];
 
 function hydratePlanCard(planKey, basePlan) {
@@ -106,7 +112,7 @@ function hydratePlanCard(planKey, basePlan) {
     if (meta) meta.innerHTML = `PLANO COMERCIAL <span>ANO — ${plan.year}</span>`;
     write("h3", plan.name, details);
     const scope = details.querySelector(":scope > p");
-    if (scope) scope.innerHTML = planScopeLines(plan).join("<br>");
+    if (scope) scope.innerHTML = scopeLines(plan).join("<br>");
     const link = details.querySelector(".text-link");
     if (link) {
       link.setAttribute("aria-label", `Ver plano: ${plan.name}`);
