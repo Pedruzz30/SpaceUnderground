@@ -18,6 +18,7 @@
 @import "./sections/work.css";
 @import "./components/live-project-preview.css";
 @import "./sections/labs.css";
+@import "./sections/jarvis-lab.css";
 @import "./sections/statement.css";
 @import "./sections/process.css";
 @import "./sections/plans.css";
