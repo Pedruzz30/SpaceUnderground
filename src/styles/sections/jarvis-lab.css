@@ -1,0 +1,102 @@
+/* JARVIS / LAB_001 ------------------------------------------------ */
+.labs:has(.labs-product--jarvis)::before {
+  border-color: color-mix(in srgb, var(--labs-accent, #f59e0b) 24%, transparent);
+}
+
+.labs:has(.labs-product--jarvis) .labs__grid {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--labs-accent, #f59e0b) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+}
+
+.labs-product--jarvis {
+  --accent: #f59e0b;
+  min-height: 460px;
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  background:
+    radial-gradient(circle at 70% 42%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 34%),
+    linear-gradient(145deg, color-mix(in srgb, var(--accent) 7%, transparent), rgba(255, 255, 255, 0.02) 38%, rgba(0, 0, 0, 0.34));
+}
+
+.labs-product--jarvis::after {
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 68%, transparent), transparent);
+}
+
+.labs-product--jarvis .labs-product__signal span {
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.labs-product__identity {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  align-content: end;
+  gap: 0.65rem;
+  max-width: 340px;
+  min-height: 300px;
+}
+
+.labs-product__identity > span {
+  color: color-mix(in srgb, var(--accent) 68%, #8a8a82);
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+}
+
+.labs-product__identity > strong {
+  color: var(--accent);
+  font-family: var(--display);
+  font-size: clamp(3.1rem, 5.2vw, 5.8rem);
+  font-weight: 500;
+  line-height: 0.82;
+  letter-spacing: -0.07em;
+  text-shadow: 0 0 42px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.labs-product__identity > p {
+  max-width: 310px;
+  margin: 0;
+  color: #c6c0af;
+  font-family: var(--body);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.labs-product__identity > a {
+  justify-self: start;
+  display: inline-flex;
+  gap: 0.7rem;
+  align-items: center;
+  margin-top: 0.4rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+}
+
+.labs-product__identity > a i {
+  font-style: normal;
+  transition: transform 180ms ease;
+}
+
+.labs-product__identity > a:hover i,
+.labs-product__identity > a:focus-visible i {
+  transform: translate(2px, -2px);
+}
+
+.case-index__row[data-project-slot="jarvis"] .case-index__status i {
+  background: #f59e0b;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.45);
+}
+
+.signal-ui__slot[data-project-slot="jarvis"] i {
+  border-color: color-mix(in srgb, #f59e0b 65%, transparent);
+}
+
+@media (max-width: 759px) {
+  .labs-product--jarvis { min-height: 390px; }
+  .labs-product__identity { min-height: 245px; }
+}
