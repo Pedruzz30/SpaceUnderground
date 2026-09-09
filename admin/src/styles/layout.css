@@ -119,6 +119,10 @@
   min-width: 0;
 }
 
+.drawer-backdrop {
+  display: none;
+}
+
 .topbar {
   position: sticky;
   z-index: 12;
@@ -142,6 +146,12 @@
 
 .topbar__menu {
   display: none;
+}
+
+.topbar__account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .topbar__user {

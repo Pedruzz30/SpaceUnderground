@@ -6,10 +6,11 @@ function projectCard(project) {
   return `
     <button class="project-row" type="button" data-project-id="${escapeAttribute(project.id)}">
       <span class="project-row__case">${escapeHtml(project.caseNumber)}</span>
-      <strong>${escapeHtml(project.name)}</strong>
+      <strong>${escapeHtml(project.name || "Untitled project")}</strong>
       <span>${escapeHtml(project.category)}</span>
       <span>${badge(project.status, badgeType(project.status))}</span>
       <span>${badge(project.editorialStatus, badgeType(project.editorialStatus))}</span>
+      <span class="project-row__arrow" aria-hidden="true">&rarr;</span>
     </button>
   `;
 }
@@ -22,9 +23,11 @@ export const projectsPage = {
       <div>
         <span>PROJECTS</span>
         <h2>Portfolio control.</h2>
-        <p>Search, filter and open mock project records.</p>
+        <p>Search, filter and manage project records.</p>
       </div>
-      <a class="button" href="#/dashboard">Back to dashboard</a>
+      <div class="heading-actions">
+        <button class="button button--primary" type="button" data-new-project>New Project</button>
+      </div>
     </section>
 
     <section class="panel projects-panel">
@@ -45,6 +48,10 @@ export const projectsPage = {
     </section>
   `,
   afterRender: () => {
+    document.querySelector("[data-new-project]")?.addEventListener("click", () => {
+      window.location.hash = "#/projects/new";
+    });
+
     const search = document.querySelector("[data-search-projects]");
     const list = document.querySelector("[data-project-list]");
     const filters = [...document.querySelectorAll("[data-editorial-filter]")];
@@ -62,7 +69,7 @@ export const projectsPage = {
 
       list.innerHTML = `
         <div class="project-table__head" aria-hidden="true">
-          <span>CASE</span><span>PROJECT</span><span>CATEGORY</span><span>STATUS</span><span>EDITORIAL</span>
+          <span>CASE</span><span>PROJECT</span><span>CATEGORY</span><span>STATUS</span><span>EDITORIAL</span><span></span>
         </div>
         ${projects.length ? projects.map(projectCard).join("") : '<p class="empty-inline">No projects found.</p>'}
       `;

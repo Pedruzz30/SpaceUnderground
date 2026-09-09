@@ -1,3 +1,5 @@
+import { login } from "../services/session.js";
+
 export const loginPage = {
   title: "Admin Access",
   breadcrumb: "ADMIN / ACCESS",
@@ -33,6 +35,7 @@ export const loginPage = {
     document.querySelector("[data-login-form]")?.addEventListener("submit", (event) => {
       event.preventDefault();
       // MOCK AUTH - substituir futuramente por Supabase Auth.
+      login();
       window.location.hash = "#/dashboard";
     });
   },

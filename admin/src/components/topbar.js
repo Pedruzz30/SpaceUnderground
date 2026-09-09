@@ -10,10 +10,13 @@ export function topbar({ title, breadcrumb }) {
         <p>${breadcrumb}</p>
         <h1>${title}</h1>
       </div>
-      <div class="topbar__user" aria-label="Administrador mockado">
-        <span aria-hidden="true"></span>
-        <strong>Pedro</strong>
-        <small>MOCK USER</small>
+      <div class="topbar__account">
+        <div class="topbar__user" aria-label="Administrador mockado">
+          <span aria-hidden="true"></span>
+          <strong>Pedro</strong>
+          <small>MOCK USER</small>
+        </div>
+        <button class="button topbar__logout" type="button" data-logout>Logout</button>
       </div>
     </header>
   `;

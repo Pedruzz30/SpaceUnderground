@@ -1,7 +1,18 @@
-import { dashboardActivity, spaceStatus } from "../data/dashboard.js";
+import { spaceStatus } from "../data/dashboard.js";
 import { badge, badgeType } from "../components/badge.js";
 import { statCard } from "../components/stat-card.js";
-import { getProjects } from "../services/mock-storage.js";
+import { getActivity, getProjects } from "../services/mock-storage.js";
+import { escapeHtml } from "../utils/html.js";
+
+function formatTimestamp(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  if (sameDay) return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleDateString(undefined, { month: "short", day: "2-digit" });
+}
 
 export const dashboardPage = {
   title: "Dashboard",
@@ -10,6 +21,10 @@ export const dashboardPage = {
     const projects = getProjects();
     const published = projects.filter((project) => project.editorialStatus === "PUBLISHED").length;
     const drafts = projects.filter((project) => project.editorialStatus === "DRAFT").length;
+    const recentProjects = [...projects]
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 4);
+    const activity = getActivity();
 
     return `
       <section class="page-heading">
@@ -29,11 +44,11 @@ export const dashboardPage = {
           <header class="panel__head">
             <div>
               <span>SPACE STATUS</span>
-              <h3>${spaceStatus.label}</h3>
+              <h3>${escapeHtml(spaceStatus.label)}</h3>
             </div>
             ${badge("ONLINE", "success")}
           </header>
-          <p>${spaceStatus.detail}</p>
+          <p>${escapeHtml(spaceStatus.detail)}</p>
         </article>
 
         <article class="panel">
@@ -45,14 +60,14 @@ export const dashboardPage = {
             <a class="text-link" href="#/projects">Manage</a>
           </header>
           <div class="compact-list">
-            ${projects.slice(0, 4).map((project) => `
+            ${recentProjects.length ? recentProjects.map((project) => `
               <a href="#/projects/${project.id}">
-                <span>${project.caseNumber}</span>
-                <strong>${project.name}</strong>
-                <small>${project.category}</small>
+                <span>${escapeHtml(project.caseNumber)}</span>
+                <strong>${escapeHtml(project.name || "Untitled project")}</strong>
+                <small>${escapeHtml(project.category)}</small>
                 ${badge(project.status, badgeType(project.status))}
               </a>
-            `).join("")}
+            `).join("") : '<p class="empty-inline">No projects yet.</p>'}
           </div>
         </article>
 
@@ -64,14 +79,14 @@ export const dashboardPage = {
             </div>
           </header>
           <div class="activity-list">
-            ${dashboardActivity.map((item) => `
+            ${activity.length ? activity.map((item) => `
               <div>
                 <span></span>
-                <strong>${item.title}</strong>
-                <p>${item.detail}</p>
-                <small>${item.time}</small>
+                <strong>${escapeHtml(item.title)}</strong>
+                <p>${escapeHtml(item.detail)}</p>
+                <small>${formatTimestamp(item.time)}</small>
               </div>
-            `).join("")}
+            `).join("") : '<p class="empty-inline">No recent activity yet.</p>'}
           </div>
         </article>
       </section>

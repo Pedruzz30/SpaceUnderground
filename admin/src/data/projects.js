@@ -1,3 +1,9 @@
+export const CATEGORIES = ["Website", "System", "Automation", "AI", "Other"];
+
+export const PROJECT_STATUSES = ["Live", "Prototype", "MVP", "Pilot", "In Development", "Research", "Archived"];
+
+export const EDITORIAL_STATUSES = ["DRAFT", "PUBLISHED", "ARCHIVED"];
+
 export const seedProjects = [
   {
     id: "001",
@@ -7,17 +13,20 @@ export const seedProjects = [
     client: "INK Tattoo",
     category: "Website",
     description: "Dark editorial website for a tattoo studio, built around visual depth, motion and brand presence.",
-    status: "LIVE",
+    status: "Live",
     editorialStatus: "PUBLISHED",
     featured: true,
     visible: true,
     year: "2026",
     accent: "#c6ff00",
-    techStack: "HTML / CSS / JavaScript",
+    techStack: ["HTML", "CSS", "JavaScript"],
     poster: "../tattoo-preview-poster.png",
+    gallery: [],
     projectUrl: "https://pedruzz30.github.io/TattooSite/",
     previewUrl: "https://pedruzz30.github.io/TattooSite/?embed=spaceunderground",
-    updatedAt: "2026-09-04",
+    createdAt: "2026-09-04T12:00:00.000Z",
+    updatedAt: "2026-09-04T12:00:00.000Z",
+    publishedAt: "2026-09-04T12:00:00.000Z",
   },
   {
     id: "002",
@@ -27,16 +36,19 @@ export const seedProjects = [
     client: "Lucas Souza",
     category: "Website",
     description: "Strategic digital presence for sports nutrition, focused on credibility, performance and conversion.",
-    status: "LIVE",
+    status: "Live",
     editorialStatus: "PUBLISHED",
     featured: true,
     visible: true,
     year: "2026",
     accent: "#ff9d00",
-    techStack: "HTML / CSS / JavaScript",
+    techStack: ["HTML", "CSS", "JavaScript"],
     poster: "../LucasNutri.png",
+    gallery: [],
     projectUrl: "https://pedruzz30.github.io/LucasNutri/",
     previewUrl: "https://pedruzz30.github.io/LucasNutri/?embed=spaceunderground",
-    updatedAt: "2026-09-04",
+    createdAt: "2026-09-04T12:00:00.000Z",
+    updatedAt: "2026-09-04T12:00:00.000Z",
+    publishedAt: "2026-09-04T12:00:00.000Z",
   },
 ];

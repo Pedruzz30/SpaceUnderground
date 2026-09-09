@@ -25,9 +25,18 @@
   color: #070806;
 }
 
+.button--danger {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  color: var(--danger);
+}
+
+.button--danger:hover {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+
 .stats-grid,
-.dashboard-grid,
-.editor-grid {
+.dashboard-grid {
   display: grid;
   gap: var(--space-3);
 }
@@ -256,7 +265,7 @@ textarea {
 
 .project-table__head,
 .project-row {
-  grid-template-columns: 4.5rem minmax(12rem, 1fr) 8rem 8rem 8rem;
+  grid-template-columns: 4.5rem minmax(12rem, 1fr) 8rem 8rem 8rem 1.5rem;
 }
 
 .project-table__head {
@@ -272,6 +281,27 @@ textarea {
 .project-row {
   border-width: 0 0 1px;
   box-shadow: none;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.project-row:active {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-hover));
+}
+
+.project-row__arrow {
+  color: var(--text-muted);
+  text-align: right;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.project-row:hover .project-row__arrow,
+.project-row:focus-visible .project-row__arrow {
+  color: var(--accent);
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .empty-inline,
@@ -296,23 +326,6 @@ textarea {
   margin: 0;
   color: var(--text-primary);
   font-size: 2rem;
-}
-
-.editor-grid {
-  grid-template-columns: minmax(0, 1fr) 340px;
-}
-
-.editor-section:first-child,
-.editor-section:nth-child(2) {
-  grid-column: 1;
-}
-
-.editor-section--side {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  align-self: start;
-  position: sticky;
-  top: 96px;
 }
 
 .form-grid {

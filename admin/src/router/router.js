@@ -5,6 +5,8 @@ import { loginPage } from "../pages/login.js";
 import { dashboardPage } from "../pages/dashboard.js";
 import { projectsPage } from "../pages/projects.js";
 import { projectEditorPage } from "../pages/project-editor.js";
+import { isAuthenticated, logout } from "../services/session.js";
+import { confirmModal } from "../components/modal.js";
 import { escapeHtml } from "../utils/html.js";
 
 const pages = [
@@ -70,24 +72,73 @@ function bindShell() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") setOpen(false);
   });
+
+  document.querySelector("[data-logout]")?.addEventListener("click", () => {
+    logout();
+    window.location.hash = "#/login";
+  });
+}
+
+let navigationGuard = null;
+let activeRoute = null;
+
+// Lets a page (eg. Project Editor) block navigation while it has unsaved
+// changes. The guard function must return true when there is unsaved work.
+export function setNavigationGuard(hasUnsavedChanges) {
+  navigationGuard = hasUnsavedChanges;
+}
+
+export function clearNavigationGuard() {
+  navigationGuard = null;
 }
 
 export function initRouter(root) {
   if (!root) return;
 
   const render = () => {
-    const route = currentRoute();
-    const params = routeParams(route);
-    const match = pages.find((entry) => entry.test(route));
-    const page = match?.page || notFoundPage(route);
+    const requestedRoute = currentRoute();
+
+    if (navigationGuard && requestedRoute !== activeRoute) {
+      if (navigationGuard()) {
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${activeRoute}`);
+        confirmModal({
+          title: "UNSAVED CHANGES",
+          body: "<p>You have changes that haven't been saved.</p>",
+          confirmLabel: "Discard Changes",
+          cancelLabel: "Stay",
+        }).then((discard) => {
+          if (discard) {
+            navigationGuard = null;
+            window.location.hash = `#${requestedRoute}`;
+          }
+        });
+        return;
+      }
+      navigationGuard = null;
+    }
+
+    if (requestedRoute !== "/login" && !isAuthenticated()) {
+      window.location.hash = "#/login";
+      return;
+    }
+
+    if (requestedRoute === "/login" && isAuthenticated()) {
+      window.location.hash = "#/dashboard";
+      return;
+    }
+
+    const params = routeParams(requestedRoute);
+    const match = pages.find((entry) => entry.test(requestedRoute));
+    const page = match?.page || notFoundPage(requestedRoute);
 
     if (page === loginPage) {
       root.innerHTML = page.render(params);
     } else {
-      root.innerHTML = shell(page, route, params);
+      root.innerHTML = shell(page, requestedRoute, params);
       bindShell();
     }
 
+    activeRoute = requestedRoute;
     page.afterRender?.(params);
     document.querySelector(".page")?.focus({ preventScroll: true });
   };
