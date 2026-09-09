@@ -1,4 +1,5 @@
 import { initRouter } from "./router/router.js";
+import "./services/dev-tools.js";
 
 document.documentElement.classList.add("js");
 

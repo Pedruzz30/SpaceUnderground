@@ -2,15 +2,16 @@ import { badge, badgeType } from "../components/badge.js";
 import { showToast } from "../components/toast.js";
 import { confirmModal, openModal } from "../components/modal.js";
 import { CATEGORIES, EDITORIAL_STATUSES, PROJECT_STATUSES } from "../data/projects.js";
+import { logActivity } from "../services/activity-service.js";
+import { describeError, toDataError } from "../services/errors.js";
 import {
   archiveProject,
   createProject,
   deleteProject,
   getProjectById,
-  logActivity,
   nextAvailableCaseNumber,
   updateProject,
-} from "../services/mock-storage.js";
+} from "../services/project-service.js";
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
@@ -93,10 +94,11 @@ function selectMarkup({ label, name, value, options }) {
   `;
 }
 
-function blankProject() {
+function blankProject(caseNumber) {
   return {
     id: null,
-    caseNumber: nextAvailableCaseNumber(),
+    dbId: null,
+    caseNumber,
     name: "",
     slug: "",
     client: "",
@@ -143,11 +145,11 @@ function renderEditor(project, isCreate) {
     <form class="editor-form" data-project-editor data-project-id="${escapeAttribute(project.id || "")}" data-mode="${isCreate ? "create" : "edit"}" novalidate>
       <div class="editor-toolbar">
         ${isCreate
-          ? `<button type="submit" class="button button--primary" data-action-create>Create Project</button>`
+          ? `<button type="submit" class="button button--primary" data-editor-action data-action-create>Create Project</button>`
           : `
-            <button type="button" class="button" data-action-preview>Preview</button>
-            <button type="submit" class="button" data-action-save>Save Changes</button>
-            <button type="button" class="button button--primary" data-action-publish>Publish Changes</button>
+            <button type="button" class="button" data-editor-action data-action-preview>Preview</button>
+            <button type="submit" class="button" data-editor-action data-action-save>Save Changes</button>
+            <button type="button" class="button button--primary" data-editor-action data-action-publish>Publish Changes</button>
           `}
       </div>
 
@@ -256,10 +258,10 @@ function renderEditor(project, isCreate) {
             <h3>Irreversible actions</h3>
           </div>
         </header>
-        <p>These actions affect mock storage immediately and cannot be undone from the UI.</p>
+        <p>These actions take effect immediately and cannot be undone from the UI.</p>
         <div class="danger-zone__actions">
-          <button type="button" class="button" data-action-archive>Archive Project</button>
-          <button type="button" class="button button--danger" data-action-delete>Delete Project</button>
+          <button type="button" class="button" data-editor-action data-action-archive>Archive Project</button>
+          <button type="button" class="button button--danger" data-editor-action data-action-delete>Delete Project</button>
         </div>
       </section>
     `}
@@ -299,19 +301,46 @@ function bindTabs(form) {
   });
 }
 
-function mount(id) {
+// Serializes editor actions: while one is running every action button is
+// disabled, so a double click can never fire two saves or two deletes.
+function createActionRunner() {
+  let running = false;
+
+  return async function run(button, busyLabel, task) {
+    if (running) return;
+    running = true;
+
+    const actions = [...document.querySelectorAll("[data-editor-action]")];
+    const originalLabel = button?.textContent;
+    actions.forEach((action) => {
+      action.disabled = true;
+    });
+    if (button) button.textContent = busyLabel;
+
+    try {
+      await task();
+    } finally {
+      running = false;
+      actions.forEach((action) => {
+        if (action.isConnected) action.disabled = false;
+      });
+      if (button?.isConnected) button.textContent = originalLabel;
+    }
+  };
+}
+
+function mount(project, isCreate) {
   const form = document.querySelector("[data-project-editor]");
   if (!form) return;
 
-  const isCreate = id === "new";
-  const project = isCreate ? null : getProjectById(id);
-  if (!isCreate && !project) return;
-
-  let techStack = isCreate ? [] : [...(project.techStack || [])];
-  let gallery = isCreate ? [] : [...(project.gallery || [])];
-  let posterUrl = isCreate ? "" : project.poster || "";
-  let slugTouched = !isCreate && Boolean(project.slug);
+  const id = project.id;
+  let techStack = [...(project.techStack || [])];
+  let gallery = [...(project.gallery || [])];
+  let posterUrl = project.poster || "";
+  let slugTouched = Boolean(project.slug);
   let isDirty = false;
+
+  const run = createActionRunner();
 
   function collectFormValues() {
     const data = Object.fromEntries(new FormData(form).entries());
@@ -367,7 +396,7 @@ function mount(id) {
     input?.removeAttribute("aria-invalid");
   }
 
-  function showErrors(errors) {
+  function showErrors(errors, toastMessage = "Fix the highlighted fields.") {
     clearErrors();
     let firstInvalid = null;
 
@@ -387,7 +416,18 @@ function mount(id) {
     });
 
     firstInvalid?.focus();
-    showToast("Fix the highlighted fields.");
+    showToast(toastMessage);
+  }
+
+  // Database rejections (a duplicate slug, for instance) belong next to the
+  // field that caused them; everything else is a toast.
+  function reportFailure(error, fallbackMessage) {
+    const dataError = toDataError(error, fallbackMessage);
+    if (dataError.field && fieldContainer(dataError.field)) {
+      showErrors({ [dataError.field]: dataError.message }, dataError.message);
+      return;
+    }
+    showToast(dataError.message);
   }
 
   const baselineSnapshot = JSON.stringify(collectFormValues());
@@ -484,7 +524,7 @@ function mount(id) {
     markDirty();
   });
 
-  // Gallery (mock metadata only, no real upload/storage).
+  // Gallery (local metadata only; Supabase Storage comes later).
   function renderGallery() {
     const grid = form.querySelector("[data-gallery]");
     if (!grid) return;
@@ -531,14 +571,7 @@ function mount(id) {
   updateSaveState();
   setNavigationGuard(() => isDirty);
 
-  function refresh(nextId) {
-    const page = document.querySelector(".page");
-    if (!page) return;
-    page.innerHTML = projectEditorPage.render({ id: nextId });
-    mount(nextId);
-  }
-
-  function handleCreate() {
+  async function handleCreate() {
     const values = collectFormValues();
     const errors = validate(values);
     if (Object.keys(errors).length) {
@@ -547,15 +580,18 @@ function mount(id) {
     }
     clearErrors();
 
-    const caseNumber = form.elements.caseNumber.value;
-    const created = createProject({ ...values, caseNumber });
-    showToast("Project created.");
-    isDirty = false;
-    clearNavigationGuard();
-    window.location.hash = `#/projects/${created.id}`;
+    try {
+      const created = await createProject({ ...values, caseNumber: form.elements.caseNumber.value });
+      showToast("Project created.");
+      isDirty = false;
+      clearNavigationGuard();
+      window.location.hash = `#/projects/${created.id}`;
+    } catch (error) {
+      reportFailure(error, "Unable to create project.");
+    }
   }
 
-  function handleSave() {
+  async function handleSave() {
     const values = collectFormValues();
     const errors = validate(values);
     if (Object.keys(errors).length) {
@@ -564,13 +600,17 @@ function mount(id) {
     }
     clearErrors();
 
-    const updated = updateProject(id, values);
-    logActivity("Project updated", `${updated.name || "Untitled project"} updated`);
-    showToast("Changes saved.");
-    refresh(updated.id);
+    try {
+      const updated = await updateProject(id, values);
+      await logActivity("Project updated", `${updated.name || "Untitled project"} updated`);
+      showToast("Changes saved.");
+      await loadEditor(updated.id);
+    } catch (error) {
+      reportFailure(error, "Unable to save changes.");
+    }
   }
 
-  function handlePublish() {
+  async function handlePublish() {
     const values = { ...collectFormValues(), editorialStatus: "PUBLISHED" };
     const errors = validate(values);
     if (Object.keys(errors).length) {
@@ -579,10 +619,14 @@ function mount(id) {
     }
     clearErrors();
 
-    const updated = updateProject(id, values);
-    logActivity("Project published", `CASE ${updated.caseNumber} published`);
-    showToast("Project published.");
-    refresh(updated.id);
+    try {
+      const updated = await updateProject(id, values);
+      await logActivity("Project published", `CASE ${updated.caseNumber} published`);
+      showToast("Project published.");
+      await loadEditor(updated.id);
+    } catch (error) {
+      reportFailure(error, "Unable to publish project.");
+    }
   }
 
   async function handleArchive() {
@@ -594,24 +638,32 @@ function mount(id) {
     });
     if (!confirmed) return;
 
-    archiveProject(id);
-    showToast("Project archived.");
-    refresh(id);
+    try {
+      await archiveProject(id);
+      showToast("Project archived.");
+      await loadEditor(id);
+    } catch (error) {
+      reportFailure(error, "Unable to archive project.");
+    }
   }
 
   async function handleDelete() {
     const confirmed = await confirmModal({
       title: `DELETE CASE ${project.caseNumber}?`,
-      body: "<p>This action removes the project from mock storage. This cannot be undone.</p>",
+      body: "<p>This permanently removes the project. This cannot be undone.</p>",
       confirmLabel: "Delete Project",
     });
     if (!confirmed) return;
 
-    deleteProject(id);
-    showToast("Project deleted.");
-    isDirty = false;
-    clearNavigationGuard();
-    window.location.hash = "#/projects";
+    try {
+      await deleteProject(id);
+      showToast("Project deleted.");
+      isDirty = false;
+      clearNavigationGuard();
+      window.location.hash = "#/projects";
+    } catch (error) {
+      reportFailure(error, "Unable to delete project.");
+    }
   }
 
   function handlePreview() {
@@ -636,34 +688,91 @@ function mount(id) {
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (isCreate) handleCreate();
-    else handleSave();
+    if (isCreate) {
+      run(form.querySelector("[data-action-create]"), "Creating...", handleCreate);
+    } else {
+      run(form.querySelector("[data-action-save]"), "Saving...", handleSave);
+    }
   });
 
-  form.querySelector("[data-action-publish]")?.addEventListener("click", handlePublish);
+  const publishBtn = form.querySelector("[data-action-publish]");
+  publishBtn?.addEventListener("click", () => run(publishBtn, "Publishing...", handlePublish));
+
   form.querySelector("[data-action-preview]")?.addEventListener("click", handlePreview);
-  document.querySelector("[data-action-archive]")?.addEventListener("click", handleArchive);
-  document.querySelector("[data-action-delete]")?.addEventListener("click", handleDelete);
+
+  const archiveBtn = document.querySelector("[data-action-archive]");
+  archiveBtn?.addEventListener("click", () => run(archiveBtn, "Archiving...", handleArchive));
+
+  const deleteBtn = document.querySelector("[data-action-delete]");
+  deleteBtn?.addEventListener("click", () => run(deleteBtn, "Deleting...", handleDelete));
+}
+
+function loadingMarkup() {
+  return `
+    <section class="empty-state" aria-busy="true">
+      <span>PROJECT</span>
+      <h2>Loading project...</h2>
+    </section>
+  `;
+}
+
+function notFoundMarkup(id) {
+  return `
+    <section class="empty-state">
+      <span>CASE / ${escapeHtml(id)}</span>
+      <h2>Project not found</h2>
+      <p>This project is no longer available.</p>
+      <a class="button" href="#/projects">Back to Projects</a>
+    </section>
+  `;
+}
+
+function errorMarkup(message) {
+  return `
+    <section class="empty-state">
+      <span>ERROR</span>
+      <h2>${escapeHtml(message)}</h2>
+      <button class="button" type="button" data-retry-editor>Try again</button>
+    </section>
+  `;
+}
+
+async function loadEditor(id) {
+  const root = document.querySelector("[data-editor-root]");
+  if (!root) return;
+
+  const isCreate = id === "new";
+  root.innerHTML = loadingMarkup();
+
+  try {
+    let project;
+
+    if (isCreate) {
+      project = blankProject(await nextAvailableCaseNumber());
+    } else {
+      project = await getProjectById(id);
+      if (!root.isConnected) return;
+      if (!project) {
+        clearNavigationGuard();
+        root.innerHTML = notFoundMarkup(id);
+        return;
+      }
+    }
+
+    if (!root.isConnected) return;
+    root.innerHTML = renderEditor(project, isCreate);
+    mount(project, isCreate);
+  } catch (error) {
+    if (!root.isConnected) return;
+    clearNavigationGuard();
+    root.innerHTML = errorMarkup(describeError(error, "Unable to load project."));
+    root.querySelector("[data-retry-editor]")?.addEventListener("click", () => loadEditor(id));
+  }
 }
 
 export const projectEditorPage = {
   title: "Project Editor",
   breadcrumb: "CONTENT / PROJECTS / CASE",
-  render: ({ id }) => {
-    const isCreate = id === "new";
-    const project = isCreate ? blankProject() : getProjectById(id);
-
-    if (!isCreate && !project) {
-      return `
-        <section class="empty-state">
-          <span>CASE / ${escapeHtml(id)}</span>
-          <h2>Projeto nao encontrado</h2>
-          <a class="button" href="#/projects">Voltar para Projects</a>
-        </section>
-      `;
-    }
-
-    return renderEditor(project, isCreate);
-  },
-  afterRender: ({ id }) => mount(id),
+  render: () => `<div data-editor-root>${loadingMarkup()}</div>`,
+  afterRender: ({ id }) => loadEditor(id),
 };

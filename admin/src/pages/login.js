@@ -1,4 +1,5 @@
-import { login } from "../services/session.js";
+import { login } from "../services/auth-service.js";
+import { describeError } from "../services/errors.js";
 
 export const loginPage = {
   title: "Admin Access",
@@ -24,7 +25,8 @@ export const loginPage = {
             <label for="login-password">PASSWORD</label>
             <input id="login-password" name="password" type="password" autocomplete="current-password" required>
           </div>
-          <button class="button button--primary" type="submit">ACCESS CONTROL SYSTEM</button>
+          <p class="field-error" data-login-error role="alert" hidden></p>
+          <button class="button button--primary" type="submit" data-login-submit>ACCESS CONTROL SYSTEM</button>
         </form>
 
         <p class="login-panel__foot">RESTRICTED / AUTHORIZED PERSONNEL ONLY</p>
@@ -32,11 +34,33 @@ export const loginPage = {
     </main>
   `,
   afterRender: () => {
-    document.querySelector("[data-login-form]")?.addEventListener("submit", (event) => {
+    const form = document.querySelector("[data-login-form]");
+    const submit = document.querySelector("[data-login-submit]");
+    const errorEl = document.querySelector("[data-login-error]");
+    let pending = false;
+
+    form?.addEventListener("submit", async (event) => {
       event.preventDefault();
-      // MOCK AUTH - substituir futuramente por Supabase Auth.
-      login();
-      window.location.hash = "#/dashboard";
+      if (pending) return;
+
+      pending = true;
+      submit.disabled = true;
+      submit.textContent = "SIGNING IN...";
+      errorEl.hidden = true;
+
+      try {
+        await login({
+          email: form.elements.email.value.trim(),
+          password: form.elements.password.value,
+        });
+        window.location.hash = "#/dashboard";
+      } catch (error) {
+        errorEl.textContent = describeError(error, "Unable to sign in.");
+        errorEl.hidden = false;
+        submit.disabled = false;
+        submit.textContent = "ACCESS CONTROL SYSTEM";
+        pending = false;
+      }
     });
   },
 };

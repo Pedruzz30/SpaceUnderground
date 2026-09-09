@@ -1,5 +1,6 @@
 import { badge, badgeType } from "../components/badge.js";
-import { getProjects } from "../services/mock-storage.js";
+import { getProjects } from "../services/project-service.js";
+import { describeError } from "../services/errors.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
 function projectCard(project) {
@@ -34,7 +35,7 @@ export const projectsPage = {
       <div class="toolbar">
         <label class="search-field">
           <span>Search projects</span>
-          <input data-search-projects type="search" placeholder="Search projects...">
+          <input data-search-projects type="search" placeholder="Search projects..." disabled>
         </label>
         <div class="segmented" role="group" aria-label="Filtrar projetos por editorial">
           <button type="button" class="is-active" data-editorial-filter="ALL" aria-pressed="true">ALL</button>
@@ -44,10 +45,12 @@ export const projectsPage = {
         </div>
       </div>
 
-      <div class="project-table" data-project-list aria-live="polite"></div>
+      <div class="project-table" data-project-list aria-live="polite" aria-busy="true">
+        <p class="empty-inline">Loading projects...</p>
+      </div>
     </section>
   `,
-  afterRender: () => {
+  afterRender: async () => {
     document.querySelector("[data-new-project]")?.addEventListener("click", () => {
       window.location.hash = "#/projects/new";
     });
@@ -56,10 +59,11 @@ export const projectsPage = {
     const list = document.querySelector("[data-project-list]");
     const filters = [...document.querySelectorAll("[data-editorial-filter]")];
     let activeFilter = "ALL";
+    let projects = [];
 
     const renderList = () => {
       const query = search.value.trim().toLowerCase();
-      const projects = getProjects().filter((project) => {
+      const visible = projects.filter((project) => {
         const matchesQuery = [project.name, project.client, project.category, project.status].some((value) =>
           String(value).toLowerCase().includes(query),
         );
@@ -71,7 +75,7 @@ export const projectsPage = {
         <div class="project-table__head" aria-hidden="true">
           <span>CASE</span><span>PROJECT</span><span>CATEGORY</span><span>STATUS</span><span>EDITORIAL</span><span></span>
         </div>
-        ${projects.length ? projects.map(projectCard).join("") : '<p class="empty-inline">No projects found.</p>'}
+        ${visible.length ? visible.map(projectCard).join("") : '<p class="empty-inline">No projects found.</p>'}
       `;
 
       list.querySelectorAll("[data-project-id]").forEach((row) => {
@@ -94,6 +98,17 @@ export const projectsPage = {
     });
 
     search.addEventListener("input", renderList);
-    renderList();
+
+    try {
+      projects = await getProjects();
+      if (!list.isConnected) return;
+      search.disabled = false;
+      renderList();
+    } catch (error) {
+      if (!list.isConnected) return;
+      list.innerHTML = `<p class="empty-inline">${escapeHtml(describeError(error, "Unable to load projects."))}</p>`;
+    } finally {
+      list.removeAttribute("aria-busy");
+    }
   },
 };
