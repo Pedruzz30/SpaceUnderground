@@ -1,0 +1,92 @@
+import { badge, badgeType } from "../components/badge.js";
+import { getProjects } from "../services/mock-storage.js";
+import { escapeAttribute, escapeHtml } from "../utils/html.js";
+
+function projectCard(project) {
+  return `
+    <button class="project-row" type="button" data-project-id="${escapeAttribute(project.id)}">
+      <span class="project-row__case">${escapeHtml(project.caseNumber)}</span>
+      <strong>${escapeHtml(project.name)}</strong>
+      <span>${escapeHtml(project.category)}</span>
+      <span>${badge(project.status, badgeType(project.status))}</span>
+      <span>${badge(project.editorialStatus, badgeType(project.editorialStatus))}</span>
+    </button>
+  `;
+}
+
+export const projectsPage = {
+  title: "Projects",
+  breadcrumb: "CONTENT / PROJECTS",
+  render: () => `
+    <section class="page-heading page-heading--split">
+      <div>
+        <span>PROJECTS</span>
+        <h2>Portfolio control.</h2>
+        <p>Search, filter and open mock project records.</p>
+      </div>
+      <a class="button" href="#/dashboard">Back to dashboard</a>
+    </section>
+
+    <section class="panel projects-panel">
+      <div class="toolbar">
+        <label class="search-field">
+          <span>Search projects</span>
+          <input data-search-projects type="search" placeholder="Search projects...">
+        </label>
+        <div class="segmented" role="group" aria-label="Filtrar projetos por editorial">
+          <button type="button" class="is-active" data-editorial-filter="ALL" aria-pressed="true">ALL</button>
+          <button type="button" data-editorial-filter="PUBLISHED" aria-pressed="false">PUBLISHED</button>
+          <button type="button" data-editorial-filter="DRAFT" aria-pressed="false">DRAFT</button>
+          <button type="button" data-editorial-filter="ARCHIVED" aria-pressed="false">ARCHIVED</button>
+        </div>
+      </div>
+
+      <div class="project-table" data-project-list aria-live="polite"></div>
+    </section>
+  `,
+  afterRender: () => {
+    const search = document.querySelector("[data-search-projects]");
+    const list = document.querySelector("[data-project-list]");
+    const filters = [...document.querySelectorAll("[data-editorial-filter]")];
+    let activeFilter = "ALL";
+
+    const renderList = () => {
+      const query = search.value.trim().toLowerCase();
+      const projects = getProjects().filter((project) => {
+        const matchesQuery = [project.name, project.client, project.category, project.status].some((value) =>
+          String(value).toLowerCase().includes(query),
+        );
+        const matchesFilter = activeFilter === "ALL" || project.editorialStatus === activeFilter;
+        return matchesQuery && matchesFilter;
+      });
+
+      list.innerHTML = `
+        <div class="project-table__head" aria-hidden="true">
+          <span>CASE</span><span>PROJECT</span><span>CATEGORY</span><span>STATUS</span><span>EDITORIAL</span>
+        </div>
+        ${projects.length ? projects.map(projectCard).join("") : '<p class="empty-inline">No projects found.</p>'}
+      `;
+
+      list.querySelectorAll("[data-project-id]").forEach((row) => {
+        row.addEventListener("click", () => {
+          window.location.hash = `#/projects/${row.dataset.projectId}`;
+        });
+      });
+    };
+
+    filters.forEach((button) => {
+      button.addEventListener("click", () => {
+        activeFilter = button.dataset.editorialFilter;
+        filters.forEach((item) => {
+          const isActive = item === button;
+          item.classList.toggle("is-active", isActive);
+          item.setAttribute("aria-pressed", String(isActive));
+        });
+        renderList();
+      });
+    });
+
+    search.addEventListener("input", renderList);
+    renderList();
+  },
+};
