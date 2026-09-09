@@ -67,6 +67,19 @@ Or paste `migrations/001_admin_foundation.sql` into the SQL editor in the
 Supabase dashboard and run it. The script is idempotent (`if not exists`,
 `drop policy if exists`), so re-running it is safe.
 
+### Verifying it before deploying
+
+`admin/tests/migration.test.mjs` applies this file to a real Postgres engine
+(PGlite, Postgres compiled to WASM) and asserts the constraints, both triggers
+and every RLS policy — including that an authenticated non-admin can read
+nothing but published projects and cannot promote themselves.
+
+```bash
+cd admin && npm test
+```
+
+No Docker, no Supabase project and no credentials needed.
+
 ## Creating the first admin
 
 Promotion is intentionally manual — the frontend can never grant admin access.
