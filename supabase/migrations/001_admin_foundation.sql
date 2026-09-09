@@ -8,7 +8,7 @@
 -- Value casing matches the admin UI model exactly, so no translation layer is
 -- needed: category/status are title case, editorial_status is upper case.
 
-create extension if not exists pgcrypto;
+-- gen_random_uuid() is in core since PostgreSQL 13, so no extension is needed.
 
 -- ---------------------------------------------------------------------------
 -- admins
