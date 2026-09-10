@@ -41,11 +41,32 @@ function writeAll(projects) {
 
 // Older mock records stored gallery items as { id, url }.
 function normalizeGallery(project) {
-  if (!Array.isArray(project.gallery)) return { ...project, gallery: [] };
-  return {
+  const next = {
     ...project,
-    gallery: project.gallery.map((item) => ({ ...item, path: item.path ?? item.url ?? "" })),
+    gallery: Array.isArray(project.gallery)
+      ? project.gallery.map((item) => ({ ...item, path: item.path ?? item.url ?? "" }))
+      : [],
+    presentation: {
+      system: project.presentation?.system ?? "",
+      label: project.presentation?.label ?? "",
+      address: project.presentation?.address ?? "",
+      type: project.presentation?.type ?? "",
+      origin: project.presentation?.origin ?? "",
+      coordinates: Array.isArray(project.presentation?.coordinates) ? project.presentation.coordinates : [],
+    },
+    modules: Array.isArray(project.modules)
+      ? project.modules
+          .map((item, index) => ({
+            id: item.id ?? `mock-module-${project.id || "new"}-${index}`,
+            position: Number.isFinite(Number(item.position)) ? Number(item.position) : index,
+            code: item.code ?? "",
+            title: item.title ?? "",
+            description: item.description ?? "",
+          }))
+          .sort((a, b) => a.position - b.position)
+      : [],
   };
+  return next;
 }
 
 function nextNumber(projects) {
@@ -77,6 +98,11 @@ export const mockProjectRepository = {
       id: caseNumber,
       dbId: null,
       caseNumber,
+      modules: (data.modules || []).map((item, index) => ({
+        ...item,
+        id: item.id || `mock-module-${caseNumber}-${crypto.randomUUID()}`,
+        position: index,
+      })),
       createdAt: timestamp,
       updatedAt: timestamp,
       publishedAt: data.editorialStatus === "PUBLISHED" ? timestamp : null,
@@ -101,6 +127,14 @@ export const mockProjectRepository = {
       createdAt: current.createdAt,
       updatedAt: nowIso(),
     };
+
+    if (Array.isArray(patch.modules)) {
+      next.modules = patch.modules.map((item, moduleIndex) => ({
+        ...item,
+        id: item.id || `mock-module-${current.id}-${crypto.randomUUID()}`,
+        position: moduleIndex,
+      }));
+    }
 
     // First publication stamps published_at; later edits never reset it.
     if (next.editorialStatus === "PUBLISHED" && !next.publishedAt) {

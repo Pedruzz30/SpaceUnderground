@@ -34,4 +34,8 @@ export const mockMediaRepository = {
   async resolveUrl(value) {
     return value;
   },
+
+  async scanOrphans() {
+    return [];
+  },
 };

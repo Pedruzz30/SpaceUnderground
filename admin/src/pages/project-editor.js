@@ -40,8 +40,9 @@ function slugify(value) {
 function isValidUrl(value) {
   if (!value) return true;
   try {
-    new URL(value);
-    return true;
+    if (/^(#|\/|\.{1,2}\/)/.test(value)) return true;
+    const url = new URL(value, "https://spaceunderground.local");
+    return /^(https?:)?\/\//i.test(value) && ["http:", "https:"].includes(url.protocol);
   } catch {
     return false;
   }
@@ -77,6 +78,8 @@ function validate(values) {
   if (!isValidUrl(values.projectUrl)) errors.projectUrl = "Enter a valid URL.";
   if (!isValidUrl(values.previewUrl)) errors.previewUrl = "Enter a valid URL.";
   if (values.accent && !isValidHex(values.accent)) errors.accent = "Enter a valid hex color (eg. #baff00).";
+  const untitledModule = (values.modules || []).findIndex((module) => !module.title.trim());
+  if (untitledModule >= 0) errors[`module-title-${untitledModule}`] = "Module title is required.";
 
   return errors;
 }
@@ -121,6 +124,15 @@ function blankProject(caseNumber) {
     year: String(new Date().getFullYear()),
     accent: "#c6ff00",
     techStack: [],
+    presentation: {
+      system: "",
+      label: "",
+      address: "",
+      type: "",
+      origin: "",
+      coordinates: ["", ""],
+    },
+    modules: [],
     poster: "",
     gallery: [],
     projectUrl: "",
@@ -131,8 +143,36 @@ function blankProject(caseNumber) {
   };
 }
 
+function moduleMarkup(module, index, total) {
+  return `
+    <article class="module-card" data-module-index="${index}">
+      <header class="module-card__head">
+        <div>
+          <span>MODULE ${String(index + 1).padStart(2, "0")}</span>
+          <strong>${escapeHtml(module.title || "Untitled module")}</strong>
+        </div>
+        <div class="module-card__actions">
+          <button type="button" class="button" data-module-up="${index}" ${index === 0 ? "disabled" : ""}>Move Up</button>
+          <button type="button" class="button" data-module-down="${index}" ${index === total - 1 ? "disabled" : ""}>Move Down</button>
+          <button type="button" class="button button--danger" data-module-remove="${index}">Remove Module</button>
+        </div>
+      </header>
+      <div class="form-grid">
+        ${fieldMarkup({ label: "Code", name: `module-code-${index}`, value: module.code, attrs: `data-module-field="code" data-module-index="${index}"` })}
+        ${fieldMarkup({ label: "Title", name: `module-title-${index}`, value: module.title, attrs: `data-module-field="title" data-module-index="${index}"` })}
+        <div class="field field--wide">
+          <label for="field-module-description-${index}">Description</label>
+          <textarea id="field-module-description-${index}" rows="3" data-module-field="description" data-module-index="${index}">${escapeHtml(module.description)}</textarea>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
 function renderEditor(project, isCreate) {
   const accentValue = project.accent || "#c6ff00";
+  const presentation = project.presentation || {};
+  const coordinates = Array.isArray(presentation.coordinates) ? presentation.coordinates : [];
 
   return `
     <section class="page-heading page-heading--split">
@@ -165,6 +205,7 @@ function renderEditor(project, isCreate) {
 
       <div class="tabs" role="tablist" aria-label="Project editor sections">
         <button type="button" role="tab" id="tab-general" aria-selected="true" aria-controls="panel-general" data-tab="general" tabindex="0">General</button>
+        <button type="button" role="tab" id="tab-presentation" aria-selected="false" aria-controls="panel-presentation" data-tab="presentation" tabindex="-1">Presentation</button>
         <button type="button" role="tab" id="tab-media" aria-selected="false" aria-controls="panel-media" data-tab="media" tabindex="-1">Media</button>
         <button type="button" role="tab" id="tab-publishing" aria-selected="false" aria-controls="panel-publishing" data-tab="publishing" tabindex="-1">Publishing</button>
       </div>
@@ -201,6 +242,29 @@ function renderEditor(project, isCreate) {
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="tab-panel" id="panel-presentation" role="tabpanel" aria-labelledby="tab-presentation" hidden>
+        <div class="form-grid">
+          ${fieldMarkup({ label: "System Label", name: "presentationSystem", value: presentation.system || "", hint: "Example: SISTEMA DE INTELIGÊNCIA / 03" })}
+          ${fieldMarkup({ label: "Viewer Label", name: "presentationLabel", value: presentation.label || "", hint: "Example: IA / AUTOMAÇÃO" })}
+          ${fieldMarkup({ label: "Address", name: "presentationAddress", value: presentation.address || "", hint: "Example: JARVIS AI / PROTÓTIPO" })}
+          ${fieldMarkup({ label: "Type", name: "presentationType", value: presentation.type || "", hint: "Example: APLICAÇÃO DESKTOP COM IA" })}
+          ${fieldMarkup({ label: "Origin", name: "presentationOrigin", value: presentation.origin || "", hint: "Example: RJ / BR" })}
+          ${fieldMarkup({ label: "Latitude Display", name: "presentationLatitude", value: coordinates[0] || "", hint: "Display text only, not real geolocation." })}
+          ${fieldMarkup({ label: "Longitude Display", name: "presentationLongitude", value: coordinates[1] || "", hint: "Display text only, not real geolocation." })}
+        </div>
+
+        <section class="module-builder" aria-labelledby="modules-title">
+          <div class="module-builder__head">
+            <div>
+              <span class="field-label">Modules</span>
+              <h3 id="modules-title">Project viewer modules</h3>
+            </div>
+            <button type="button" class="button" data-module-add>+ Add Module</button>
+          </div>
+          <div class="module-list" data-module-list></div>
+        </section>
       </div>
 
       <div class="tab-panel" id="panel-media" role="tabpanel" aria-labelledby="tab-media" hidden>
@@ -355,6 +419,7 @@ function mount(project, isCreate) {
   const storageOwnerId = project.dbId || project.id;
   let techStack = [...(project.techStack || [])];
   let gallery = [...(project.gallery || [])];
+  let modules = [...(project.modules || [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   let posterUrl = project.poster || "";
   let slugTouched = Boolean(project.slug);
   let isDirty = false;
@@ -389,6 +454,21 @@ function mount(project, isCreate) {
       visible: form.elements.visible.checked,
       featured: form.elements.featured.checked,
       techStack: [...techStack],
+      presentation: {
+        system: (data.presentationSystem || "").trim(),
+        label: (data.presentationLabel || "").trim(),
+        address: (data.presentationAddress || "").trim(),
+        type: (data.presentationType || "").trim(),
+        origin: (data.presentationOrigin || "").trim(),
+        coordinates: [data.presentationLatitude, data.presentationLongitude].map((value) => String(value || "").trim()).filter(Boolean),
+      },
+      modules: modules.map((item, index) => ({
+        id: item.id ?? null,
+        position: index,
+        code: item.code ?? "",
+        title: item.title ?? "",
+        description: item.description ?? "",
+      })),
       // displayUrl is a short-lived signed URL that changes on every resolve,
       // so it must stay out of what we save and out of the dirty comparison.
       gallery: gallery.map((item) => ({
@@ -540,6 +620,78 @@ function mount(project, isCreate) {
     }
   });
   renderChips();
+
+  function normalizeModule(item = {}, index = modules.length) {
+    return {
+      id: item.id ?? null,
+      position: index,
+      code: item.code ?? "",
+      title: item.title ?? "",
+      description: item.description ?? "",
+    };
+  }
+
+  function renderModules() {
+    const list = form.querySelector("[data-module-list]");
+    if (!list) return;
+
+    modules = modules.map(normalizeModule);
+    list.innerHTML = modules.length
+      ? modules.map((module, index) => moduleMarkup(module, index, modules.length)).join("")
+      : '<p class="empty-inline">No modules yet. Add modules to drive the project viewer.</p>';
+
+    list.querySelectorAll("[data-module-field]").forEach((input) => {
+      input.addEventListener("input", () => {
+        const index = Number(input.dataset.moduleIndex);
+        const field = input.dataset.moduleField;
+        if (!modules[index] || !field) return;
+        modules[index] = { ...modules[index], [field]: input.value };
+        markDirty();
+      });
+    });
+
+    list.querySelectorAll("[data-module-remove]").forEach((button) => {
+      button.addEventListener("click", () => {
+        modules.splice(Number(button.dataset.moduleRemove), 1);
+        renderModules();
+        markDirty();
+      });
+    });
+
+    list.querySelectorAll("[data-module-up]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = Number(button.dataset.moduleUp);
+        if (index <= 0) return;
+        [modules[index - 1], modules[index]] = [modules[index], modules[index - 1]];
+        renderModules();
+        markDirty();
+      });
+    });
+
+    list.querySelectorAll("[data-module-down]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = Number(button.dataset.moduleDown);
+        if (index >= modules.length - 1) return;
+        [modules[index], modules[index + 1]] = [modules[index + 1], modules[index]];
+        renderModules();
+        markDirty();
+      });
+    });
+  }
+
+  form.querySelector("[data-module-add]")?.addEventListener("click", () => {
+    modules = [
+      ...modules,
+      normalizeModule({
+        code: String(modules.length + 1).padStart(2, "0"),
+        title: "",
+        description: "",
+      }),
+    ];
+    renderModules();
+    markDirty();
+  });
+  renderModules();
 
   // Poster: uploaded to storage immediately so it has a durable path. Files it
   // replaces are only deleted once the record is actually saved.

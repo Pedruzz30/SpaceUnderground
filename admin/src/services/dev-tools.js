@@ -1,3 +1,4 @@
+import { DATA_SOURCE } from "../config/env.js";
 import { resetMockActivity } from "./repositories/mock-activity-repository.js";
 import { resetMockProjects } from "./repositories/mock-project-repository.js";
 
@@ -10,4 +11,7 @@ export function resetMockData() {
 
 if (typeof window !== "undefined") {
   window.__resetSpaceAdminMocks = resetMockData;
+  // Lets a test refuse to run destructive mock steps against a real backend.
+  // The data source is not a secret; the credentials behind it never surface.
+  window.__spaceAdminDataSource = DATA_SOURCE;
 }
