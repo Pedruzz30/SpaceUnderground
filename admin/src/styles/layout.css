@@ -1,7 +1,7 @@
 .admin-shell {
   display: grid;
   min-height: 100vh;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
 }
 
 .sidebar {
@@ -10,9 +10,12 @@
   display: flex;
   height: 100vh;
   flex-direction: column;
-  border-right: 1px solid var(--border);
-  background: rgba(8, 9, 8, 0.96);
+  border-right: 1px solid rgba(198, 255, 0, 0.08);
+  background:
+    linear-gradient(180deg, rgba(198, 255, 0, 0.055), transparent 18%),
+    rgba(8, 9, 8, 0.96);
   padding: var(--space-4);
+  box-shadow: 16px 0 70px rgba(0, 0, 0, 0.24);
 }
 
 .sidebar__brand,
@@ -30,12 +33,15 @@
 
 .brand-mark {
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--accent) 52%, var(--border));
+  border-radius: 6px;
+  background: rgba(198, 255, 0, 0.06);
   color: var(--accent);
   font: 700 0.75rem/1 var(--mono);
+  box-shadow: inset 0 0 22px rgba(198, 255, 0, 0.06);
 }
 
 .sidebar__brand strong,
@@ -58,7 +64,7 @@
 
 .sidebar__nav {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-5);
   margin-top: var(--space-5);
 }
 
@@ -71,12 +77,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 2.55rem;
+  min-height: 2.7rem;
   border: 1px solid transparent;
-  padding: 0 var(--space-2);
+  border-radius: 6px;
+  padding: 0 var(--space-3);
   background: transparent;
   color: var(--text-muted);
+  font-weight: 650;
   text-align: left;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
 }
 
 .side-link:hover,
@@ -89,6 +98,13 @@
 
 .side-link.is-current {
   border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: linear-gradient(90deg, rgba(198, 255, 0, 0.12), rgba(198, 255, 0, 0.02));
+  color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.side-link:not(.side-link--disabled):hover {
+  transform: translateX(2px);
 }
 
 .side-link--disabled {
@@ -107,8 +123,10 @@
   display: flex;
   justify-content: space-between;
   margin-top: auto;
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-radius: 6px;
+  padding: 0.9rem;
+  background: rgba(198, 255, 0, 0.055);
   color: var(--accent);
   font: 500 0.72rem/1 var(--mono);
   letter-spacing: 0.08em;
@@ -117,6 +135,9 @@
 
 .admin-main {
   min-width: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 30rem),
+    transparent;
 }
 
 .drawer-backdrop {
@@ -128,16 +149,16 @@
   z-index: 12;
   top: 0;
   justify-content: space-between;
-  min-height: 72px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(8, 9, 8, 0.88);
+  min-height: 76px;
+  border-bottom: 1px solid rgba(198, 255, 0, 0.08);
+  background: rgba(8, 9, 8, 0.76);
   padding: 0 var(--space-5);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(16px);
 }
 
 .topbar h1 {
   margin: 0.15rem 0 0;
-  font-size: 1rem;
+  font-size: 1.04rem;
 }
 
 .topbar p {
@@ -156,6 +177,10 @@
 
 .topbar__user {
   gap: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.48rem 0.75rem;
+  background: rgba(255, 255, 255, 0.025);
 }
 
 .topbar__user > span {
@@ -167,18 +192,20 @@
 }
 
 .page {
-  max-width: 1440px;
+  max-width: 1480px;
   margin: 0 auto;
-  padding: var(--space-5);
+  padding: clamp(1.25rem, 2.8vw, 2.5rem);
 }
 
 .page-heading {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
+  border-bottom: 1px solid rgba(198, 255, 0, 0.08);
+  padding-bottom: var(--space-4);
 }
 
 .page-heading h2 {
-  margin: 0.35rem 0;
-  font-size: clamp(1.8rem, 4vw, 3.6rem);
+  margin: 0.4rem 0;
+  font-size: clamp(1.7rem, 3.4vw, 3.1rem);
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -186,7 +213,7 @@
 .page-heading p {
   max-width: 46rem;
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-soft);
   line-height: 1.65;
 }
 

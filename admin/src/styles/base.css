@@ -1,14 +1,17 @@
 :root {
   color-scheme: dark;
-  --bg: #080908;
-  --bg-soft: #0d0f0d;
-  --surface: #111410;
-  --surface-hover: #171b15;
-  --border: #252b22;
-  --border-strong: #3b4634;
-  --text-primary: #f2f5ee;
-  --text-muted: #90998b;
+  --bg: #070806;
+  --bg-soft: #0c0f0b;
+  --surface: #11150f;
+  --surface-strong: #171d14;
+  --surface-hover: #1b2117;
+  --border: #273022;
+  --border-strong: #45533c;
+  --text-primary: #f4f7ef;
+  --text-muted: #9aa591;
+  --text-soft: #c4ccba;
   --accent: #c6ff00;
+  --accent-soft: rgba(198, 255, 0, 0.12);
   --success: #77d98b;
   --warning: #f4b24d;
   --danger: #ef6a64;
@@ -18,7 +21,8 @@
   --space-3: 1rem;
   --space-4: 1.5rem;
   --space-5: 2rem;
-  --shadow: 0 22px 70px rgba(0, 0, 0, 0.34);
+  --shadow: 0 22px 70px rgba(0, 0, 0, 0.36);
+  --shadow-soft: 0 10px 34px rgba(0, 0, 0, 0.22);
   --mono: "DM Mono", "Cascadia Mono", Consolas, monospace;
   --sans: Inter, Manrope, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -37,17 +41,20 @@ html {
 body {
   margin: 0;
   background:
-    linear-gradient(rgba(198, 255, 0, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(198, 255, 0, 0.025) 1px, transparent 1px),
-    radial-gradient(circle at 80% -10%, rgba(198, 255, 0, 0.08), transparent 30%),
+    linear-gradient(rgba(198, 255, 0, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(198, 255, 0, 0.018) 1px, transparent 1px),
+    radial-gradient(circle at 82% -8%, rgba(198, 255, 0, 0.13), transparent 28%),
+    radial-gradient(circle at 0% 90%, rgba(119, 217, 139, 0.08), transparent 24%),
     var(--bg);
   background-size: 44px 44px, 44px 44px, auto, auto;
   color: var(--text-primary);
   font-family: var(--sans);
+  min-height: 100vh;
 }
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -65,6 +72,10 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+}
+
 img {
   display: block;
   max-width: 100%;
@@ -73,6 +84,30 @@ img {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+
+::selection {
+  background: var(--accent);
+  color: #070806;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-track {
+  background: #070806;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid #070806;
+  border-radius: 999px;
+  background: #394430;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #566449;
 }
 
 /* Author styles beat the browser's [hidden] rule, so any element we give a

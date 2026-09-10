@@ -36,6 +36,7 @@
     height: 42px;
     place-items: center;
     border: 1px solid var(--border);
+    border-radius: 6px;
     background: var(--surface);
   }
 
@@ -48,14 +49,23 @@
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
+
+  .page-heading h2 {
+    font-size: clamp(1.6rem, 6vw, 2.4rem);
+  }
 }
 
 @media (max-width: 760px) {
   .topbar {
     padding: 0 var(--space-3);
+    gap: var(--space-3);
   }
 
   .topbar__user small {
+    display: none;
+  }
+
+  .topbar__logout {
     display: none;
   }
 
@@ -100,10 +110,27 @@
 
   .tabs [role="tab"] {
     flex: none;
+    min-width: 9rem;
+  }
+
+  .tab-panel {
+    padding: var(--space-3);
   }
 
   .meta-grid {
     grid-template-columns: 1fr;
+  }
+
+  .chip-input-row,
+  .media-actions,
+  .modal__actions {
+    flex-direction: column;
+  }
+
+  .chip-input-row .button,
+  .media-actions .button,
+  .modal__actions .button {
+    width: 100%;
   }
 
   .danger-zone__actions {
