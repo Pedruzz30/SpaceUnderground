@@ -31,27 +31,26 @@ const BLUE_PNG = Buffer.from(
 
 const imageFile = (name, buffer) => ({ name, mimeType: "image/png", buffer });
 
-// Direct Storage reads, to assert what the UI leaves behind.
-const SUPABASE_URL = String(process.env.VITE_SUPABASE_URL ?? "").replace(/\/+$/, "");
-const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
-
 async function storageHas(path) {
-  if (!SUPABASE_URL || !ANON_KEY) return null;
-  const auth = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    headers: { apikey: ANON_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
-  }).then((response) => response.json());
+  return page.evaluate(async (targetPath) => {
+    const { getSupabaseClient } = await import("/src/lib/supabase.js");
+    const supabase = getSupabaseClient();
+    const [, projectId, kind] = targetPath.split("/");
+    const { data } = await supabase.storage.from("project-media").list(`projects/${projectId}/${kind}`, { limit: 1000 });
+    const name = targetPath.split("/").pop();
+    return Array.isArray(data) && data.some((object) => object.name === name);
+  }, path);
+}
 
-  const [, projectId, kind] = path.split("/");
-  const listed = await fetch(`${SUPABASE_URL}/storage/v1/object/list/project-media`, {
-    method: "POST",
-    headers: { apikey: ANON_KEY, Authorization: `Bearer ${auth.access_token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ prefix: `projects/${projectId}/${kind}`, limit: 1000 }),
-  }).then((response) => response.json());
+async function waitForStorageMissing(path, timeoutMs = 10000) {
+  const start = Date.now();
 
-  const name = path.split("/").pop();
-  return Array.isArray(listed) && listed.some((object) => object.name === name);
+  while (Date.now() - start < timeoutMs) {
+    if ((await storageHas(path)) === false) return true;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  return (await storageHas(path)) === false;
 }
 
 const checks = [];
@@ -235,10 +234,8 @@ try {
   await page.waitForSelector(".modal");
   await page.click(".modal__actions >> text=Discard Changes");
   await page.waitForSelector("[data-project-list]", { timeout: 20000 });
-  await page.waitForTimeout(2500);
-
-  const stillThere = await storageHas(abandonedPath);
-  check(stillThere === false, "an upload abandoned without saving is removed from Storage", abandonedPath.slice(-28));
+  const removed = await waitForStorageMissing(abandonedPath);
+  check(removed === true, "an upload abandoned without saving is removed from Storage", abandonedPath.slice(-28));
 
   // Back into the editor for the delete step.
   await page.goto(`${BASE_URL}/#/projects/${projectId}`);
