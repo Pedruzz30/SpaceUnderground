@@ -80,6 +80,19 @@ cd admin && npm test
 
 No Docker, no Supabase project and no credentials needed.
 
+### Verifying against the live project
+
+`admin/tests/e2e/supabase-flow.mjs` drives the admin against a real Supabase
+project: login, CRUD, duplicate slug, publish/unpublish, archive, delete,
+logout and route protection. It assumes nothing about existing data and deletes
+every project it creates.
+
+```bash
+# admin/.env.local (gitignored): ADMIN_EMAIL=... ADMIN_PASSWORD=...
+npm run dev
+BASE_URL=http://127.0.0.1:5173 npm run test:e2e:supabase
+```
+
 ## Creating the first admin
 
 Promotion is intentionally manual — the frontend can never grant admin access.
