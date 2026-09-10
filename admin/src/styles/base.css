@@ -4,6 +4,7 @@
   --bg-soft: #0c0f0b;
   --surface: #11150f;
   --surface-strong: #171d14;
+  --surface-raised: #151a12;
   --surface-hover: #1b2117;
   --border: #273022;
   --border-strong: #45533c;
@@ -21,6 +22,7 @@
   --space-3: 1rem;
   --space-4: 1.5rem;
   --space-5: 2rem;
+  --space-6: 3rem;
   --shadow: 0 22px 70px rgba(0, 0, 0, 0.36);
   --shadow-soft: 0 10px 34px rgba(0, 0, 0, 0.22);
   --mono: "DM Mono", "Cascadia Mono", Consolas, monospace;
@@ -76,6 +78,14 @@ button:disabled {
   cursor: not-allowed;
 }
 
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
 img {
   display: block;
   max-width: 100%;
@@ -123,4 +133,15 @@ img {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

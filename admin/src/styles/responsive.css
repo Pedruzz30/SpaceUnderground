@@ -50,6 +50,10 @@
     grid-template-columns: 1fr;
   }
 
+  .editor-toolbar {
+    top: 82px;
+  }
+
   .page-heading h2 {
     font-size: clamp(1.6rem, 6vw, 2.4rem);
   }
@@ -79,6 +83,15 @@
     flex-direction: column;
   }
 
+  .toolbar__controls {
+    justify-content: stretch;
+  }
+
+  .sort-field,
+  .toolbar__controls .segmented {
+    width: 100%;
+  }
+
   .stats-grid {
     grid-template-columns: 1fr;
   }
@@ -87,15 +100,56 @@
     grid-template-columns: 1fr;
   }
 
-  .projects-panel {
-    overflow-x: auto;
+  .project-table {
+    gap: var(--space-2);
   }
 
-  .project-table {
-    min-width: 700px;
+  .project-table__head {
+    display: none;
+  }
+
+  .project-row {
+    grid-template-columns: 1fr auto;
+    gap: 0.7rem;
+    align-items: start;
+    padding: var(--space-3);
+  }
+
+  .project-row__case {
+    grid-column: 1 / -1;
+  }
+
+  .project-row__project {
+    grid-column: 1 / -1;
+  }
+
+  .project-row > span:not(.project-row__case, .project-row__project, .project-row__arrow) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    border-top: 1px solid var(--border);
+    padding-top: 0.55rem;
+    font-size: 0.78rem;
+  }
+
+  .project-row > span[data-label]::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font: 600 0.58rem/1 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .project-row__arrow {
+    grid-column: 2;
+    grid-row: 1;
+    opacity: 1;
+    transform: none;
   }
 
   .editor-toolbar {
+    position: static;
     justify-content: stretch;
   }
 
@@ -119,6 +173,15 @@
 
   .meta-grid {
     grid-template-columns: 1fr;
+  }
+
+  .compact-list a {
+    grid-template-columns: 3.4rem minmax(0, 1fr);
+  }
+
+  .compact-list a .badge,
+  .compact-list a em {
+    grid-column: 2;
   }
 
   .chip-input-row,
@@ -153,6 +216,14 @@
 
   .topbar p {
     font-size: 0.58rem;
+  }
+
+  .topbar__user {
+    max-width: 9rem;
+  }
+
+  .topbar__user strong {
+    max-width: 6rem;
   }
 
   .heading-actions {

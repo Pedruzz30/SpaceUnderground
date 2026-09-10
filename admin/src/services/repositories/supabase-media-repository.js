@@ -17,6 +17,45 @@ function extensionFor(file) {
   return EXTENSION_BY_TYPE[file.type] ?? "bin";
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, ms);
+  });
+}
+
+function splitPath(path) {
+  const parts = String(path).split("/");
+  return {
+    folder: parts.slice(0, -1).join("/"),
+    name: parts.at(-1),
+  };
+}
+
+async function listExisting(supabase, paths) {
+  const remaining = [];
+  const groups = new Map();
+
+  paths.forEach((path) => {
+    const { folder, name } = splitPath(path);
+    if (!folder || !name) return;
+    if (!groups.has(folder)) groups.set(folder, []);
+    groups.get(folder).push({ path, name });
+  });
+
+  for (const [folder, entries] of groups) {
+    const { data, error } = await supabase.storage.from(BUCKET).list(folder, { limit: 1000 });
+    if (error || !Array.isArray(data)) {
+      remaining.push(...entries.map((entry) => entry.path));
+      continue;
+    }
+
+    const names = new Set(data.map((object) => object.name));
+    remaining.push(...entries.filter((entry) => names.has(entry.name)).map((entry) => entry.path));
+  }
+
+  return remaining;
+}
+
 export const supabaseMediaRepository = {
   // Mirrors the bucket configuration in 002_project_media_storage.sql. The
   // storage API enforces these too; checking here just fails faster and nicer.
@@ -40,8 +79,17 @@ export const supabaseMediaRepository = {
   async remove(paths) {
     if (!paths.length) return;
     const supabase = getSupabaseClient();
-    const { error } = await supabase.storage.from(BUCKET).remove(paths);
-    if (error) throw toDataError(error, "Unable to remove the image.");
+    let pending = [...new Set(paths)];
+
+    for (let attempt = 0; attempt < 3 && pending.length; attempt += 1) {
+      const { error } = await supabase.storage.from(BUCKET).remove(pending);
+      if (error) throw toDataError(error, "Unable to remove the image.");
+
+      if (attempt < 2) {
+        await sleep(450);
+        pending = await listExisting(supabase, pending);
+      }
+    }
   },
 
   // Best effort: a storage hiccup must not block deleting the project itself,

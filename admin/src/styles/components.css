@@ -15,6 +15,11 @@
   transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, color 140ms ease;
 }
 
+.button:disabled {
+  opacity: 0.46;
+  transform: none;
+}
+
 .button:hover,
 .text-link:hover {
   border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
@@ -55,11 +60,17 @@
 }
 
 .dashboard-grid {
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .panel--wide {
   grid-column: 1 / -1;
+}
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .stat-card,
@@ -182,6 +193,18 @@
   text-align: left;
 }
 
+.compact-list a {
+  grid-template-columns: 4rem minmax(0, 1fr) auto auto;
+}
+
+.compact-list a em {
+  grid-column: 2 / -1;
+  color: var(--text-muted);
+  font: 500 0.62rem/1 var(--mono);
+  font-style: normal;
+  text-transform: uppercase;
+}
+
 .compact-list a:hover,
 .project-row:hover,
 .project-row:focus-visible {
@@ -242,17 +265,31 @@
 }
 
 .search-field,
+.sort-field,
 .field {
   display: grid;
   gap: 0.45rem;
 }
 
 .search-field span,
+.sort-field span,
 .field label {
   color: var(--text-muted);
   font: 600 0.62rem/1 var(--mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.toolbar__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.sort-field {
+  min-width: 9rem;
 }
 
 input,
@@ -280,6 +317,12 @@ textarea:focus {
   background: #090b09;
   box-shadow: 0 0 0 3px rgba(198, 255, 0, 0.09);
   outline: none;
+}
+
+input[readonly] {
+  border-style: dashed;
+  color: var(--text-muted);
+  cursor: default;
 }
 
 textarea {
@@ -315,7 +358,7 @@ textarea {
 
 .project-table__head,
 .project-row {
-  grid-template-columns: 4.5rem minmax(12rem, 1fr) 8rem 8rem 8rem 1.5rem;
+  grid-template-columns: 4.5rem minmax(13rem, 1.2fr) 7.5rem 8rem 8rem 7rem 6.5rem 1.5rem;
 }
 
 .project-table__head {
@@ -333,6 +376,50 @@ textarea {
   box-shadow: none;
   cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease;
+}
+
+.project-row__project {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.project-row__project small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font: 500 0.62rem/1.2 var(--mono);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.project-row--skeleton,
+.skeleton-card {
+  position: relative;
+  min-height: 4.2rem;
+  overflow: hidden;
+}
+
+.skeleton-card::before,
+.project-row--skeleton::before,
+.empty-state[aria-busy="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.055), transparent),
+    rgba(255, 255, 255, 0.018);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
 }
 
 .project-row:active {
@@ -360,11 +447,21 @@ textarea {
 }
 
 .empty-state {
+  position: relative;
   display: grid;
   min-height: 55vh;
   align-content: center;
   justify-items: start;
   gap: var(--space-3);
+}
+
+.empty-inline {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  margin: 0;
+  padding: var(--space-3);
+  background: rgba(255, 255, 255, 0.012);
+  line-height: 1.55;
 }
 
 .empty-state span {
@@ -464,6 +561,26 @@ textarea {
     linear-gradient(180deg, #111410, #090b09);
   padding: var(--space-5);
   box-shadow: var(--shadow);
+}
+
+.login-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--success) 32%, var(--border));
+  border-radius: 999px;
+  padding: 0.42rem 0.62rem;
+  color: var(--success);
+  font: 600 0.58rem/1 var(--mono);
+  letter-spacing: 0.1em;
+}
+
+.login-status span {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: var(--success);
 }
 
 .login-panel__brand {
