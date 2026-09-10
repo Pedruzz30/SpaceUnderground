@@ -9,9 +9,12 @@
     "preview": "vite preview --host 127.0.0.1",
     "plans": "node scripts/render-plans.mjs",
     "test:e2e:public": "node --env-file-if-exists=admin/.env --env-file-if-exists=admin/.env.local tests/e2e/public-site.mjs",
-    "seed:supabase": "node --env-file-if-exists=admin/.env --env-file-if-exists=admin/.env.local scripts/seed-supabase-projects.mjs"
+    "seed:supabase": "node --env-file-if-exists=admin/.env --env-file-if-exists=admin/.env.local scripts/seed-supabase-projects.mjs",
+    "seed:projects:presentation": "node --env-file-if-exists=admin/.env --env-file-if-exists=admin/.env.local scripts/seed-supabase-project-presentation.mjs",
+    "seed:plans": "node --env-file-if-exists=admin/.env --env-file-if-exists=admin/.env.local scripts/seed-supabase-plans.mjs"
   },
   "devDependencies": {
+    "playwright": "^1.63.0",
     "vite": "^7.1.0"
   }
 }
