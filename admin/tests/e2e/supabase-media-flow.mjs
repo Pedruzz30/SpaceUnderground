@@ -180,7 +180,7 @@ try {
 
   // --- Remove the poster ----------------------------------------------------
   await page.click("[data-remove-poster]");
-  await page.waitForSelector("[data-poster-preview][hidden]", { timeout: 10000 });
+  await page.waitForSelector("[data-poster-preview]", { state: "hidden", timeout: 10000 });
   await saveChanges();
   await page.reload();
   await page.waitForSelector("#field-name", { timeout: 20000 });

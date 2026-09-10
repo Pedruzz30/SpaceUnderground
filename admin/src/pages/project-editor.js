@@ -817,6 +817,10 @@ async function loadEditor(id) {
   const root = document.querySelector("[data-editor-root]");
   if (!root) return;
 
+  // Saving re-renders the editor; keep the reader where they were instead of
+  // throwing them back to the first tab.
+  const previousTab = document.querySelector('[role="tab"][aria-selected="true"]')?.dataset.tab;
+
   const isCreate = id === "new";
   root.innerHTML = loadingMarkup();
 
@@ -843,6 +847,8 @@ async function loadEditor(id) {
     if (!root.isConnected) return;
     root.innerHTML = renderEditor(project, isCreate);
     mount(project, isCreate);
+
+    if (previousTab) root.querySelector(`[role="tab"][data-tab="${previousTab}"]`)?.click();
   } catch (error) {
     if (!root.isConnected) return;
     clearNavigationGuard();

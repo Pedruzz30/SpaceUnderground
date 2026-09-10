@@ -75,6 +75,12 @@ img {
   outline-offset: 3px;
 }
 
+/* Author styles beat the browser's [hidden] rule, so any element we give a
+   display to would ignore the attribute. Make it authoritative instead. */
+[hidden] {
+  display: none !important;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
