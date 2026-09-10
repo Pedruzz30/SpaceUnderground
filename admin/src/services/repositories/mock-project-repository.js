@@ -1,4 +1,5 @@
 import { seedProjects } from "../../data/projects.js";
+import { DataError } from "../errors.js";
 import { formatCaseNumber } from "../mappers/project-mapper.js";
 
 // localStorage-backed repository. Same persistence the admin has always used,
@@ -27,7 +28,24 @@ function readAll() {
 }
 
 function writeAll(projects) {
-  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+  try {
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+  } catch (error) {
+    // Mock images are inlined as data URLs, so localStorage can genuinely fill up.
+    if (error?.name === "QuotaExceededError" || error?.code === 22) {
+      throw new DataError("Mock storage is full. Remove some images or use smaller files.", { code: "quota_exceeded" });
+    }
+    throw error;
+  }
+}
+
+// Older mock records stored gallery items as { id, url }.
+function normalizeGallery(project) {
+  if (!Array.isArray(project.gallery)) return { ...project, gallery: [] };
+  return {
+    ...project,
+    gallery: project.gallery.map((item) => ({ ...item, path: item.path ?? item.url ?? "" })),
+  };
 }
 
 function nextNumber(projects) {
@@ -37,11 +55,12 @@ function nextNumber(projects) {
 
 export const mockProjectRepository = {
   async list() {
-    return readAll();
+    return readAll().map(normalizeGallery);
   },
 
   async getById(id) {
-    return readAll().find((project) => project.id === id) ?? null;
+    const project = readAll().find((entry) => entry.id === id);
+    return project ? normalizeGallery(project) : null;
   },
 
   async nextCaseNumber() {

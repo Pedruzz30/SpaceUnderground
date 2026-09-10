@@ -18,6 +18,19 @@ export function parseCaseNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+export function mapGalleryFromDatabase(rows) {
+  if (!Array.isArray(rows)) return [];
+
+  return [...rows]
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map((row) => ({
+      id: row.id,
+      path: row.url ?? "",
+      alt: row.alt ?? "",
+      caption: row.caption ?? "",
+    }));
+}
+
 export function mapProjectFromDatabase(row) {
   if (!row) return null;
 
@@ -37,10 +50,10 @@ export function mapProjectFromDatabase(row) {
     year: row.year == null ? "" : String(row.year),
     accent: row.accent ?? "",
     techStack: Array.isArray(row.tech_stack) ? row.tech_stack : [],
+    // Either a storage path inside the project-media bucket or an absolute URL.
     poster: row.poster_url ?? "",
-    // Gallery lives in the project_gallery table and is not wired to real
-    // uploads yet, so it stays empty on the way out of the database.
-    gallery: [],
+    // Gallery rows live in project_gallery; the repository attaches them.
+    gallery: mapGalleryFromDatabase(row.project_gallery),
     projectUrl: row.project_url ?? "",
     previewUrl: row.preview_url ?? "",
     createdAt: row.created_at ?? null,

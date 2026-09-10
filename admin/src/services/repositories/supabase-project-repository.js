@@ -1,9 +1,15 @@
 import { getSupabaseClient } from "../../lib/supabase.js";
 import { toDataError } from "../errors.js";
 import { formatCaseNumber, mapProjectFromDatabase, mapProjectToDatabase, parseCaseNumber } from "../mappers/project-mapper.js";
+import { supabaseMediaRepository } from "./supabase-media-repository.js";
 
 const TABLE = "projects";
+const GALLERY_TABLE = "project_gallery";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Gallery rows come back nested through the foreign key so a project and its
+// images are one round trip.
+const PROJECT_SELECT = "*, project_gallery(*)";
 
 function unwrap(result, fallbackMessage) {
   if (result.error) throw toDataError(result.error, fallbackMessage);
@@ -12,30 +18,77 @@ function unwrap(result, fallbackMessage) {
 
 // The admin router still addresses projects by padded case number ("001"), so
 // look-ups accept either that or the real uuid primary key.
-async function findRow(id) {
+async function findRow(id, columns = "*") {
   const supabase = getSupabaseClient();
 
   if (UUID_PATTERN.test(String(id))) {
-    const result = await supabase.from(TABLE).select("*").eq("id", id).maybeSingle();
-    return unwrap(result, "Unable to load project.");
+    return unwrap(await supabase.from(TABLE).select(columns).eq("id", id).maybeSingle(), "Unable to load project.");
   }
 
   const caseNumber = parseCaseNumber(id);
   if (caseNumber === null) return null;
 
-  const result = await supabase.from(TABLE).select("*").eq("case_number", caseNumber).maybeSingle();
-  return unwrap(result, "Unable to load project.");
+  return unwrap(await supabase.from(TABLE).select(columns).eq("case_number", caseNumber).maybeSingle(), "Unable to load project.");
+}
+
+// Reconciles the gallery the editor holds with the rows already stored:
+// new items are inserted, removed ones deleted, and order is rewritten.
+async function syncGallery(projectDbId, gallery) {
+  const supabase = getSupabaseClient();
+
+  const existing = unwrap(
+    await supabase.from(GALLERY_TABLE).select("id").eq("project_id", projectDbId),
+    "Unable to load the gallery.",
+  );
+  const existingIds = new Set(existing.map((row) => row.id));
+
+  const keptIds = new Set();
+  const inserts = [];
+
+  gallery.forEach((item, index) => {
+    if (item.id && existingIds.has(item.id)) {
+      keptIds.add(item.id);
+      return;
+    }
+    inserts.push({
+      project_id: projectDbId,
+      url: item.path,
+      alt: item.alt || null,
+      caption: item.caption || null,
+      position: index,
+    });
+  });
+
+  const removedIds = [...existingIds].filter((id) => !keptIds.has(id));
+  if (removedIds.length) {
+    unwrap(await supabase.from(GALLERY_TABLE).delete().in("id", removedIds), "Unable to update the gallery.");
+  }
+
+  // Rewrite positions for the rows that stayed, so reordering persists.
+  for (const [index, item] of gallery.entries()) {
+    if (keptIds.has(item.id)) {
+      unwrap(
+        await supabase.from(GALLERY_TABLE).update({ position: index }).eq("id", item.id),
+        "Unable to update the gallery.",
+      );
+    }
+  }
+
+  if (inserts.length) {
+    unwrap(await supabase.from(GALLERY_TABLE).insert(inserts), "Unable to save the gallery.");
+  }
 }
 
 export const supabaseProjectRepository = {
   async list() {
     const supabase = getSupabaseClient();
+    // The list view never renders images, so the gallery is left out here.
     const result = await supabase.from(TABLE).select("*").order("case_number", { ascending: true });
     return unwrap(result, "Unable to load projects.").map(mapProjectFromDatabase);
   },
 
   async getById(id) {
-    return mapProjectFromDatabase(await findRow(id));
+    return mapProjectFromDatabase(await findRow(id, PROJECT_SELECT));
   },
 
   async nextCaseNumber() {
@@ -61,8 +114,16 @@ export const supabaseProjectRepository = {
     }
 
     // published_at and the timestamps are owned by the database triggers.
-    const result = await supabase.from(TABLE).insert(row).select("*").single();
-    return mapProjectFromDatabase(unwrap(result, "Unable to create project."));
+    const created = mapProjectFromDatabase(
+      unwrap(await supabase.from(TABLE).insert(row).select("*").single(), "Unable to create project."),
+    );
+
+    if (data.gallery?.length) {
+      await syncGallery(created.dbId, data.gallery);
+      return this.getById(created.dbId);
+    }
+
+    return created;
   },
 
   async update(id, patch) {
@@ -74,8 +135,13 @@ export const supabaseProjectRepository = {
     // Case number is editorial identity: it is assigned once and never patched.
     delete row.case_number;
 
-    const result = await supabase.from(TABLE).update(row).eq("id", existing.id).select("*").single();
-    return mapProjectFromDatabase(unwrap(result, "Unable to save changes."));
+    unwrap(await supabase.from(TABLE).update(row).eq("id", existing.id).select("*").single(), "Unable to save changes.");
+
+    if (Array.isArray(patch.gallery)) {
+      await syncGallery(existing.id, patch.gallery);
+    }
+
+    return this.getById(existing.id);
   },
 
   async remove(id) {
@@ -83,8 +149,13 @@ export const supabaseProjectRepository = {
     const existing = await findRow(id);
     if (!existing) return null;
 
-    const result = await supabase.from(TABLE).delete().eq("id", existing.id);
-    unwrap(result, "Unable to delete project.");
+    // Delete the files first so they cannot outlive the record. This is best
+    // effort on purpose: a storage failure would only leave orphans behind and
+    // must not stop the admin from deleting the project.
+    await supabaseMediaRepository.removeProjectFolder(existing.id).catch(() => ({ removed: 0 }));
+
+    // project_gallery rows disappear through the foreign key cascade.
+    unwrap(await supabase.from(TABLE).delete().eq("id", existing.id), "Unable to delete project.");
     return mapProjectFromDatabase(existing);
   },
 };

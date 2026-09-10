@@ -12,8 +12,17 @@ import {
   nextAvailableCaseNumber,
   updateProject,
 } from "../services/project-service.js";
+import {
+  isStoragePath,
+  removeProjectImages,
+  resolveGalleryUrls,
+  resolveImageUrl,
+  uploadProjectImage,
+} from "../services/storage-service.js";
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
+
+const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/avif,image/gif";
 
 const EDITORIAL_LABELS = { DRAFT: "Draft", PUBLISHED: "Published", ARCHIVED: "Archived" };
 
@@ -197,13 +206,15 @@ function renderEditor(project, isCreate) {
         <div class="media-block">
           <span class="field-label">Project Poster</span>
           <div class="media-preview">
-            <img data-poster-preview src="${escapeAttribute(project.poster || "")}" alt="Poster preview for ${escapeAttribute(project.name || "project")}" ${project.poster ? "" : "hidden"}>
-            <p class="media-preview__empty" data-poster-empty ${project.poster ? "hidden" : ""}>No poster set.</p>
+            <img data-poster-preview src="${escapeAttribute(project.posterDisplayUrl || "")}" alt="Poster preview for ${escapeAttribute(project.name || "project")}" ${project.posterDisplayUrl ? "" : "hidden"}>
+            <p class="media-preview__empty" data-poster-empty ${project.posterDisplayUrl ? "hidden" : ""}>No poster set.</p>
           </div>
           <div class="media-actions">
-            <button type="button" class="button" data-replace-poster>Replace Image</button>
-            <input type="file" accept="image/*" data-poster-file hidden>
+            <button type="button" class="button" data-editor-action data-replace-poster ${isCreate ? "disabled" : ""}>Replace Image</button>
+            <button type="button" class="button button--danger" data-editor-action data-remove-poster ${project.poster ? "" : "hidden"}>Remove Poster</button>
+            <input type="file" accept="${IMAGE_ACCEPT}" data-poster-file hidden>
           </div>
+          ${isCreate ? '<p class="field-hint">Save the project first to upload images.</p>' : ""}
         </div>
 
         <div class="form-grid">
@@ -214,8 +225,8 @@ function renderEditor(project, isCreate) {
         <div class="media-block">
           <span class="field-label">Gallery</span>
           <div class="gallery-grid" data-gallery></div>
-          <button type="button" class="button" data-gallery-add>+ Add Image</button>
-          <input type="file" accept="image/*" data-gallery-file hidden>
+          <button type="button" class="button" data-editor-action data-gallery-add ${isCreate ? "disabled" : ""}>+ Add Image</button>
+          <input type="file" accept="${IMAGE_ACCEPT}" data-gallery-file hidden>
         </div>
       </div>
 
@@ -311,6 +322,9 @@ function createActionRunner() {
     running = true;
 
     const actions = [...document.querySelectorAll("[data-editor-action]")];
+    // Remember which were already disabled (uploads are, while creating) so
+    // finishing an action never enables something that should stay off.
+    const wasDisabled = actions.map((action) => action.disabled);
     const originalLabel = button?.textContent;
     actions.forEach((action) => {
       action.disabled = true;
@@ -321,8 +335,8 @@ function createActionRunner() {
       await task();
     } finally {
       running = false;
-      actions.forEach((action) => {
-        if (action.isConnected) action.disabled = false;
+      actions.forEach((action, index) => {
+        if (action.isConnected) action.disabled = wasDisabled[index];
       });
       if (button?.isConnected) button.textContent = originalLabel;
     }
@@ -334,11 +348,19 @@ function mount(project, isCreate) {
   if (!form) return;
 
   const id = project.id;
+  // Storage paths are keyed by the database uuid so the RLS policy can map an
+  // object back to its project. Mock mode has no uuid and uses the case number.
+  const storageOwnerId = project.dbId || project.id;
   let techStack = [...(project.techStack || [])];
   let gallery = [...(project.gallery || [])];
   let posterUrl = project.poster || "";
   let slugTouched = Boolean(project.slug);
   let isDirty = false;
+
+  // Files replaced or removed in the editor are only deleted from storage once
+  // the save succeeds, so cancelling out of the page never destroys an image
+  // the record still points at.
+  const pendingDeletions = [];
 
   const run = createActionRunner();
 
@@ -359,7 +381,14 @@ function mount(project, isCreate) {
       visible: form.elements.visible.checked,
       featured: form.elements.featured.checked,
       techStack: [...techStack],
-      gallery: [...gallery],
+      // displayUrl is a short-lived signed URL that changes on every resolve,
+      // so it must stay out of what we save and out of the dirty comparison.
+      gallery: gallery.map((item) => ({
+        id: item.id ?? null,
+        path: item.path,
+        alt: item.alt ?? "",
+        caption: item.caption ?? "",
+      })),
       poster: posterUrl,
     };
   }
@@ -504,44 +533,79 @@ function mount(project, isCreate) {
   });
   renderChips();
 
-  // Poster replace (local preview only, never uploaded).
+  // Poster: uploaded to storage immediately so it has a durable path. Files it
+  // replaces are only deleted once the record is actually saved.
   const posterPreview = form.querySelector("[data-poster-preview]");
   const posterEmpty = form.querySelector("[data-poster-empty]");
   const replacePosterBtn = form.querySelector("[data-replace-poster]");
+  const removePosterBtn = form.querySelector("[data-remove-poster]");
   const posterFileInput = form.querySelector("[data-poster-file]");
+
+  function showPoster(displayUrl) {
+    if (posterPreview) {
+      posterPreview.src = displayUrl || "";
+      posterPreview.hidden = !displayUrl;
+    }
+    if (posterEmpty) posterEmpty.hidden = Boolean(displayUrl);
+    if (removePosterBtn) removePosterBtn.hidden = !posterUrl;
+  }
+
+  function trackDeletion(path) {
+    if (isStoragePath(path)) pendingDeletions.push(path);
+  }
 
   replacePosterBtn?.addEventListener("click", () => posterFileInput.click());
   posterFileInput?.addEventListener("change", () => {
     const [file] = posterFileInput.files || [];
+    posterFileInput.value = "";
     if (!file) return;
-    posterUrl = URL.createObjectURL(file);
-    if (posterPreview) {
-      posterPreview.src = posterUrl;
-      posterPreview.hidden = false;
-    }
-    if (posterEmpty) posterEmpty.hidden = true;
-    showToast("Local preview updated.");
+
+    run(replacePosterBtn, "Uploading...", async () => {
+      try {
+        const path = await uploadProjectImage({ projectId: storageOwnerId, kind: "poster", file });
+        trackDeletion(posterUrl);
+        posterUrl = path;
+        showPoster(await resolveImageUrl(path));
+        showToast("Poster uploaded.");
+        markDirty();
+      } catch (error) {
+        showToast(describeError(error, "Unable to upload the image."));
+      }
+    });
+  });
+
+  removePosterBtn?.addEventListener("click", () => {
+    trackDeletion(posterUrl);
+    posterUrl = "";
+    showPoster("");
+    showToast("Poster removed. Save to confirm.");
     markDirty();
   });
 
-  // Gallery (local metadata only; Supabase Storage comes later).
+  // Gallery: same contract as the poster. The storage path is the stable key,
+  // because a freshly uploaded image has no database id until the next save.
   function renderGallery() {
     const grid = form.querySelector("[data-gallery]");
     if (!grid) return;
-    grid.innerHTML = gallery
-      .map(
-        (item) => `
-          <figure class="gallery-item">
-            <img src="${escapeAttribute(item.url)}" alt="">
-            <button type="button" data-remove-gallery="${escapeAttribute(item.id)}" aria-label="Remove image">&times;</button>
-          </figure>
-        `,
-      )
-      .join("");
+
+    grid.innerHTML = gallery.length
+      ? gallery
+          .map(
+            (item) => `
+              <figure class="gallery-item">
+                <img src="${escapeAttribute(item.displayUrl || "")}" alt="${escapeAttribute(item.alt || "")}">
+                <button type="button" data-remove-gallery="${escapeAttribute(item.path)}" aria-label="Remove image">&times;</button>
+              </figure>
+            `,
+          )
+          .join("")
+      : '<p class="empty-inline">No gallery images yet.</p>';
 
     grid.querySelectorAll("[data-remove-gallery]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        gallery = gallery.filter((item) => item.id !== btn.dataset.removeGallery);
+        const path = btn.dataset.removeGallery;
+        trackDeletion(path);
+        gallery = gallery.filter((item) => item.path !== path);
         renderGallery();
         markDirty();
       });
@@ -553,13 +617,23 @@ function mount(project, isCreate) {
   galleryAddBtn?.addEventListener("click", () => galleryFileInput.click());
   galleryFileInput?.addEventListener("change", () => {
     const [file] = galleryFileInput.files || [];
-    if (!file) return;
-    gallery = [...gallery, { id: `g-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, url: URL.createObjectURL(file) }];
     galleryFileInput.value = "";
-    renderGallery();
-    markDirty();
+    if (!file) return;
+
+    run(galleryAddBtn, "Uploading...", async () => {
+      try {
+        const path = await uploadProjectImage({ projectId: storageOwnerId, kind: "gallery", file });
+        gallery = [...gallery, { id: null, path, alt: "", caption: "", displayUrl: await resolveImageUrl(path) }];
+        renderGallery();
+        showToast("Image added.");
+        markDirty();
+      } catch (error) {
+        showToast(describeError(error, "Unable to upload the image."));
+      }
+    });
   });
   renderGallery();
+  showPoster(project.posterDisplayUrl || "");
 
   form.addEventListener("input", (event) => {
     const container = event.target.closest("[data-field]");
@@ -602,6 +676,7 @@ function mount(project, isCreate) {
 
     try {
       const updated = await updateProject(id, values);
+      await removeProjectImages(pendingDeletions.splice(0));
       await logActivity("Project updated", `${updated.name || "Untitled project"} updated`);
       showToast("Changes saved.");
       await loadEditor(updated.id);
@@ -621,6 +696,7 @@ function mount(project, isCreate) {
 
     try {
       const updated = await updateProject(id, values);
+      await removeProjectImages(pendingDeletions.splice(0));
       await logActivity("Project published", `CASE ${updated.caseNumber} published`);
       showToast("Project published.");
       await loadEditor(updated.id);
@@ -758,6 +834,11 @@ async function loadEditor(id) {
         return;
       }
     }
+
+    // Stored values are storage paths; turn them into something an <img> can
+    // actually load before rendering.
+    project.posterDisplayUrl = await resolveImageUrl(project.poster);
+    project.gallery = await resolveGalleryUrls(project.gallery);
 
     if (!root.isConnected) return;
     root.innerHTML = renderEditor(project, isCreate);
