@@ -362,6 +362,10 @@ function mount(project, isCreate) {
   // the record still points at.
   const pendingDeletions = [];
 
+  // Uploads that no saved record points at yet. Leaving the page discards them,
+  // otherwise an abandoned edit would leave files nobody can reach.
+  const unsavedUploads = new Set();
+
   const run = createActionRunner();
 
   function collectFormValues() {
@@ -563,6 +567,7 @@ function mount(project, isCreate) {
     run(replacePosterBtn, "Uploading...", async () => {
       try {
         const path = await uploadProjectImage({ projectId: storageOwnerId, kind: "poster", file });
+        unsavedUploads.add(path);
         trackDeletion(posterUrl);
         posterUrl = path;
         showPoster(await resolveImageUrl(path));
@@ -623,6 +628,7 @@ function mount(project, isCreate) {
     run(galleryAddBtn, "Uploading...", async () => {
       try {
         const path = await uploadProjectImage({ projectId: storageOwnerId, kind: "gallery", file });
+        unsavedUploads.add(path);
         gallery = [...gallery, { id: null, path, alt: "", caption: "", displayUrl: await resolveImageUrl(path) }];
         renderGallery();
         showToast("Image added.");
@@ -643,7 +649,14 @@ function mount(project, isCreate) {
   form.addEventListener("change", markDirty);
 
   updateSaveState();
-  setNavigationGuard(() => isDirty);
+  setNavigationGuard(
+    () => isDirty,
+    () => {
+      // Fire and forget: the page is already going away.
+      removeProjectImages([...unsavedUploads]);
+      unsavedUploads.clear();
+    },
+  );
 
   async function handleCreate() {
     const values = collectFormValues();
@@ -676,6 +689,7 @@ function mount(project, isCreate) {
 
     try {
       const updated = await updateProject(id, values);
+      unsavedUploads.clear();
       await removeProjectImages(pendingDeletions.splice(0));
       await logActivity("Project updated", `${updated.name || "Untitled project"} updated`);
       showToast("Changes saved.");
@@ -696,6 +710,7 @@ function mount(project, isCreate) {
 
     try {
       const updated = await updateProject(id, values);
+      unsavedUploads.clear();
       await removeProjectImages(pendingDeletions.splice(0));
       await logActivity("Project published", `CASE ${updated.caseNumber} published`);
       showToast("Project published.");

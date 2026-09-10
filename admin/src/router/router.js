@@ -104,17 +104,33 @@ function bindShell() {
 }
 
 let navigationGuard = null;
+let navigationCleanup = null;
 let activeRoute = null;
 let renderToken = 0;
 
 // Lets a page (eg. Project Editor) block navigation while it has unsaved
-// changes. The guard function must return true when there is unsaved work.
-export function setNavigationGuard(hasUnsavedChanges) {
+// changes. The guard returns true when there is unsaved work; the optional
+// cleanup runs once the page is actually left, which is what lets the editor
+// discard uploads that never made it into a saved record.
+export function setNavigationGuard(hasUnsavedChanges, onLeave = null) {
   navigationGuard = hasUnsavedChanges;
+  navigationCleanup = onLeave;
 }
 
 export function clearNavigationGuard() {
   navigationGuard = null;
+  navigationCleanup = null;
+}
+
+function runNavigationCleanup() {
+  const cleanup = navigationCleanup;
+  navigationGuard = null;
+  navigationCleanup = null;
+  try {
+    cleanup?.();
+  } catch (error) {
+    console.warn("Navigation cleanup failed", error);
+  }
 }
 
 export function initRouter(root) {
@@ -134,13 +150,13 @@ export function initRouter(root) {
           cancelLabel: "Stay",
         }).then((discard) => {
           if (discard) {
-            navigationGuard = null;
+            runNavigationCleanup();
             window.location.hash = `#${requestedRoute}`;
           }
         });
         return;
       }
-      navigationGuard = null;
+      runNavigationCleanup();
     }
 
     // Authentication is asynchronous once Supabase is in play. Show an explicit

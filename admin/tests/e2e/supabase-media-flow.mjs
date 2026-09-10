@@ -31,6 +31,29 @@ const BLUE_PNG = Buffer.from(
 
 const imageFile = (name, buffer) => ({ name, mimeType: "image/png", buffer });
 
+// Direct Storage reads, to assert what the UI leaves behind.
+const SUPABASE_URL = String(process.env.VITE_SUPABASE_URL ?? "").replace(/\/+$/, "");
+const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
+
+async function storageHas(path) {
+  if (!SUPABASE_URL || !ANON_KEY) return null;
+  const auth = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: ANON_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
+  }).then((response) => response.json());
+
+  const [, projectId, kind] = path.split("/");
+  const listed = await fetch(`${SUPABASE_URL}/storage/v1/object/list/project-media`, {
+    method: "POST",
+    headers: { apikey: ANON_KEY, Authorization: `Bearer ${auth.access_token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ prefix: `projects/${projectId}/${kind}`, limit: 1000 }),
+  }).then((response) => response.json());
+
+  const name = path.split("/").pop();
+  return Array.isArray(listed) && listed.some((object) => object.name === name);
+}
+
 const checks = [];
 function check(ok, label, extra = "") {
   checks.push({ ok, label, extra });
@@ -191,6 +214,35 @@ try {
   await page.setInputFiles("[data-poster-file]", imageFile("final.png", RED_PNG));
   await page.waitForSelector("[data-poster-preview]:not([hidden])", { timeout: 30000 });
   await saveChanges();
+
+  // --- An abandoned upload must not leave a file behind ---------------------
+  await page.setInputFiles("[data-poster-file]", imageFile("abandoned.png", BLUE_PNG));
+  await page.waitForFunction(
+    (previous) => {
+      const img = document.querySelector("[data-poster-preview]");
+      return img?.getAttribute("src") && !img.getAttribute("src").startsWith(previous);
+    },
+    (await posterSrc()).split("?")[0],
+    { timeout: 30000 },
+  );
+
+  const abandonedPath = decodeURIComponent(
+    new URL(await posterSrc()).pathname.split("/object/sign/project-media/")[1] ?? "",
+  );
+
+  // Walk away without saving and discard the changes.
+  await page.click('a[href="#/projects"]');
+  await page.waitForSelector(".modal");
+  await page.click(".modal__actions >> text=Discard Changes");
+  await page.waitForSelector("[data-project-list]", { timeout: 20000 });
+  await page.waitForTimeout(2500);
+
+  const stillThere = await storageHas(abandonedPath);
+  check(stillThere === false, "an upload abandoned without saving is removed from Storage", abandonedPath.slice(-28));
+
+  // Back into the editor for the delete step.
+  await page.goto(`${BASE_URL}/#/projects/${projectId}`);
+  await page.waitForSelector("[data-action-delete]", { timeout: 20000 });
 
   // --- Delete the project ---------------------------------------------------
   await page.click("[data-action-delete]");
