@@ -14,7 +14,11 @@ export const loginPage = {
             <h1 id="login-title">ADMIN / ACCESS</h1>
           </div>
         </div>
-        <p class="login-panel__copy">Administrative environment for managing Space Underground content.</p>
+        <div class="login-status" aria-label="System status">
+          <span aria-hidden="true"></span>
+          SYSTEM ONLINE
+        </div>
+        <p class="login-panel__copy">Administrative control system.</p>
 
         <form class="login-form" data-login-form>
           <div class="field">
@@ -45,6 +49,7 @@ export const loginPage = {
 
       pending = true;
       submit.disabled = true;
+      form.setAttribute("aria-busy", "true");
       submit.textContent = "SIGNING IN...";
       errorEl.hidden = true;
 
@@ -59,6 +64,7 @@ export const loginPage = {
         errorEl.hidden = false;
         submit.disabled = false;
         submit.textContent = "ACCESS CONTROL SYSTEM";
+        form.removeAttribute("aria-busy");
         pending = false;
       }
     });
