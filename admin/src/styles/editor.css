@@ -236,6 +236,53 @@ fieldset.field legend {
   flex: 1;
 }
 
+.module-builder {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.module-builder__head,
+.module-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.module-builder__head h3,
+.module-card__head strong {
+  display: block;
+  margin: 0.35rem 0 0;
+}
+
+.module-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.module-card {
+  display: grid;
+  gap: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.module-card__head span {
+  color: var(--accent);
+  font: 700 0.62rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.module-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 .media-block {
   display: grid;
   gap: 0.75rem;

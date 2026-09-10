@@ -1,6 +1,7 @@
 // Ponto de entrada. Cada modulo cuida de uma parte da pagina e se
 // inicializa sozinho; a ORDEM abaixo e a mesma do arquivo original.
 import { initCapabilitiesSection } from "./capabilities-section.js";
+import { initPublicContent } from "./public-content.js";
 import { initCommercialPositioning } from "./commercial-positioning.js";
 import { initScrollProgress } from "./scroll-progress.js";
 import { initMenu } from "./menu.js";
@@ -23,6 +24,7 @@ document.documentElement.classList.add("js");
 // Insere a camada de posicionamento Sites > Sistemas > Automacao > IA antes
 // do sistema de reveal e da navegacao observarem as secoes da pagina.
 initCapabilitiesSection();
+initPublicContent();
 
 // Reposiciona a area comercial e expande o formulario antes de dialog/form
 // capturarem os elementos e conectarem seus listeners.

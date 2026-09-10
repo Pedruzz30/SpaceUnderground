@@ -183,6 +183,7 @@ try {
   const signedPaths = signRequests.flatMap((body) => body.paths ?? []);
   check(signedPaths.includes(galleryPath), "gallery images are fetched and signed", `${signedPaths.length} path(s) signed`);
   check(signRequests.length === 1, "signing happens in a single batched request", `${signRequests.length} request(s)`);
+  check((await page.locator("[data-viewer-gallery] img").count()) >= 1, "gallery renders inside the public project viewer");
 
   // --- Drafts, archived and hidden must never appear -----------------------
   for (const [label, patch] of [
@@ -208,11 +209,11 @@ try {
 
   // --- Supabase unavailable -------------------------------------------------
   await loadSite({ offline: true });
-  check((await source()) === "static", "falls back to the bundled registry when Supabase is unreachable", await source());
+  check((await source()) === "unavailable", "uses a neutral fallback when Supabase is unreachable", await source());
   const offlineNames = await liveCaseNames();
-  check(offlineNames.length > 0, "the site still shows its work while offline", offlineNames.join(", "));
-  const offlinePoster = await page.getAttribute(".signal-ui__poster", "src");
-  check(!offlinePoster.includes("/storage/v1/"), "offline poster comes from the bundle", offlinePoster.slice(-32));
+  check(!offlineNames.includes(target.name), "offline fallback does not leak the unpublished/stale project name", offlineNames.join(", "));
+  const offlinePoster = (await page.getAttribute(".signal-ui__poster", "src")) || "";
+  check(!offlinePoster.includes("/storage/v1/"), "offline poster is not a stale signed Storage URL", offlinePoster.slice(-32));
 } finally {
   for (const undo of restore.reverse()) {
     try {

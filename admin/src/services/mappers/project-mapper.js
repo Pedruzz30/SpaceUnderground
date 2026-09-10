@@ -31,6 +31,20 @@ export function mapGalleryFromDatabase(rows) {
     }));
 }
 
+export function mapModulesFromDatabase(rows) {
+  if (!Array.isArray(rows)) return [];
+
+  return [...rows]
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map((row, index) => ({
+      id: row.id ?? null,
+      position: Number.isFinite(Number(row.position)) ? Number(row.position) : index,
+      code: row.code ?? "",
+      title: row.title ?? "",
+      description: row.description ?? "",
+    }));
+}
+
 export function mapProjectFromDatabase(row) {
   if (!row) return null;
 
@@ -50,6 +64,15 @@ export function mapProjectFromDatabase(row) {
     year: row.year == null ? "" : String(row.year),
     accent: row.accent ?? "",
     techStack: Array.isArray(row.tech_stack) ? row.tech_stack : [],
+    presentation: {
+      system: row.presentation_system ?? "",
+      label: row.presentation_label ?? "",
+      address: row.presentation_address ?? "",
+      type: row.presentation_type ?? "",
+      origin: row.origin ?? "",
+      coordinates: Array.isArray(row.coordinates) ? row.coordinates : [],
+    },
+    modules: mapModulesFromDatabase(row.project_modules),
     // Either a storage path inside the project-media bucket or an absolute URL.
     poster: row.poster_url ?? "",
     // Gallery rows live in project_gallery; the repository attaches them.
@@ -78,6 +101,16 @@ export function mapProjectToDatabase(model) {
   if (model.year !== undefined) row.year = model.year === "" ? null : Number(model.year);
   if (model.accent !== undefined) row.accent = model.accent || null;
   if (model.techStack !== undefined) row.tech_stack = model.techStack ?? [];
+  if (model.presentation !== undefined) {
+    row.presentation_system = model.presentation?.system || null;
+    row.presentation_label = model.presentation?.label || null;
+    row.presentation_address = model.presentation?.address || null;
+    row.presentation_type = model.presentation?.type || null;
+    row.origin = model.presentation?.origin || null;
+    row.coordinates = Array.isArray(model.presentation?.coordinates)
+      ? model.presentation.coordinates.filter((item) => typeof item === "string" && item.trim()).map((item) => item.trim())
+      : [];
+  }
   if (model.poster !== undefined) row.poster_url = model.poster || null;
   if (model.projectUrl !== undefined) row.project_url = model.projectUrl || null;
   if (model.previewUrl !== undefined) row.preview_url = model.previewUrl || null;

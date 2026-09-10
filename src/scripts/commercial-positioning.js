@@ -1,4 +1,5 @@
 import { plans, commercialPlan } from "./plans-registry.js";
+import { fetchVisiblePlans, isConfigured } from "./supabase-public.js";
 
 const PRODUCT_OPTIONS = [
   {
@@ -151,6 +152,57 @@ function hydratePlansSection() {
   }
 }
 
+function applyPlanRow(row) {
+  const key = String(row.slug || "").replace(/^plan-/, "");
+  const plan = plans[key];
+  if (!plan) return;
+
+  const included = Array.isArray(row.plan_features)
+    ? [...row.plan_features]
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        .map((feature) => feature.text)
+        .filter(Boolean)
+    : plan.included;
+
+  Object.assign(plan, {
+    name: row.name || plan.name,
+    monogram: row.monogram || plan.monogram,
+    category: row.category || plan.category,
+    range: row.range || plan.range,
+    scope: row.scope || plan.scope,
+    scopeShort: row.scope_short || plan.scopeShort,
+    status: row.status || plan.status,
+    description: row.description || plan.description,
+    included,
+    timeline: row.timeline || plan.timeline,
+    year: row.year ? String(row.year) : plan.year,
+    accent: row.accent || plan.accent,
+    commercial: {
+      ...(plan.commercial || {}),
+      category: row.category || plan.commercial?.category || plan.category,
+      range: row.range || plan.commercial?.range || plan.range,
+      scope: row.scope || plan.commercial?.scope || plan.scope,
+      scopeShort: row.scope_short || plan.commercial?.scopeShort || plan.scopeShort,
+      status: row.status || plan.commercial?.status || plan.status,
+      description: row.description || plan.commercial?.description || plan.description,
+      included,
+      timeline: row.timeline || plan.commercial?.timeline || plan.timeline,
+      accent: row.accent || plan.commercial?.accent,
+    },
+  });
+}
+
+async function hydratePlansFromSupabase() {
+  if (!isConfigured()) return;
+  try {
+    const rows = await fetchVisiblePlans();
+    rows.forEach(applyPlanRow);
+    hydratePlansSection();
+  } catch (error) {
+    console.warn("[plans] Supabase unavailable, keeping bundled plan copy.", error);
+  }
+}
+
 function productButton(option) {
   return `
     <button class="product-option" type="button" data-product-option data-value="${option.value}" data-budget="${option.budget}" data-timeline="${option.timeline}" aria-pressed="false">
@@ -229,5 +281,6 @@ function hydrateProjectForm() {
 
 export function initCommercialPositioning() {
   hydratePlansSection();
+  hydratePlansFromSupabase();
   hydrateProjectForm();
 }

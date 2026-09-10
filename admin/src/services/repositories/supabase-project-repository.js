@@ -5,11 +5,12 @@ import { supabaseMediaRepository } from "./supabase-media-repository.js";
 
 const TABLE = "projects";
 const GALLERY_TABLE = "project_gallery";
+const MODULES_TABLE = "project_modules";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Gallery rows come back nested through the foreign key so a project and its
 // images are one round trip.
-const PROJECT_SELECT = "*, project_gallery(*)";
+const PROJECT_SELECT = "*, project_gallery(*), project_modules(*)";
 
 function unwrap(result, fallbackMessage) {
   if (result.error) throw toDataError(result.error, fallbackMessage);
@@ -79,6 +80,64 @@ async function syncGallery(projectDbId, gallery) {
   }
 }
 
+// Supabase PostgREST does not expose a browser-side transaction. This
+// reconciler deletes first, parks kept rows at temporary positions, then writes
+// final order so reordering cannot trip the unique (project_id, position) key.
+async function syncModules(projectDbId, modules) {
+  const supabase = getSupabaseClient();
+
+  const existing = unwrap(
+    await supabase.from(MODULES_TABLE).select("id").eq("project_id", projectDbId),
+    "Unable to load project modules.",
+  );
+  const existingIds = new Set(existing.map((row) => row.id));
+  const keptIds = new Set(modules.filter((item) => item.id && existingIds.has(item.id)).map((item) => item.id));
+  const removedIds = [...existingIds].filter((id) => !keptIds.has(id));
+
+  if (removedIds.length) {
+    unwrap(await supabase.from(MODULES_TABLE).delete().in("id", removedIds), "Unable to update project modules.");
+  }
+
+  for (const [index, item] of modules.entries()) {
+    if (!keptIds.has(item.id)) continue;
+    unwrap(
+      await supabase.from(MODULES_TABLE).update({ position: 100000 + index }).eq("id", item.id),
+      "Unable to update project modules.",
+    );
+  }
+
+  for (const [index, item] of modules.entries()) {
+    if (!keptIds.has(item.id)) continue;
+    unwrap(
+      await supabase
+        .from(MODULES_TABLE)
+        .update({
+          position: index,
+          code: item.code || null,
+          title: item.title,
+          description: item.description || null,
+        })
+        .eq("id", item.id),
+      "Unable to update project modules.",
+    );
+  }
+
+  const inserts = modules
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => !item.id || !existingIds.has(item.id))
+    .map(({ item, index }) => ({
+      project_id: projectDbId,
+      position: index,
+      code: item.code || null,
+      title: item.title,
+      description: item.description || null,
+    }));
+
+  if (inserts.length) {
+    unwrap(await supabase.from(MODULES_TABLE).insert(inserts), "Unable to save project modules.");
+  }
+}
+
 export const supabaseProjectRepository = {
   async list() {
     const supabase = getSupabaseClient();
@@ -120,6 +179,13 @@ export const supabaseProjectRepository = {
 
     if (data.gallery?.length) {
       await syncGallery(created.dbId, data.gallery);
+    }
+
+    if (data.modules?.length) {
+      await syncModules(created.dbId, data.modules);
+    }
+
+    if (data.gallery?.length || data.modules?.length) {
       return this.getById(created.dbId);
     }
 
@@ -139,6 +205,10 @@ export const supabaseProjectRepository = {
 
     if (Array.isArray(patch.gallery)) {
       await syncGallery(existing.id, patch.gallery);
+    }
+
+    if (Array.isArray(patch.modules)) {
+      await syncModules(existing.id, patch.modules);
     }
 
     return this.getById(existing.id);

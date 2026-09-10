@@ -92,3 +92,13 @@ export async function resolveGalleryUrls(gallery = []) {
     gallery.map(async (item) => ({ ...item, displayUrl: await resolveImageUrl(item.path) })),
   );
 }
+
+export async function scanOrphanedAssets(usedPaths = []) {
+  try {
+    const repository = await getMediaRepository();
+    if (typeof repository.scanOrphans !== "function") return [];
+    return await repository.scanOrphans(usedPaths);
+  } catch (error) {
+    throw toDataError(error, "Unable to scan storage.");
+  }
+}

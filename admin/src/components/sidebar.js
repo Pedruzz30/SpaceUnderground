@@ -5,14 +5,18 @@ const navGroups = [
   },
   {
     label: "CONTENT",
-    items: [{ label: "Projects", href: "#/projects", match: "/projects" }],
+    items: [
+      { label: "Projects", href: "#/projects", match: "/projects" },
+      { label: "Media", href: "#/media", match: "/media" },
+      { label: "Services", href: "#/services", match: "/services" },
+      { label: "Site Content", href: "#/content", match: "/content" },
+    ],
   },
   {
-    label: "FUTURE",
+    label: "SYSTEM",
     items: [
-      { label: "Services", soon: true },
-      { label: "Media", soon: true },
-      { label: "Settings", soon: true },
+      { label: "Activity", href: "#/activity", match: "/activity" },
+      { label: "Settings", href: "#/settings", match: "/settings" },
     ],
   },
 ];

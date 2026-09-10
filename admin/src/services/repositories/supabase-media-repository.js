@@ -56,6 +56,13 @@ async function listExisting(supabase, paths) {
   return remaining;
 }
 
+async function listFolder(prefix) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.storage.from(BUCKET).list(prefix, { limit: 1000 });
+  if (error || !Array.isArray(data)) return [];
+  return data;
+}
+
 export const supabaseMediaRepository = {
   // Mirrors the bucket configuration in 002_project_media_storage.sql. The
   // storage API enforces these too; checking here just fails faster and nicer.
@@ -119,5 +126,32 @@ export const supabaseMediaRepository = {
     // thrown error that takes the whole editor down.
     if (error || !data?.signedUrl) return "";
     return data.signedUrl;
+  },
+
+  async scanOrphans(usedPaths = []) {
+    const used = new Set(usedPaths.filter(Boolean));
+    const orphans = [];
+    const projectFolders = await listFolder("projects");
+
+    for (const project of projectFolders) {
+      if (!project?.name) continue;
+      for (const kind of FOLDERS) {
+        const prefix = `projects/${project.name}/${kind}`;
+        const objects = await listFolder(prefix);
+        objects.forEach((object) => {
+          const path = `${prefix}/${object.name}`;
+          if (!used.has(path)) {
+            orphans.push({
+              path,
+              type: kind,
+              size: object.metadata?.size ?? object.metadata?.contentLength ?? null,
+              createdAt: object.created_at ?? object.updated_at ?? null,
+            });
+          }
+        });
+      }
+    }
+
+    return orphans;
   },
 };

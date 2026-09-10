@@ -16,6 +16,7 @@ const STATE_LABELS = {
 };
 
 let activePreview = null;
+let viewer = null;
 
 function openProject(url) {
   window.open(url, "_blank", "noopener,noreferrer");
@@ -39,6 +40,18 @@ function originOf(url) {
   } catch {
     return "";
   }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replace(/'/g, "&#39;");
 }
 
 function setPreviewStatus(frame, label) {
@@ -305,7 +318,7 @@ function createProjectViewer(frame, preview) {
   const root = frame.closest("section") || article;
   const caseIndex = root.querySelector("[data-case-index]");
   const accentTargets = [article, caseIndex].filter(Boolean);
-  const slots = [...root.querySelectorAll("[data-project-slot]")];
+  let slots = [];
 
   const pick = (attribute, scope = article) => [...scope.querySelectorAll(`[${attribute}]`)];
   const fields = {
@@ -325,6 +338,7 @@ function createProjectViewer(frame, preview) {
     links: pick("data-viewer-link"),
     open: pick("data-viewer-open"),
     modules: [...article.querySelectorAll("[data-viewer-module]")],
+    gallery: [...root.querySelectorAll("[data-viewer-gallery]")],
   };
 
   const write = (nodes, value) => nodes.forEach((node) => { node.textContent = value; });
@@ -345,19 +359,19 @@ function createProjectViewer(frame, preview) {
       title: `Prévia ao vivo de ${project.name}`,
     });
 
-    accentTargets.forEach((target) => target.style.setProperty("--accent", project.accent));
+    accentTargets.forEach((target) => target.style.setProperty("--accent", project.accent || "#c6ff00"));
 
     write(fields.index, `CASE / ${project.id}`);
     write(fields.eyebrow, `CLIENTE / ${project.id}`);
-    write(fields.client, project.client);
-    write(fields.category, project.category);
-    write(fields.description, project.description);
-    write(fields.address, project.address);
-    write(fields.system, project.system);
-    write(fields.label, project.label);
-    write(fields.origin, project.origin);
-    write(fields.coordinates, project.coordinates.join("\n"));
-    write(fields.name, project.name);
+    write(fields.client, project.client || "");
+    write(fields.category, project.category || "");
+    write(fields.description, project.description || "");
+    write(fields.address, project.address || "");
+    write(fields.system, project.system || "");
+    write(fields.label, project.label || "");
+    write(fields.origin, project.origin || "");
+    write(fields.coordinates, (project.coordinates || []).join("\n"));
+    write(fields.name, project.name || "");
     write(fields.year, `ANO — ${project.year}`);
     write(fields.specs, `TIPO — ${project.type}\nTECNOLOGIA — ${project.tech}\nSTATUS — ${project.status}`);
 
@@ -371,7 +385,8 @@ function createProjectViewer(frame, preview) {
     });
 
     fields.modules.forEach((button) => {
-      const module = project.modules[Number(button.dataset.viewerModule)];
+      const module = (project.modules || [])[Number(button.dataset.viewerModule)];
+      button.hidden = !module;
       if (!module) return;
       const [number, title, caption] = module;
       const numberNode = button.querySelector("span");
@@ -381,6 +396,19 @@ function createProjectViewer(frame, preview) {
       if (titleNode) titleNode.textContent = title;
       if (captionNode) captionNode.textContent = caption;
       button.setAttribute("aria-label", `Inspecionar ${title.toLowerCase()}`);
+    });
+
+    fields.gallery.forEach((node) => {
+      const gallery = project.gallery || [];
+      node.hidden = !gallery.length;
+      node.innerHTML = gallery.length
+        ? gallery.map((image) => `
+          <figure class="project-gallery__item">
+            <img src="${escapeAttribute(image.url)}" alt="${escapeAttribute(image.alt || project.name || "")}" loading="lazy" decoding="async">
+            ${image.caption ? `<figcaption>${escapeHtml(image.caption)}</figcaption>` : ""}
+          </figure>
+        `).join("")
+        : "";
     });
 
     slots.forEach((slot) => {
@@ -394,24 +422,37 @@ function createProjectViewer(frame, preview) {
     preview.calibrate();
   };
 
+  function bindSlots() {
+    slots = [...root.querySelectorAll("[data-project-slot]")];
+    slots.forEach((slot) => {
+      if (slot.dataset.viewerBound === "true") return;
+      slot.dataset.viewerBound = "true";
+      slot.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (slot.hasAttribute("data-slot-reserved")) return;
+        apply(slot.dataset.projectSlot || defaultProjectKey);
+        if (!slot.closest(".signal-ui")) {
+          article.querySelector(".project__visual")?.scrollIntoView({ block: "center" });
+        }
+      });
+    });
+  }
+
+  bindSlots();
+
   slots.forEach((slot) => {
-    slot.addEventListener("click", (event) => {
+    slot.addEventListener("keydown", (event) => {
+      if (!["Enter", " "].includes(event.key)) return;
       event.preventDefault();
-      event.stopPropagation();
-      if (slot.hasAttribute("data-slot-reserved")) return;
-      apply(slot.dataset.projectSlot || defaultProjectKey);
-      if (!slot.closest(".signal-ui")) {
-        article.querySelector(".project__visual")?.scrollIntoView({ block: "center" });
-      }
+      slot.click();
     });
   });
 
-  apply(defaultProjectKey);
+  if (defaultProjectKey) apply(defaultProjectKey);
 
-  return { apply, getActiveKey: () => activeKey };
+  return { apply, bindSlots, getActiveKey: () => activeKey };
 }
-
-let viewer = null;
 
 export function initSignalFrame() {
   const mobileMedia = window.matchMedia(MOBILE_QUERY);
@@ -429,4 +470,8 @@ export function getActiveProjectKey() {
 export function showProject(key) {
   if (!viewer) return;
   viewer.apply(key ?? viewer.getActiveKey(), { force: true });
+}
+
+export function refreshProjectViewerSlots() {
+  viewer?.bindSlots();
 }

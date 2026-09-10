@@ -575,6 +575,7 @@
   .statement-line:last-child { padding-left: 0; }
 
   .statement__seal {
+    right: 0;
     width: 78px;
     opacity: 0.85;
   }

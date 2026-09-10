@@ -5,6 +5,11 @@ import { loginPage } from "../pages/login.js";
 import { dashboardPage } from "../pages/dashboard.js";
 import { projectsPage } from "../pages/projects.js";
 import { projectEditorPage } from "../pages/project-editor.js";
+import { mediaPage } from "../pages/media.js";
+import { servicesPage } from "../pages/services.js";
+import { contentPage } from "../pages/content.js";
+import { activityPage } from "../pages/activity.js";
+import { settingsPage } from "../pages/settings.js";
 import { getCachedSession, getSession, hasResolvedSession, logout } from "../services/auth-service.js";
 import { confirmModal } from "../components/modal.js";
 import { escapeHtml } from "../utils/html.js";
@@ -14,6 +19,11 @@ const pages = [
   { test: (route) => route === "/dashboard" || route === "/", page: dashboardPage },
   { test: (route) => route === "/projects", page: projectsPage },
   { test: (route) => /^\/projects\/[^/]+$/.test(route), page: projectEditorPage },
+  { test: (route) => route === "/media", page: mediaPage },
+  { test: (route) => route === "/services", page: servicesPage },
+  { test: (route) => route === "/content", page: contentPage },
+  { test: (route) => route === "/activity", page: activityPage },
+  { test: (route) => route === "/settings", page: settingsPage },
 ];
 
 function currentRoute() {

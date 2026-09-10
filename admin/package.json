@@ -10,7 +10,8 @@
     "test": "node --test \"tests/*.test.mjs\"",
     "test:e2e": "node tests/e2e/admin-flow.mjs",
     "test:e2e:supabase": "node --env-file-if-exists=.env.local tests/e2e/supabase-flow.mjs",
-    "test:e2e:media": "node --env-file-if-exists=.env.local tests/e2e/supabase-media-flow.mjs"
+    "test:e2e:media": "node --env-file-if-exists=.env.local tests/e2e/supabase-media-flow.mjs",
+    "dev:mock": "vite --mode mock --host 127.0.0.1"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

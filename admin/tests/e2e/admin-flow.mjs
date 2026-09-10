@@ -32,6 +32,18 @@ const ROW = "[data-project-list] [data-project-id]";
 const rows = () => page.locator(ROW);
 const waitForRows = () => page.waitForSelector(ROW);
 
+// This test resets the store and creates/deletes projects. Running it against
+// a real backend would touch production data, so refuse unless the app really
+// is in mock mode.
+async function assertMockMode() {
+  await page.goto(`${BASE_URL}/#/login`);
+  await page.waitForFunction(() => window.__spaceAdminDataSource !== undefined, null, { timeout: 20000 });
+  const dataSource = await page.evaluate(() => window.__spaceAdminDataSource);
+  if (dataSource !== "mock") {
+    throw new Error(`Refusing to run: the admin is in "${dataSource}" mode. Start it with npm run dev:mock.`);
+  }
+}
+
 async function signIn() {
   await page.goto(`${BASE_URL}/#/login`);
   await page.fill("#login-email", "admin@spaceunderground.local");
@@ -41,6 +53,7 @@ async function signIn() {
 }
 
 try {
+  await assertMockMode();
   await signIn();
   await page.evaluate(() => window.__resetSpaceAdminMocks());
 
@@ -76,8 +89,35 @@ try {
   await page.press("[data-tech-input]", "Enter");
   assert.equal(await page.locator(".chip").count(), 2, "tech stack chips");
 
-  // Tabs are keyboard navigable.
+  // Tabs are keyboard navigable. The editor has four: General, Presentation,
+  // Media and Publishing.
   await page.focus("#tab-general");
+  await page.keyboard.press("ArrowRight");
+  await settle();
+  assert.equal(await page.getAttribute("#tab-presentation", "aria-selected"), "true", "presentation tab via keyboard");
+
+  await page.fill("#field-presentationSystem", "SISTEMA DE INTELIGÊNCIA / 03");
+  await page.fill("#field-presentationLabel", "IA / AUTOMAÇÃO");
+  await page.fill("#field-presentationAddress", "NEBULA / PROTÓTIPO");
+  await page.fill("#field-presentationType", "APLICAÇÃO WEB COM IA");
+  await page.fill("#field-presentationOrigin", "RJ / BR");
+  await page.fill("#field-presentationLatitude", "22°54'S");
+  await page.fill("#field-presentationLongitude", "43°12'W");
+
+  for (const [code, title, description] of [
+    ["01", "INTELIGÊNCIA", "IA + CAMADA REFLEX"],
+    ["02", "AUTOMAÇÃO", "TOOLS + SISTEMA"],
+    ["03", "SEGURANÇA", "PERMISSÕES + AUTOPILOT"],
+  ]) {
+    await page.click("[data-module-add]");
+    const index = (await page.locator(".module-card").count()) - 1;
+    await page.fill(`#field-module-code-${index}`, code);
+    await page.fill(`#field-module-title-${index}`, title);
+    await page.fill(`#field-module-description-${index}`, description);
+  }
+  assert.equal(await page.locator(".module-card").count(), 3, "presentation modules added");
+
+  await page.focus("#tab-presentation");
   await page.keyboard.press("ArrowRight");
   await settle();
   assert.equal(await page.getAttribute("#tab-media", "aria-selected"), "true", "media tab via keyboard");
@@ -119,6 +159,19 @@ try {
   await page.reload();
   await page.waitForSelector("#field-name");
   assert.equal(await page.inputValue("#field-name"), "Nebula Client Portal v2", "persisted after reload");
+
+  await page.click("#tab-presentation");
+  assert.equal(await page.inputValue("#field-presentationSystem"), "SISTEMA DE INTELIGÊNCIA / 03", "presentation persisted");
+  assert.equal(await page.locator(".module-card").count(), 3, "modules persisted");
+  await page.fill("#field-module-title-1", "ORQUESTRAÇÃO");
+  await page.click('[data-module-down="1"]');
+  await page.click('[data-module-remove="0"]');
+  await page.click("[data-action-save]");
+  await page.waitForSelector("[data-save-state].is-saved");
+  await page.reload();
+  await page.click("#tab-presentation");
+  assert.equal(await page.locator(".module-card").count(), 2, "module removal persisted");
+  assert.equal(await page.inputValue("#field-module-title-1"), "ORQUESTRAÇÃO", "module reorder/edit persisted");
 
   // Archive, then confirm the Archived filter shows it.
   await page.click("[data-action-archive]");
