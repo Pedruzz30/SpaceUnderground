@@ -10,6 +10,7 @@ import { initFooterYear } from "./footer-year.js";
 import { initProjectDialog } from "./project-dialog.js";
 import { initProjectHydrator } from "./project-hydrator.js";
 import { initSignalFrame } from "./signal-frame.js";
+import { initPublicProjects } from "./public-projects.js";
 import { initProjectForm } from "./project-form.js";
 import { initPointerEffects } from "./pointer-effects.js";
 
@@ -39,3 +40,7 @@ initProjectDialog();
 initSignalFrame();
 initProjectForm();
 initPointerEffects();
+
+// Live data arrives after the page is already usable: the database decides
+// which cases stay published, never blocking the first paint.
+initPublicProjects();

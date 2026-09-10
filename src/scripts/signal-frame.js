@@ -177,12 +177,26 @@ function createLivePreview(frame, mobileMedia) {
     sleepTimer = window.setTimeout(unload, SLEEP_DELAY);
   };
 
-  const setSource = ({ url, previewUrl: nextPreviewUrl, poster: nextPoster, title }) => {
+  // A remote poster (a signed Storage URL) can fail: an expired token, an
+  // offline backend. Fall back to the poster shipped with the page instead of
+  // leaving a broken image in the frame.
+  let posterFallback = null;
+  let posterFailed = false;
+
+  poster?.addEventListener("error", () => {
+    if (posterFailed || !posterFallback) return;
+    posterFailed = true;
+    applyPoster(posterFallback);
+  });
+
+  const setSource = ({ url, previewUrl: nextPreviewUrl, poster: nextPoster, posterFallback: fallback, title }) => {
     unload();
     projectUrl = url || "";
     previewUrl = resolveUrl(nextPreviewUrl || url);
     previewOrigin = originOf(previewUrl);
     posterUrl = nextPoster || "";
+    posterFallback = fallback || null;
+    posterFailed = false;
     if (iframe) {
       iframe.dataset.src = previewUrl;
       if (title) iframe.title = title;
@@ -316,15 +330,18 @@ function createProjectViewer(frame, preview) {
   const write = (nodes, value) => nodes.forEach((node) => { node.textContent = value; });
   let activeKey = "";
 
-  const apply = (key) => {
+  const apply = (key, { force = false } = {}) => {
     const project = projects[key];
-    if (!project || project.reserved || key === activeKey) return;
+    if (!project || project.reserved || (key === activeKey && !force)) return;
     activeKey = key;
 
     preview.setSource({
       url: project.url,
       previewUrl: project.previewUrl,
       poster: project.poster,
+      // Set when the poster came from Supabase Storage: the bundled artwork
+      // stays available as the fallback.
+      posterFallback: project.posterFallback,
       title: `Prévia ao vivo de ${project.name}`,
     });
 
@@ -390,12 +407,26 @@ function createProjectViewer(frame, preview) {
   });
 
   apply(defaultProjectKey);
+
+  return { apply, getActiveKey: () => activeKey };
 }
+
+let viewer = null;
 
 export function initSignalFrame() {
   const mobileMedia = window.matchMedia(MOBILE_QUERY);
   document.querySelectorAll(LIVE_PREVIEW_SELECTOR).forEach((frame) => {
     const preview = createLivePreview(frame, mobileMedia);
-    if (frame.hasAttribute("data-project-viewer")) createProjectViewer(frame, preview);
+    if (frame.hasAttribute("data-project-viewer")) viewer = createProjectViewer(frame, preview);
   });
+}
+
+export function getActiveProjectKey() {
+  return viewer?.getActiveKey() ?? "";
+}
+
+// Called once live data arrives, so the viewer repaints with it.
+export function showProject(key) {
+  if (!viewer) return;
+  viewer.apply(key ?? viewer.getActiveKey(), { force: true });
 }
