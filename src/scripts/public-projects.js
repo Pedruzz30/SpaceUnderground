@@ -1,104 +1,175 @@
-// Brings the Selected Work section under the control of the database.
-//
-// The page ships with the static registry, so it renders instantly and keeps
-// working when Supabase is unreachable. Once the live data arrives it decides
-// what stays: only projects that are PUBLISHED and visible remain, and their
-// editorial fields and Storage images replace the bundled ones.
-//
-// The registry still supplies the presentation copy the admin has no column
-// for (modules, coordinates, system, address) and the optimised poster
-// variants, so nothing about the layout changes.
+// Brings Selected Work under Supabase control without bundling editorial
+// project content. If Supabase is unavailable, the section remains neutral.
 
-import { projects, defaultProjectKey } from "./project-registry.js";
+import { projects } from "./project-registry.js";
 import { fetchPublishedProjects, isConfigured, signPaths } from "./supabase-public.js";
-import { getActiveProjectKey, showProject } from "./signal-frame.js";
+import { refreshProjectViewerSlots, showProject } from "./signal-frame.js";
 
 const SOURCE_ATTRIBUTE = "data-projects-source";
+const PLACEHOLDER_POSTER =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900'%3E%3Crect width='1440' height='900' fill='%23050605'/%3E%3Cpath d='M120 450h1200' stroke='%23c6ff00' stroke-opacity='.22'/%3E%3Ccircle cx='720' cy='450' r='120' fill='none' stroke='%23c6ff00' stroke-opacity='.18'/%3E%3C/svg%3E";
 
-// Anything without a scheme is a path inside the project-media bucket.
 const isStoragePath = (value) => Boolean(value) && !/^(https?:|data:|blob:|\/|\.{1,2}\/)/i.test(value);
-
 const text = (value) => (typeof value === "string" ? value.trim() : "");
+const pad = (value) => String(Number(value) || value || "").padStart(3, "0");
+const keyFor = (row) => `case-${pad(row.case_number)}`;
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replace(/'/g, "&#39;");
+}
 
 function markSection(state) {
   document.querySelector("#work")?.setAttribute(SOURCE_ATTRIBUTE, state);
 }
 
-function slotsFor(key) {
-  return [...document.querySelectorAll(`[data-project-slot="${key}"]`)];
-}
-
-// Projects the database no longer publishes fall back to the "reserved" state
-// the design already has, and lose the copy that identified them.
-function retireProject(key) {
-  const project = projects[key];
-  if (project) project.reserved = true;
-
-  slotsFor(key).forEach((slot) => {
-    slot.classList.remove("is-active");
-    slot.classList.add("is-reserved");
-    slot.setAttribute("data-slot-reserved", "");
-    slot.setAttribute("aria-disabled", "true");
-    slot.removeAttribute("aria-pressed");
-
-    const caseNumber = project?.id ?? "";
-    slot.setAttribute("aria-label", `Slot de projeto ${caseNumber} — reservado`);
-
-    const tip = slot.querySelector(".signal-ui__slot-tip");
-    if (tip) tip.innerHTML = `<em>PROJETO / ${caseNumber}</em>RESERVADO`;
-
-    const name = slot.querySelector(".case-index__name");
-    if (name) name.textContent = "RESERVADO";
-    const type = slot.querySelector(".case-index__type");
-    if (type) type.textContent = "—";
-    const status = slot.querySelector(".case-index__status");
-    if (status) status.innerHTML = '<i aria-hidden="true"></i>—';
+function clearRegistry() {
+  Object.keys(projects).forEach((key) => {
+    delete projects[key];
   });
 }
 
-function applyRow(project, row, posterUrl) {
-  // Only overwrite what the database actually holds: an empty column must not
-  // erase the editorial copy the registry provides.
-  const assign = (field, value) => {
-    if (value !== undefined && value !== null && value !== "") project[field] = value;
-  };
+function normalizeStatus(row) {
+  const status = text(row.status);
+  if (!status) return "";
+  return status.toUpperCase() === "LIVE" ? "NO AR" : status.toUpperCase();
+}
 
-  assign("name", text(row.name));
-  assign("client", text(row.client));
-  assign("description", text(row.description));
-  assign("accent", text(row.accent));
-  assign("year", row.year ? String(row.year) : "");
-  assign("url", text(row.project_url));
-  assign("previewUrl", text(row.preview_url));
-
-  if (Array.isArray(row.tech_stack) && row.tech_stack.length) {
-    project.tech = row.tech_stack.join(" / ").toUpperCase();
-  }
-
-  if (posterUrl) {
-    // Keep the bundled artwork as the fallback for an expired or failed token.
-    project.posterFallback = project.poster;
-    project.poster = posterUrl;
-  }
-
-  // Exposed for future use; Selected Work has no gallery surface yet.
-  project.gallery = Array.isArray(row.project_gallery)
+function projectFromRow(row, signed) {
+  const key = keyFor(row);
+  const posterPath = text(row.poster_url);
+  const gallery = Array.isArray(row.project_gallery)
     ? [...row.project_gallery]
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-        .map((image) => ({ url: image.signedUrl ?? "", alt: text(image.alt), caption: text(image.caption) }))
+        .map((image) => {
+          const path = text(image.url);
+          return {
+            url: isStoragePath(path) ? signed.get(path) || "" : path,
+            alt: text(image.alt),
+            caption: text(image.caption),
+          };
+        })
         .filter((image) => image.url)
     : [];
+
+  const modules = Array.isArray(row.project_modules)
+    ? [...row.project_modules]
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        .map((module, index) => [
+          text(module.code) || String(index + 1).padStart(2, "0"),
+          text(module.title),
+          text(module.description),
+        ])
+        .filter((module) => module[1])
+    : [];
+
+  return [
+    key,
+    {
+      id: pad(row.case_number),
+      name: text(row.name),
+      client: text(row.client || row.name).toUpperCase(),
+      category: text(row.category).toUpperCase(),
+      description: text(row.description),
+      url: text(row.project_url),
+      previewUrl: text(row.preview_url || row.project_url),
+      poster: isStoragePath(posterPath) ? signed.get(posterPath) || PLACEHOLDER_POSTER : posterPath || PLACEHOLDER_POSTER,
+      accent: text(row.accent) || "#c6ff00",
+      system: text(row.presentation_system),
+      label: text(row.presentation_label),
+      address: text(row.presentation_address),
+      type: text(row.presentation_type || row.category).toUpperCase(),
+      tech: Array.isArray(row.tech_stack) ? row.tech_stack.join(" / ").toUpperCase() : "",
+      status: normalizeStatus(row),
+      year: row.year ? String(row.year) : "",
+      modules,
+      origin: text(row.origin),
+      coordinates: Array.isArray(row.coordinates) ? row.coordinates.map(text).filter(Boolean) : [],
+      gallery,
+    },
+  ];
+}
+
+function slotButton(key, project, active) {
+  return `
+    <button class="signal-ui__slot${active ? " is-active" : ""}" type="button" data-project-slot="${escapeAttribute(key)}" aria-pressed="${active ? "true" : "false"}" aria-label="Show project ${escapeAttribute(project.id)} — ${escapeAttribute(project.name)}">
+      <i></i>
+      <span class="signal-ui__slot-tip" aria-hidden="true"><em>PROJECT / ${escapeHtml(project.id)}</em>${escapeHtml(project.name)}</span>
+    </button>
+  `;
+}
+
+function indexRow(key, project, active) {
+  return `
+    <li>
+      <button class="case-index__row${active ? " is-active" : ""}" type="button" data-project-slot="${escapeAttribute(key)}" aria-pressed="${active ? "true" : "false"}">
+        <span class="case-index__id">${escapeHtml(project.id)}</span>
+        <span class="case-index__name">${escapeHtml(project.name)}</span>
+        <span class="case-index__type">${escapeHtml(project.type)}</span>
+        <span class="case-index__year">${escapeHtml(project.year || "—")}</span>
+        <span class="case-index__status"><i aria-hidden="true"></i>${escapeHtml(project.status || "—")}</span>
+        <span class="case-index__go" aria-hidden="true">↗</span>
+      </button>
+    </li>
+  `;
+}
+
+function renderNavigation(entries) {
+  const activeKey = entries[0]?.[0] || "";
+  const rail = document.querySelector(".signal-ui__rail-track");
+  const index = document.querySelector(".case-index__list");
+  const indexHead = document.querySelector(".case-index__head span:first-child");
+
+  if (rail) {
+    rail.innerHTML = entries.map(([key, project]) => slotButton(key, project, key === activeKey)).join("");
+  }
+
+  if (index) {
+    index.innerHTML = entries.map(([key, project]) => indexRow(key, project, key === activeKey)).join("");
+  }
+
+  if (indexHead) {
+    const last = entries.at(-1)?.[1]?.id || "000";
+    indexHead.textContent = `Index / 001—${last}`;
+  }
+
+  refreshProjectViewerSlots();
+  return activeKey;
+}
+
+function renderUnavailable(message = "Projects temporarily unavailable.") {
+  clearRegistry();
+  const rail = document.querySelector(".signal-ui__rail-track");
+  const index = document.querySelector(".case-index__list");
+  const title = document.querySelector("[data-viewer-name]");
+  const description = document.querySelector("[data-viewer-description]");
+  const specs = document.querySelector("[data-viewer-specs]");
+
+  if (rail) rail.innerHTML = "";
+  if (index) index.innerHTML = `<li><span class="case-index__row is-reserved"><span class="case-index__name">${escapeHtml(message)}</span></span></li>`;
+  if (title) title.textContent = "Selected Work";
+  if (description) description.textContent = message;
+  if (specs) specs.textContent = "STATUS — TEMPORARILY UNAVAILABLE";
 }
 
 export async function initPublicProjects() {
-  // Without configuration the site behaves exactly as it always has.
-  if (!isConfigured()) return;
+  if (!isConfigured()) {
+    renderUnavailable();
+    markSection("unconfigured");
+    return;
+  }
 
   try {
     const rows = await fetchPublishedProjects();
-    const byCase = new Map(rows.map((row) => [Number(row.case_number), row]));
+    clearRegistry();
 
-    // One batched signing request for every image on the page.
     const paths = [];
     rows.forEach((row) => {
       if (isStoragePath(row.poster_url)) paths.push(row.poster_url);
@@ -108,46 +179,25 @@ export async function initPublicProjects() {
     });
 
     let signed = new Map();
-    if (paths.length) {
-      try {
-        signed = await signPaths(paths);
-      } catch (error) {
-        // Images are optional; the bundled posters carry the page.
-        console.warn("[projects] could not sign image urls", error);
-      }
-    }
+    if (paths.length) signed = await signPaths(paths);
 
-    rows.forEach((row) => {
-      (row.project_gallery ?? []).forEach((image) => {
-        image.signedUrl = isStoragePath(image.url) ? signed.get(image.url) ?? "" : image.url;
-      });
+    const entries = rows.map((row) => projectFromRow(row, signed));
+    entries.forEach(([key, project]) => {
+      projects[key] = project;
     });
 
-    const published = [];
-    Object.entries(projects).forEach(([key, project]) => {
-      const row = byCase.get(Number(project.id));
-      if (!row) {
-        retireProject(key);
-        return;
-      }
-      applyRow(project, row, isStoragePath(row.poster_url) ? signed.get(row.poster_url) : text(row.poster_url));
-      published.push(key);
-    });
-
-    if (!published.length) {
+    if (!entries.length) {
+      renderUnavailable("No published projects available.");
       markSection("empty");
       return;
     }
 
+    const activeKey = renderNavigation(entries);
     markSection("supabase");
-
-    // If the project on screen was just retired, move to one that is live.
-    const active = getActiveProjectKey();
-    const next = published.includes(active) ? active : published.includes(defaultProjectKey) ? defaultProjectKey : published[0];
-    showProject(next);
+    showProject(activeKey);
   } catch (error) {
-    // Supabase is unreachable or slow: keep the page exactly as it shipped.
-    markSection("static");
-    console.warn("[projects] Supabase unavailable, keeping the bundled registry.", error);
+    renderUnavailable();
+    markSection("unavailable");
+    console.warn("[projects] Supabase unavailable, keeping the viewer neutral.", error);
   }
 }

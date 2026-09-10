@@ -813,7 +813,7 @@
 @media (max-width: 760px) {
   .signal-ui {
     top: 13%;
-    right: -15%;
+    right: 3%;
     bottom: 4%;
     left: 5%;
     grid-template-columns: 10% minmax(0, 1fr);

@@ -27,10 +27,35 @@ const PROJECT_COLUMNS = [
   "year",
   "accent",
   "tech_stack",
+  "presentation_system",
+  "presentation_label",
+  "presentation_address",
+  "presentation_type",
+  "origin",
+  "coordinates",
   "poster_url",
   "project_url",
   "preview_url",
   "project_gallery(url,alt,caption,position)",
+  "project_modules(code,title,description,position)",
+].join(",");
+
+const PLAN_COLUMNS = [
+  "id",
+  "slug",
+  "name",
+  "monogram",
+  "category",
+  "range",
+  "scope",
+  "scope_short",
+  "status",
+  "description",
+  "timeline",
+  "year",
+  "accent",
+  "position",
+  "plan_features(text,position)",
 ].join(",");
 
 export function isConfigured() {
@@ -65,6 +90,28 @@ export async function fetchPublishedProjects() {
 
   const rows = await request(query, { headers: headers() });
   return Array.isArray(rows) ? rows : [];
+}
+
+export async function fetchVisiblePlans() {
+  const query =
+    `${SUPABASE_URL}/rest/v1/plans` +
+    `?select=${encodeURIComponent(PLAN_COLUMNS)}` +
+    `&visible=eq.true&order=position.asc`;
+
+  const rows = await request(query, { headers: headers() });
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function fetchSiteContent() {
+  const query = `${SUPABASE_URL}/rest/v1/site_content?select=key,content`;
+  const rows = await request(query, { headers: headers() });
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function fetchSiteSettings() {
+  const query = `${SUPABASE_URL}/rest/v1/site_settings?select=site_name,site_url,contact_email,locale,seo_title,seo_description,og_image_path&key=eq.public`;
+  const rows = await request(query, { headers: headers() });
+  return Array.isArray(rows) ? rows[0] ?? null : null;
 }
 
 // path -> { url, expiresAt }
