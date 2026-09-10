@@ -59,13 +59,13 @@ function statusScreen({ title, heading, copy, action = "" }) {
   `;
 }
 
-function shell(page, route, params) {
+function shell(page, route, params, session) {
   return `
     <div class="admin-shell">
       ${sidebar(route)}
       <div class="drawer-backdrop" data-drawer-backdrop></div>
       <div class="admin-main">
-        ${topbar({ title: page.title, breadcrumb: page.breadcrumb })}
+        ${topbar({ title: page.title, breadcrumb: page.breadcrumb, session })}
         <main class="page" tabindex="-1">${page.render(params)}</main>
       </div>
       ${toastRegion()}
@@ -122,12 +122,12 @@ export function clearNavigationGuard() {
   navigationCleanup = null;
 }
 
-function runNavigationCleanup() {
+async function runNavigationCleanup() {
   const cleanup = navigationCleanup;
   navigationGuard = null;
   navigationCleanup = null;
   try {
-    cleanup?.();
+    await cleanup?.();
   } catch (error) {
     console.warn("Navigation cleanup failed", error);
   }
@@ -148,15 +148,15 @@ export function initRouter(root) {
           body: "<p>You have changes that haven't been saved.</p>",
           confirmLabel: "Discard Changes",
           cancelLabel: "Stay",
-        }).then((discard) => {
+        }).then(async (discard) => {
           if (discard) {
-            runNavigationCleanup();
+            await runNavigationCleanup();
             window.location.hash = `#${requestedRoute}`;
           }
         });
         return;
       }
-      runNavigationCleanup();
+      await runNavigationCleanup();
     }
 
     // Authentication is asynchronous once Supabase is in play. Show an explicit
@@ -207,7 +207,7 @@ export function initRouter(root) {
     if (page === loginPage) {
       root.innerHTML = page.render(params);
     } else {
-      root.innerHTML = shell(page, requestedRoute, params);
+      root.innerHTML = shell(page, requestedRoute, params, session);
       bindShell();
     }
 

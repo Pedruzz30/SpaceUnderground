@@ -81,11 +81,12 @@ function validate(values) {
   return errors;
 }
 
-function fieldMarkup({ label, name, value = "", type = "text", attrs = "" }) {
+function fieldMarkup({ label, name, value = "", type = "text", attrs = "", hint = "" }) {
   return `
     <div class="field" data-field="${name}">
       <label for="field-${name}">${escapeHtml(label)}</label>
       <input id="field-${name}" name="${name}" type="${type}" value="${escapeAttribute(value)}" ${attrs}>
+      ${hint ? `<p class="field-hint">${escapeHtml(hint)}</p>` : ""}
       <p class="field-error" id="field-${name}-error" hidden></p>
     </div>
   `;
@@ -170,9 +171,9 @@ function renderEditor(project, isCreate) {
 
       <div class="tab-panel" id="panel-general" role="tabpanel" aria-labelledby="tab-general">
         <div class="form-grid">
-          ${fieldMarkup({ label: "Case Number", name: "caseNumber", value: project.caseNumber, attrs: 'readonly aria-readonly="true"' })}
+          ${fieldMarkup({ label: "Case Number", name: "caseNumber", value: project.caseNumber, attrs: 'readonly aria-readonly="true"', hint: "Assigned by the admin system." })}
           ${fieldMarkup({ label: "Project Name", name: "name", value: project.name, attrs: "required" })}
-          ${fieldMarkup({ label: "Slug", name: "slug", value: project.slug, attrs: "required" })}
+          ${fieldMarkup({ label: "Slug", name: "slug", value: project.slug, attrs: "required", hint: "URL-safe identifier generated from the project name until edited." })}
           ${fieldMarkup({ label: "Client", name: "client", value: project.client })}
           ${selectMarkup({ label: "Category", name: "category", value: project.category, options: CATEGORIES })}
           ${selectMarkup({ label: "Project Status", name: "status", value: project.status, options: PROJECT_STATUSES })}
@@ -209,6 +210,7 @@ function renderEditor(project, isCreate) {
             <img data-poster-preview src="${escapeAttribute(project.posterDisplayUrl || "")}" alt="Poster preview for ${escapeAttribute(project.name || "project")}" ${project.posterDisplayUrl ? "" : "hidden"}>
             <p class="media-preview__empty" data-poster-empty ${project.posterDisplayUrl ? "hidden" : ""}>No poster set.</p>
           </div>
+          <p class="media-meta">${project.poster ? `Path: ${escapeHtml(project.poster)}` : "No storage path available."}</p>
           <div class="media-actions">
             <button type="button" class="button" data-editor-action data-replace-poster ${isCreate ? "disabled" : ""}>Replace Image</button>
             <button type="button" class="button button--danger" data-editor-action data-remove-poster ${project.poster ? "" : "hidden"}>Remove Poster</button>
@@ -356,6 +358,8 @@ function mount(project, isCreate) {
   let posterUrl = project.poster || "";
   let slugTouched = Boolean(project.slug);
   let isDirty = false;
+  const originalPosterUrl = project.poster || "";
+  const originalGalleryPaths = new Set((project.gallery || []).map((item) => item.path).filter(Boolean));
 
   // Files replaced or removed in the editor are only deleted from storage once
   // the save succeeds, so cancelling out of the page never destroys an image
@@ -558,6 +562,23 @@ function mount(project, isCreate) {
     if (isStoragePath(path)) pendingDeletions.push(path);
   }
 
+  async function cleanupUnsavedMedia() {
+    const paths = new Set(unsavedUploads);
+
+    if (posterUrl && posterUrl !== originalPosterUrl && isStoragePath(posterUrl)) {
+      paths.add(posterUrl);
+    }
+
+    gallery.forEach((item) => {
+      if (item.path && !originalGalleryPaths.has(item.path) && isStoragePath(item.path)) {
+        paths.add(item.path);
+      }
+    });
+
+    unsavedUploads.clear();
+    await removeProjectImages([...paths]);
+  }
+
   replacePosterBtn?.addEventListener("click", () => posterFileInput.click());
   posterFileInput?.addEventListener("change", () => {
     const [file] = posterFileInput.files || [];
@@ -604,7 +625,7 @@ function mount(project, isCreate) {
             `,
           )
           .join("")
-      : '<p class="empty-inline">No gallery images yet.</p>';
+      : '<p class="empty-inline">No gallery images yet. Add images to build the project gallery.</p>';
 
     grid.querySelectorAll("[data-remove-gallery]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -639,6 +660,13 @@ function mount(project, isCreate) {
     });
   });
   renderGallery();
+  posterPreview?.addEventListener("error", () => {
+    posterPreview.hidden = true;
+    if (posterEmpty) {
+      posterEmpty.textContent = "Poster preview unavailable.";
+      posterEmpty.hidden = false;
+    }
+  });
   showPoster(project.posterDisplayUrl || "");
 
   form.addEventListener("input", (event) => {
@@ -652,9 +680,7 @@ function mount(project, isCreate) {
   setNavigationGuard(
     () => isDirty,
     () => {
-      // Fire and forget: the page is already going away.
-      removeProjectImages([...unsavedUploads]);
-      unsavedUploads.clear();
+      return cleanupUnsavedMedia();
     },
   );
 
