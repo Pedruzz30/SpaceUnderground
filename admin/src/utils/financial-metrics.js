@@ -5,21 +5,34 @@
 // away from them. Pure functions, no period concept — the Dashboard layers its
 // period window on top of these in dashboard-metrics.js.
 
-function sumOf(transactions, type, status) {
-  return transactions
-    .filter((transaction) => transaction.type === type && transaction.status === status)
-    .reduce((total, transaction) => total + Math.abs(transaction.amount), 0);
+function sumTransactions(transactions) {
+  return transactions.reduce((total, transaction) => total + Math.abs(transaction.amount), 0);
+}
+
+// Only settled money counts toward revenue.
+export function settledIncome(transactions = []) {
+  return transactions.filter((transaction) => transaction.type === "INCOME" && transaction.status === "PAID");
+}
+
+// Only settled money counts toward expenses.
+export function settledExpenses(transactions = []) {
+  return transactions.filter((transaction) => transaction.type === "EXPENSE" && transaction.status === "PAID");
+}
+
+// Money that is still owed. Pending until it is paid, and never revenue.
+export function openReceivables(transactions = []) {
+  return transactions.filter((transaction) => transaction.type === "RECEIVABLE" && transaction.status === "PENDING");
 }
 
 // Money that is still owed. Pending until it is paid, and never revenue.
 export function pendingReceivables(transactions = []) {
-  return sumOf(transactions, "RECEIVABLE", "PENDING");
+  return sumTransactions(openReceivables(transactions));
 }
 
 // Only settled money counts toward revenue and expenses.
 export function financialSummary(transactions = []) {
-  const revenue = sumOf(transactions, "INCOME", "PAID");
-  const expenses = sumOf(transactions, "EXPENSE", "PAID");
+  const revenue = sumTransactions(settledIncome(transactions));
+  const expenses = sumTransactions(settledExpenses(transactions));
 
   return {
     revenue,

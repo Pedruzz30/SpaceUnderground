@@ -2,7 +2,7 @@ import { badge, badgeType } from "../components/badge.js";
 import { statCard } from "../components/stat-card.js";
 import { bindTabs } from "../components/tabs.js";
 import { demoTransactions } from "../data/operations-demo.js";
-import { financialSummary } from "../utils/financial-metrics.js";
+import { financialSummary, openReceivables, settledExpenses, settledIncome } from "../utils/financial-metrics.js";
 import { formatCurrency, formatDayMonth, formatSignedCurrency } from "../utils/format.js";
 import { escapeHtml } from "../utils/html.js";
 
@@ -76,10 +76,6 @@ function ledger(transactions, emptyMessage) {
   `;
 }
 
-function byType(type) {
-  return demoTransactions.filter((transaction) => transaction.type === type);
-}
-
 function panel(id, content) {
   const index = TABS.findIndex((tab) => tab.id === id);
   return `
@@ -114,9 +110,9 @@ export const financialPage = {
   title: "Financial",
   breadcrumb: "OPERATIONS / FINANCIAL",
   render: () => {
-    const income = byType("INCOME");
-    const expenses = byType("EXPENSE");
-    const receivables = byType("RECEIVABLE");
+    const income = settledIncome(demoTransactions);
+    const expenses = settledExpenses(demoTransactions);
+    const receivables = openReceivables(demoTransactions);
 
     return `
       <section class="page-heading">

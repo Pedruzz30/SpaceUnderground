@@ -7,17 +7,23 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 
-import { financialSummary, pendingReceivables } from "../src/utils/financial-metrics.js";
+import {
+  financialSummary,
+  openReceivables,
+  pendingReceivables,
+  settledExpenses,
+  settledIncome,
+} from "../src/utils/financial-metrics.js";
 
 const ledger = [
-  { type: "INCOME", status: "PAID", amount: 1750 },
-  { type: "INCOME", status: "PAID", amount: 3200 },
-  { type: "INCOME", status: "PENDING", amount: 5000 },
-  { type: "EXPENSE", status: "PAID", amount: -90 },
-  { type: "EXPENSE", status: "PAID", amount: -160 },
-  { type: "RECEIVABLE", status: "PENDING", amount: 1000 },
-  { type: "RECEIVABLE", status: "PENDING", amount: 1750 },
-  { type: "RECEIVABLE", status: "PAID", amount: 900 },
+  { id: "income-paid-1", type: "INCOME", status: "PAID", amount: 1750 },
+  { id: "income-paid-2", type: "INCOME", status: "PAID", amount: 3200 },
+  { id: "income-pending", type: "INCOME", status: "PENDING", amount: 5000 },
+  { id: "expense-paid-1", type: "EXPENSE", status: "PAID", amount: -90 },
+  { id: "expense-paid-2", type: "EXPENSE", status: "PAID", amount: -160 },
+  { id: "receivable-pending-1", type: "RECEIVABLE", status: "PENDING", amount: 1000 },
+  { id: "receivable-pending-2", type: "RECEIVABLE", status: "PENDING", amount: 1750 },
+  { id: "receivable-paid", type: "RECEIVABLE", status: "PAID", amount: 900 },
 ];
 
 describe("financial summary", () => {
@@ -51,6 +57,72 @@ describe("financial summary", () => {
 
   it("survives being called with no argument at all", () => {
     assert.equal(financialSummary().result, 0);
+  });
+});
+
+describe("financial ledger groups", () => {
+  it("returns only paid income as settled income", () => {
+    assert.deepEqual(
+      settledIncome(ledger).map((entry) => entry.id),
+      ["income-paid-1", "income-paid-2"],
+    );
+  });
+
+  it("ignores pending income", () => {
+    assert.deepEqual(settledIncome([{ id: "income-pending", type: "INCOME", status: "PENDING", amount: 5000 }]), []);
+  });
+
+  it("returns only paid expenses as settled expenses", () => {
+    assert.deepEqual(
+      settledExpenses(ledger).map((entry) => entry.id),
+      ["expense-paid-1", "expense-paid-2"],
+    );
+  });
+
+  it("returns only pending receivables as open receivables", () => {
+    assert.deepEqual(
+      openReceivables(ledger).map((entry) => entry.id),
+      ["receivable-pending-1", "receivable-pending-2"],
+    );
+  });
+
+  it("ignores receivables that have already been paid", () => {
+    assert.deepEqual(openReceivables([{ id: "receivable-paid", type: "RECEIVABLE", status: "PAID", amount: 900 }]), []);
+  });
+
+  it("places each mixed ledger entry only in its matching financial group", () => {
+    const mixedLedger = [
+      { id: "income-paid", type: "INCOME", status: "PAID", amount: 100 },
+      { id: "income-pending", type: "INCOME", status: "PENDING", amount: 200 },
+      { id: "expense-paid", type: "EXPENSE", status: "PAID", amount: -50 },
+      { id: "receivable-pending", type: "RECEIVABLE", status: "PENDING", amount: 300 },
+      { id: "receivable-paid", type: "RECEIVABLE", status: "PAID", amount: 400 },
+    ];
+
+    assert.deepEqual(
+      {
+        income: settledIncome(mixedLedger).map((entry) => entry.id),
+        expenses: settledExpenses(mixedLedger).map((entry) => entry.id),
+        receivables: openReceivables(mixedLedger).map((entry) => entry.id),
+      },
+      {
+        income: ["income-paid"],
+        expenses: ["expense-paid"],
+        receivables: ["receivable-pending"],
+      },
+    );
+  });
+
+  it("returns empty groups for an empty ledger", () => {
+    assert.deepEqual(settledIncome([]), []);
+    assert.deepEqual(settledExpenses([]), []);
+    assert.deepEqual(openReceivables([]), []);
+  });
+
+  it("survives being called with no argument at all", () => {
+    assert.deepEqual(settledIncome(), []);
+    assert.deepEqual(settledExpenses(), []);
+    assert.deepEqual(openReceivables(), []);
   });
 });
 
