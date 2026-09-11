@@ -17,6 +17,7 @@ import { logsPage } from "../pages/logs.js";
 import { settingsPage } from "../pages/settings.js";
 import { getCachedSession, getSession, hasResolvedSession, logout } from "../services/auth-service.js";
 import { confirmModal } from "../components/modal.js";
+import { CONFIGURATION_ERROR, isConfigurationValid } from "../config/env.js";
 import { escapeHtml } from "../utils/html.js";
 
 const pages = [
@@ -160,6 +161,16 @@ export function initRouter(root) {
   const render = async () => {
     const requestedRoute = currentRoute();
     const token = ++renderToken;
+
+    if (!isConfigurationValid()) {
+      activeRoute = requestedRoute;
+      root.innerHTML = statusScreen({
+        title: "ADMIN / CONFIGURATION",
+        heading: "CONFIGURATION REQUIRED",
+        copy: CONFIGURATION_ERROR,
+      });
+      return;
+    }
 
     if (navigationGuard && requestedRoute !== activeRoute) {
       if (navigationGuard()) {

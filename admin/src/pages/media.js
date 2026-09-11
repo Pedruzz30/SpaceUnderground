@@ -37,6 +37,28 @@ function renderAsset(asset, index) {
   `;
 }
 
+function mediaStats(assets) {
+  const posters = assets.filter((asset) => asset.type === "Poster").length;
+  const galleries = assets.filter((asset) => asset.type === "Gallery").length;
+  const storage = assets.filter((asset) => !/^(https?:|data:|blob:|\/|\.{1,2}\/)/i.test(asset.path)).length;
+  return [
+    { label: "Total", value: assets.length, hint: "attached assets" },
+    { label: "Posters", value: posters, hint: "project covers" },
+    { label: "Gallery", value: galleries, hint: "project gallery images" },
+    { label: "Storage", value: storage, hint: "Supabase paths" },
+  ];
+}
+
+function statCard(stat) {
+  return `
+    <article class="stat-card">
+      <span>${escapeHtml(stat.label)}</span>
+      <strong>${escapeHtml(String(stat.value))}</strong>
+      <p>${escapeHtml(stat.hint)}</p>
+    </article>
+  `;
+}
+
 function renderOrphan(orphan, index) {
   return `
     <div class="asset-row asset-row--orphan">
@@ -56,8 +78,10 @@ export const mediaPage = {
     <section class="page-heading">
       <span>MEDIA LIBRARY</span>
       <h2>Project assets.</h2>
-      <p>Poster and gallery files currently attached to projects.</p>
+      <p>Poster and gallery files currently attached to public portfolio records.</p>
     </section>
+
+    <div class="stats-grid stats-grid--four" data-media-stats></div>
 
     <section class="panel">
       <div class="toolbar">
@@ -95,6 +119,7 @@ export const mediaPage = {
     const filters = [...document.querySelectorAll("[data-media-filter]")];
     const orphanList = document.querySelector("[data-orphan-list]");
     const orphanCount = document.querySelector("[data-orphan-count]");
+    const statsRoot = document.querySelector("[data-media-stats]");
     let assets = [];
     let activeFilter = "All";
     let orphans = [];
@@ -126,8 +151,10 @@ export const mediaPage = {
           openModal({
             title: "ASSET DETAILS",
             body: `
+              <div class="asset-detail-preview" data-modal-thumb></div>
               <dl class="detail-list">
                 <div><dt>Project</dt><dd>${escapeHtml(asset.project.name)}</dd></div>
+                <div><dt>Case</dt><dd>${escapeHtml(asset.project.caseNumber)}</dd></div>
                 <div><dt>Type</dt><dd>${escapeHtml(asset.type)}</dd></div>
                 <div><dt>Storage path</dt><dd>${escapeHtml(asset.path)}</dd></div>
                 <div><dt>Alt</dt><dd>${escapeHtml(asset.alt || "—")}</dd></div>
@@ -136,9 +163,13 @@ export const mediaPage = {
               </dl>
             `,
             actions: [
-              { label: "View Project", onClick: () => { window.location.hash = `#/projects/${asset.project.id}`; } },
+              { label: "View Project", onSelect: () => { window.location.hash = `#/projects/${asset.project.id}`; } },
               { label: "Close" },
             ],
+          });
+          resolveImageUrl(asset.path).then((src) => {
+            const preview = document.querySelector("[data-modal-thumb]");
+            if (preview && src) preview.innerHTML = `<img src="${escapeAttribute(src)}" alt="">`;
           });
         });
       });
@@ -192,6 +223,7 @@ export const mediaPage = {
 
     try {
       assets = assetRows(await getProjects());
+      statsRoot.innerHTML = mediaStats(assets).map(statCard).join("");
       search.disabled = false;
       renderList();
     } catch (error) {

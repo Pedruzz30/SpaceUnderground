@@ -59,7 +59,11 @@ export async function createProject(data = {}) {
       ...data,
     });
 
-    await logActivity("Project created", `CASE ${created.caseNumber} created`);
+    await logActivity("Project created", `CASE ${created.caseNumber} created`, {
+      action: "project.created",
+      entityType: "project",
+      entityId: created.id,
+    });
     return created;
   } catch (error) {
     throw toDataError(error, "Unable to create project.");
@@ -81,7 +85,13 @@ export async function deleteProject(id) {
   try {
     const repository = await getProjectRepository();
     const removed = await repository.remove(id);
-    if (removed) await logActivity("Project deleted", `CASE ${removed.caseNumber} deleted`);
+    if (removed) {
+      await logActivity("Project deleted", `CASE ${removed.caseNumber} deleted`, {
+        action: "project.deleted",
+        entityType: "project",
+        entityId: removed.id,
+      });
+    }
     return removed;
   } catch (error) {
     throw toDataError(error, "Unable to delete project.");
@@ -94,7 +104,11 @@ export async function archiveProject(id) {
     const archived = await repository.update(id, { editorialStatus: "ARCHIVED" });
     if (!archived) throw toDataError({ code: "not_found" }, "Project not found.");
 
-    await logActivity("Project archived", `CASE ${archived.caseNumber} archived`);
+    await logActivity("Project archived", `CASE ${archived.caseNumber} archived`, {
+      action: "project.archived",
+      entityType: "project",
+      entityId: archived.id,
+    });
     return archived;
   } catch (error) {
     throw toDataError(error, "Unable to archive project.");

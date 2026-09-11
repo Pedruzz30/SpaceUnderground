@@ -14,6 +14,7 @@ function field(label, name, value = "", attrs = "") {
 }
 
 function renderPlan(plan) {
+  const featureCount = plan.features?.length || 0;
   return `
     <article class="plan-editor" data-plan-id="${escapeAttribute(plan.id)}">
       <header class="panel__head">
@@ -21,7 +22,10 @@ function renderPlan(plan) {
           <span>${escapeHtml(plan.monogram || plan.slug)}</span>
           <h3>${escapeHtml(plan.name)}</h3>
         </div>
-        <strong class="badge ${plan.visible ? "badge--success" : "badge--muted"}">${plan.visible ? "VISIBLE" : "HIDDEN"}</strong>
+        <div class="plan-editor__badges">
+          <strong class="badge ${plan.visible ? "badge--success" : "badge--muted"}">${plan.visible ? "VISIBLE" : "HIDDEN"}</strong>
+          <strong class="badge">${featureCount} FEATURES</strong>
+        </div>
       </header>
       <form data-plan-form="${escapeAttribute(plan.id)}">
         <div class="form-grid">
@@ -50,6 +54,8 @@ function renderPlan(plan) {
                 <label class="feature-row">
                   <span>${String(index + 1).padStart(2, "0")}</span>
                   <input value="${escapeAttribute(feature.text)}" data-feature-id="${escapeAttribute(feature.id || "")}">
+                  <button type="button" class="button" data-move-feature-up="${index}" ${index === 0 ? "disabled" : ""}>Up</button>
+                  <button type="button" class="button" data-move-feature-down="${index}" ${index === featureCount - 1 ? "disabled" : ""}>Down</button>
                   <button type="button" class="button button--danger" data-remove-feature="${index}">Remove</button>
                 </label>
               `).join("") || '<p class="empty-inline">No features yet.</p>'}
@@ -57,6 +63,12 @@ function renderPlan(plan) {
             <button class="button" type="button" data-add-feature>+ Add Feature</button>
           </div>
         </div>
+        <aside class="plan-preview">
+          <span>${escapeHtml(plan.scopeShort || plan.scope || "Plan")}</span>
+          <strong>${escapeHtml(plan.name || "Untitled plan")}</strong>
+          <p>${escapeHtml(plan.description || "No public description yet.")}</p>
+          <small>${escapeHtml(plan.range || "Range pending")} · ${escapeHtml(plan.timeline || "Timeline pending")}</small>
+        </aside>
         <div class="form-actions">
           <button class="button button--primary" type="submit">Save Plan</button>
         </div>
@@ -85,20 +97,49 @@ export const servicesPage = {
     function bindPlanForms() {
       root.querySelectorAll("[data-plan-form]").forEach((form) => {
         const planId = form.dataset.planForm;
+        const renumberFeatures = () => {
+          const rows = [...form.querySelectorAll(".feature-row")];
+          rows.forEach((row, index) => {
+            row.querySelector("span").textContent = String(index + 1).padStart(2, "0");
+            const up = row.querySelector("[data-move-feature-up]");
+            const down = row.querySelector("[data-move-feature-down]");
+            const remove = row.querySelector("[data-remove-feature]");
+            if (up) {
+              up.dataset.moveFeatureUp = String(index);
+              up.disabled = index === 0;
+            }
+            if (down) {
+              down.dataset.moveFeatureDown = String(index);
+              down.disabled = index === rows.length - 1;
+            }
+            if (remove) remove.dataset.removeFeature = String(index);
+          });
+        };
         form.querySelector("[data-add-feature]")?.addEventListener("click", () => {
           const list = form.querySelector("[data-feature-list]");
           const count = list.querySelectorAll("input[data-feature-id]").length;
           const label = document.createElement("label");
           label.className = "feature-row";
-          label.innerHTML = `<span>${String(count + 1).padStart(2, "0")}</span><input value="" data-feature-id=""><button type="button" class="button button--danger" data-remove-feature="${count}">Remove</button>`;
+          label.innerHTML = `<span>${String(count + 1).padStart(2, "0")}</span><input value="" data-feature-id=""><button type="button" class="button" data-move-feature-up="${count}">Up</button><button type="button" class="button" data-move-feature-down="${count}">Down</button><button type="button" class="button button--danger" data-remove-feature="${count}">Remove</button>`;
           if (list.querySelector(".empty-inline")) list.innerHTML = "";
           list.append(label);
+          renumberFeatures();
         });
 
         form.addEventListener("click", (event) => {
-          const button = event.target.closest("[data-remove-feature]");
-          if (!button) return;
-          button.closest(".feature-row")?.remove();
+          const remove = event.target.closest("[data-remove-feature]");
+          if (remove) {
+            remove.closest(".feature-row")?.remove();
+            renumberFeatures();
+            return;
+          }
+          const up = event.target.closest("[data-move-feature-up]");
+          const down = event.target.closest("[data-move-feature-down]");
+          if (!up && !down) return;
+          const row = (up || down).closest(".feature-row");
+          if (up) row?.previousElementSibling?.before(row);
+          if (down) row?.nextElementSibling?.after(row);
+          renumberFeatures();
         });
 
         form.addEventListener("submit", async (event) => {

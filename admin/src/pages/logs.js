@@ -2,7 +2,7 @@ import { getActivity } from "../services/activity-service.js";
 import { escapeHtml } from "../utils/html.js";
 
 const CHANNELS = ["ALL", "ACTIVITY", "SYSTEM", "SECURITY"];
-const DOMAINS = ["All", "Projects", "Media", "Publishing", "Content", "Settings"];
+const DOMAINS = ["All", "Projects", "Media", "Publishing", "Content", "Plans", "Settings"];
 
 const SECURITY_HINTS = ["auth", "login", "logout", "session", "permission", "denied", "security"];
 const SYSTEM_HINTS = ["storage", "settings", "system", "migration", "upload", "failed", "error"];
@@ -23,6 +23,7 @@ function domainFor(entry) {
   const value = signature(entry);
   if (value.includes("project") || value.includes("publish")) return "Projects";
   if (value.includes("media")) return "Media";
+  if (value.includes("plan")) return "Plans";
   if (value.includes("content")) return "Content";
   if (value.includes("settings")) return "Settings";
   return "All";

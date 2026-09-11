@@ -1,4 +1,4 @@
-name: Validar Pull Request
+name: Validate Pull Request
 
 on:
   pull_request:
@@ -10,23 +10,57 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  public-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configurar Node
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Instalar dependências
+      - name: Install dependencies
         run: npm ci
 
-      - name: Validar JavaScript estático
+      - name: Validate static JavaScript
         run: find public -type f -name '*.js' -print0 | xargs -0 -r -n1 node --check
 
-      - name: Validar build
+      - name: Validate public build
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+
+  admin-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run admin tests
+        run: npm test
+        env:
+          VITE_ADMIN_DATA_SOURCE: mock
+          VITE_ADMIN_ALLOW_MOCK_BUILD: "true"
+
+      - name: Validate admin build
+        run: npm run build
+        env:
+          VITE_ADMIN_DATA_SOURCE: mock
+          VITE_ADMIN_ALLOW_MOCK_BUILD: "true"
