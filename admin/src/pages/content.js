@@ -88,7 +88,7 @@ function contentFromForm(key, form) {
 
 export const contentPage = {
   title: "Site Content",
-  breadcrumb: "CONTENT / SITE CONTENT",
+  breadcrumb: "CONTENT / CMS / SITE CONTENT",
   render: () => `
     <section class="page-heading">
       <span>SITE CONTENT</span>

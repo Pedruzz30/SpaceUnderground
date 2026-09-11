@@ -1052,7 +1052,7 @@ async function loadEditor(id) {
 
 export const projectEditorPage = {
   title: "Project Editor",
-  breadcrumb: "CONTENT / PROJECTS / CASE",
+  breadcrumb: "OPERATIONS / PROJECTS / CASE",
   render: () => `<div data-editor-root>${loadingMarkup()}</div>`,
   afterRender: ({ id }) => loadEditor(id),
 };

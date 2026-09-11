@@ -182,8 +182,9 @@ export const dashboardPage = {
         <header class="panel__head">
           <div>
             <span>RECENT ACTIVITY</span>
-            <h3>Editorial log</h3>
+            <h3>Administrative log</h3>
           </div>
+          <a class="text-link" href="#/logs">Open Logs</a>
         </header>
         <div class="activity-list" data-activity aria-busy="true">
           <p class="empty-inline">Loading activity...</p>

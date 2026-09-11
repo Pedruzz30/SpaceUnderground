@@ -51,7 +51,7 @@ function renderOrphan(orphan, index) {
 
 export const mediaPage = {
   title: "Media",
-  breadcrumb: "CONTENT / MEDIA",
+  breadcrumb: "CONTENT / CMS / MEDIA",
   render: () => `
     <section class="page-heading">
       <span>MEDIA LIBRARY</span>

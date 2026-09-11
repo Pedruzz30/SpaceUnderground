@@ -15,6 +15,7 @@
     linear-gradient(180deg, rgba(198, 255, 0, 0.055), transparent 18%),
     rgba(8, 9, 8, 0.96);
   padding: var(--space-4);
+  overflow-y: auto;
   box-shadow: 16px 0 70px rgba(0, 0, 0, 0.24);
 }
 
@@ -65,8 +66,9 @@
 
 .sidebar__nav {
   display: grid;
-  gap: var(--space-5);
-  margin-top: var(--space-5);
+  align-content: start;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
 }
 
 .sidebar__nav section {

@@ -37,7 +37,7 @@ function projectCard(project) {
 
 export const projectsPage = {
   title: "Projects",
-  breadcrumb: "CONTENT / PROJECTS",
+  breadcrumb: "OPERATIONS / PROJECTS",
   render: () => `
     <section class="page-heading page-heading--split">
       <div>

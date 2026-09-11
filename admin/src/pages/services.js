@@ -67,7 +67,7 @@ function renderPlan(plan) {
 
 export const servicesPage = {
   title: "Services",
-  breadcrumb: "CONTENT / SERVICES",
+  breadcrumb: "OPERATIONS / SERVICES",
   render: () => `
     <section class="page-heading">
       <span>SERVICES / PLANS</span>
