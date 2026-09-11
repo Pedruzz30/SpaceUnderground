@@ -469,10 +469,7 @@
     min-width: 0;
   }
 
-  .clients-table .ops-row,
-  .ledger-table .ops-row,
-  .client-ledger .ops-row,
-  .client-projects .ops-row {
+  .ops-table .ops-row {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
     gap: 0.7rem;
