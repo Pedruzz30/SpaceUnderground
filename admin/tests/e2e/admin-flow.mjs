@@ -59,8 +59,11 @@ try {
 
   // Dashboard reflects the seeded store.
   await page.goto(`${BASE_URL}/#/dashboard`);
-  await page.waitForSelector(".stat-card");
-  assert.deepEqual(await page.locator(".stat-card strong").allInnerTexts(), ["2", "2", "0"], "seeded dashboard stats");
+  await page.waitForSelector("[data-pulse-row]");
+  assert.equal(await page.locator(".stat-card").count(), 4, "command center KPI strip");
+  assert.equal(await page.locator("[data-pulse-row]").count(), 2, "seeded project pulse");
+  assert.equal(await page.locator('[data-health-metric="published"]').innerText(), "2", "seeded published cases");
+  assert.equal(await page.locator('[data-health-metric="drafts"]').innerText(), "0", "seeded draft cases");
 
   // Projects list.
   await page.click('a[href="#/projects"]');
@@ -198,8 +201,10 @@ try {
 
   // Dashboard reflects the final state.
   await page.click('a[href="#/dashboard"]');
-  await page.waitForSelector(".stat-card");
-  assert.deepEqual(await page.locator(".stat-card strong").allInnerTexts(), ["2", "2", "0"], "final dashboard stats");
+  await page.waitForSelector("[data-pulse-row]");
+  assert.equal(await page.locator("[data-pulse-row]").count(), 2, "final project pulse");
+  assert.equal(await page.locator('[data-health-metric="published"]').innerText(), "2", "final published cases");
+  assert.equal(await page.locator('[data-health-metric="drafts"]').innerText(), "0", "final draft cases");
   assert.ok((await page.locator(".activity-list > div").count()) > 0, "activity log populated");
 
   assert.deepEqual(errors, [], "no console or page errors");

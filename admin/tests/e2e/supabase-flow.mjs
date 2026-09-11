@@ -71,8 +71,11 @@ try {
   await login();
   check((await hash()) === "#/dashboard", "real Supabase login reaches the dashboard", await hash());
 
-  await page.waitForSelector(".stat-card");
-  check((await page.locator(".stat-card").count()) === 3, "dashboard loads stats from Supabase");
+  await page.waitForSelector('[data-health-metric="published"]');
+  check(
+    /^\d+$/.test((await page.locator('[data-health-metric="published"]').innerText()).trim()),
+    "dashboard derives publication counts from Supabase",
+  );
 
   // Session must survive a reload without bouncing to login.
   await page.reload();
