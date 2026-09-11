@@ -11,6 +11,7 @@ import {
 import { getActivityWithStatus } from "../services/activity-service.js";
 import { getProjects } from "../services/project-service.js";
 import { describeError } from "../services/errors.js";
+import { pendingReceivables } from "../utils/financial-metrics.js";
 import { formatCurrency, formatRelativeDay, formatSignedCurrency } from "../utils/format.js";
 import {
   PERIODS,
@@ -22,7 +23,6 @@ import {
   followUps,
   openOpportunities,
   operationalChecks,
-  pendingReceivables,
   periodLabel,
   pipelineSummary,
   projectChecks,

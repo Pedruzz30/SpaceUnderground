@@ -11,6 +11,8 @@
 // Nothing here reads a module directly: callers pass the data in, which keeps
 // these functions pure and testable.
 
+import { financialSummary } from "./financial-metrics.js";
+
 export const PERIODS = [
   { id: "month", label: "This month" },
   { id: "30d", label: "Last 30 days" },
@@ -78,26 +80,15 @@ export function pipelineSummary(stages, opportunities) {
 
 /* --- Financial (presentation-only) ------------------------------------- */
 
-// Only settled money counts: a receivable is not revenue until it is paid, and
-// the range strings on opportunities are never parsed into arithmetic.
+// The period window is the only thing the Dashboard adds: the rules for what
+// counts as revenue or an expense live in financial-metrics.js, so this and the
+// Financial page can never disagree. "To receive" is deliberately absent — an
+// open balance is point-in-time, not something a date range scopes.
 export function financialTotals(transactions, periodId, now = new Date()) {
   const scoped = transactions.filter((transaction) => withinPeriod(transaction.date, periodId, now));
-  const revenue = scoped
-    .filter((transaction) => transaction.type === "INCOME" && transaction.status === "PAID")
-    .reduce((total, transaction) => total + Math.abs(transaction.amount), 0);
-  const expenses = scoped
-    .filter((transaction) => transaction.type === "EXPENSE" && transaction.status === "PAID")
-    .reduce((total, transaction) => total + Math.abs(transaction.amount), 0);
+  const { revenue, expenses, result } = financialSummary(scoped);
 
-  return { revenue, expenses, result: revenue - expenses, transactions: scoped };
-}
-
-// The only source of truth for open receivables: the transaction list. A
-// standing summary total would be a second one, free to drift out of step.
-export function pendingReceivables(transactions = []) {
-  return transactions
-    .filter((transaction) => transaction.type === "RECEIVABLE" && transaction.status === "PENDING")
-    .reduce((total, transaction) => total + Math.abs(transaction.amount), 0);
+  return { revenue, expenses, result, transactions: scoped };
 }
 
 export function barPercent(value, max) {

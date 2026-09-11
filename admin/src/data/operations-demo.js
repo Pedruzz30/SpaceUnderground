@@ -209,13 +209,6 @@ export const demoOpportunities = [
   },
 ];
 
-export const demoFinancialSummary = {
-  revenue: 8400,
-  expenses: 1250,
-  result: 7150,
-  toReceive: 3200,
-};
-
 export const demoTransactions = [
   {
     id: "tx-001",

@@ -15,7 +15,6 @@ import {
   followUps,
   openOpportunities,
   operationalChecks,
-  pendingReceivables,
   periodStart,
   pipelineSummary,
   projectChecks,
@@ -114,41 +113,6 @@ describe("financial totals", () => {
   it("returns zeroes rather than NaN for an empty window", () => {
     const totals = financialTotals([], "month", NOW);
     assert.deepEqual([totals.revenue, totals.expenses, totals.result], [0, 0, 0]);
-  });
-});
-
-describe("open receivables", () => {
-  // One source of truth: whatever is still pending in the ledger, never a
-  // standing summary total that can drift away from it.
-  const ledger = [
-    { type: "RECEIVABLE", status: "PENDING", amount: 1000 },
-    { type: "RECEIVABLE", status: "PENDING", amount: 1750 },
-    { type: "RECEIVABLE", status: "PAID", amount: 900 },
-    { type: "INCOME", status: "PAID", amount: 3200 },
-    { type: "EXPENSE", status: "PAID", amount: -160 },
-  ];
-
-  it("totals every pending receivable", () => {
-    assert.equal(pendingReceivables(ledger), 2750);
-  });
-
-  it("ignores a receivable that has already been settled", () => {
-    assert.equal(pendingReceivables([{ type: "RECEIVABLE", status: "PAID", amount: 900 }]), 0);
-  });
-
-  it("ignores income and expenses entirely", () => {
-    const notReceivables = ledger.filter((entry) => entry.type !== "RECEIVABLE");
-    assert.equal(pendingReceivables(notReceivables), 0);
-  });
-
-  it("returns zero for an empty ledger", () => {
-    assert.equal(pendingReceivables([]), 0);
-  });
-
-  it("never counts a pending receivable as revenue at the same time", () => {
-    const totals = financialTotals(ledger.map((entry) => ({ ...entry, date: daysBefore(1) })), "30d", NOW);
-    assert.equal(totals.revenue, 3200, "only the settled income");
-    assert.equal(pendingReceivables(ledger), 2750, "and the receivables stay separate");
   });
 });
 

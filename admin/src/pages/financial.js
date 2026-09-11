@@ -1,7 +1,8 @@
 import { badge, badgeType } from "../components/badge.js";
 import { statCard } from "../components/stat-card.js";
 import { bindTabs } from "../components/tabs.js";
-import { demoFinancialSummary, demoTransactions } from "../data/operations-demo.js";
+import { demoTransactions } from "../data/operations-demo.js";
+import { financialSummary } from "../utils/financial-metrics.js";
 import { formatCurrency, formatDayMonth, formatSignedCurrency } from "../utils/format.js";
 import { escapeHtml } from "../utils/html.js";
 
@@ -14,11 +15,13 @@ const TABS = [
 ];
 
 function renderMetrics() {
+  const summary = financialSummary(demoTransactions);
+
   return `
-    ${statCard({ label: "REVENUE", value: formatCurrency(demoFinancialSummary.revenue), detail: "Confirmed income" })}
-    ${statCard({ label: "EXPENSES", value: formatCurrency(demoFinancialSummary.expenses), detail: "Operational costs" })}
-    ${statCard({ label: "RESULT", value: formatCurrency(demoFinancialSummary.result), detail: "Revenue minus expenses" })}
-    ${statCard({ label: "TO RECEIVE", value: formatCurrency(demoFinancialSummary.toReceive), detail: "Open receivables" })}
+    ${statCard({ label: "REVENUE", value: formatCurrency(summary.revenue), detail: "Confirmed income" })}
+    ${statCard({ label: "EXPENSES", value: formatCurrency(summary.expenses), detail: "Operational costs" })}
+    ${statCard({ label: "RESULT", value: formatCurrency(summary.result), detail: "Revenue minus expenses" })}
+    ${statCard({ label: "TO RECEIVE", value: formatCurrency(summary.toReceive), detail: "Open receivables" })}
   `;
 }
 
