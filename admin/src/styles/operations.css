@@ -1,0 +1,484 @@
+/* Operations workspaces: Clients, Commercial pipeline, Financial ledger and the
+   CMS hub. Everything here extends the existing shell/panel/badge language —
+   no second design system, no new colour tokens. */
+
+/* --- shared operations primitives ------------------------------------- */
+
+.stats-grid--quad {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ops-note {
+  margin: 0;
+  color: var(--text-muted);
+  font: 500 0.62rem/1.5 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ops-note--spaced {
+  margin-top: var(--space-3);
+}
+
+.ops-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.ops-filters__group {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ops-filters__group > span {
+  color: var(--text-muted);
+  font: 600 0.62rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ops-count {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+  font: 500 0.62rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* --- generic operations table ----------------------------------------- */
+
+.ops-table {
+  display: grid;
+}
+
+.ops-table__head {
+  display: grid;
+  gap: 0.85rem;
+  border-bottom: 1px solid var(--border);
+  padding: 0 0.9rem 0.8rem;
+  color: var(--text-muted);
+  font: 600 0.58rem/1 var(--mono);
+  letter-spacing: 0.1em;
+}
+
+.ops-row {
+  display: grid;
+  align-items: center;
+  width: 100%;
+  margin-top: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.9rem;
+  gap: 0.85rem;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-muted);
+  text-align: left;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.ops-row strong {
+  display: block;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.ops-row small {
+  display: block;
+  overflow: hidden;
+  color: var(--text-muted);
+  font: 500 0.62rem/1.3 var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-row--link {
+  cursor: pointer;
+}
+
+.ops-row--link:hover,
+.ops-row--link:focus-visible,
+.ops-row--link.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: linear-gradient(90deg, rgba(198, 255, 0, 0.065), rgba(255, 255, 255, 0.026));
+}
+
+.ops-row--link:active {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-hover));
+}
+
+.ops-row__primary,
+.ops-stack {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.ops-row__arrow {
+  color: var(--text-muted);
+  text-align: right;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.ops-row--link:hover .ops-row__arrow,
+.ops-row--link:focus-visible .ops-row__arrow,
+.ops-row--link.is-selected .ops-row__arrow {
+  color: var(--accent);
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.clients-table .ops-table__head,
+.clients-table .ops-row {
+  grid-template-columns:
+    minmax(11rem, 1.4fr) minmax(10rem, 1.2fr) 6.5rem 7.5rem 8rem 6.5rem 1.5rem;
+}
+
+.ledger-table .ops-table__head,
+.ledger-table .ops-row {
+  grid-template-columns:
+    5.5rem 7.5rem minmax(11rem, 1.5fr) minmax(8rem, 1fr) 7rem 8.5rem;
+}
+
+.client-projects .ops-row {
+  grid-template-columns: minmax(0, 1fr) 7.5rem;
+}
+
+.client-ledger .ops-row {
+  grid-template-columns: 5.5rem minmax(0, 1fr) 7rem 8.5rem;
+}
+
+.ops-meta {
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+}
+
+/* Ledger amounts: two colours only, so a scan finds the sign without the page
+   turning into a christmas tree. */
+.ops-amount {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ops-amount--positive {
+  color: var(--success);
+}
+
+.ops-amount--negative {
+  color: var(--danger);
+}
+
+.ops-amount--neutral {
+  color: var(--text-soft);
+}
+
+/* --- commercial pipeline ---------------------------------------------- */
+
+.pipeline {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(16.5rem, 1fr);
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  scroll-snap-type: x proximity;
+}
+
+.pipeline__column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  background: rgba(255, 255, 255, 0.012);
+  scroll-snap-align: start;
+}
+
+.pipeline__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.6rem;
+}
+
+.pipeline__head h3 {
+  margin: 0;
+  color: var(--text-soft);
+  font: 600 0.62rem/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pipeline__count {
+  min-width: 1.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.24rem 0.45rem;
+  color: var(--text-muted);
+  font: 600 0.58rem/1 var(--mono);
+  text-align: center;
+}
+
+.pipeline__body {
+  display: grid;
+  align-content: start;
+  gap: 0.6rem;
+  min-height: 4rem;
+}
+
+.pipeline-card {
+  display: grid;
+  gap: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.8rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 46%),
+    rgba(255, 255, 255, 0.018);
+  cursor: grab;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.pipeline-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  background: linear-gradient(180deg, rgba(198, 255, 0, 0.055), rgba(255, 255, 255, 0.022));
+  transform: translateY(-1px);
+}
+
+.pipeline-card:active {
+  cursor: grabbing;
+  transform: none;
+}
+
+.pipeline-card__head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.pipeline-card__client {
+  min-width: 0;
+  color: var(--accent);
+  font: 600 0.66rem/1.3 var(--mono);
+  letter-spacing: 0.08em;
+  overflow-wrap: anywhere;
+}
+
+.pipeline-card__type {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.pipeline-card__range {
+  margin: 0;
+  color: var(--text-soft);
+  font: 500 0.72rem/1.3 var(--mono);
+}
+
+.pipeline-card__foot {
+  color: var(--text-muted);
+  font: 500 0.6rem/1.3 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* --- client detail ----------------------------------------------------- */
+
+.client-heading__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.client-heading__title h2 {
+  margin: 0.4rem 0;
+}
+
+.client-detail {
+  margin-top: var(--space-4);
+}
+
+.ops-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: var(--space-3);
+}
+
+.ops-panel-grid .panel--wide {
+  grid-column: 1 / -1;
+}
+
+.ops-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--space-2);
+}
+
+.ops-figures div {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: var(--space-3);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.ops-figures span {
+  display: block;
+  color: var(--text-muted);
+  font: 600 0.6rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ops-figures strong {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--text-primary);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.ops-figures strong.is-accent {
+  color: var(--accent);
+}
+
+/* --- CMS hub ------------------------------------------------------------ */
+
+.cms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: var(--space-3);
+}
+
+.cms-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cms-card p {
+  flex: 1;
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.cms-card .button {
+  width: fit-content;
+  margin-top: var(--space-2);
+}
+
+/* --- responsive --------------------------------------------------------- */
+
+@media (max-width: 1180px) {
+  .stats-grid--quad {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .ledger-table .ops-table__head,
+  .ledger-table .ops-row {
+    grid-template-columns: 5rem 6.5rem minmax(9rem, 1.4fr) 6.5rem 7.5rem;
+  }
+
+  .ledger-table .ops-table__head span:nth-child(4),
+  .ledger-table .ops-row [data-column="client"] {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .ops-table {
+    gap: var(--space-2);
+  }
+
+  .ops-table__head {
+    display: none;
+  }
+
+  .clients-table .ops-row,
+  .ledger-table .ops-row,
+  .client-ledger .ops-row,
+  .client-projects .ops-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 0.7rem;
+    padding: var(--space-3);
+  }
+
+  .ops-row__primary {
+    grid-column: 1 / -1;
+  }
+
+  .ops-row > [data-label] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--border);
+    padding-top: 0.55rem;
+    font-size: 0.78rem;
+  }
+
+  /* Two-line values (email + phone) keep stacking instead of collapsing into
+     the single-line label/value row. */
+  .ops-row > [data-label].ops-stack {
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .ops-row > [data-label]::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font: 600 0.58rem/1 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .ledger-table .ops-row [data-column="client"] {
+    display: flex;
+  }
+
+  .ops-amount {
+    text-align: left;
+  }
+
+  .ops-row__arrow {
+    grid-column: 2;
+    grid-row: 1;
+    opacity: 1;
+    transform: none;
+  }
+
+  .pipeline {
+    grid-auto-columns: min(78vw, 18rem);
+  }
+}
+
+@media (max-width: 760px) {
+  .stats-grid--quad {
+    grid-template-columns: 1fr;
+  }
+
+  .ops-filters {
+    gap: var(--space-3);
+  }
+
+  .ops-filters__group {
+    width: 100%;
+  }
+}

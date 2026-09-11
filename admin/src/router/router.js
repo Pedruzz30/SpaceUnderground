@@ -5,6 +5,8 @@ import { loginPage } from "../pages/login.js";
 import { dashboardPage } from "../pages/dashboard.js";
 import { projectsPage } from "../pages/projects.js";
 import { projectEditorPage } from "../pages/project-editor.js";
+import { clientsPage } from "../pages/clients.js";
+import { clientDetailPage } from "../pages/client-detail.js";
 import { mediaPage } from "../pages/media.js";
 import { servicesPage } from "../pages/services.js";
 import { contentPage } from "../pages/content.js";
@@ -19,6 +21,8 @@ const pages = [
   { test: (route) => route === "/dashboard" || route === "/", page: dashboardPage },
   { test: (route) => route === "/projects", page: projectsPage },
   { test: (route) => /^\/projects\/[^/]+$/.test(route), page: projectEditorPage },
+  { test: (route) => route === "/clients", page: clientsPage },
+  { test: (route) => /^\/clients\/[^/]+$/.test(route), page: clientDetailPage },
   { test: (route) => route === "/media", page: mediaPage },
   { test: (route) => route === "/services", page: servicesPage },
   { test: (route) => route === "/content", page: contentPage },
