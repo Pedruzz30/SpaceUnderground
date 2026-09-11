@@ -50,6 +50,14 @@
     grid-template-columns: 1fr;
   }
 
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-aside {
+    position: static;
+  }
+
   .editor-toolbar {
     top: 82px;
   }
@@ -97,6 +105,10 @@
   }
 
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-integration-grid {
     grid-template-columns: 1fr;
   }
 

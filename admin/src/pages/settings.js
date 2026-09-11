@@ -8,8 +8,10 @@ import { logActivity } from "../services/activity-service.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
 function field(label, name, value = "", type = "text", hint = "") {
+  const className = ["seoDescription", "ogImagePath"].includes(name) ? "field field--wide" : "field";
+
   return `
-    <div class="field">
+    <div class="${className}">
       <label for="settings-${name}">${escapeHtml(label)}</label>
       <input id="settings-${name}" name="${name}" type="${type}" value="${escapeAttribute(value || "")}">
       ${hint ? `<p class="field-hint">${escapeHtml(hint)}</p>` : ""}
@@ -44,12 +46,12 @@ function validate(data) {
 
 function preview(data, imageUrl = "") {
   return `
-    <div class="search-preview">
+    <div class="search-preview settings-search-preview">
       <strong>${escapeHtml(data.seoTitle || data.siteName || "Space Underground")}</strong>
       <span>${escapeHtml(data.siteUrl || "https://spaceunderground.dev")}</span>
       <p>${escapeHtml(data.seoDescription || "Digital studio for sites, systems, automation and AI.")}</p>
     </div>
-    <div class="og-preview">
+    <div class="og-preview settings-og-preview">
       <span>${imageUrl ? `<img src="${escapeAttribute(imageUrl)}" alt="">` : "OG"}</span>
       <div>
         <strong>${escapeHtml(data.seoTitle || data.siteName || "Space Underground")}</strong>
@@ -111,35 +113,42 @@ export const settingsPage = {
     try {
       const settings = await getSiteSettings();
       form.innerHTML = `
-        <section class="panel">
-          <header class="panel__head"><div><span>GENERAL</span><h3>Site identity</h3></div></header>
-          <div class="form-grid">
-            ${field("Site Name", "siteName", settings.siteName, "text", "Updates public brand labels.")}
-            ${field("Public URL", "siteUrl", settings.siteUrl, "url", "Updates canonical and social URLs.")}
-            ${field("Contact Email", "contactEmail", settings.contactEmail, "email", "Updates public mail links when present.")}
-            ${field("Locale", "locale", settings.locale, "text", "Updates the html lang attribute.")}
-          </div>
-        </section>
-        <section class="panel">
-          <header class="panel__head"><div><span>SEO</span><h3>Search and social</h3></div></header>
-          <div class="form-grid">
-            ${field("Title", "seoTitle", settings.seoTitle, "text", "Updates document title and social title.")}
-            ${field("Description", "seoDescription", settings.seoDescription, "text", "Updates meta description and social description.")}
-            ${field("OG Image path", "ogImagePath", settings.ogImagePath, "text", "Absolute URL or project-media storage path.")}
-          </div>
-          <div data-settings-preview>${preview(settings)}</div>
-        </section>
-        <section class="panel">
-          <header class="panel__head"><div><span>INTEGRATIONS</span><h3>Runtime status</h3></div></header>
-          <div class="integration-grid">
-            <div><span>Supabase</span><strong>${DATA_SOURCE === "supabase" ? "Enabled" : "Mock mode"}</strong></div>
-            <div><span>Database</span><strong>${isSupabaseConfigured() ? "Configured" : "Not configured"}</strong></div>
-            <div><span>Storage</span><strong>${isSupabaseConfigured() ? "Project media" : "Local mock"}</strong></div>
-            <div><span>Public Site</span><strong>Read-only anon key</strong></div>
-          </div>
-          <p>No keys or secrets are shown in this interface.</p>
-        </section>
-        <div class="form-actions"><button class="button button--primary" type="submit">Save Settings</button></div>
+        <div class="settings-main">
+          <section class="panel settings-panel">
+            <header class="panel__head"><div><span>GENERAL</span><h3>Site identity</h3></div></header>
+            <div class="form-grid">
+              ${field("Site Name", "siteName", settings.siteName, "text", "Updates public brand labels.")}
+              ${field("Public URL", "siteUrl", settings.siteUrl, "url", "Updates canonical and social URLs.")}
+              ${field("Contact Email", "contactEmail", settings.contactEmail, "email", "Updates public mail links when present.")}
+              ${field("Locale", "locale", settings.locale, "text", "Updates the html lang attribute.")}
+            </div>
+          </section>
+          <section class="panel settings-panel">
+            <header class="panel__head"><div><span>SEO</span><h3>Search metadata</h3></div></header>
+            <div class="form-grid">
+              ${field("Title", "seoTitle", settings.seoTitle, "text", "Updates document title and social title.")}
+              ${field("Description", "seoDescription", settings.seoDescription, "text", "Updates meta description and social description.")}
+              ${field("OG Image path", "ogImagePath", settings.ogImagePath, "text", "Absolute URL or project-media storage path.")}
+            </div>
+          </section>
+        </div>
+        <aside class="settings-aside">
+          <section class="panel settings-panel settings-panel--preview">
+            <header class="panel__head"><div><span>PREVIEW</span><h3>Search and social</h3></div></header>
+            <div class="settings-preview" data-settings-preview>${preview(settings)}</div>
+          </section>
+          <section class="panel settings-panel settings-panel--runtime">
+            <header class="panel__head"><div><span>INTEGRATIONS</span><h3>Runtime status</h3></div></header>
+            <div class="integration-grid settings-integration-grid">
+              <div><span>Supabase</span><strong>${DATA_SOURCE === "supabase" ? "Enabled" : "Mock mode"}</strong></div>
+              <div><span>Database</span><strong>${isSupabaseConfigured() ? "Configured" : "Not configured"}</strong></div>
+              <div><span>Storage</span><strong>${isSupabaseConfigured() ? "Project media" : "Local mock"}</strong></div>
+              <div><span>Public Site</span><strong>Read-only anon key</strong></div>
+            </div>
+            <p>No keys or secrets are shown in this interface.</p>
+          </section>
+          <div class="form-actions settings-actions"><button class="button button--primary" type="submit">Save Settings</button></div>
+        </aside>
       `;
       form.removeAttribute("aria-busy");
       await renderPreview();
