@@ -4,12 +4,11 @@ import { spaceStatus } from "../data/dashboard.js";
 import { DATA_SOURCE } from "../config/env.js";
 import {
   demoClients,
-  demoFinancialSummary,
   demoOpportunities,
   demoPipelineStages,
   demoTransactions,
 } from "../data/operations-demo.js";
-import { getActivity } from "../services/activity-service.js";
+import { getActivityWithStatus } from "../services/activity-service.js";
 import { getProjects } from "../services/project-service.js";
 import { describeError } from "../services/errors.js";
 import { formatCurrency, formatRelativeDay, formatSignedCurrency } from "../utils/format.js";
@@ -23,6 +22,7 @@ import {
   followUps,
   openOpportunities,
   operationalChecks,
+  pendingReceivables,
   periodLabel,
   pipelineSummary,
   projectChecks,
@@ -87,7 +87,7 @@ function renderKpis() {
     })}
     ${statCard({
       label: "TO RECEIVE",
-      value: escapeHtml(formatCurrency(demoFinancialSummary.toReceive)),
+      value: escapeHtml(formatCurrency(pendingReceivables(demoTransactions))),
       detail: "Open receivables",
     })}
   `;
@@ -272,7 +272,7 @@ function renderHealth({ projects, projectsOk, activityOk }) {
   const health = projectsOk ? projectHealth(projects) : null;
 
   return `
-    ${healthTile("PUBLIC WEBSITE", "ONLINE", spaceStatus.detail, "ok")}
+    ${healthTile("PUBLIC WEBSITE", "CONFIGURED", spaceStatus.detail)}
     ${healthTile("ADMIN DATA", status.label, `${status.detail} · ${DATA_SOURCE} source`, status.tone)}
     ${healthTile("PUBLISHED CASES", health ? String(health.published) : "—", health ? `${health.archived} archived` : "Project data unavailable", "", "published")}
     ${healthTile("DRAFT CASES", health ? String(health.drafts) : "—", health ? `${health.hidden} hidden` : "Project data unavailable", "", "drafts")}
@@ -315,7 +315,7 @@ export const dashboardPage = {
       ${renderKpis()}
     </section>
 
-    <p class="ops-note dash-legend">Operational figures are presentation data · projects and activity are live · the period applies to the financial snapshot</p>
+    <p class="ops-note dash-legend">Operational figures are presentation data · projects and activity come from the admin database · the period applies to the financial snapshot</p>
 
     <div class="dash-grid">
       <article class="panel dash-panel--attention" aria-labelledby="dash-attention-title">
@@ -388,7 +388,7 @@ export const dashboardPage = {
     // are already on screen, and each real block resolves independently.
     const [projectsResult, activityResult] = await Promise.allSettled([
       getProjects(),
-      getActivity({ limit: 6 }),
+      getActivityWithStatus({ limit: 6 }),
     ]);
 
     const attentionEl = document.querySelector("[data-attention]");
@@ -409,27 +409,29 @@ export const dashboardPage = {
       pulseEl.innerHTML = `<p class="empty-inline">${escapeHtml(message)}</p>`;
     }
 
-    // getActivity() resolves to [] instead of throwing, so a rejection here is
-    // only reachable if that contract changes. Handled anyway.
-    const activityOk = activityResult.status === "fulfilled";
-    if (activityOk) {
-      const entries = activityResult.value.slice(0, 6);
-      activityEl.innerHTML = entries.length
-        ? entries
-            .map(
-              (item) => `
-                <div>
-                  <span></span>
-                  <strong>${escapeHtml(item.title || item.action || "Administrative event")}</strong>
-                  <p>${escapeHtml(item.detail || "No additional detail.")}</p>
-                  <small>${escapeHtml(activityTime(item.time))}</small>
-                </div>
-              `,
-            )
-            .join("")
-        : '<p class="empty-inline">No recent activity yet.</p>';
-    } else {
+    // An outage and an empty log are different facts: getActivityWithStatus()
+    // reports the read failure that getActivity() deliberately swallows.
+    const activity = activityResult.status === "fulfilled" ? activityResult.value : { items: [], ok: false };
+    const activityOk = activity.ok;
+    const entries = activity.items.slice(0, 6);
+
+    if (!activityOk) {
       activityEl.innerHTML = '<p class="empty-inline">Activity unavailable.</p>';
+    } else if (!entries.length) {
+      activityEl.innerHTML = '<p class="empty-inline">No recent activity yet.</p>';
+    } else {
+      activityEl.innerHTML = entries
+        .map(
+          (item) => `
+            <div>
+              <span></span>
+              <strong>${escapeHtml(item.title || item.action || "Administrative event")}</strong>
+              <p>${escapeHtml(item.detail || "No additional detail.")}</p>
+              <small>${escapeHtml(activityTime(item.time))}</small>
+            </div>
+          `,
+        )
+        .join("");
     }
 
     healthEl.innerHTML = renderHealth({ projects, projectsOk, activityOk });

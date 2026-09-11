@@ -92,6 +92,14 @@ export function financialTotals(transactions, periodId, now = new Date()) {
   return { revenue, expenses, result: revenue - expenses, transactions: scoped };
 }
 
+// The only source of truth for open receivables: the transaction list. A
+// standing summary total would be a second one, free to drift out of step.
+export function pendingReceivables(transactions = []) {
+  return transactions
+    .filter((transaction) => transaction.type === "RECEIVABLE" && transaction.status === "PENDING")
+    .reduce((total, transaction) => total + Math.abs(transaction.amount), 0);
+}
+
 export function barPercent(value, max) {
   if (!max || max <= 0) return 0;
   return Math.max(0, Math.min(100, Math.round((value / max) * 100)));
