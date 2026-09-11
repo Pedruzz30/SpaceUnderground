@@ -159,6 +159,27 @@
 
 /* Ledger amounts: two colours only, so a scan finds the sign without the page
    turning into a christmas tree. */
+.ops-link {
+  border-bottom: 1px solid transparent;
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+}
+
+.ops-link:hover,
+.ops-link:focus-visible {
+  border-bottom-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  color: var(--accent);
+}
+
+.ops-subtitle {
+  margin: 0 0 var(--space-3);
+  color: var(--text-soft);
+  font: 600 0.66rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .ops-amount {
   font-family: var(--mono);
   font-size: 0.82rem;

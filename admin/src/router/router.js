@@ -7,6 +7,8 @@ import { projectsPage } from "../pages/projects.js";
 import { projectEditorPage } from "../pages/project-editor.js";
 import { clientsPage } from "../pages/clients.js";
 import { clientDetailPage } from "../pages/client-detail.js";
+import { commercialPage } from "../pages/commercial.js";
+import { financialPage } from "../pages/financial.js";
 import { mediaPage } from "../pages/media.js";
 import { servicesPage } from "../pages/services.js";
 import { contentPage } from "../pages/content.js";
@@ -23,6 +25,8 @@ const pages = [
   { test: (route) => /^\/projects\/[^/]+$/.test(route), page: projectEditorPage },
   { test: (route) => route === "/clients", page: clientsPage },
   { test: (route) => /^\/clients\/[^/]+$/.test(route), page: clientDetailPage },
+  { test: (route) => route === "/commercial", page: commercialPage },
+  { test: (route) => route === "/financial", page: financialPage },
   { test: (route) => route === "/media", page: mediaPage },
   { test: (route) => route === "/services", page: servicesPage },
   { test: (route) => route === "/content", page: contentPage },
