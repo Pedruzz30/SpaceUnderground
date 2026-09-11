@@ -16,7 +16,7 @@ function mapRow(row) {
   };
 }
 
-function toRow(settings) {
+function toRow(settings, userId = null) {
   return {
     key: "public",
     site_name: settings.siteName || null,
@@ -26,6 +26,7 @@ function toRow(settings) {
     seo_title: settings.seoTitle || null,
     seo_description: settings.seoDescription || null,
     og_image_path: settings.ogImagePath || null,
+    updated_by: userId,
   };
 }
 
@@ -41,9 +42,11 @@ export const supabaseSettingsRepository = {
   },
 
   async save(settings) {
-    const result = await getSupabaseClient()
+    const supabase = getSupabaseClient();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const result = await supabase
       .from("site_settings")
-      .upsert(toRow(settings), { onConflict: "key" })
+      .upsert(toRow(settings, sessionData?.session?.user?.id ?? null), { onConflict: "key" })
       .select("*")
       .single();
     return mapRow(unwrap(result, "Unable to save site settings."));

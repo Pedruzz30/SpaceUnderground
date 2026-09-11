@@ -2,9 +2,6 @@ import { logActivity } from "./activity-service.js";
 import { toDataError } from "./errors.js";
 import { getProjectRepository } from "./repositories/index.js";
 
-// Async contract used by every admin page. Pages call these functions and never
-// learn whether the data came from localStorage, Supabase or anything else.
-
 const PROJECT_DEFAULTS = {
   name: "",
   slug: "",
@@ -22,6 +19,14 @@ const PROJECT_DEFAULTS = {
   projectUrl: "",
   previewUrl: "",
 };
+
+function projectMeta(action, project) {
+  return {
+    action,
+    entityType: "project",
+    entityId: project?.dbId || project?.id || null,
+  };
+}
 
 export async function getProjects() {
   try {
@@ -59,7 +64,7 @@ export async function createProject(data = {}) {
       ...data,
     });
 
-    await logActivity("Project created", `CASE ${created.caseNumber} created`);
+    await logActivity("Project created", `CASE ${created.caseNumber} created`, projectMeta("project.created", created));
     return created;
   } catch (error) {
     throw toDataError(error, "Unable to create project.");
@@ -69,8 +74,23 @@ export async function createProject(data = {}) {
 export async function updateProject(id, patch) {
   try {
     const repository = await getProjectRepository();
+    const before = await repository.getById(id);
     const updated = await repository.update(id, patch);
     if (!updated) throw toDataError({ code: "not_found" }, "Project not found.");
+
+    const previousStatus = before?.editorialStatus;
+    const nextStatus = updated.editorialStatus;
+    let action = "project.updated";
+    let title = "Project updated";
+    if (previousStatus !== nextStatus && nextStatus === "PUBLISHED") {
+      action = "project.published";
+      title = "Project published";
+    } else if (previousStatus === "PUBLISHED" && nextStatus === "DRAFT") {
+      action = "project.unpublished";
+      title = "Project unpublished";
+    }
+
+    await logActivity(title, `CASE ${updated.caseNumber} updated`, projectMeta(action, updated));
     return updated;
   } catch (error) {
     throw toDataError(error, "Unable to save changes.");
@@ -81,7 +101,9 @@ export async function deleteProject(id) {
   try {
     const repository = await getProjectRepository();
     const removed = await repository.remove(id);
-    if (removed) await logActivity("Project deleted", `CASE ${removed.caseNumber} deleted`);
+    if (removed) {
+      await logActivity("Project deleted", `CASE ${removed.caseNumber} deleted`, projectMeta("project.deleted", removed));
+    }
     return removed;
   } catch (error) {
     throw toDataError(error, "Unable to delete project.");
@@ -94,7 +116,7 @@ export async function archiveProject(id) {
     const archived = await repository.update(id, { editorialStatus: "ARCHIVED" });
     if (!archived) throw toDataError({ code: "not_found" }, "Project not found.");
 
-    await logActivity("Project archived", `CASE ${archived.caseNumber} archived`);
+    await logActivity("Project archived", `CASE ${archived.caseNumber} archived`, projectMeta("project.archived", archived));
     return archived;
   } catch (error) {
     throw toDataError(error, "Unable to archive project.");

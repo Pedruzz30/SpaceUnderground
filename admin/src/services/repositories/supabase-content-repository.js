@@ -22,9 +22,15 @@ export const supabaseContentRepository = {
   },
 
   async upsert(entry) {
-    const result = await getSupabaseClient()
+    const supabase = getSupabaseClient();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const result = await supabase
       .from("site_content")
-      .upsert({ key: entry.key, content: entry.content ?? {} }, { onConflict: "key" })
+      .upsert({
+        key: entry.key,
+        content: entry.content ?? {},
+        updated_by: sessionData?.session?.user?.id ?? null,
+      }, { onConflict: "key" })
       .select("*")
       .single();
     return mapRow(unwrap(result, "Unable to save site content."));

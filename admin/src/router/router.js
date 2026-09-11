@@ -16,6 +16,7 @@ import { cmsPage } from "../pages/cms.js";
 import { logsPage } from "../pages/logs.js";
 import { settingsPage } from "../pages/settings.js";
 import { getCachedSession, getSession, hasResolvedSession, logout } from "../services/auth-service.js";
+import { adminConfigurationErrorMessage, hasAdminConfigurationError } from "../config/env.js";
 import { confirmModal } from "../components/modal.js";
 import { escapeHtml } from "../utils/html.js";
 
@@ -53,9 +54,9 @@ function notFoundPage(route) {
     render: () => `
       <section class="empty-state">
         <span>404</span>
-        <h2>Rota inexistente</h2>
-        <p>A rota <code>${escapeHtml(route)}</code> ainda nao existe neste Admin.</p>
-        <a class="button" href="#/dashboard">Voltar ao Dashboard</a>
+        <h2>Route not found</h2>
+        <p>The route <code>${escapeHtml(route)}</code> does not exist in this Admin.</p>
+        <a class="button" href="#/dashboard">Back to Dashboard</a>
       </section>
     `,
   };
@@ -129,10 +130,6 @@ let navigationCleanup = null;
 let activeRoute = null;
 let renderToken = 0;
 
-// Lets a page (eg. Project Editor) block navigation while it has unsaved
-// changes. The guard returns true when there is unsaved work; the optional
-// cleanup runs once the page is actually left, which is what lets the editor
-// discard uploads that never made it into a saved record.
 export function setNavigationGuard(hasUnsavedChanges, onLeave = null) {
   navigationGuard = hasUnsavedChanges;
   navigationCleanup = onLeave;
@@ -161,6 +158,16 @@ export function initRouter(root) {
     const requestedRoute = currentRoute();
     const token = ++renderToken;
 
+    if (hasAdminConfigurationError()) {
+      activeRoute = requestedRoute;
+      root.innerHTML = statusScreen({
+        title: "ADMIN / CONFIGURATION",
+        heading: "CONFIGURATION ERROR",
+        copy: adminConfigurationErrorMessage(),
+      });
+      return;
+    }
+
     if (navigationGuard && requestedRoute !== activeRoute) {
       if (navigationGuard()) {
         window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${activeRoute}`);
@@ -180,8 +187,6 @@ export function initRouter(root) {
       await runNavigationCleanup();
     }
 
-    // Authentication is asynchronous once Supabase is in play. Show an explicit
-    // state instead of flashing the dashboard before we know who the user is.
     if (!hasResolvedSession()) {
       root.innerHTML = statusScreen({
         title: "ADMIN / SESSION",
@@ -203,8 +208,6 @@ export function initRouter(root) {
       return;
     }
 
-    // Being signed in is not the same as being an admin: authorization comes
-    // from the admins table (and is enforced again by RLS on every query).
     if (session && !session.isAdmin) {
       activeRoute = requestedRoute;
       root.innerHTML = statusScreen({
