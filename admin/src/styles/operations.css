@@ -49,6 +49,12 @@
 
 /* --- generic operations table ----------------------------------------- */
 
+.ops-table-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  padding-block: 4px;
+}
+
 .ops-table {
   display: grid;
 }
@@ -115,6 +121,26 @@
   min-width: 0;
 }
 
+.ops-row__primary strong,
+.ops-row .ops-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-link {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.ops-row [data-column="client"] {
+  min-width: 0;
+}
+
 .ops-row__arrow {
   color: var(--text-muted);
   text-align: right;
@@ -173,7 +199,7 @@
 }
 
 .ops-subtitle {
-  margin: 0 0 var(--space-3);
+  margin: 0;
   color: var(--text-soft);
   font: 600 0.66rem/1 var(--mono);
   letter-spacing: 0.1em;
@@ -204,7 +230,7 @@
 .pipeline {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(16.5rem, 1fr);
+  grid-auto-columns: minmax(14rem, 1fr);
   gap: var(--space-3);
   overflow-x: auto;
   padding-bottom: var(--space-2);
@@ -334,7 +360,7 @@
 
 .ops-panel-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: var(--space-3);
 }
 
@@ -403,21 +429,29 @@
 
 /* --- responsive --------------------------------------------------------- */
 
-@media (max-width: 1180px) {
-  .stats-grid--quad {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 1400px) {
+  .clients-table {
+    min-width: 48.5rem;
+  }
+
+  .ledger-table {
+    min-width: 46rem;
+  }
+
+  .clients-table .ops-table__head,
+  .clients-table .ops-row {
+    grid-template-columns: minmax(8rem, 1.4fr) minmax(8rem, 1.2fr) 5.5rem 6.5rem 6.5rem 5.5rem 1.2rem;
+  }
+
+  .ledger-table .ops-table__head,
+  .ledger-table .ops-row {
+    grid-template-columns: 5rem 6.5rem minmax(8rem, 1.5fr) minmax(6rem, 1fr) 6.5rem 7.5rem;
   }
 }
 
-@media (max-width: 980px) {
-  .ledger-table .ops-table__head,
-  .ledger-table .ops-row {
-    grid-template-columns: 5rem 6.5rem minmax(9rem, 1.4fr) 6.5rem 7.5rem;
-  }
-
-  .ledger-table .ops-table__head span:nth-child(4),
-  .ledger-table .ops-row [data-column="client"] {
-    display: none;
+@media (max-width: 1180px) {
+  .stats-grid--quad {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -428,6 +462,11 @@
 
   .ops-table__head {
     display: none;
+  }
+
+  .clients-table,
+  .ledger-table {
+    min-width: 0;
   }
 
   .clients-table .ops-row,
@@ -470,8 +509,11 @@
     text-transform: uppercase;
   }
 
-  .ledger-table .ops-row [data-column="client"] {
-    display: flex;
+  .ops-row__primary strong,
+  .ops-row .ops-meta,
+  .ops-link {
+    overflow: visible;
+    white-space: normal;
   }
 
   .ops-amount {
@@ -493,6 +535,22 @@
 @media (max-width: 760px) {
   .stats-grid--quad {
     grid-template-columns: 1fr;
+  }
+
+  /* Four full-height stat cards would push the actual workspace a screen and a
+     half down, so the quad strip gets a compact form on phones. */
+  .stats-grid--quad .stat-card {
+    min-height: 0;
+    padding: var(--space-3);
+  }
+
+  .stats-grid--quad .stat-card::after {
+    display: none;
+  }
+
+  .stats-grid--quad .stat-card strong {
+    margin: 0.5rem 0 0.3rem;
+    font-size: 1.75rem;
   }
 
   .ops-filters {

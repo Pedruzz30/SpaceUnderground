@@ -22,15 +22,6 @@ function figure(label, value, accent = false) {
   `;
 }
 
-function definition(term, value) {
-  return `
-    <div>
-      <dt>${escapeHtml(term)}</dt>
-      <dd>${escapeHtml(value || "—")}</dd>
-    </div>
-  `;
-}
-
 function projectRow(project) {
   return `
     <div class="ops-row">
@@ -140,15 +131,14 @@ function overviewPanel(client) {
           <header class="panel__head">
             <div>
               <span>CLIENT INFORMATION</span>
-              <h3>Contact record</h3>
+              <h3>Record</h3>
             </div>
           </header>
-          <dl class="detail-list">
-            ${definition("Email", client.email)}
-            ${definition("Phone", client.phone)}
-            ${definition("Company", client.company)}
-            ${definition("Last contact", formatRelativeDay(client.lastContactAt))}
-          </dl>
+          <div class="ops-figures">
+            ${figure("Reference", `CLIENT / ${client.code}`)}
+            ${figure("Status", client.status)}
+            ${figure("Total value", formatCurrency(client.totalValue), true)}
+          </div>
         </article>
 
         <article class="panel">
@@ -215,7 +205,7 @@ function renderClient(client) {
           <h2>${escapeHtml(client.name)}</h2>
           ${badge(client.status, badgeType(client.status))}
         </div>
-        <p>${escapeHtml(client.company || "Independent")} · last contact ${escapeHtml(formatRelativeDay(client.lastContactAt))}</p>
+        <p>${escapeHtml(client.company || "Independent")} · ${counts.active} active, ${counts.completed} completed</p>
       </div>
       <div class="heading-actions">
         <a class="button" href="#/clients">All clients</a>
@@ -228,7 +218,6 @@ function renderClient(client) {
       <div><span>Company</span><strong>${escapeHtml(client.company || "—")}</strong></div>
       <div><span>Last contact</span><strong>${escapeHtml(formatRelativeDay(client.lastContactAt))}</strong></div>
       <div><span>Client since</span><strong>${escapeHtml(client.since ? formatFullDate(client.since) : "—")}</strong></div>
-      <div><span>Total value</span><strong>${escapeHtml(formatCurrency(client.totalValue))}</strong></div>
     </div>
 
     <section class="client-detail" data-client-detail>

@@ -62,11 +62,13 @@ function ledger(transactions, emptyMessage) {
   if (!transactions.length) return `<p class="empty-inline">${escapeHtml(emptyMessage)}</p>`;
 
   return `
-    <div class="ops-table ledger-table">
-      <div class="ops-table__head" aria-hidden="true">
-        <span>DATE</span><span>TYPE</span><span>DESCRIPTION</span><span>CLIENT</span><span>STATUS</span><span>VALUE</span>
+    <div class="ops-table-scroll">
+      <div class="ops-table ledger-table">
+        <div class="ops-table__head" aria-hidden="true">
+          <span>DATE</span><span>TYPE</span><span>DESCRIPTION</span><span>CLIENT</span><span>STATUS</span><span>VALUE</span>
+        </div>
+        ${transactions.map(transactionRow).join("")}
       </div>
-      ${transactions.map(transactionRow).join("")}
     </div>
   `;
 }
@@ -137,10 +139,8 @@ export const financialPage = {
         ${panel(
           "overview",
           `
-            <div>
-              <h3 class="ops-subtitle">Recent transactions</h3>
-              ${ledger(demoTransactions, "No transactions recorded yet.")}
-            </div>
+            <h3 class="ops-subtitle">Recent transactions</h3>
+            ${ledger(demoTransactions, "No transactions recorded yet.")}
           `,
         )}
         ${panel(

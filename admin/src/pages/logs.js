@@ -50,7 +50,7 @@ function row(entry) {
       <span>${escapeHtml(formatTime(entry.time))}</span>
       <strong>${escapeHtml(entry.title)}</strong>
       <p>${escapeHtml(entry.detail || entry.action || "No detail.")}</p>
-      <small>${escapeHtml(channel)} · ${escapeHtml(entry.entityType || "system")}</small>
+      <small>${escapeHtml(channel)}${entry.entityType ? ` · ${escapeHtml(entry.entityType)}` : ""}</small>
     </div>
   `;
 }

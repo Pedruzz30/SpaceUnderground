@@ -68,6 +68,7 @@ export const commercialPage = {
           <span>PIPELINE</span>
           <h3>Opportunities by stage</h3>
         </div>
+        <span class="ops-note">Scroll sideways for every stage</span>
       </header>
       <div class="pipeline" role="group" aria-label="Sales pipeline stages" tabindex="0">
         ${demoPipelineStages.map(stageColumn).join("")}

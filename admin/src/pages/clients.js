@@ -88,9 +88,11 @@ export const clientsPage = {
 
       <p class="ops-count" data-client-count></p>
 
-      <div class="ops-table clients-table" data-client-list aria-live="polite">
-        <div class="ops-table__head" aria-hidden="true">
-          <span>CLIENT</span><span>CONTACT</span><span>PROJECTS</span><span>STATUS</span><span>TOTAL VALUE</span><span>UPDATED</span><span></span>
+      <div class="ops-table-scroll">
+        <div class="ops-table clients-table" data-client-list aria-live="polite">
+          <div class="ops-table__head" aria-hidden="true">
+            <span>CLIENT</span><span>CONTACT</span><span>PROJECTS</span><span>STATUS</span><span>TOTAL VALUE</span><span>UPDATED</span><span></span>
+          </div>
         </div>
       </div>
     </section>
