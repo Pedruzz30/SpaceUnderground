@@ -1,6 +1,10 @@
 /* CMS editorial control center. Extends the existing Space Underground Lab
    system without introducing new tokens or a parallel component language. */
 
+.stats-grid--four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .cms-status-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -377,10 +381,12 @@
   font: 500 0.6rem/1.4 var(--mono);
 }
 
-.cms-preview {
+.cms-preview,
+.content-preview,
+.plan-preview,
+.og-preview {
   display: grid;
   gap: var(--space-2);
-  min-height: 15rem;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: var(--space-4);
@@ -389,21 +395,32 @@
     rgba(255, 255, 255, 0.012);
 }
 
-.cms-preview > span {
+.cms-preview {
+  min-height: 15rem;
+}
+
+.cms-preview > span,
+.content-preview span,
+.plan-preview span {
   color: var(--accent);
   font: 600 0.58rem/1.4 var(--mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-.cms-preview > strong {
+.cms-preview > strong,
+.content-preview strong,
+.plan-preview strong {
   color: var(--text-primary);
   font-size: clamp(1.4rem, 2vw, 2rem);
   font-weight: 600;
   line-height: 1.08;
 }
 
-.cms-preview > p {
+.cms-preview > p,
+.content-preview p,
+.plan-preview p,
+.og-preview p {
   margin: 0;
   color: var(--text-muted);
   line-height: 1.55;
@@ -450,6 +467,64 @@
   font-style: normal;
 }
 
+/* CMS-adjacent controls used by Media, Plans and Settings. */
+
+.plan-editor__badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.plan-preview {
+  margin-top: var(--space-3);
+}
+
+.plan-preview small,
+.content-preview small {
+  color: var(--accent);
+  font: 600 0.62rem/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.og-preview {
+  grid-template-columns: 8rem minmax(0, 1fr);
+  align-items: center;
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+}
+
+.og-preview > span {
+  display: grid;
+  min-height: 4.5rem;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(198, 255, 0, 0.055);
+  color: var(--accent);
+  font: 600 0.58rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.og-preview img,
+.asset-detail-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.asset-detail-preview {
+  overflow: hidden;
+  min-height: 220px;
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
 @media (max-width: 1320px) {
   .cms-content-shell {
     grid-template-columns: minmax(11rem, 0.45fr) minmax(0, 1.55fr);
@@ -462,6 +537,7 @@
 }
 
 @media (max-width: 1180px) {
+  .stats-grid--four,
   .cms-status-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -487,6 +563,7 @@
 }
 
 @media (max-width: 760px) {
+  .stats-grid--four,
   .cms-status-grid {
     grid-template-columns: 1fr;
   }
@@ -511,6 +588,10 @@
   .cms-editor-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .og-preview {
+    grid-template-columns: 1fr;
   }
 }
 

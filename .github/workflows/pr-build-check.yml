@@ -31,6 +31,9 @@ jobs:
 
       - name: Build public site
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
 
   admin:
     name: Admin
@@ -54,6 +57,12 @@ jobs:
 
       - name: Run admin tests
         run: npm test
+        env:
+          VITE_ADMIN_DATA_SOURCE: mock
+          VITE_ADMIN_ALLOW_MOCK_BUILD: "true"
 
       - name: Build admin
         run: npm run build
+        env:
+          VITE_ADMIN_DATA_SOURCE: mock
+          VITE_ADMIN_ALLOW_MOCK_BUILD: "true"

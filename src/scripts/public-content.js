@@ -1,5 +1,7 @@
 import { fetchSiteContent, fetchSiteSettings, isConfigured, signPaths } from "./supabase-public.js";
 
+const STORAGE_PATH = /^(?!https?:|data:|blob:|\/|\.{1,2}\/).+/i;
+
 function text(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -114,31 +116,52 @@ function applyAbout(content = {}) {
   writeSectionLabel("#about .section-label", content.kicker);
   writeAccentHeading("#about-title", content.title);
   write("#about .about__lead", content.description);
+  const notes = document.querySelectorAll(".about__notes > p");
+  if (notes[0] && text(content.notePrimary)) notes[0].textContent = content.notePrimary.trim();
+  if (notes[1] && text(content.noteSecondary)) notes[1].textContent = content.noteSecondary.trim();
+}
+
+function writeTimeline(row, item) {
+  const title = row.querySelector("h3");
+  const copy = row.querySelector("p");
+  if (title && text(item.title)) title.textContent = item.title.trim();
+  if (copy && text(item.description)) copy.textContent = item.description.trim();
 }
 
 function applyProcess(content = {}) {
   writeSectionLabel("#process .section-label", content.kicker);
   writeAccentHeading("#process-title", content.title);
   write("#process .section-intro", content.description);
+
+  const items = Array.isArray(content.items) ? [...content.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)) : [];
+  const rows = [...document.querySelectorAll(".timeline__item")];
+  items.forEach((item, index) => {
+    const row = rows[index];
+    if (row) writeTimeline(row, item);
+  });
 }
 
 function applyContact(content = {}) {
   writeSectionLabel("#contact .section-label", content.kicker);
+  write(".contact__availability", content.availability);
   writeAccentHeading("#contact-title", content.title);
   write("#contact .contact__bottom p", content.description);
+  const submit = document.querySelector(".project-form__submit span");
+  if (submit && text(content.buttonLabel)) submit.textContent = content.buttonLabel.trim();
 }
 
 function applyFooter(content = {}) {
-  const title = text(content.title);
-  if (title) {
+  const brandText = text(content.brand || content.title);
+  if (brandText) {
     const brand = document.querySelector(".footer-brand");
     if (brand) {
-      brand.textContent = title;
+      brand.textContent = brandText;
       const mark = document.createElement("span");
       mark.textContent = "®";
       brand.append(mark);
     }
   }
+  write(".footer__bottom p:first-of-type", content.legal);
   write(".footer__bottom p:nth-child(2)", content.description || content.kicker);
 }
 
@@ -147,7 +170,7 @@ async function resolveOgImage(path, siteUrl) {
   if (!value) return "";
   if (/^https?:\/\//i.test(value)) return value;
 
-  if (value.startsWith("projects/")) {
+  if (STORAGE_PATH.test(value)) {
     try {
       const signed = await signPaths([value]);
       const url = signed.get(value);
@@ -218,6 +241,9 @@ async function applySettings(settings = {}) {
     document.querySelectorAll("[data-public-contact-email]").forEach((node) => {
       node.textContent = contactEmail;
       if (node instanceof HTMLAnchorElement) node.href = `mailto:${contactEmail}`;
+    });
+    document.querySelectorAll('a[href^="mailto:"]').forEach((link) => {
+      link.href = `mailto:${contactEmail}`;
     });
   }
 }

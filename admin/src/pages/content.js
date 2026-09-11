@@ -1,22 +1,39 @@
 import { showToast } from "../components/toast.js";
-import { logActivity } from "../services/activity-service.js";
-import { describeError } from "../services/errors.js";
-import { getSiteContent, saveSiteContent } from "../services/content-service.js";
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
+import { logActivity } from "../services/activity-service.js";
+import { getSiteContent, saveSiteContent } from "../services/content-service.js";
+import { describeError } from "../services/errors.js";
 import { formatRelativeDay } from "../utils/format.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
 const SECTIONS = [
   { key: "hero", label: "Hero", description: "Primary message and calls to action." },
-  { key: "about", label: "About", description: "Studio positioning and introductory copy." },
+  { key: "about", label: "About", description: "Studio positioning, introductory copy and notes." },
   { key: "capabilities", label: "Capabilities", description: "Public capability cards and links." },
-  { key: "process", label: "Process", description: "Process heading and supporting copy." },
-  { key: "contact", label: "Contact", description: "Contact section message and invitation." },
-  { key: "footer", label: "Footer", description: "Footer identity and closing statement." },
+  { key: "process", label: "Process", description: "Process heading, supporting copy and timeline steps." },
+  { key: "contact", label: "Contact", description: "Contact section message, availability and call to action." },
+  { key: "footer", label: "Footer", description: "Footer identity, legal line and closing statement." },
+];
+
+const CAPABILITY_FIELDS = [
+  { name: "kicker", label: "Kicker" },
+  { name: "title", label: "Title" },
+  { name: "link", label: "Link" },
+  { name: "accent", label: "Accent" },
+  { name: "description", label: "Description", type: "textarea" },
+];
+
+const PROCESS_FIELDS = [
+  { name: "title", label: "Title" },
+  { name: "description", label: "Description", type: "textarea" },
 ];
 
 function sectionFor(key) {
   return SECTIONS.find((section) => section.key === key) || SECTIONS[0];
+}
+
+function titleFor(key) {
+  return sectionFor(key).label;
 }
 
 function hasConfiguredContent(entry) {
@@ -32,14 +49,23 @@ function input(label, name, value = "", hint = "") {
   return `
     <div class="field">
       <label for="content-${name}">${escapeHtml(label)}</label>
-      <input id="content-${name}" name="${name}" value="${escapeAttribute(value)}">
+      <input id="content-${name}" name="${name}" value="${escapeAttribute(value || "")}">
       ${hint ? `<small>${escapeHtml(hint)}</small>` : ""}
     </div>
   `;
 }
 
-function heroForm(entry) {
-  const content = entry?.content || {};
+function textarea(label, name, value = "", rows = 5, hint = "") {
+  return `
+    <div class="field field--wide">
+      <label for="content-${name}">${escapeHtml(label)}</label>
+      <textarea id="content-${name}" name="${name}" rows="${rows}">${escapeHtml(value || "")}</textarea>
+      ${hint ? `<small>${escapeHtml(hint)}</small>` : ""}
+    </div>
+  `;
+}
+
+function heroForm(content = {}) {
   return `
     <div class="form-grid">
       ${input("Eyebrow", "eyebrow", content.eyebrow, "Short context line above the main headline.")}
@@ -48,72 +74,88 @@ function heroForm(entry) {
       ${input("Primary CTA URL", "primaryCtaUrl", content.primaryCtaUrl, "Anchor or absolute URL.")}
       ${input("Secondary CTA Label", "secondaryCtaLabel", content.secondaryCtaLabel)}
       ${input("Secondary CTA URL", "secondaryCtaUrl", content.secondaryCtaUrl, "Anchor or absolute URL.")}
-      <div class="field field--wide">
-        <label for="content-description">Description</label>
-        <textarea id="content-description" name="description" rows="5">${escapeHtml(content.description || "")}</textarea>
-        <small>Supporting copy beneath the headline.</small>
-      </div>
+      ${textarea("Description", "description", content.description, 5, "Supporting copy beneath the headline.")}
     </div>
   `;
 }
 
-function genericForm(entry) {
-  const content = entry?.content || {};
+function genericForm(content = {}, extra = "") {
   return `
     <div class="form-grid">
-      ${input("Title", "title", content.title, "Main heading for this section.")}
       ${input("Kicker", "kicker", content.kicker, "Small editorial label above the title.")}
-      <div class="field field--wide">
-        <label for="content-description">Description</label>
-        <textarea id="content-description" name="description" rows="6">${escapeHtml(content.description || "")}</textarea>
-        <small>Public supporting copy for this section.</small>
-      </div>
+      ${input("Title", "title", content.title, "Main heading for this section.")}
+      ${textarea("Description", "description", content.description, 6, "Public supporting copy for this section.")}
+      ${extra}
     </div>
   `;
 }
 
-function capabilityCard(item, index) {
+function repeatableItem(kind, fields, item = {}, index = 0) {
   return `
-    <article class="module-card" data-capability-card>
+    <article class="module-card" data-repeatable-item>
       <header class="module-card__head">
-        <div><span>CAPABILITY ${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title || "Untitled")}</strong></div>
+        <div><span>${escapeHtml(kind.toUpperCase())} ${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title || "Untitled")}</strong></div>
+        <button type="button" class="button button--danger" data-remove-repeatable>Remove</button>
       </header>
       <div class="form-grid">
-        <div class="field"><label>Title</label><input data-capability-field="title" value="${escapeAttribute(item.title || "")}"></div>
-        <div class="field"><label>Kicker</label><input data-capability-field="kicker" value="${escapeAttribute(item.kicker || "")}"></div>
-        <div class="field"><label>Link</label><input data-capability-field="link" value="${escapeAttribute(item.link || "")}"></div>
-        <div class="field"><label>Accent</label><input data-capability-field="accent" value="${escapeAttribute(item.accent || "")}"></div>
-        <div class="field field--wide"><label>Description</label><textarea rows="3" data-capability-field="description">${escapeHtml(item.description || "")}</textarea></div>
+        ${fields.map((field) => field.type === "textarea"
+          ? `<div class="field field--wide"><label>${escapeHtml(field.label)}</label><textarea rows="3" data-repeatable-field="${escapeAttribute(field.name)}">${escapeHtml(item[field.name] || "")}</textarea></div>`
+          : `<div class="field"><label>${escapeHtml(field.label)}</label><input data-repeatable-field="${escapeAttribute(field.name)}" value="${escapeAttribute(item[field.name] || "")}"></div>`).join("")}
       </div>
     </article>
   `;
 }
 
-function capabilitiesForm(entry) {
-  const items = Array.isArray(entry?.content?.items) ? entry.content.items : [];
-  return `<div class="module-list" data-capability-list>${items.length ? items.map(capabilityCard).join("") : '<p class="empty-inline">No capability cards configured.</p>'}</div>`;
+function repeatableForm(content = {}, kind, fields) {
+  const items = Array.isArray(content.items) ? content.items : [];
+  return `
+    ${genericForm(content)}
+    <div class="module-list" data-repeatable-list="${escapeAttribute(kind)}">
+      ${items.map((item, index) => repeatableItem(kind, fields, item, index)).join("") || '<p class="empty-inline">No items configured.</p>'}
+    </div>
+    <button class="button" type="button" data-add-repeatable>Add Item</button>
+  `;
+}
+
+function formFor(key, content = {}) {
+  if (key === "hero") return heroForm(content);
+  if (key === "about") {
+    return genericForm(content, `
+      ${input("Primary note", "notePrimary", content.notePrimary)}
+      ${input("Secondary note", "noteSecondary", content.noteSecondary)}
+    `);
+  }
+  if (key === "capabilities") return repeatableForm(content, "capability", CAPABILITY_FIELDS);
+  if (key === "process") return repeatableForm(content, "step", PROCESS_FIELDS);
+  if (key === "contact") {
+    return genericForm(content, `
+      ${input("Availability", "availability", content.availability)}
+      ${input("Button Label", "buttonLabel", content.buttonLabel)}
+    `);
+  }
+  return genericForm(content, `
+    ${input("Brand", "brand", content.brand)}
+    ${input("Legal line", "legal", content.legal)}
+  `);
+}
+
+function readRepeatable(form) {
+  return [...form.querySelectorAll("[data-repeatable-item]")].map((card, index) => {
+    const item = { position: index };
+    card.querySelectorAll("[data-repeatable-field]").forEach((inputEl) => {
+      item[inputEl.dataset.repeatableField] = inputEl.value.trim();
+    });
+    return item;
+  }).filter((item) => Object.entries(item).some(([key, value]) => key !== "position" && value));
 }
 
 function contentFromForm(key, form) {
-  if (key === "capabilities") {
-    return {
-      items: [...form.querySelectorAll("[data-capability-card]")].map((card, index) => {
-        const get = (field) => card.querySelector(`[data-capability-field="${field}"]`)?.value.trim() || "";
-        return {
-          title: get("title"),
-          kicker: get("kicker"),
-          description: get("description"),
-          link: get("link"),
-          accent: get("accent"),
-          position: index,
-        };
-      }),
-    };
-  }
-  return Object.fromEntries([...new FormData(form).entries()].map(([name, value]) => [name, String(value).trim()]));
+  const content = Object.fromEntries([...new FormData(form).entries()].map(([name, value]) => [name, String(value).trim()]));
+  if (key === "capabilities" || key === "process") content.items = readRepeatable(form);
+  return content;
 }
 
-function previewFor(key, content) {
+function previewFor(key, content = {}) {
   if (key === "hero") {
     return `
       <div class="cms-preview cms-preview--hero">
@@ -125,14 +167,15 @@ function previewFor(key, content) {
     `;
   }
 
-  if (key === "capabilities") {
+  if (key === "capabilities" || key === "process") {
     const items = Array.isArray(content.items) ? content.items : [];
     return `
       <div class="cms-preview">
-        <span>CAPABILITIES / PREVIEW</span>
-        <strong>${items.length ? `${items.length} public capability${items.length === 1 ? "" : "s"}` : "No capabilities configured"}</strong>
+        <span>${escapeHtml(sectionFor(key).label.toUpperCase())} / PREVIEW</span>
+        <strong>${items.length ? `${items.length} structured item${items.length === 1 ? "" : "s"}` : `No ${sectionFor(key).label.toLowerCase()} configured`}</strong>
+        <p>${escapeHtml(content.description || "Section copy will appear here.")}</p>
         <div class="cms-preview-list">
-          ${items.slice(0, 4).map((item, index) => `<p><i>${String(index + 1).padStart(2, "0")}</i>${escapeHtml(item.title || "Untitled capability")}</p>`).join("") || '<p class="empty-inline">Add capabilities to preview them here.</p>'}
+          ${items.slice(0, 4).map((item, index) => `<p><i>${String(index + 1).padStart(2, "0")}</i>${escapeHtml(item.title || item.description || "Untitled item")}</p>`).join("") || '<p class="empty-inline">Add items to preview them here.</p>'}
         </div>
       </div>
     `;
@@ -141,8 +184,8 @@ function previewFor(key, content) {
   return `
     <div class="cms-preview">
       <span>${escapeHtml(content.kicker || `${sectionFor(key).label.toUpperCase()} / PREVIEW`)}</span>
-      <strong>${escapeHtml(content.title || sectionFor(key).label)}</strong>
-      <p>${escapeHtml(content.description || "Section copy will appear here.")}</p>
+      <strong>${escapeHtml(content.headline || content.title || content.brand || titleFor(key))}</strong>
+      <p>${escapeHtml(content.description || content.availability || content.legal || "Section copy will appear here.")}</p>
     </div>
   `;
 }
@@ -188,8 +231,7 @@ export const contentPage = {
     let saving = false;
     let saveError = false;
 
-    const isDirty = () => dirty;
-    setNavigationGuard(isDirty);
+    setNavigationGuard(() => dirty);
 
     function renderNav() {
       nav.innerHTML = `
@@ -209,7 +251,7 @@ export const contentPage = {
       `;
 
       nav.querySelectorAll("[data-content-section]").forEach((button) => {
-        button.addEventListener("click", async () => {
+        button.addEventListener("click", () => {
           const next = button.dataset.contentSection;
           if (next === active) return;
           if (dirty) {
@@ -225,7 +267,7 @@ export const contentPage = {
 
     function renderEditorState() {
       const state = editor.querySelector("[data-content-state]");
-      if (state) state.outerHTML = `<span data-content-state>${stateLabel(entries.get(active), dirty, saving, saveError)}</span>`;
+      if (state) state.innerHTML = stateLabel(entries.get(active), dirty, saving, saveError);
     }
 
     function renderPreview() {
@@ -237,6 +279,19 @@ export const contentPage = {
         ${previewFor(active, content)}
         <p class="ops-note">Structural preview · the public site keeps its own layout and motion system</p>
       `;
+    }
+
+    function addRepeatableItem(form) {
+      const list = form.querySelector("[data-repeatable-list]");
+      if (!list) return;
+      const kind = active === "process" ? "step" : "capability";
+      const fields = active === "process" ? PROCESS_FIELDS : CAPABILITY_FIELDS;
+      if (list.querySelector(".empty-inline")) list.innerHTML = "";
+      list.insertAdjacentHTML("beforeend", repeatableItem(kind, fields, {}, list.querySelectorAll("[data-repeatable-item]").length));
+      dirty = true;
+      saveError = false;
+      renderEditorState();
+      renderPreview();
     }
 
     function renderEditor() {
@@ -259,18 +314,30 @@ export const contentPage = {
             <span>${hasConfiguredContent(entry) ? "CONFIGURED" : "FALLBACK"}</span>
             <span>${entry.updatedAt ? `UPDATED ${escapeHtml(formatRelativeDay(entry.updatedAt))}` : "NO SAVED REVISION"}</span>
           </div>
-          ${active === "hero" ? heroForm(entry) : active === "capabilities" ? capabilitiesForm(entry) : genericForm(entry)}
+          <p class="field-error" data-content-error hidden></p>
+          ${formFor(active, entry.content)}
         </form>
       `;
 
       const form = editor.querySelector("[data-content-form]");
+      const error = form.querySelector("[data-content-error]");
       form.addEventListener("input", () => {
+        dirty = true;
+        saveError = false;
+        error.hidden = true;
+        renderEditorState();
+        renderPreview();
+      });
+      form.querySelector("[data-add-repeatable]")?.addEventListener("click", () => addRepeatableItem(form));
+      form.addEventListener("click", (event) => {
+        const remove = event.target.closest("[data-remove-repeatable]");
+        if (!remove) return;
+        remove.closest("[data-repeatable-item]")?.remove();
         dirty = true;
         saveError = false;
         renderEditorState();
         renderPreview();
       });
-
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         if (saving) return;
@@ -285,18 +352,22 @@ export const contentPage = {
           entries.set(active, saved);
           dirty = false;
           await logActivity("Site content updated", `${section.label} updated`, {
-            action: "content.updated",
-            entityType: "content",
+            action: "site_content.updated",
+            entityType: "site_content",
             entityId: active,
           });
           showToast("Content saved.");
+          saving = false;
           renderWorkspace();
-        } catch (error) {
+        } catch (err) {
           saveError = true;
-          showToast(describeError(error, "Unable to save content."));
+          saving = false;
+          const message = describeError(err, "Unable to save content.");
+          error.textContent = message;
+          error.hidden = false;
+          showToast(message);
           renderEditorState();
         } finally {
-          saving = false;
           if (button?.isConnected) {
             button.disabled = false;
             button.textContent = "Save Section";
@@ -321,9 +392,6 @@ export const contentPage = {
     } finally {
       workspace.removeAttribute("aria-busy");
     }
-
-    window.addEventListener("hashchange", () => {
-      if (!dirty) clearNavigationGuard();
-    }, { once: true });
   },
+  beforeLeave: () => clearNavigationGuard(),
 };

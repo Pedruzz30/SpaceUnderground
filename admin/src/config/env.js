@@ -3,25 +3,36 @@
 
 const env = import.meta.env ?? {};
 
+const VALID_DATA_SOURCES = new Set(["mock", "supabase"]);
 const RAW_DATA_SOURCE = String(env.VITE_ADMIN_DATA_SOURCE ?? "").trim().toLowerCase();
 const IS_PRODUCTION = Boolean(env.PROD);
-const VALID_DATA_SOURCE = ["mock", "supabase"].includes(RAW_DATA_SOURCE);
+const ALLOW_MOCK_BUILD = String(env.VITE_ADMIN_ALLOW_MOCK_BUILD ?? "").trim().toLowerCase() === "true";
+const requestedDataSource = RAW_DATA_SOURCE || (IS_PRODUCTION ? "" : "mock");
 
-// Development keeps the historical mock default. Production never does:
-// a missing or invalid selector becomes an explicit configuration error instead
-// of silently booting a fake localStorage admin.
-export const CONFIGURATION_ERROR = IS_PRODUCTION && !VALID_DATA_SOURCE
-  ? "VITE_ADMIN_DATA_SOURCE must be explicitly configured as supabase for production."
-  : "";
-
-export const DATA_SOURCE = VALID_DATA_SOURCE
-  ? RAW_DATA_SOURCE
-  : IS_PRODUCTION
-    ? "invalid"
-    : "mock";
+export const DATA_SOURCE = VALID_DATA_SOURCES.has(requestedDataSource) ? requestedDataSource : "invalid";
 
 export const SUPABASE_URL = env.VITE_SUPABASE_URL ?? "";
 export const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY ?? "";
+
+const configurationProblems = [];
+
+if (DATA_SOURCE === "invalid") {
+  configurationProblems.push(
+    IS_PRODUCTION
+      ? "Production admin requires VITE_ADMIN_DATA_SOURCE=supabase."
+      : "VITE_ADMIN_DATA_SOURCE must be either mock or supabase.",
+  );
+}
+
+if (IS_PRODUCTION && DATA_SOURCE === "mock" && !ALLOW_MOCK_BUILD) {
+  configurationProblems.push("Production admin cannot run in mock mode.");
+}
+
+if (DATA_SOURCE === "supabase" && !(SUPABASE_URL && SUPABASE_ANON_KEY)) {
+  configurationProblems.push("Supabase mode requires VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+}
+
+export const CONFIGURATION_ERROR = configurationProblems.join(" ");
 
 export function isSupabaseMode() {
   return DATA_SOURCE === "supabase";
@@ -31,16 +42,14 @@ export function isSupabaseConfigured() {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
 
+export function isConfigurationValid() {
+  return !CONFIGURATION_ERROR;
+}
+
 export function hasAdminConfigurationError() {
-  if (CONFIGURATION_ERROR) return true;
-  if (IS_PRODUCTION && DATA_SOURCE === "supabase" && !isSupabaseConfigured()) return true;
-  return false;
+  return !isConfigurationValid();
 }
 
 export function adminConfigurationErrorMessage() {
-  if (CONFIGURATION_ERROR) return CONFIGURATION_ERROR;
-  if (IS_PRODUCTION && DATA_SOURCE === "supabase" && !isSupabaseConfigured()) {
-    return "Supabase production configuration is incomplete. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.";
-  }
-  return "";
+  return CONFIGURATION_ERROR;
 }

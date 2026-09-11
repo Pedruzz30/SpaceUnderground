@@ -16,8 +16,8 @@ import { cmsPage } from "../pages/cms.js";
 import { logsPage } from "../pages/logs.js";
 import { settingsPage } from "../pages/settings.js";
 import { getCachedSession, getSession, hasResolvedSession, logout } from "../services/auth-service.js";
-import { adminConfigurationErrorMessage, hasAdminConfigurationError } from "../config/env.js";
 import { confirmModal } from "../components/modal.js";
+import { adminConfigurationErrorMessage, hasAdminConfigurationError } from "../config/env.js";
 import { escapeHtml } from "../utils/html.js";
 
 const pages = [
@@ -130,6 +130,9 @@ let navigationCleanup = null;
 let activeRoute = null;
 let renderToken = 0;
 
+// Lets a page block navigation while it has unsaved changes. The cleanup runs
+// once the page is actually left, which also lets editors discard temporary
+// uploads that never made it into a saved record.
 export function setNavigationGuard(hasUnsavedChanges, onLeave = null) {
   navigationGuard = hasUnsavedChanges;
   navigationCleanup = onLeave;
@@ -187,6 +190,8 @@ export function initRouter(root) {
       await runNavigationCleanup();
     }
 
+    // Authentication is asynchronous once Supabase is in play. Show an explicit
+    // state instead of flashing the dashboard before we know who the user is.
     if (!hasResolvedSession()) {
       root.innerHTML = statusScreen({
         title: "ADMIN / SESSION",
@@ -208,6 +213,8 @@ export function initRouter(root) {
       return;
     }
 
+    // Being signed in is not the same as being an admin: authorization comes
+    // from the admins table and is enforced again by RLS on every query.
     if (session && !session.isAdmin) {
       activeRoute = requestedRoute;
       root.innerHTML = statusScreen({

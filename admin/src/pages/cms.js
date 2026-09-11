@@ -57,10 +57,14 @@ function hasText(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function hasContent(value) {
+  if (Array.isArray(value)) return value.some(hasContent);
+  if (value && typeof value === "object") return Object.values(value).some(hasContent);
+  return hasText(value);
+}
+
 function contentConfigured(entry) {
-  if (!entry?.content || typeof entry.content !== "object") return false;
-  if (Array.isArray(entry.content.items)) return entry.content.items.some((item) => Object.values(item || {}).some(hasText));
-  return Object.values(entry.content).some(hasText);
+  return hasContent(entry?.content);
 }
 
 function presentationComplete(project) {
@@ -68,28 +72,34 @@ function presentationComplete(project) {
   return [presentation.system, presentation.label, presentation.type].every(hasText) && (project.modules || []).length > 0;
 }
 
+function countMedia(projects) {
+  return projects.reduce((total, project) => total + (project.poster ? 1 : 0) + (project.gallery?.length || 0), 0);
+}
+
 function deriveState({ projects, content, plans, settings }) {
   const published = projects.filter((project) => project.editorialStatus === "PUBLISHED" && project.visible);
   const drafts = projects.filter((project) => project.editorialStatus === "DRAFT");
   const archived = projects.filter((project) => project.editorialStatus === "ARCHIVED");
   const hidden = projects.filter((project) => !project.visible);
-  const missingPoster = projects.filter((project) => project.editorialStatus !== "ARCHIVED" && !hasText(project.poster));
-  const missingPresentation = projects.filter((project) => project.editorialStatus !== "ARCHIVED" && !presentationComplete(project));
+  const activeProjects = projects.filter((project) => project.editorialStatus !== "ARCHIVED");
+  const missingPoster = activeProjects.filter((project) => !hasText(project.poster));
+  const missingPresentation = activeProjects.filter((project) => !presentationComplete(project));
   const galleryItems = projects.reduce((total, project) => total + (project.gallery || []).length, 0);
   const configuredContent = CONTENT_KEYS.filter((key) => contentConfigured(content.find((entry) => entry.key === key))).length;
   const visiblePlans = plans.filter((plan) => plan.visible);
-  const plansWithoutFeatures = plans.filter((plan) => !(plan.features || []).length);
+  const plansWithoutFeatures = visiblePlans.filter((plan) => !(plan.features || []).length);
   const seoReady = hasText(settings.seoTitle) && hasText(settings.seoDescription);
   const ogReady = hasText(settings.ogImagePath);
 
   const attention = [];
+  if (!published.length) attention.push({ label: "No live cases", detail: "No visible published projects are available.", href: "#/projects" });
   if (drafts.length) attention.push({ label: `${drafts.length} draft case${drafts.length === 1 ? "" : "s"}`, detail: "Review publishing state before release.", href: "#/projects" });
   if (missingPoster.length) attention.push({ label: `${missingPoster.length} case${missingPoster.length === 1 ? "" : "s"} without poster`, detail: "Public presentation is missing a primary visual.", href: "#/projects" });
   if (missingPresentation.length) attention.push({ label: `${missingPresentation.length} incomplete presentation${missingPresentation.length === 1 ? "" : "s"}`, detail: "Presentation metadata or modules are incomplete.", href: "#/projects" });
   if (configuredContent < CONTENT_KEYS.length) attention.push({ label: `${CONTENT_KEYS.length - configuredContent} empty content section${CONTENT_KEYS.length - configuredContent === 1 ? "" : "s"}`, detail: "Some public sections still rely on build-time copy.", href: "#/content" });
   if (!seoReady) attention.push({ label: "SEO metadata incomplete", detail: "Title and description should both be configured.", href: "#/settings" });
   if (!ogReady) attention.push({ label: "OG image missing", detail: "Social previews do not have a configured image yet.", href: "#/settings" });
-  if (plansWithoutFeatures.length) attention.push({ label: `${plansWithoutFeatures.length} plan${plansWithoutFeatures.length === 1 ? "" : "s"} without features`, detail: "Offer cards need a clear feature list.", href: "#/services" });
+  if (plansWithoutFeatures.length) attention.push({ label: `${plansWithoutFeatures.length} visible plan${plansWithoutFeatures.length === 1 ? "" : "s"} without features`, detail: "Offer cards need a clear feature list.", href: "#/services" });
 
   return {
     published,
@@ -99,6 +109,7 @@ function deriveState({ projects, content, plans, settings }) {
     missingPoster,
     missingPresentation,
     galleryItems,
+    attachedAssets: countMedia(projects),
     configuredContent,
     visiblePlans,
     seoReady,
@@ -129,7 +140,7 @@ function moduleMeta(module, state, plans) {
     return [`${state.published.length} published`, `${state.drafts.length} draft`, `${state.missingPoster.length + state.missingPresentation.length} needs attention`];
   }
   if (module.key === "media") {
-    return [`${state.galleryItems} gallery item${state.galleryItems === 1 ? "" : "s"}`, `${state.missingPoster.length} missing poster`, "Storage-backed assets"];
+    return [`${state.attachedAssets} attached asset${state.attachedAssets === 1 ? "" : "s"}`, `${state.galleryItems} gallery item${state.galleryItems === 1 ? "" : "s"}`, `${state.missingPoster.length} missing poster`];
   }
   if (module.key === "content") {
     return [`${state.configuredContent} / ${CONTENT_KEYS.length} configured`, `${CONTENT_KEYS.length - state.configuredContent} using fallback`, "Structured content"];
@@ -250,7 +261,7 @@ export const cmsPage = {
   render: () => `
     <section class="page-heading page-heading--split">
       <div>
-        <span>CMS</span>
+        <span>CMS CONTROL CENTER</span>
         <h2>Content control.</h2>
         <p>Manage, review and publish everything visible on the Space Underground website.</p>
       </div>

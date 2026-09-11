@@ -744,6 +744,11 @@ function mount(project, isCreate) {
         trackDeletion(posterUrl);
         posterUrl = path;
         showPoster(await resolveImageUrl(path));
+        await logActivity("Poster uploaded", `${file.name} uploaded for CASE ${project.caseNumber}`, {
+          action: "media.uploaded",
+          entityType: "media",
+          entityId: id,
+        });
         showToast("Poster uploaded.");
         markDirty();
       } catch (error) {
@@ -804,6 +809,11 @@ function mount(project, isCreate) {
         unsavedUploads.add(path);
         gallery = [...gallery, { id: null, path, alt: "", caption: "", displayUrl: await resolveImageUrl(path) }];
         renderGallery();
+        await logActivity("Gallery image uploaded", `${file.name} uploaded for CASE ${project.caseNumber}`, {
+          action: "media.uploaded",
+          entityType: "media",
+          entityId: id,
+        });
         showToast("Image added.");
         markDirty();
       } catch (error) {
@@ -869,7 +879,6 @@ function mount(project, isCreate) {
       const updated = await updateProject(id, values);
       unsavedUploads.clear();
       await removeProjectImages(pendingDeletions.splice(0));
-      await logActivity("Project updated", `${updated.name || "Untitled project"} updated`);
       showToast("Changes saved.");
       await loadEditor(updated.id);
     } catch (error) {
@@ -890,7 +899,6 @@ function mount(project, isCreate) {
       const updated = await updateProject(id, values);
       unsavedUploads.clear();
       await removeProjectImages(pendingDeletions.splice(0));
-      await logActivity("Project published", `CASE ${updated.caseNumber} published`);
       showToast("Project published.");
       await loadEditor(updated.id);
     } catch (error) {

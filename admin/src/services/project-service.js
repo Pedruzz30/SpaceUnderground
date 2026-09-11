@@ -2,6 +2,9 @@ import { logActivity } from "./activity-service.js";
 import { toDataError } from "./errors.js";
 import { getProjectRepository } from "./repositories/index.js";
 
+// Async contract used by every admin page. Pages call these functions and never
+// learn whether the data came from localStorage, Supabase or anything else.
+
 const PROJECT_DEFAULTS = {
   name: "",
   slug: "",
@@ -82,15 +85,19 @@ export async function updateProject(id, patch) {
     const nextStatus = updated.editorialStatus;
     let action = "project.updated";
     let title = "Project updated";
+    let detail = `CASE ${updated.caseNumber} updated`;
+
     if (previousStatus !== nextStatus && nextStatus === "PUBLISHED") {
       action = "project.published";
       title = "Project published";
+      detail = `CASE ${updated.caseNumber} published`;
     } else if (previousStatus === "PUBLISHED" && nextStatus === "DRAFT") {
       action = "project.unpublished";
       title = "Project unpublished";
+      detail = `CASE ${updated.caseNumber} unpublished`;
     }
 
-    await logActivity(title, `CASE ${updated.caseNumber} updated`, projectMeta(action, updated));
+    await logActivity(title, detail, projectMeta(action, updated));
     return updated;
   } catch (error) {
     throw toDataError(error, "Unable to save changes.");
