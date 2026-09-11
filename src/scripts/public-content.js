@@ -1,27 +1,93 @@
-import { fetchSiteContent, fetchSiteSettings, isConfigured } from "./supabase-public.js";
+import { fetchSiteContent, fetchSiteSettings, isConfigured, signPaths } from "./supabase-public.js";
+
+function text(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
 function write(selector, value) {
   const node = document.querySelector(selector);
-  if (node && typeof value === "string" && value.trim()) node.textContent = value.trim();
+  const next = text(value);
+  if (node && next) node.textContent = next;
+}
+
+function writeSectionLabel(selector, value) {
+  const node = document.querySelector(selector);
+  const next = text(value);
+  if (!node || !next) return;
+  const index = node.querySelector("span");
+  node.textContent = "";
+  if (index) node.append(index, document.createTextNode(` ${next}`));
+  else node.textContent = next;
+}
+
+function writeAccentHeading(selector, value) {
+  const node = document.querySelector(selector);
+  const next = text(value);
+  if (!node || !next) return;
+
+  const words = next.split(/\s+/).filter(Boolean);
+  node.textContent = "";
+  if (words.length === 1) {
+    const emphasis = document.createElement("em");
+    emphasis.textContent = words[0];
+    node.append(emphasis);
+    return;
+  }
+
+  node.append(document.createTextNode(`${words.slice(0, -1).join(" ")} `));
+  const emphasis = document.createElement("em");
+  emphasis.textContent = words.at(-1);
+  node.append(emphasis);
+}
+
+function ensureMeta(selector, attributes = {}) {
+  let node = document.head.querySelector(selector);
+  if (!node) {
+    node = document.createElement("meta");
+    Object.entries(attributes).forEach(([name, value]) => node.setAttribute(name, value));
+    document.head.append(node);
+  }
+  return node;
+}
+
+function ensureCanonical() {
+  let link = document.head.querySelector('link[rel="canonical"]');
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "canonical";
+    document.head.append(link);
+  }
+  return link;
+}
+
+function absolutePublicUrl(value, baseUrl = window.location.href) {
+  const next = text(value);
+  if (!next) return "";
+  try {
+    return new URL(next, baseUrl).href;
+  } catch {
+    return "";
+  }
 }
 
 function applyHero(content = {}) {
-  write(".hero .eyebrow", content.eyebrow);
+  writeSectionLabel(".hero .eyebrow", content.eyebrow);
   write(".hero__lede", content.description);
+
   const title = document.querySelector("#hero-title");
-  if (title && content.headline) {
-    title.textContent = content.headline;
-    title.setAttribute("aria-label", content.headline);
+  if (title && text(content.headline)) {
+    title.textContent = content.headline.trim();
+    title.setAttribute("aria-label", content.headline.trim());
   }
 
   const actions = document.querySelectorAll(".hero__actions a");
   if (actions[0]) {
-    if (content.primaryCtaLabel) actions[0].querySelector("span").textContent = content.primaryCtaLabel;
-    if (content.primaryCtaUrl) actions[0].setAttribute("href", content.primaryCtaUrl);
+    if (text(content.primaryCtaLabel)) actions[0].querySelector("span").textContent = content.primaryCtaLabel.trim();
+    if (text(content.primaryCtaUrl)) actions[0].setAttribute("href", content.primaryCtaUrl.trim());
   }
   if (actions[1]) {
-    if (content.secondaryCtaLabel) actions[1].querySelector("span").textContent = content.secondaryCtaLabel;
-    if (content.secondaryCtaUrl) actions[1].setAttribute("href", content.secondaryCtaUrl);
+    if (text(content.secondaryCtaLabel)) actions[1].querySelector("span").textContent = content.secondaryCtaLabel.trim();
+    if (text(content.secondaryCtaUrl)) actions[1].setAttribute("href", content.secondaryCtaUrl.trim());
   }
 }
 
@@ -32,19 +98,69 @@ function applyCapabilities(content = {}) {
   items.forEach((item, index) => {
     const card = cards[index];
     if (!card) return;
-    if (item.accent) card.style.setProperty("--capability-accent", item.accent);
+    if (text(item.accent)) card.style.setProperty("--capability-accent", item.accent.trim());
     const kicker = card.querySelector(".capability-card__kicker");
     const title = card.querySelector("h3");
     const copy = card.querySelector("h3 + p");
     const link = card.querySelector("a");
-    if (kicker && item.kicker) kicker.textContent = item.kicker;
-    if (title && item.title) title.textContent = item.title;
-    if (copy && item.description) copy.textContent = item.description;
-    if (link && item.link) link.href = item.link;
+    if (kicker && text(item.kicker)) kicker.textContent = item.kicker.trim();
+    if (title && text(item.title)) title.textContent = item.title.trim();
+    if (copy && text(item.description)) copy.textContent = item.description.trim();
+    if (link && text(item.link)) link.href = item.link.trim();
   });
 }
 
-function applySettings(settings = {}) {
+function applyAbout(content = {}) {
+  writeSectionLabel("#about .section-label", content.kicker);
+  writeAccentHeading("#about-title", content.title);
+  write("#about .about__lead", content.description);
+}
+
+function applyProcess(content = {}) {
+  writeSectionLabel("#process .section-label", content.kicker);
+  writeAccentHeading("#process-title", content.title);
+  write("#process .section-intro", content.description);
+}
+
+function applyContact(content = {}) {
+  writeSectionLabel("#contact .section-label", content.kicker);
+  writeAccentHeading("#contact-title", content.title);
+  write("#contact .contact__bottom p", content.description);
+}
+
+function applyFooter(content = {}) {
+  const title = text(content.title);
+  if (title) {
+    const brand = document.querySelector(".footer-brand");
+    if (brand) {
+      brand.textContent = title;
+      const mark = document.createElement("span");
+      mark.textContent = "®";
+      brand.append(mark);
+    }
+  }
+  write(".footer__bottom p:nth-child(2)", content.description || content.kicker);
+}
+
+async function resolveOgImage(path, siteUrl) {
+  const value = text(path);
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+
+  if (value.startsWith("projects/")) {
+    try {
+      const signed = await signPaths([value]);
+      const url = signed.get(value);
+      if (url) return url;
+    } catch {
+      // Fall through to a public-site-relative URL.
+    }
+  }
+
+  return absolutePublicUrl(value, siteUrl || window.location.href);
+}
+
+async function applySettings(settings = {}) {
   if (settings.site_name) {
     const brand = document.querySelector(".brand__name");
     const parts = String(settings.site_name).trim().split(/\s+/, 2);
@@ -57,10 +173,53 @@ function applySettings(settings = {}) {
       }
     }
   }
-  if (settings.locale) document.documentElement.lang = settings.locale;
-  if (settings.seo_title) document.title = settings.seo_title;
-  const description = document.querySelector('meta[name="description"]');
-  if (description && settings.seo_description) description.content = settings.seo_description;
+
+  if (text(settings.locale)) document.documentElement.lang = settings.locale.trim();
+
+  const siteUrl = absolutePublicUrl(settings.site_url || window.location.href);
+  const seoTitle = text(settings.seo_title);
+  const seoDescription = text(settings.seo_description);
+
+  if (seoTitle) document.title = seoTitle;
+
+  const description = ensureMeta('meta[name="description"]', { name: "description" });
+  if (seoDescription) description.content = seoDescription;
+
+  if (siteUrl) ensureCanonical().href = siteUrl;
+
+  const ogTitle = ensureMeta('meta[property="og:title"]', { property: "og:title" });
+  const ogDescription = ensureMeta('meta[property="og:description"]', { property: "og:description" });
+  const ogUrl = ensureMeta('meta[property="og:url"]', { property: "og:url" });
+  const ogImage = ensureMeta('meta[property="og:image"]', { property: "og:image" });
+  const twitterCard = ensureMeta('meta[name="twitter:card"]', { name: "twitter:card" });
+  const twitterTitle = ensureMeta('meta[name="twitter:title"]', { name: "twitter:title" });
+  const twitterDescription = ensureMeta('meta[name="twitter:description"]', { name: "twitter:description" });
+  const twitterImage = ensureMeta('meta[name="twitter:image"]', { name: "twitter:image" });
+
+  if (seoTitle) {
+    ogTitle.content = seoTitle;
+    twitterTitle.content = seoTitle;
+  }
+  if (seoDescription) {
+    ogDescription.content = seoDescription;
+    twitterDescription.content = seoDescription;
+  }
+  if (siteUrl) ogUrl.content = siteUrl;
+
+  const resolvedOgImage = await resolveOgImage(settings.og_image_path, siteUrl);
+  if (resolvedOgImage) {
+    ogImage.content = resolvedOgImage;
+    twitterImage.content = resolvedOgImage;
+  }
+  twitterCard.content = resolvedOgImage ? "summary_large_image" : "summary";
+
+  const contactEmail = text(settings.contact_email);
+  if (contactEmail) {
+    document.querySelectorAll("[data-public-contact-email]").forEach((node) => {
+      node.textContent = contactEmail;
+      if (node instanceof HTMLAnchorElement) node.href = `mailto:${contactEmail}`;
+    });
+  }
 }
 
 export async function initPublicContent() {
@@ -68,9 +227,14 @@ export async function initPublicContent() {
   try {
     const [contentRows, settings] = await Promise.all([fetchSiteContent(), fetchSiteSettings()]);
     const content = new Map(contentRows.map((row) => [row.key, row.content || {}]));
+
     applyHero(content.get("hero"));
+    applyAbout(content.get("about"));
     applyCapabilities(content.get("capabilities"));
-    if (settings) applySettings(settings);
+    applyProcess(content.get("process"));
+    applyContact(content.get("contact"));
+    applyFooter(content.get("footer"));
+    if (settings) await applySettings(settings);
   } catch (error) {
     console.warn("[content] Supabase content unavailable, keeping build-time copy.", error);
   }
