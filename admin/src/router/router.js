@@ -12,7 +12,8 @@ import { financialPage } from "../pages/financial.js";
 import { mediaPage } from "../pages/media.js";
 import { servicesPage } from "../pages/services.js";
 import { contentPage } from "../pages/content.js";
-import { activityPage } from "../pages/activity.js";
+import { cmsPage } from "../pages/cms.js";
+import { logsPage } from "../pages/logs.js";
 import { settingsPage } from "../pages/settings.js";
 import { getCachedSession, getSession, hasResolvedSession, logout } from "../services/auth-service.js";
 import { confirmModal } from "../components/modal.js";
@@ -30,7 +31,9 @@ const pages = [
   { test: (route) => route === "/media", page: mediaPage },
   { test: (route) => route === "/services", page: servicesPage },
   { test: (route) => route === "/content", page: contentPage },
-  { test: (route) => route === "/activity", page: activityPage },
+  { test: (route) => route === "/cms", page: cmsPage },
+  // #/activity is the pre-Lab name for this screen; keep the old link working.
+  { test: (route) => route === "/logs" || route === "/activity", page: logsPage },
   { test: (route) => route === "/settings", page: settingsPage },
 ];
 
