@@ -23,7 +23,7 @@ globalThis.localStorage = createStorageStub();
 
 const { resetMockProjects } = await import("../src/services/repositories/mock-project-repository.js");
 const { resetMockActivity } = await import("../src/services/repositories/mock-activity-repository.js");
-const { getActivity } = await import("../src/services/activity-service.js");
+const { getActivity, getActivityWithStatus } = await import("../src/services/activity-service.js");
 const {
   archiveProject,
   createProject,
@@ -184,5 +184,40 @@ describe("project mapper", () => {
     assert.deepEqual(row.tech_stack, ["Node"]);
     // Fields that were not provided must not appear in the patch.
     assert.equal("slug" in row, false);
+  });
+});
+
+describe("activity service (mock repository)", () => {
+  beforeEach(() => {
+    resetMockActivity();
+  });
+
+  // Breaks the read the way a repository outage would, so the distinction
+  // between "nothing logged" and "could not read the log" is exercised for
+  // real rather than asserted in the abstract.
+  async function withBrokenStorage(task) {
+    const original = globalThis.localStorage.getItem;
+    globalThis.localStorage.getItem = () => {
+      throw new Error("storage unavailable");
+    };
+    try {
+      return await task();
+    } finally {
+      globalThis.localStorage.getItem = original;
+    }
+  }
+
+  it("reports a successful read of an empty log", async () => {
+    assert.deepEqual(await getActivityWithStatus(), { items: [], ok: true });
+  });
+
+  it("reports a read failure instead of passing it off as an empty log", async () => {
+    const result = await withBrokenStorage(() => getActivityWithStatus());
+    assert.equal(result.ok, false, "the outage is visible to the caller");
+    assert.deepEqual(result.items, []);
+  });
+
+  it("keeps getActivity() forgiving for the pages that only want entries", async () => {
+    assert.deepEqual(await withBrokenStorage(() => getActivity()), []);
   });
 });
