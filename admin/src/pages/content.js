@@ -1,3 +1,4 @@
+import { mergeLocalizedRecord } from "../../../shared/localized-items.js";
 import { showToast } from "../components/toast.js";
 import { BASE_LOCALE, TRANSLATION_LOCALE, localeHint, localeTabs } from "../components/locale-fields.js";
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
@@ -217,28 +218,11 @@ function draftFromForm(key, form, { translatableOnly }) {
 }
 
 // What the public site will actually render for the chosen locale: an English
-// field that has not been filled in falls back to the Portuguese one.
-function resolvedContent(baseContent, translation, key) {
-  if (!translation) return baseContent;
-  const merged = { ...baseContent };
-  Object.entries(translation).forEach(([name, value]) => {
-    if (name === "items") return;
-    if (String(value ?? "").trim()) merged[name] = value;
-  });
-
-  const repeatable = REPEATABLE[key];
-  if (repeatable && Array.isArray(baseContent.items)) {
-    merged.items = baseContent.items.map((item, index) => {
-      const localized = translation.items?.[index] || {};
-      const next = { ...item };
-      Object.entries(localized).forEach(([name, value]) => {
-        if (name === "position") return;
-        if (String(value ?? "").trim()) next[name] = value;
-      });
-      return next;
-    });
-  }
-  return merged;
+// field that has not been filled in falls back to the Portuguese one. The merge
+// itself is shared with the public renderer so the preview cannot drift from
+// what visitors actually see.
+function resolvedContent(baseContent, translation) {
+  return mergeLocalizedRecord(baseContent, translation);
 }
 
 function previewFor(key, content = {}) {
@@ -392,7 +376,7 @@ export const contentPage = {
       const shown =
         editLocale === BASE_LOCALE
           ? baseContent
-          : resolvedContent(baseContent, sectionDrafts[TRANSLATION_LOCALE], active);
+          : resolvedContent(baseContent, sectionDrafts[TRANSLATION_LOCALE]);
 
       const fallbackNote =
         editLocale === BASE_LOCALE

@@ -1,5 +1,6 @@
 import { fetchSiteContent, fetchSiteSettings, isConfigured, signPaths } from "./supabase-public.js";
 import { applyStaticTranslations, getLocale, subscribeLocaleChange } from "./i18n/index.js";
+import { mergeLocalizedRecord } from "../../shared/localized-items.js";
 
 const STORAGE_PATH = /^(?!https?:|data:|blob:|\/|\.{1,2}\/).+/i;
 let subscribedToLocale = false;
@@ -12,12 +13,12 @@ function text(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+// Scalars merge normally; `items` is merged by position, so a translation that
+// only covers one of four capability cards localizes that card and leaves the
+// rest in pt-BR instead of collapsing the list. Shared with the Admin preview.
 function localizedRecord(row) {
   const locale = getLocale();
-  return {
-    ...(row?.content || {}),
-    ...(row?.translations?.[locale] || {}),
-  };
+  return mergeLocalizedRecord(row?.content, row?.translations?.[locale]);
 }
 
 function localizedSettings(settings = {}) {
