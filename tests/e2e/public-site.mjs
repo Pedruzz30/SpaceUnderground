@@ -28,7 +28,10 @@ function check(ok, label, extra = "") {
 
 if (!RUN_SUPABASE_PUBLIC_E2E || !SUPABASE_URL || !ANON_KEY || !EMAIL || !PASSWORD) {
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  // Explicit pt-BR context: these checks assert the Portuguese default, so they
+  // must not inherit whatever language Playwright's default context uses.
+  const context = await browser.newContext({ locale: "pt-BR", viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
   try {
     await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
     await page.evaluate(() => localStorage.clear());
@@ -47,6 +50,7 @@ if (!RUN_SUPABASE_PUBLIC_E2E || !SUPABASE_URL || !ANON_KEY || !EMAIL || !PASSWOR
     await page.reload({ waitUntil: "domcontentloaded" });
     check((await page.locator("html").getAttribute("lang")) === "en", "reload preserves EN preference");
   } finally {
+    await context.close();
     await browser.close();
   }
 
