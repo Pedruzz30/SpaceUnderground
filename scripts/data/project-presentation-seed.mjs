@@ -1,6 +1,27 @@
+// pt-BR is the editorial base. `translations.en` carries curated English for
+// the editorial fields only -- description, presentation system/label/type and
+// each module's title and caption. Proper names, clients, URLs, tech stack,
+// coordinates, origin, year, accent, status and category are structural and
+// read identically in both languages. `presentation.address` is a technical
+// address built on a brand name, so it is not translated either.
 export const projectPresentationSeed = [
   {
     key: "ink",
+    translations: {
+      en: {
+        description: "A dark editorial experience built around tattoo culture, movement and visual depth.",
+        presentation: {
+          system: "EXPERIENCE SYSTEM / 01",
+          label: "PORTFOLIO",
+          type: "PORTFOLIO WEBSITE",
+        },
+        modules: [
+          ["01", "ART DIRECTION", "MONOCHROME DEPTH"],
+          ["02", "INTERACTION", "FLUID MOTION"],
+          ["03", "EXPERIENCE", "EDITORIAL RHYTHM"],
+        ],
+      },
+    },
     caseNumber: 1,
     name: "INK Tattoo",
     client: "INK TATTOO",
@@ -30,6 +51,21 @@ export const projectPresentationSeed = [
   },
   {
     key: "lucas",
+    translations: {
+      en: {
+        description: "A strategic digital presence built around performance, credibility and conversion.",
+        presentation: {
+          system: "PERFORMANCE SYSTEM / 02",
+          label: "PERFORMANCE",
+          type: "SPORTS NUTRITION WEBSITE",
+        },
+        modules: [
+          ["01", "PERFORMANCE", "SPORTS STRATEGY"],
+          ["02", "COMPOSITION", "BODY GOALS"],
+          ["03", "RECOVERY", "LONGEVITY"],
+        ],
+      },
+    },
     caseNumber: 2,
     name: "Lucas Souza",
     client: "LUCAS SOUZA",
@@ -59,6 +95,21 @@ export const projectPresentationSeed = [
   },
   {
     key: "jarvis",
+    translations: {
+      en: {
+        description: "An intelligent Windows environment combining conversational AI, voice, memory, automation, permission-based security and real-time system control.",
+        presentation: {
+          system: "INTELLIGENCE SYSTEM / 03",
+          label: "AI / AUTOMATION",
+          type: "AI-POWERED DESKTOP APPLICATION",
+        },
+        modules: [
+          ["01", "INTELLIGENCE", "AI + REFLEX LAYER"],
+          ["02", "AUTOMATION", "TOOLS + SYSTEM"],
+          ["03", "SECURITY", "PERMISSIONS + AUTOPILOT"],
+        ],
+      },
+    },
     caseNumber: 3,
     name: "JARVIS AI",
     client: "SPACE UNDERGROUND LABS",
@@ -88,6 +139,21 @@ export const projectPresentationSeed = [
   },
   {
     key: "despensa",
+    translations: {
+      en: {
+        description: "A school inventory management system for kitchen and cleaning supplies, with stock movements, auditing, alerts, spreadsheet syncing and AI-based invoice reading.",
+        presentation: {
+          system: "OPERATIONS SYSTEM / 04",
+          label: "MANAGEMENT / AUTOMATION",
+          type: "WEB MANAGEMENT SYSTEM",
+        },
+        modules: [
+          ["01", "INVENTORY", "KITCHEN & CLEANING"],
+          ["02", "AUTOMATION", "SPREADSHEETS & ALERTS"],
+          ["03", "INTELLIGENCE", "INVOICE READING"],
+        ],
+      },
+    },
     caseNumber: 4,
     name: "Despensa Digital",
     client: "GESTÃO ESCOLAR",
@@ -117,6 +183,21 @@ export const projectPresentationSeed = [
   },
   {
     key: "termo",
+    translations: {
+      en: {
+        description: "A platform for personal trainers to create versioned digital agreements, send invitations, record acceptances and generate receipts with snapshots and SHA-256 hashes.",
+        presentation: {
+          system: "PRODUCT SYSTEM / 05",
+          label: "SAAS / FLOW",
+          type: "WEB PLATFORM / SAAS",
+        },
+        modules: [
+          ["01", "AGREEMENTS", "IMMUTABLE VERSIONS"],
+          ["02", "ACCEPTANCE", "INVITATIONS & PROTOCOL"],
+          ["03", "SECURITY", "RLS & SHA-256"],
+        ],
+      },
+    },
     caseNumber: 5,
     name: "Termo Digital",
     client: "SISTEMA PARA PERSONAL TRAINER",
