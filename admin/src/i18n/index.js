@@ -1,3 +1,4 @@
+import { applyLocaleFormatting } from "../utils/format.js";
 import en from "./locales/en.js";
 import ptBR from "./locales/pt-BR.js";
 
@@ -95,6 +96,10 @@ export function applyStaticTranslations(root = globalThis.document) {
   root.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
     node.setAttribute("placeholder", t(node.dataset.i18nPlaceholder));
   });
+  root.querySelectorAll("[data-status-label]").forEach((node) => {
+    node.textContent = statusLabel(node.dataset.statusLabel);
+  });
+  applyLocaleFormatting(root);
   root.querySelectorAll("[data-locale-switch]").forEach((button) => {
     const active = button.dataset.localeSwitch === currentLocale;
     button.setAttribute("aria-pressed", String(active));
@@ -102,10 +107,31 @@ export function applyStaticTranslations(root = globalThis.document) {
   });
 }
 
+// Pages call this from afterRender() to re-label themselves in place. The
+// handler runs for as long as `anchor` stays in the document, so a page that
+// has been navigated away from stops listening without extra bookkeeping.
+export function onLocaleChange(anchor, handler) {
+  const unsubscribe = subscribeLocaleChange((locale) => {
+    if (!anchor?.isConnected) {
+      unsubscribe();
+      return;
+    }
+    handler(locale);
+    applyStaticTranslations(document);
+  });
+  return unsubscribe;
+}
+
 export function t(key, params = {}) {
   const value = readPath(dictionaries[currentLocale], key) ?? readPath(dictionaries[DEFAULT_LOCALE], key) ?? key;
   if (typeof value === "object") return key;
   return interpolate(value, params);
+}
+
+// pt-BR and en share the same one/other split, so a two-form lookup is enough
+// here. Dictionaries store plurals as `{ one, other }` under the given key.
+export function plural(key, count, params = {}) {
+  return t(`${key}.${count === 1 ? "one" : "other"}`, { count, ...params });
 }
 
 export function statusLabel(value) {
