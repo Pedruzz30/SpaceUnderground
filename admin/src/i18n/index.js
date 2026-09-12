@@ -99,6 +99,9 @@ export function applyStaticTranslations(root = globalThis.document) {
   root.querySelectorAll("[data-status-label]").forEach((node) => {
     node.textContent = statusLabel(node.dataset.statusLabel);
   });
+  root.querySelectorAll("[data-i18n-title]").forEach((node) => {
+    node.setAttribute("title", t(node.dataset.i18nTitle));
+  });
   applyLocaleFormatting(root);
   root.querySelectorAll("[data-locale-switch]").forEach((button) => {
     const active = button.dataset.localeSwitch === currentLocale;

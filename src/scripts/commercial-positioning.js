@@ -40,9 +40,15 @@ function productOptions() {
   }));
 }
 
+// Editorial copy only.
 function localized(row, field) {
   const translated = row?.translations?.[getLocale()]?.[field];
   return translated || row?.[field];
+}
+
+// Structural values, read straight from the record.
+function base(value) {
+  return typeof value === "string" ? value.trim() : value || "";
 }
 
 const scopeLines = (plan) => [
@@ -132,6 +138,9 @@ function hydratePlansSection() {
   if (noteLink) noteLink.textContent = t("commercial.requestProposal");
 }
 
+// Plan names ("Plus", "Pro", "Max"), the numeric range, position, accent and
+// year are structural and identical in both locales. Only editorial copy --
+// scope, description, timeline wording, feature text -- comes from translations.
 function applyPlanRow(row) {
   const key = String(row.slug || "").replace(/^plan-/, "");
   const plan = plans[key];
@@ -145,10 +154,10 @@ function applyPlanRow(row) {
     : plan.included;
 
   Object.assign(plan, {
-    name: localized(row, "name") || plan.name,
+    name: base(row.name) || plan.name,
     monogram: row.monogram || plan.monogram,
     category: localized(row, "category") || plan.category,
-    range: localized(row, "range") || plan.range,
+    range: base(row.range) || plan.range,
     scope: localized(row, "scope") || plan.scope,
     scopeShort: localized(row, "scope_short") || plan.scopeShort,
     status: localized(row, "status") || plan.status,
@@ -160,7 +169,7 @@ function applyPlanRow(row) {
     commercial: {
       ...(plan.commercial || {}),
       category: localized(row, "category") || plan.commercial?.category || plan.category,
-      range: localized(row, "range") || plan.commercial?.range || plan.range,
+      range: base(row.range) || plan.commercial?.range || plan.range,
       scope: localized(row, "scope") || plan.commercial?.scope || plan.scope,
       scopeShort: localized(row, "scope_short") || plan.commercial?.scopeShort || plan.scopeShort,
       status: localized(row, "status") || plan.commercial?.status || plan.status,

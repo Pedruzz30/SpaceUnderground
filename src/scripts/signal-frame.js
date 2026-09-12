@@ -1,4 +1,5 @@
 import { projects, defaultProjectKey } from "./project-registry.js";
+import { t } from "./i18n/index.js";
 
 const LIVE_PREVIEW_SELECTOR = "[data-live-project]";
 const MOBILE_QUERY = "(max-width: 759px)";
@@ -203,6 +204,16 @@ function createLivePreview(frame, mobileMedia) {
   });
 
   const setSource = ({ url, previewUrl: nextPreviewUrl, poster: nextPoster, posterFallback: fallback, title }) => {
+    const resolvedPreview = resolveUrl(nextPreviewUrl || url);
+    // Re-applying the same project -- which is what a locale change does -- must
+    // not tear down a preview that is already loaded. Only the surrounding copy
+    // changes, so the iframe is left exactly as it is.
+    if (resolvedPreview === previewUrl && (nextPoster || "") === posterUrl) {
+      projectUrl = url || "";
+      if (iframe && title) iframe.title = title;
+      return;
+    }
+
     unload();
     projectUrl = url || "";
     previewUrl = resolveUrl(nextPreviewUrl || url);
@@ -356,13 +367,13 @@ function createProjectViewer(frame, preview) {
       // Set when the poster came from Supabase Storage: the bundled artwork
       // stays available as the fallback.
       posterFallback: project.posterFallback,
-      title: `Prévia ao vivo de ${project.name}`,
+      title: t("work.livePreviewOf", { name: project.name }),
     });
 
     accentTargets.forEach((target) => target.style.setProperty("--accent", project.accent || "#c6ff00"));
 
-    write(fields.index, `CASE / ${project.id}`);
-    write(fields.eyebrow, `CLIENTE / ${project.id}`);
+    write(fields.index, t("work.caseIndex", { id: project.id }));
+    write(fields.eyebrow, t("work.clientIndex", { id: project.id }));
     write(fields.client, project.client || "");
     write(fields.category, project.category || "");
     write(fields.description, project.description || "");
@@ -372,16 +383,16 @@ function createProjectViewer(frame, preview) {
     write(fields.origin, project.origin || "");
     write(fields.coordinates, (project.coordinates || []).join("\n"));
     write(fields.name, project.name || "");
-    write(fields.year, `ANO — ${project.year}`);
-    write(fields.specs, `TIPO — ${project.type}\nTECNOLOGIA — ${project.tech}\nSTATUS — ${project.status}`);
+    write(fields.year, t("work.yearValue", { year: project.year }));
+    write(fields.specs, t("work.specs", { type: project.type, tech: project.tech, status: project.status }));
 
-    const openLabel = `Ver ${project.name} (abre em uma nova aba)`;
+    const openLabel = t("work.openNamedTab", { name: project.name });
     fields.links.forEach((link) => {
       link.href = project.url;
       link.setAttribute("aria-label", openLabel);
     });
     fields.open.forEach((button) => {
-      button.setAttribute("aria-label", `Abrir ${project.name} em uma nova aba`);
+      button.setAttribute("aria-label", t("work.openNamed", { name: project.name }));
     });
 
     fields.modules.forEach((button) => {
@@ -395,7 +406,7 @@ function createProjectViewer(frame, preview) {
       if (numberNode) numberNode.textContent = number;
       if (titleNode) titleNode.textContent = title;
       if (captionNode) captionNode.textContent = caption;
-      button.setAttribute("aria-label", `Inspecionar ${title.toLowerCase()}`);
+      button.setAttribute("aria-label", t("work.inspectModule", { title: title.toLowerCase() }));
     });
 
     fields.gallery.forEach((node) => {

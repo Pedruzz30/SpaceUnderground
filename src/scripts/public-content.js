@@ -3,6 +3,10 @@ import { applyStaticTranslations, getLocale, subscribeLocaleChange } from "./i18
 
 const STORAGE_PATH = /^(?!https?:|data:|blob:|\/|\.{1,2}\/).+/i;
 let subscribedToLocale = false;
+// Content rows and settings are fetched once. A locale change re-applies the
+// localized view of the same rows instead of querying Supabase again.
+let lastContentRows = null;
+let lastSettings = null;
 
 function text(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -264,26 +268,33 @@ async function applySettings(settings = {}) {
   }
 }
 
+async function applyContentRows(contentRows, settings) {
+  const content = new Map(contentRows.map((row) => [row.key, localizedRecord(row)]));
+
+  applyHero(content.get("hero"));
+  applyAbout(content.get("about"));
+  applyCapabilities(content.get("capabilities"));
+  applyProcess(content.get("process"));
+  applyContact(content.get("contact"));
+  applyFooter(content.get("footer"));
+  if (settings) await applySettings(localizedSettings(settings));
+  applyStaticTranslations();
+}
+
 export async function initPublicContent() {
   if (!isConfigured()) return;
   if (!subscribedToLocale) {
     subscribedToLocale = true;
     subscribeLocaleChange(() => {
-      initPublicContent();
+      if (lastContentRows) applyContentRows(lastContentRows, lastSettings);
+      else initPublicContent();
     });
   }
   try {
     const [contentRows, settings] = await Promise.all([fetchSiteContent(), fetchSiteSettings()]);
-    const content = new Map(contentRows.map((row) => [row.key, localizedRecord(row)]));
-
-    applyHero(content.get("hero"));
-    applyAbout(content.get("about"));
-    applyCapabilities(content.get("capabilities"));
-    applyProcess(content.get("process"));
-    applyContact(content.get("contact"));
-    applyFooter(content.get("footer"));
-    if (settings) await applySettings(localizedSettings(settings));
-    applyStaticTranslations();
+    lastContentRows = contentRows;
+    lastSettings = settings;
+    await applyContentRows(contentRows, settings);
   } catch (error) {
     console.warn("[content] Supabase content unavailable, keeping build-time copy.", error);
   }

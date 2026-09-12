@@ -79,6 +79,9 @@ export function applyStaticTranslations(root = document) {
   root.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
     node.setAttribute("placeholder", t(node.dataset.i18nPlaceholder));
   });
+  root.querySelectorAll("[data-i18n-title]").forEach((node) => {
+    node.setAttribute("title", t(node.dataset.i18nTitle));
+  });
   root.querySelectorAll("[data-locale-switch]").forEach((button) => {
     const active = button.dataset.localeSwitch === currentLocale;
     button.setAttribute("aria-pressed", String(active));

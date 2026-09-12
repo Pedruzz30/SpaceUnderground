@@ -4,10 +4,15 @@
 import { projects } from "./project-registry.js";
 import { getLocale, subscribeLocaleChange, t } from "./i18n/index.js";
 import { fetchPublishedProjects, isConfigured, signPaths } from "./supabase-public.js";
-import { refreshProjectViewerSlots, showProject } from "./signal-frame.js";
+import { getActiveProjectKey, refreshProjectViewerSlots, showProject } from "./signal-frame.js";
 
 const SOURCE_ATTRIBUTE = "data-projects-source";
 let subscribedToLocale = false;
+// Rows and signed URLs are kept so a locale change can re-render the section
+// without asking Supabase for the same data again, or re-signing storage paths
+// that are still valid.
+let lastRows = null;
+let lastSigned = new Map();
 const PLACEHOLDER_POSTER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900'%3E%3Crect width='1440' height='900' fill='%23050605'/%3E%3Cpath d='M120 450h1200' stroke='%23c6ff00' stroke-opacity='.22'/%3E%3Ccircle cx='720' cy='450' r='120' fill='none' stroke='%23c6ff00' stroke-opacity='.18'/%3E%3C/svg%3E";
 
@@ -16,10 +21,23 @@ const text = (value) => (typeof value === "string" ? value.trim() : "");
 const pad = (value) => String(Number(value) || value || "").padStart(3, "0");
 const keyFor = (row) => `case-${pad(row.case_number)}`;
 
+// Editorial copy only. A project's name, client, URLs, accent, year, tech stack
+// and coordinates are records rather than copy: they read identically in both
+// locales and must never come from `translations`.
 function localized(row, field) {
   const locale = getLocale();
   const translated = row?.translations?.[locale]?.[field];
   return text(translated) || text(row?.[field]);
+}
+
+// Category is a stored enum ("Website", "System", ...). Its presentation is
+// localized through the dictionary; the stored value never changes.
+function categoryLabel(row) {
+  const value = text(row?.category);
+  if (!value) return "";
+  const key = `work.categories.${value.toLowerCase().replace(/\s+/g, "")}`;
+  const label = t(key);
+  return (label === key ? value : label).toUpperCase();
 }
 
 function escapeHtml(value) {
@@ -44,10 +62,13 @@ function clearRegistry() {
   });
 }
 
+// Status is a stored enum too; only its label follows the locale.
 function normalizeStatus(row) {
   const status = text(row.status);
   if (!status) return "";
-  return status.toUpperCase() === "LIVE" ? t("work.statusLive") : status.toUpperCase();
+  const key = `work.statuses.${status.toLowerCase().replace(/\s+/g, "")}`;
+  const label = t(key);
+  return (label === key ? status : label).toUpperCase();
 }
 
 function projectFromRow(row, signed) {
@@ -82,9 +103,9 @@ function projectFromRow(row, signed) {
     key,
     {
       id: pad(row.case_number),
-      name: localized(row, "name"),
+      name: text(row.name),
       client: text(row.client || row.name).toUpperCase(),
-      category: localized(row, "category").toUpperCase(),
+      category: categoryLabel(row),
       description: localized(row, "description"),
       url: text(row.project_url),
       previewUrl: text(row.preview_url || row.project_url),
@@ -93,7 +114,7 @@ function projectFromRow(row, signed) {
       system: localized(row, "presentation_system"),
       label: localized(row, "presentation_label"),
       address: localized(row, "presentation_address"),
-      type: (localized(row, "presentation_type") || localized(row, "category")).toUpperCase(),
+      type: (localized(row, "presentation_type").toUpperCase() || categoryLabel(row)),
       tech: Array.isArray(row.tech_stack) ? row.tech_stack.join(" / ").toUpperCase() : "",
       status: normalizeStatus(row),
       year: row.year ? String(row.year) : "",
@@ -131,8 +152,11 @@ function indexRow(key, project, active) {
   `;
 }
 
-function renderNavigation(entries) {
-  const activeKey = entries[0]?.[0] || "";
+function renderNavigation(entries, preferredKey = "") {
+  // Keeps whichever project the visitor was looking at; only falls back to the
+  // first one when that project is no longer published.
+  const hasPreferred = preferredKey && entries.some(([key]) => key === preferredKey);
+  const activeKey = hasPreferred ? preferredKey : entries[0]?.[0] || "";
   const rail = document.querySelector(".signal-ui__rail-track");
   const index = document.querySelector(".case-index__list");
   const indexHead = document.querySelector(".case-index__head span:first-child");
@@ -169,11 +193,35 @@ function renderUnavailable(message = t("work.unavailable")) {
   if (specs) specs.textContent = t("work.statusUnavailable");
 }
 
+// Renders the section from rows already in hand. Pure presentation: no network
+// calls, so it is safe to replay on every locale change.
+function renderFromRows(rows, signed, { preferredKey = "" } = {}) {
+  clearRegistry();
+
+  const entries = rows.map((row) => projectFromRow(row, signed));
+  entries.forEach(([key, project]) => {
+    projects[key] = project;
+  });
+
+  if (!entries.length) {
+    renderUnavailable(t("work.empty"));
+    markSection("empty");
+    return;
+  }
+
+  const activeKey = renderNavigation(entries, preferredKey);
+  markSection("supabase");
+  showProject(activeKey);
+}
+
 export async function initPublicProjects() {
   if (!subscribedToLocale) {
     subscribedToLocale = true;
     subscribeLocaleChange(() => {
-      initPublicProjects();
+      // Re-render the localized copy over the cached rows, keeping the project
+      // the visitor had open and leaving a loaded preview iframe alone.
+      if (lastRows) renderFromRows(lastRows, lastSigned, { preferredKey: getActiveProjectKey() });
+      else initPublicProjects();
     });
   }
   if (!isConfigured()) {
@@ -184,7 +232,6 @@ export async function initPublicProjects() {
 
   try {
     const rows = await fetchPublishedProjects();
-    clearRegistry();
 
     const paths = [];
     rows.forEach((row) => {
@@ -197,20 +244,9 @@ export async function initPublicProjects() {
     let signed = new Map();
     if (paths.length) signed = await signPaths(paths);
 
-    const entries = rows.map((row) => projectFromRow(row, signed));
-    entries.forEach(([key, project]) => {
-      projects[key] = project;
-    });
-
-    if (!entries.length) {
-      renderUnavailable(t("work.empty"));
-      markSection("empty");
-      return;
-    }
-
-    const activeKey = renderNavigation(entries);
-    markSection("supabase");
-    showProject(activeKey);
+    lastRows = rows;
+    lastSigned = signed;
+    renderFromRows(rows, signed, { preferredKey: getActiveProjectKey() });
   } catch (error) {
     renderUnavailable();
     markSection("unavailable");
