@@ -17,20 +17,20 @@ export function topbar({ title, breadcrumb, session }) {
       <button class="topbar__menu" type="button" data-menu-toggle aria-controls="admin-sidebar" aria-expanded="false">
         <span></span>
         <span></span>
-        <span class="visually-hidden">${t("shell.openMenu")}</span>
+        <span class="visually-hidden" data-i18n="shell.openMenu">${t("shell.openMenu")}</span>
       </button>
       <div>
-        <p>${escapeHtml(breadcrumb)}</p>
-        <h1>${escapeHtml(title)}</h1>
+        <p data-page-breadcrumb>${escapeHtml(breadcrumb)}</p>
+        <h1 data-page-title>${escapeHtml(title)}</h1>
       </div>
       <div class="topbar__account">
         ${localeSwitcher()}
-        <div class="topbar__user" aria-label="${t("shell.authenticatedAdministrator")}">
+        <div class="topbar__user" aria-label="${t("shell.authenticatedAdministrator")}" data-i18n-aria-label="shell.authenticatedAdministrator">
           <span aria-hidden="true"></span>
           <strong>${escapeHtml(accountLabel)}</strong>
-          <small>${session?.isAdmin ? t("common.owner").toUpperCase() : t("common.session").toUpperCase()}</small>
+          <small data-i18n="${session?.isAdmin ? "common.owner" : "common.session"}">${session?.isAdmin ? t("common.owner").toUpperCase() : t("common.session").toUpperCase()}</small>
         </div>
-        <button class="button topbar__logout" type="button" data-logout>${t("common.logout")}</button>
+        <button class="button topbar__logout" type="button" data-logout data-i18n="common.logout">${t("common.logout")}</button>
       </div>
     </header>
   `;

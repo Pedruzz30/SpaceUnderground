@@ -20,11 +20,10 @@ import {
   uploadProjectImage,
 } from "../services/storage-service.js";
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
+import { applyStaticTranslations, subscribeLocaleChange, t, statusLabel } from "../i18n/index.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
 const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/avif,image/gif";
-
-const EDITORIAL_LABELS = { DRAFT: "Draft", PUBLISHED: "Published", ARCHIVED: "Archived" };
 
 const DIACRITIC_MARKS = new RegExp(`[${String.fromCharCode(0x0300)}-${String.fromCharCode(0x036f)}]`, "g");
 
@@ -62,49 +61,55 @@ function formatDate(iso) {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return date.toLocaleString(document.documentElement.lang || undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function validate(values) {
   const errors = {};
-  if (!values.name.trim()) errors.name = "Project name is required.";
-  if (!values.slug.trim()) errors.slug = "Slug is required.";
-  if (!CATEGORIES.includes(values.category)) errors.category = "Select a category.";
+  if (!values.name.trim()) errors.name = t("projectEditor.validation.nameRequired");
+  if (!values.slug.trim()) errors.slug = t("projectEditor.validation.slugRequired");
+  if (!CATEGORIES.includes(values.category)) errors.category = t("projectEditor.validation.categoryRequired");
 
   const year = Number(values.year);
-  if (!values.year || Number.isNaN(year) || year < 1990 || year > 2100) errors.year = "Enter a valid year.";
-  if (!PROJECT_STATUSES.includes(values.status)) errors.status = "Select a valid project status.";
-  if (!EDITORIAL_STATUSES.includes(values.editorialStatus)) errors.editorialStatus = "Select a valid editorial status.";
-  if (!isValidUrl(values.projectUrl)) errors.projectUrl = "Enter a valid URL.";
-  if (!isValidUrl(values.previewUrl)) errors.previewUrl = "Enter a valid URL.";
-  if (values.accent && !isValidHex(values.accent)) errors.accent = "Enter a valid hex color (eg. #baff00).";
+  if (!values.year || Number.isNaN(year) || year < 1990 || year > 2100) errors.year = t("projectEditor.validation.yearValid");
+  if (!PROJECT_STATUSES.includes(values.status)) errors.status = t("projectEditor.validation.statusValid");
+  if (!EDITORIAL_STATUSES.includes(values.editorialStatus)) errors.editorialStatus = t("projectEditor.validation.editorialStatusValid");
+  if (!isValidUrl(values.projectUrl)) errors.projectUrl = t("projectEditor.validation.urlValid");
+  if (!isValidUrl(values.previewUrl)) errors.previewUrl = t("projectEditor.validation.urlValid");
+  if (values.accent && !isValidHex(values.accent)) errors.accent = t("projectEditor.validation.hexValid");
   const untitledModule = (values.modules || []).findIndex((module) => !module.title.trim());
-  if (untitledModule >= 0) errors[`module-title-${untitledModule}`] = "Module title is required.";
+  if (untitledModule >= 0) errors[`module-title-${untitledModule}`] = t("projectEditor.validation.moduleTitleRequired");
 
   return errors;
 }
 
-function fieldMarkup({ label, name, value = "", type = "text", attrs = "", hint = "" }) {
+function fieldMarkup({ label, labelKey, name, value = "", type = "text", attrs = "", hint = "", hintKey = "" }) {
   return `
     <div class="field" data-field="${name}">
-      <label for="field-${name}">${escapeHtml(label)}</label>
+      <label for="field-${name}"${labelKey ? ` data-i18n="${labelKey}"` : ""}>${escapeHtml(labelKey ? t(labelKey) : label)}</label>
       <input id="field-${name}" name="${name}" type="${type}" value="${escapeAttribute(value)}" ${attrs}>
-      ${hint ? `<p class="field-hint">${escapeHtml(hint)}</p>` : ""}
+      ${hint || hintKey ? `<p class="field-hint"${hintKey ? ` data-i18n="${hintKey}"` : ""}>${escapeHtml(hintKey ? t(hintKey) : hint)}</p>` : ""}
       <p class="field-error" id="field-${name}-error" hidden></p>
     </div>
   `;
 }
 
-function selectMarkup({ label, name, value, options }) {
+function selectMarkup({ labelKey, name, value, options }) {
   return `
     <div class="field" data-field="${name}">
-      <label for="field-${name}">${escapeHtml(label)}</label>
+      <label for="field-${name}" data-i18n="${labelKey}">${escapeHtml(t(labelKey))}</label>
       <select id="field-${name}" name="${name}">
-        ${options.map((option) => `<option value="${escapeAttribute(option)}" ${option === value ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+        ${options.map((option) => `<option value="${escapeAttribute(option)}" ${option === value ? "selected" : ""}>${escapeHtml(statusLabel(option))}</option>`).join("")}
       </select>
       <p class="field-error" id="field-${name}-error" hidden></p>
     </div>
   `;
+}
+
+function updateSelectLabels(select) {
+  [...select.options].forEach((option) => {
+    option.textContent = statusLabel(option.value);
+  });
 }
 
 function blankProject(caseNumber) {
@@ -148,20 +153,20 @@ function moduleMarkup(module, index, total) {
     <article class="module-card" data-module-index="${index}">
       <header class="module-card__head">
         <div>
-          <span>MODULE ${String(index + 1).padStart(2, "0")}</span>
-          <strong>${escapeHtml(module.title || "Untitled module")}</strong>
+          <span>${escapeHtml(t("projectEditor.moduleIndex", { index: String(index + 1).padStart(2, "0") }))}</span>
+          <strong>${escapeHtml(module.title || t("projectEditor.untitledModule"))}</strong>
         </div>
         <div class="module-card__actions">
-          <button type="button" class="button" data-module-up="${index}" ${index === 0 ? "disabled" : ""}>Move Up</button>
-          <button type="button" class="button" data-module-down="${index}" ${index === total - 1 ? "disabled" : ""}>Move Down</button>
-          <button type="button" class="button button--danger" data-module-remove="${index}">Remove Module</button>
+          <button type="button" class="button" data-module-up="${index}" ${index === 0 ? "disabled" : ""}>${t("projectEditor.moveUp")}</button>
+          <button type="button" class="button" data-module-down="${index}" ${index === total - 1 ? "disabled" : ""}>${t("projectEditor.moveDown")}</button>
+          <button type="button" class="button button--danger" data-module-remove="${index}">${t("projectEditor.removeModule")}</button>
         </div>
       </header>
       <div class="form-grid">
-        ${fieldMarkup({ label: "Code", name: `module-code-${index}`, value: module.code, attrs: `data-module-field="code" data-module-index="${index}"` })}
-        ${fieldMarkup({ label: "Title", name: `module-title-${index}`, value: module.title, attrs: `data-module-field="title" data-module-index="${index}"` })}
+        ${fieldMarkup({ labelKey: "projectEditor.code", name: `module-code-${index}`, value: module.code, attrs: `data-module-field="code" data-module-index="${index}"` })}
+        ${fieldMarkup({ labelKey: "projectEditor.titleField", name: `module-title-${index}`, value: module.title, attrs: `data-module-field="title" data-module-index="${index}"` })}
         <div class="field field--wide">
-          <label for="field-module-description-${index}">Description</label>
+          <label for="field-module-description-${index}" data-i18n="projectEditor.description"> ${t("projectEditor.description")}</label>
           <textarea id="field-module-description-${index}" rows="3" data-module-field="description" data-module-index="${index}">${escapeHtml(module.description)}</textarea>
         </div>
       </div>
@@ -177,67 +182,67 @@ function renderEditor(project, isCreate) {
   return `
     <section class="page-heading page-heading--split">
       <div>
-        <span>${isCreate ? "CONTENT / PROJECTS / NEW" : `CONTENT / PROJECTS / CASE ${escapeHtml(project.caseNumber)}`}</span>
-        <h2>Project Editor</h2>
+        <span data-editor-breadcrumb>${isCreate ? t("projectEditor.newBreadcrumb") : t("projectEditor.caseBreadcrumb", { caseNumber: project.caseNumber })}</span>
+        <h2 data-i18n="projectEditor.heading">${t("projectEditor.heading")}</h2>
         <div class="editor-identity">
-          <strong>CASE ${escapeHtml(project.caseNumber)}</strong>
-          <strong class="editor-identity__name">${escapeHtml(project.name || "Untitled project")}</strong>
-          <span class="editor-identity__meta">${escapeHtml(project.category)} / ${escapeHtml(project.status)}</span>
+          <strong>${escapeHtml(t("projectEditor.caseLabel", { caseNumber: project.caseNumber }))}</strong>
+          <strong class="editor-identity__name">${escapeHtml(project.name || t("projects.untitled"))}</strong>
+          <span class="editor-identity__meta" data-editor-meta data-category="${escapeAttribute(project.category)}" data-status="${escapeAttribute(project.status)}">${escapeHtml(statusLabel(project.category))} / ${escapeHtml(statusLabel(project.status))}</span>
           ${badge(project.editorialStatus, badgeType(project.editorialStatus))}
-          <span class="save-state is-saved" data-save-state ${isCreate ? "hidden" : ""}>SAVED</span>
+          <span class="save-state is-saved" data-save-state ${isCreate ? "hidden" : ""}>${t("common.saved").toUpperCase()}</span>
         </div>
       </div>
       <div class="heading-actions">
-        <a class="button" href="#/projects">All projects</a>
+        <a class="button" href="#/projects" data-i18n="projectEditor.allProjects">${t("projectEditor.allProjects")}</a>
       </div>
     </section>
 
     <form class="editor-form" data-project-editor data-project-id="${escapeAttribute(project.id || "")}" data-mode="${isCreate ? "create" : "edit"}" novalidate>
       <div class="editor-toolbar">
         ${isCreate
-          ? `<button type="submit" class="button button--primary" data-editor-action data-action-create>Create Project</button>`
+          ? `<button type="submit" class="button button--primary" data-editor-action data-action-create>${t("projectEditor.createProject")}</button>`
           : `
-            <button type="button" class="button" data-editor-action data-action-preview>Preview</button>
-            <button type="submit" class="button" data-editor-action data-action-save>Save Changes</button>
-            <button type="button" class="button button--primary" data-editor-action data-action-publish>Publish Changes</button>
+            <button type="button" class="button" data-editor-action data-action-preview>${t("projectEditor.preview")}</button>
+            <button type="submit" class="button" data-editor-action data-action-save>${t("projectEditor.saveChanges")}</button>
+            <button type="button" class="button button--primary" data-editor-action data-action-publish>${t("projectEditor.publishChanges")}</button>
           `}
       </div>
 
-      <div class="tabs" role="tablist" aria-label="Project editor sections">
-        <button type="button" role="tab" id="tab-general" aria-selected="true" aria-controls="panel-general" data-tab="general" tabindex="0">General</button>
-        <button type="button" role="tab" id="tab-presentation" aria-selected="false" aria-controls="panel-presentation" data-tab="presentation" tabindex="-1">Presentation</button>
-        <button type="button" role="tab" id="tab-media" aria-selected="false" aria-controls="panel-media" data-tab="media" tabindex="-1">Media</button>
-        <button type="button" role="tab" id="tab-publishing" aria-selected="false" aria-controls="panel-publishing" data-tab="publishing" tabindex="-1">Publishing</button>
+      <div class="tabs" role="tablist" aria-label="${t("projectEditor.sections")}" data-i18n-aria-label="projectEditor.sections">
+        <button type="button" role="tab" id="tab-general" aria-selected="true" aria-controls="panel-general" data-tab="general" tabindex="0" data-i18n="projectEditor.general">${t("projectEditor.general")}</button>
+        <button type="button" role="tab" id="tab-presentation" aria-selected="false" aria-controls="panel-presentation" data-tab="presentation" tabindex="-1" data-i18n="projectEditor.presentation">${t("projectEditor.presentation")}</button>
+        <button type="button" role="tab" id="tab-media" aria-selected="false" aria-controls="panel-media" data-tab="media" tabindex="-1" data-i18n="projectEditor.media">${t("projectEditor.media")}</button>
+        <button type="button" role="tab" id="tab-publishing" aria-selected="false" aria-controls="panel-publishing" data-tab="publishing" tabindex="-1" data-i18n="projectEditor.publishing">${t("projectEditor.publishing")}</button>
       </div>
 
       <div class="tab-panel" id="panel-general" role="tabpanel" aria-labelledby="tab-general">
         <div class="form-grid">
-          ${fieldMarkup({ label: "Case Number", name: "caseNumber", value: project.caseNumber, attrs: 'readonly aria-readonly="true"', hint: "Assigned by the admin system." })}
-          ${fieldMarkup({ label: "Project Name", name: "name", value: project.name, attrs: "required" })}
-          ${fieldMarkup({ label: "Slug", name: "slug", value: project.slug, attrs: "required", hint: "URL-safe identifier generated from the project name until edited." })}
-          ${fieldMarkup({ label: "Client", name: "client", value: project.client })}
-          ${selectMarkup({ label: "Category", name: "category", value: project.category, options: CATEGORIES })}
-          ${selectMarkup({ label: "Project Status", name: "status", value: project.status, options: PROJECT_STATUSES })}
-          ${fieldMarkup({ label: "Year", name: "year", value: project.year, type: "number", attrs: 'min="1990" max="2100"' })}
+          ${fieldMarkup({ labelKey: "projectEditor.caseNumber", name: "caseNumber", value: project.caseNumber, attrs: 'readonly aria-readonly="true"', hintKey: "projectEditor.caseNumberHint" })}
+          ${fieldMarkup({ labelKey: "projectEditor.projectName", name: "name", value: project.name, attrs: "required" })}
+          ${fieldMarkup({ labelKey: "projectEditor.slug", name: "slug", value: project.slug, attrs: "required", hintKey: "projectEditor.slugHint" })}
+          ${fieldMarkup({ labelKey: "common.client", name: "client", value: project.client })}
+          ${selectMarkup({ labelKey: "common.category", name: "category", value: project.category, options: CATEGORIES })}
+          ${selectMarkup({ labelKey: "projectEditor.projectStatus", name: "status", value: project.status, options: PROJECT_STATUSES })}
+          ${fieldMarkup({ labelKey: "projectEditor.year", name: "year", value: project.year, type: "number", attrs: 'min="1990" max="2100"' })}
           <div class="field" data-field="accent">
-            <label for="field-accent">Accent</label>
+            <label for="field-accent" data-i18n="projectEditor.accent">${t("projectEditor.accent")}</label>
             <div class="accent-field">
-              <input type="color" value="${escapeAttribute(normalizeHexForPicker(accentValue))}" data-accent-picker aria-label="Pick accent color">
+              <input type="color" value="${escapeAttribute(normalizeHexForPicker(accentValue))}" data-accent-picker aria-label="${t("projectEditor.pickAccent")}" data-i18n-aria-label="projectEditor.pickAccent">
               <input id="field-accent" name="accent" type="text" value="${escapeAttribute(accentValue)}" data-accent-text>
             </div>
             <p class="field-error" id="field-accent-error" hidden></p>
           </div>
           <div class="field field--wide" data-field="description">
-            <label for="field-description">Description</label>
+            <label for="field-description" data-i18n="projectEditor.description">${t("projectEditor.description")}</label>
             <textarea id="field-description" name="description" rows="5">${escapeHtml(project.description)}</textarea>
           </div>
           <div class="field field--wide" data-field="techStack">
-            <span class="field-label" id="tech-stack-label">Tech Stack</span>
+            <span class="field-label" id="tech-stack-label" data-i18n="projectEditor.techStack">${t("projectEditor.techStack")}</span>
             <div class="chip-field">
               <div class="chip-list" data-tech-list aria-labelledby="tech-stack-label"></div>
               <div class="chip-input-row">
-                <input type="text" data-tech-input placeholder="Add technology" aria-label="Add technology">
-                <button type="button" class="button" data-tech-add>+ Add Technology</button>
+                <input type="text" data-tech-input placeholder="${t("projectEditor.addTechnology")}" aria-label="${t("projectEditor.addTechnology")}" data-i18n-placeholder="projectEditor.addTechnology" data-i18n-aria-label="projectEditor.addTechnology">
+                <button type="button" class="button" data-tech-add>${t("projectEditor.addTechnologyButton")}</button>
               </div>
             </div>
           </div>
@@ -246,22 +251,22 @@ function renderEditor(project, isCreate) {
 
       <div class="tab-panel" id="panel-presentation" role="tabpanel" aria-labelledby="tab-presentation" hidden>
         <div class="form-grid">
-          ${fieldMarkup({ label: "System Label", name: "presentationSystem", value: presentation.system || "", hint: "Example: SISTEMA DE INTELIGÊNCIA / 03" })}
-          ${fieldMarkup({ label: "Viewer Label", name: "presentationLabel", value: presentation.label || "", hint: "Example: IA / AUTOMAÇÃO" })}
-          ${fieldMarkup({ label: "Address", name: "presentationAddress", value: presentation.address || "", hint: "Example: JARVIS AI / PROTÓTIPO" })}
-          ${fieldMarkup({ label: "Type", name: "presentationType", value: presentation.type || "", hint: "Example: APLICAÇÃO DESKTOP COM IA" })}
-          ${fieldMarkup({ label: "Origin", name: "presentationOrigin", value: presentation.origin || "", hint: "Example: RJ / BR" })}
-          ${fieldMarkup({ label: "Latitude Display", name: "presentationLatitude", value: coordinates[0] || "", hint: "Display text only, not real geolocation." })}
-          ${fieldMarkup({ label: "Longitude Display", name: "presentationLongitude", value: coordinates[1] || "", hint: "Display text only, not real geolocation." })}
+          ${fieldMarkup({ labelKey: "projectEditor.systemLabel", name: "presentationSystem", value: presentation.system || "", hintKey: "projectEditor.systemLabelHint" })}
+          ${fieldMarkup({ labelKey: "projectEditor.viewerLabel", name: "presentationLabel", value: presentation.label || "", hintKey: "projectEditor.viewerLabelHint" })}
+          ${fieldMarkup({ labelKey: "projectEditor.address", name: "presentationAddress", value: presentation.address || "", hintKey: "projectEditor.addressHint" })}
+          ${fieldMarkup({ labelKey: "projectEditor.type", name: "presentationType", value: presentation.type || "", hintKey: "projectEditor.typeHint" })}
+          ${fieldMarkup({ labelKey: "projectEditor.origin", name: "presentationOrigin", value: presentation.origin || "", hintKey: "projectEditor.originHint" })}
+          ${fieldMarkup({ labelKey: "projectEditor.latitude", name: "presentationLatitude", value: coordinates[0] || "", hintKey: "projectEditor.latitudeHint" })}
+          ${fieldMarkup({ labelKey: "projectEditor.longitude", name: "presentationLongitude", value: coordinates[1] || "", hintKey: "projectEditor.latitudeHint" })}
         </div>
 
         <section class="module-builder" aria-labelledby="modules-title">
           <div class="module-builder__head">
             <div>
-              <span class="field-label">Modules</span>
-              <h3 id="modules-title">Project viewer modules</h3>
+              <span class="field-label" data-i18n="projectEditor.modules">${t("projectEditor.modules")}</span>
+              <h3 id="modules-title" data-i18n="projectEditor.viewerModules">${t("projectEditor.viewerModules")}</h3>
             </div>
-            <button type="button" class="button" data-module-add>+ Add Module</button>
+            <button type="button" class="button" data-module-add>${t("projectEditor.addModule")}</button>
           </div>
           <div class="module-list" data-module-list></div>
         </section>
@@ -269,29 +274,29 @@ function renderEditor(project, isCreate) {
 
       <div class="tab-panel" id="panel-media" role="tabpanel" aria-labelledby="tab-media" hidden>
         <div class="media-block">
-          <span class="field-label">Project Poster</span>
+          <span class="field-label" data-i18n="projectEditor.projectPoster">${t("projectEditor.projectPoster")}</span>
           <div class="media-preview">
-            <img data-poster-preview src="${escapeAttribute(project.posterDisplayUrl || "")}" alt="Poster preview for ${escapeAttribute(project.name || "project")}" ${project.posterDisplayUrl ? "" : "hidden"}>
-            <p class="media-preview__empty" data-poster-empty ${project.posterDisplayUrl ? "hidden" : ""}>No poster set.</p>
+            <img data-poster-preview src="${escapeAttribute(project.posterDisplayUrl || "")}" alt="${escapeAttribute(t("projectEditor.posterPreviewAlt", { name: project.name || t("projectEditor.project") }))}" ${project.posterDisplayUrl ? "" : "hidden"}>
+            <p class="media-preview__empty" data-poster-empty ${project.posterDisplayUrl ? "hidden" : ""}>${t("projectEditor.noPoster")}</p>
           </div>
-          <p class="media-meta">${project.poster ? `Path: ${escapeHtml(project.poster)}` : "No storage path available."}</p>
+          <p class="media-meta">${project.poster ? `${t("projectEditor.path")}: ${escapeHtml(project.poster)}` : t("projectEditor.noStoragePath")}</p>
           <div class="media-actions">
-            <button type="button" class="button" data-editor-action data-replace-poster ${isCreate ? "disabled" : ""}>Replace Image</button>
-            <button type="button" class="button button--danger" data-editor-action data-remove-poster ${project.poster ? "" : "hidden"}>Remove Poster</button>
+            <button type="button" class="button" data-editor-action data-replace-poster ${isCreate ? "disabled" : ""}>${t("projectEditor.replaceImage")}</button>
+            <button type="button" class="button button--danger" data-editor-action data-remove-poster ${project.poster ? "" : "hidden"}>${t("projectEditor.removePoster")}</button>
             <input type="file" accept="${IMAGE_ACCEPT}" data-poster-file hidden>
           </div>
-          ${isCreate ? '<p class="field-hint">Save the project first to upload images.</p>' : ""}
+          ${isCreate ? `<p class="field-hint">${t("projectEditor.saveBeforeUpload")}</p>` : ""}
         </div>
 
         <div class="form-grid">
-          ${fieldMarkup({ label: "Project URL", name: "projectUrl", value: project.projectUrl, type: "url" })}
-          ${fieldMarkup({ label: "Preview URL", name: "previewUrl", value: project.previewUrl, type: "url" })}
+          ${fieldMarkup({ labelKey: "projectEditor.projectUrl", name: "projectUrl", value: project.projectUrl, type: "url" })}
+          ${fieldMarkup({ labelKey: "projectEditor.previewUrl", name: "previewUrl", value: project.previewUrl, type: "url" })}
         </div>
 
         <div class="media-block">
-          <span class="field-label">Gallery</span>
+          <span class="field-label" data-i18n="projectEditor.gallery">${t("projectEditor.gallery")}</span>
           <div class="gallery-grid" data-gallery></div>
-          <button type="button" class="button" data-editor-action data-gallery-add ${isCreate ? "disabled" : ""}>+ Add Image</button>
+          <button type="button" class="button" data-editor-action data-gallery-add ${isCreate ? "disabled" : ""}>${t("projectEditor.addImage")}</button>
           <input type="file" accept="${IMAGE_ACCEPT}" data-gallery-file hidden>
         </div>
       </div>
@@ -299,30 +304,30 @@ function renderEditor(project, isCreate) {
       <div class="tab-panel" id="panel-publishing" role="tabpanel" aria-labelledby="tab-publishing" hidden>
         <div class="form-grid">
           <fieldset class="field field--wide" data-field="editorialStatus">
-            <legend>Editorial Status</legend>
+            <legend data-i18n="projectEditor.editorialStatus">${t("projectEditor.editorialStatus")}</legend>
             <div class="checks">
               ${EDITORIAL_STATUSES.map((status) => `
                 <label>
                   <input type="radio" name="editorialStatus" value="${status}" ${project.editorialStatus === status ? "checked" : ""}>
-                  ${EDITORIAL_LABELS[status]}
+                  <span data-status-label="${escapeAttribute(status)}">${statusLabel(status)}</span>
                 </label>
               `).join("")}
             </div>
           </fieldset>
 
           <fieldset class="field field--wide">
-            <legend>Visibility</legend>
+            <legend data-i18n="common.visibility">${t("common.visibility")}</legend>
             <div class="checks">
-              <label><input type="checkbox" name="visible" ${project.visible ? "checked" : ""}> Show in portfolio</label>
-              <label><input type="checkbox" name="featured" ${project.featured ? "checked" : ""}> Featured project</label>
+              <label><input type="checkbox" name="visible" ${project.visible ? "checked" : ""}> <span data-i18n="projectEditor.showInPortfolio">${t("projectEditor.showInPortfolio")}</span></label>
+              <label><input type="checkbox" name="featured" ${project.featured ? "checked" : ""}> <span data-i18n="projectEditor.featuredProject">${t("projectEditor.featuredProject")}</span></label>
             </div>
           </fieldset>
         </div>
 
         <div class="meta-grid">
-          <div><span>Created</span><strong>${formatDate(project.createdAt)}</strong></div>
-          <div><span>Last modified</span><strong>${formatDate(project.updatedAt)}</strong></div>
-          <div><span>Published</span><strong>${formatDate(project.publishedAt)}</strong></div>
+          <div><span data-i18n="projectEditor.created">${t("projectEditor.created")}</span><strong>${formatDate(project.createdAt)}</strong></div>
+          <div><span data-i18n="projectEditor.lastModified">${t("projectEditor.lastModified")}</span><strong>${formatDate(project.updatedAt)}</strong></div>
+          <div><span data-i18n="common.published">${t("common.published")}</span><strong>${formatDate(project.publishedAt)}</strong></div>
         </div>
       </div>
     </form>
@@ -331,14 +336,14 @@ function renderEditor(project, isCreate) {
       <section class="panel danger-zone">
         <header class="panel__head">
           <div>
-            <span>DANGER ZONE</span>
-            <h3>Irreversible actions</h3>
+            <span data-i18n="projectEditor.dangerZone">${t("projectEditor.dangerZone")}</span>
+            <h3 data-i18n="projectEditor.irreversibleActions">${t("projectEditor.irreversibleActions")}</h3>
           </div>
         </header>
-        <p>These actions take effect immediately and cannot be undone from the UI.</p>
+        <p data-i18n="projectEditor.dangerCopy">${t("projectEditor.dangerCopy")}</p>
         <div class="danger-zone__actions">
-          <button type="button" class="button" data-editor-action data-action-archive>Archive Project</button>
-          <button type="button" class="button button--danger" data-editor-action data-action-delete>Delete Project</button>
+          <button type="button" class="button" data-editor-action data-action-archive>${t("projectEditor.archiveProject")}</button>
+          <button type="button" class="button button--danger" data-editor-action data-action-delete>${t("projectEditor.deleteProject")}</button>
         </div>
       </section>
     `}
@@ -487,7 +492,7 @@ function mount(project, isCreate) {
     // In create mode the editorial badge already reads DRAFT; only surface
     // the save-state pill once there is something that could be lost.
     stateEl.hidden = isCreate && !isDirty;
-    stateEl.textContent = isDirty ? "UNSAVED CHANGES" : "SAVED";
+    stateEl.textContent = isDirty ? t("shell.unsavedChanges") : t("common.saved").toUpperCase();
     stateEl.classList.toggle("is-unsaved", isDirty);
     stateEl.classList.toggle("is-saved", !isDirty);
   }
@@ -513,7 +518,7 @@ function mount(project, isCreate) {
     input?.removeAttribute("aria-invalid");
   }
 
-  function showErrors(errors, toastMessage = "Fix the highlighted fields.") {
+  function showErrors(errors, toastMessage = t("projectEditor.fixHighlighted")) {
     clearErrors();
     let firstInvalid = null;
 
@@ -582,11 +587,11 @@ function mount(project, isCreate) {
       ? techStack
           .map(
             (tech, index) => `
-              <span class="chip">${escapeHtml(tech)}<button type="button" data-remove-tech="${index}" aria-label="Remove ${escapeAttribute(tech)}">&times;</button></span>
+              <span class="chip">${escapeHtml(tech)}<button type="button" data-remove-tech="${index}" aria-label="${escapeAttribute(t("projectEditor.removeTechnology", { tech }))}">&times;</button></span>
             `,
           )
           .join("")
-      : '<p class="empty-inline">No technologies added.</p>';
+      : `<p class="empty-inline">${t("projectEditor.noTechnologies")}</p>`;
 
     list.querySelectorAll("[data-remove-tech]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -638,7 +643,7 @@ function mount(project, isCreate) {
     modules = modules.map(normalizeModule);
     list.innerHTML = modules.length
       ? modules.map((module, index) => moduleMarkup(module, index, modules.length)).join("")
-      : '<p class="empty-inline">No modules yet. Add modules to drive the project viewer.</p>';
+      : `<p class="empty-inline">${t("projectEditor.noModules")}</p>`;
 
     list.querySelectorAll("[data-module-field]").forEach((input) => {
       input.addEventListener("input", () => {
@@ -737,7 +742,7 @@ function mount(project, isCreate) {
     posterFileInput.value = "";
     if (!file) return;
 
-    run(replacePosterBtn, "Uploading...", async () => {
+    run(replacePosterBtn, t("projectEditor.uploading"), async () => {
       try {
         const path = await uploadProjectImage({ projectId: storageOwnerId, kind: "poster", file });
         unsavedUploads.add(path);
@@ -749,10 +754,10 @@ function mount(project, isCreate) {
           entityType: "media",
           entityId: id,
         });
-        showToast("Poster uploaded.");
+        showToast(t("projectEditor.posterUploaded"));
         markDirty();
       } catch (error) {
-        showToast(describeError(error, "Unable to upload the image."));
+        showToast(describeError(error, t("projectEditor.uploadImageError")));
       }
     });
   });
@@ -761,7 +766,7 @@ function mount(project, isCreate) {
     trackDeletion(posterUrl);
     posterUrl = "";
     showPoster("");
-    showToast("Poster removed. Save to confirm.");
+    showToast(t("projectEditor.posterRemoved"));
     markDirty();
   });
 
@@ -777,12 +782,12 @@ function mount(project, isCreate) {
             (item) => `
               <figure class="gallery-item">
                 <img src="${escapeAttribute(item.displayUrl || "")}" alt="${escapeAttribute(item.alt || "")}">
-                <button type="button" data-remove-gallery="${escapeAttribute(item.path)}" aria-label="Remove image">&times;</button>
+                <button type="button" data-remove-gallery="${escapeAttribute(item.path)}" aria-label="${escapeAttribute(t("projectEditor.removeImage"))}">&times;</button>
               </figure>
             `,
           )
           .join("")
-      : '<p class="empty-inline">No gallery images yet. Add images to build the project gallery.</p>';
+      : `<p class="empty-inline">${t("projectEditor.noGalleryImages")}</p>`;
 
     grid.querySelectorAll("[data-remove-gallery]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -803,7 +808,7 @@ function mount(project, isCreate) {
     galleryFileInput.value = "";
     if (!file) return;
 
-    run(galleryAddBtn, "Uploading...", async () => {
+    run(galleryAddBtn, t("projectEditor.uploading"), async () => {
       try {
         const path = await uploadProjectImage({ projectId: storageOwnerId, kind: "gallery", file });
         unsavedUploads.add(path);
@@ -814,10 +819,10 @@ function mount(project, isCreate) {
           entityType: "media",
           entityId: id,
         });
-        showToast("Image added.");
+        showToast(t("projectEditor.imageAdded"));
         markDirty();
       } catch (error) {
-        showToast(describeError(error, "Unable to upload the image."));
+        showToast(describeError(error, t("projectEditor.uploadImageError")));
       }
     });
   });
@@ -825,7 +830,7 @@ function mount(project, isCreate) {
   posterPreview?.addEventListener("error", () => {
     posterPreview.hidden = true;
     if (posterEmpty) {
-      posterEmpty.textContent = "Poster preview unavailable.";
+      posterEmpty.textContent = t("projectEditor.posterPreviewUnavailable");
       posterEmpty.hidden = false;
     }
   });
@@ -857,12 +862,12 @@ function mount(project, isCreate) {
 
     try {
       const created = await createProject({ ...values, caseNumber: form.elements.caseNumber.value });
-      showToast("Project created.");
+      showToast(t("projectEditor.projectCreated"));
       isDirty = false;
       clearNavigationGuard();
       window.location.hash = `#/projects/${created.id}`;
     } catch (error) {
-      reportFailure(error, "Unable to create project.");
+      reportFailure(error, t("projectEditor.createError"));
     }
   }
 
@@ -879,10 +884,10 @@ function mount(project, isCreate) {
       const updated = await updateProject(id, values);
       unsavedUploads.clear();
       await removeProjectImages(pendingDeletions.splice(0));
-      showToast("Changes saved.");
+      showToast(t("projectEditor.changesSaved"));
       await loadEditor(updated.id);
     } catch (error) {
-      reportFailure(error, "Unable to save changes.");
+      reportFailure(error, t("projectEditor.saveError"));
     }
   }
 
@@ -899,96 +904,116 @@ function mount(project, isCreate) {
       const updated = await updateProject(id, values);
       unsavedUploads.clear();
       await removeProjectImages(pendingDeletions.splice(0));
-      showToast("Project published.");
+      showToast(t("projectEditor.projectPublished"));
       await loadEditor(updated.id);
     } catch (error) {
-      reportFailure(error, "Unable to publish project.");
+      reportFailure(error, t("projectEditor.publishError"));
     }
   }
 
   async function handleArchive() {
     const confirmed = await confirmModal({
-      title: `ARCHIVE CASE ${project.caseNumber}?`,
-      body: "<p>The project will be marked as archived and hidden from published filters.</p>",
-      confirmLabel: "Archive Project",
+      title: t("projectEditor.archiveTitle", { caseNumber: project.caseNumber }),
+      body: `<p>${escapeHtml(t("projectEditor.archiveBody"))}</p>`,
+      confirmLabel: t("projectEditor.archiveProject"),
       danger: false,
     });
     if (!confirmed) return;
 
     try {
       await archiveProject(id);
-      showToast("Project archived.");
+      showToast(t("projectEditor.projectArchived"));
       await loadEditor(id);
     } catch (error) {
-      reportFailure(error, "Unable to archive project.");
+      reportFailure(error, t("projectEditor.archiveError"));
     }
   }
 
   async function handleDelete() {
     const confirmed = await confirmModal({
-      title: `DELETE CASE ${project.caseNumber}?`,
-      body: "<p>This permanently removes the project. This cannot be undone.</p>",
-      confirmLabel: "Delete Project",
+      title: t("projectEditor.deleteTitle", { caseNumber: project.caseNumber }),
+      body: `<p>${escapeHtml(t("projectEditor.deleteBody"))}</p>`,
+      confirmLabel: t("projectEditor.deleteProject"),
     });
     if (!confirmed) return;
 
     try {
       await deleteProject(id);
-      showToast("Project deleted.");
+      showToast(t("projectEditor.projectDeleted"));
       isDirty = false;
       clearNavigationGuard();
       window.location.hash = "#/projects";
     } catch (error) {
-      reportFailure(error, "Unable to delete project.");
+      reportFailure(error, t("projectEditor.deleteError"));
     }
   }
 
   function handlePreview() {
     const values = collectFormValues();
     openModal({
-      title: `PREVIEW / CASE ${form.elements.caseNumber.value}`,
+      title: t("projectEditor.previewTitle", { caseNumber: form.elements.caseNumber.value }),
       body: `
         <div class="preview-card">
           ${values.poster ? `<img src="${escapeAttribute(values.poster)}" alt="">` : ""}
-          <h3>${escapeHtml(values.name || "Untitled project")}</h3>
-          <p>${escapeHtml(values.description || "No description yet.")}</p>
+          <h3>${escapeHtml(values.name || t("projects.untitled"))}</h3>
+          <p>${escapeHtml(values.description || t("projectEditor.noDescription"))}</p>
           <dl>
-            <div><dt>Category</dt><dd>${escapeHtml(values.category)}</dd></div>
-            <div><dt>Status</dt><dd>${escapeHtml(values.status)}</dd></div>
-            <div><dt>Tech Stack</dt><dd>${values.techStack.map((tech) => escapeHtml(tech)).join(", ") || "—"}</dd></div>
+            <div><dt>${t("common.category")}</dt><dd>${escapeHtml(statusLabel(values.category))}</dd></div>
+            <div><dt>${t("common.status")}</dt><dd>${escapeHtml(statusLabel(values.status))}</dd></div>
+            <div><dt>${t("projectEditor.techStack")}</dt><dd>${values.techStack.map((tech) => escapeHtml(tech)).join(", ") || "—"}</dd></div>
           </dl>
         </div>
       `,
-      actions: [{ label: "Close" }],
+      actions: [{ label: t("common.close") }],
     });
   }
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     if (isCreate) {
-      run(form.querySelector("[data-action-create]"), "Creating...", handleCreate);
+      run(form.querySelector("[data-action-create]"), t("projectEditor.creating"), handleCreate);
     } else {
-      run(form.querySelector("[data-action-save]"), "Saving...", handleSave);
+      run(form.querySelector("[data-action-save]"), t("projectEditor.saving"), handleSave);
     }
   });
 
   const publishBtn = form.querySelector("[data-action-publish]");
-  publishBtn?.addEventListener("click", () => run(publishBtn, "Publishing...", handlePublish));
+  publishBtn?.addEventListener("click", () => run(publishBtn, t("projectEditor.publishingProgress"), handlePublish));
 
   form.querySelector("[data-action-preview]")?.addEventListener("click", handlePreview);
 
   const archiveBtn = document.querySelector("[data-action-archive]");
-  archiveBtn?.addEventListener("click", () => run(archiveBtn, "Archiving...", handleArchive));
+  archiveBtn?.addEventListener("click", () => run(archiveBtn, t("projectEditor.archiving"), handleArchive));
 
   const deleteBtn = document.querySelector("[data-action-delete]");
-  deleteBtn?.addEventListener("click", () => run(deleteBtn, "Deleting...", handleDelete));
+  deleteBtn?.addEventListener("click", () => run(deleteBtn, t("projectEditor.deleting"), handleDelete));
+
+  const unsubscribe = subscribeLocaleChange(() => {
+    if (!form.isConnected) {
+      unsubscribe();
+      return;
+    }
+    form.querySelectorAll("select").forEach(updateSelectLabels);
+    document.querySelectorAll("[data-status-label]").forEach((node) => {
+      node.textContent = statusLabel(node.dataset.statusLabel);
+    });
+    const meta = document.querySelector("[data-editor-meta]");
+    if (meta) meta.textContent = `${statusLabel(meta.dataset.category)} / ${statusLabel(meta.dataset.status)}`;
+    const breadcrumb = document.querySelector("[data-editor-breadcrumb]");
+    if (breadcrumb) breadcrumb.textContent = isCreate ? t("projectEditor.newBreadcrumb") : t("projectEditor.caseBreadcrumb", { caseNumber: project.caseNumber });
+    renderChips();
+    renderModules();
+    renderGallery();
+    updateSaveState();
+    applyStaticTranslations(document);
+  });
 }
 
 function loadingMarkup() {
   return `
     <section class="empty-state" aria-busy="true">
       <span>PROJECT</span>
-      <h2>Loading project...</h2>
+      <h2>${t("projectEditor.loadingProject")}</h2>
     </section>
   `;
 }
@@ -997,9 +1022,9 @@ function notFoundMarkup(id) {
   return `
     <section class="empty-state">
       <span>CASE / ${escapeHtml(id)}</span>
-      <h2>Project not found</h2>
-      <p>This project is no longer available.</p>
-      <a class="button" href="#/projects">Back to Projects</a>
+      <h2>${t("projectEditor.notFound")}</h2>
+      <p>${t("projectEditor.notFoundBody")}</p>
+      <a class="button" href="#/projects">${t("projectEditor.backToProjects")}</a>
     </section>
   `;
 }
@@ -1009,7 +1034,7 @@ function errorMarkup(message) {
     <section class="empty-state">
       <span>ERROR</span>
       <h2>${escapeHtml(message)}</h2>
-      <button class="button" type="button" data-retry-editor>Try again</button>
+      <button class="button" type="button" data-retry-editor>${t("projectEditor.tryAgain")}</button>
     </section>
   `;
 }
@@ -1053,14 +1078,14 @@ async function loadEditor(id) {
   } catch (error) {
     if (!root.isConnected) return;
     clearNavigationGuard();
-    root.innerHTML = errorMarkup(describeError(error, "Unable to load project."));
+    root.innerHTML = errorMarkup(describeError(error, t("projectEditor.loadError")));
     root.querySelector("[data-retry-editor]")?.addEventListener("click", () => loadEditor(id));
   }
 }
 
 export const projectEditorPage = {
-  title: "Project Editor",
-  breadcrumb: "OPERATIONS / PROJECTS / CASE",
+  title: () => t("projectEditor.title"),
+  breadcrumb: () => t("projectEditor.breadcrumb"),
   render: () => `<div data-editor-root>${loadingMarkup()}</div>`,
   afterRender: ({ id }) => loadEditor(id),
 };

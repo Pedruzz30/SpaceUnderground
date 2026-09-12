@@ -11,6 +11,7 @@ const dictionaries = {
 };
 
 const subscribers = new Set();
+let initialized = false;
 let currentLocale = resolveLocale();
 
 function storage() {
@@ -80,6 +81,27 @@ export function subscribeLocaleChange(callback) {
   return () => subscribers.delete(callback);
 }
 
+export function applyStaticTranslations(root = globalThis.document) {
+  if (!root?.querySelectorAll) return;
+  root.querySelectorAll("[data-i18n]").forEach((node) => {
+    node.textContent = t(node.dataset.i18n);
+  });
+  root.querySelectorAll("[data-i18n-html]").forEach((node) => {
+    node.innerHTML = t(node.dataset.i18nHtml);
+  });
+  root.querySelectorAll("[data-i18n-aria-label]").forEach((node) => {
+    node.setAttribute("aria-label", t(node.dataset.i18nAriaLabel));
+  });
+  root.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
+    node.setAttribute("placeholder", t(node.dataset.i18nPlaceholder));
+  });
+  root.querySelectorAll("[data-locale-switch]").forEach((button) => {
+    const active = button.dataset.localeSwitch === currentLocale;
+    button.setAttribute("aria-pressed", String(active));
+    button.toggleAttribute("aria-current", active);
+  });
+}
+
 export function t(key, params = {}) {
   const value = readPath(dictionaries[currentLocale], key) ?? readPath(dictionaries[DEFAULT_LOCALE], key) ?? key;
   if (typeof value === "object") return key;
@@ -95,6 +117,11 @@ export function initI18n() {
   currentLocale = resolveLocale();
   if (htmlElement()) htmlElement().lang = currentLocale;
   if (globalThis.window) globalThis.window.__spaceUndergroundLocale = currentLocale;
+  applyStaticTranslations();
+  if (!initialized) {
+    initialized = true;
+    subscribeLocaleChange(() => applyStaticTranslations());
+  }
 }
 
 export function dictionaryKeys(locale = DEFAULT_LOCALE) {
@@ -108,6 +135,10 @@ export function dictionaryKeys(locale = DEFAULT_LOCALE) {
   };
   walk(dictionaries[locale] || {});
   return keys.sort();
+}
+
+export function hasKey(key, locale = DEFAULT_LOCALE) {
+  return readPath(dictionaries[locale], key) !== undefined;
 }
 
 export function localeSwitcher() {

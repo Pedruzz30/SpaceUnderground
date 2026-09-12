@@ -162,6 +162,18 @@ export function initRouter(root) {
   if (!root) return;
   initI18n();
 
+  function refreshRouteChrome() {
+    const requestedRoute = currentRoute();
+    const match = pages.find((entry) => entry.test(requestedRoute));
+    const page = match?.page || notFoundPage(requestedRoute);
+    const title = typeof page.title === "function" ? page.title() : page.title;
+    const breadcrumb = typeof page.breadcrumb === "function" ? page.breadcrumb() : page.breadcrumb;
+    const titleNode = root.querySelector("[data-page-title]");
+    const breadcrumbNode = root.querySelector("[data-page-breadcrumb]");
+    if (titleNode) titleNode.textContent = title || "";
+    if (breadcrumbNode) breadcrumbNode.textContent = breadcrumb || "";
+  }
+
   const render = async () => {
     const requestedRoute = currentRoute();
     const token = ++renderToken;
@@ -180,10 +192,10 @@ export function initRouter(root) {
       if (navigationGuard()) {
         window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${activeRoute}`);
         confirmModal({
-          title: "UNSAVED CHANGES",
-          body: "<p>You have changes that haven't been saved.</p>",
-          confirmLabel: "Discard Changes",
-          cancelLabel: "Stay",
+          title: t("shell.unsavedChanges"),
+          body: `<p>${escapeHtml(t("shell.unsavedBody"))}</p>`,
+          confirmLabel: t("shell.discardChanges"),
+          cancelLabel: t("shell.stay"),
         }).then(async (discard) => {
           if (discard) {
             await runNavigationCleanup();
@@ -256,8 +268,6 @@ export function initRouter(root) {
   window.addEventListener("hashchange", () => {
     render();
   });
-  window.addEventListener("localechange", () => {
-    render();
-  });
+  window.addEventListener("localechange", refreshRouteChrome);
   render();
 }

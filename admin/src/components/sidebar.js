@@ -40,11 +40,11 @@ function isCurrent(item, route) {
 
 function navItem(item, route) {
   if (item.soon) {
-    return `<button class="side-link side-link--disabled" type="button" disabled>${t(item.labelKey)}<span>${t("common.soon")}</span></button>`;
+    return `<button class="side-link side-link--disabled" type="button" disabled><span data-i18n="${item.labelKey}">${t(item.labelKey)}</span><span data-i18n="common.soon">${t("common.soon")}</span></button>`;
   }
 
   const current = isCurrent(item, route);
-  return `<a class="side-link${current ? " is-current" : ""}" href="${item.href}"${current ? ' aria-current="page"' : ""}>${t(item.labelKey)}</a>`;
+  return `<a class="side-link${current ? " is-current" : ""}" href="${item.href}"${current ? ' aria-current="page"' : ""} data-i18n="${item.labelKey}">${t(item.labelKey)}</a>`;
 }
 
 export function sidebar(route) {
@@ -54,20 +54,20 @@ export function sidebar(route) {
         <span class="brand-mark" aria-hidden="true">SU</span>
         <div>
           <strong>SPACE UNDERGROUND</strong>
-          <small>${t("nav.labControl")}</small>
+          <small data-i18n="nav.labControl">${t("nav.labControl")}</small>
         </div>
       </div>
 
-      <nav class="sidebar__nav" aria-label="${t("nav.adminNavigation")}">
+      <nav class="sidebar__nav" aria-label="${t("nav.adminNavigation")}" data-i18n-aria-label="nav.adminNavigation">
         ${navGroups.map((group) => `
           <section>
-            <p>${t(group.labelKey)}</p>
+            <p data-i18n="${group.labelKey}">${t(group.labelKey)}</p>
             ${group.items.map((item) => navItem(item, route)).join("")}
           </section>
         `).join("")}
       </nav>
 
-      <a class="sidebar__website" href="../" target="_blank" rel="noreferrer">${t("nav.viewWebsite")} <span aria-hidden="true">↗</span></a>
+      <a class="sidebar__website" href="../" target="_blank" rel="noreferrer"><span data-i18n="nav.viewWebsite">${t("nav.viewWebsite")}</span> <span aria-hidden="true">↗</span></a>
     </aside>
   `;
 }
