@@ -11,7 +11,7 @@ import {
 import { getActivityWithStatus } from "../services/activity-service.js";
 import { getProjects } from "../services/project-service.js";
 import { describeError } from "../services/errors.js";
-import { t } from "../i18n/index.js";
+import { onLocaleChange, statusLabel, t } from "../i18n/index.js";
 import { pendingReceivables } from "../utils/financial-metrics.js";
 import { formatCurrency, formatRelativeDay, formatSignedCurrency } from "../utils/format.js";
 import {
@@ -30,7 +30,7 @@ import {
   projectHealth,
   rankAttention,
 } from "../utils/dashboard-metrics.js";
-import { escapeHtml } from "../utils/html.js";
+import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
 // The Dashboard mixes two origins and says so on screen:
 //   REAL — projects and the activity log, through the configured repository.
@@ -103,7 +103,7 @@ function queueItem(item) {
       <span class="dash-queue-item__body">
         <span class="dash-queue-item__category">${escapeHtml(item.category)}</span>
         <strong>${escapeHtml(item.title)}</strong>
-        <span class="dash-queue-item__detail">${escapeHtml(item.detail)}</span>
+        <span class="dash-queue-item__detail">${escapeHtml(item.detailKey ? t(item.detailKey, item.detailParams ?? {}) : item.detail)}</span>
       </span>
       ${item.amount === undefined ? "" : `<span class="ops-amount ops-amount--neutral">${escapeHtml(formatCurrency(item.amount))}</span>`}
       <b aria-hidden="true">&rarr;</b>
@@ -130,7 +130,7 @@ function renderAttention(projectItems, { projectsFailed = false, pending = false
       ? `<p class="dash-inline-note dash-inline-note--warn">${t("dashboard.projectChecksUnavailable")}</p>`
       : "";
 
-  return `${renderQueue(items, "Nothing needs attention right now.")}${note}`;
+  return `${renderQueue(items, t("dashboard.nothingNeedsAttention"))}${note}`;
 }
 
 /* ---------------------------------------------------------- project pulse */
@@ -138,7 +138,7 @@ function renderAttention(projectItems, { projectsFailed = false, pending = false
 function pulseRow(project) {
   return `
     <a class="ops-row ops-row--link" href="#/projects/${encodeURIComponent(project.id)}" data-pulse-row>
-      <span class="ops-meta" data-label="Case">${escapeHtml(project.caseNumber)}</span>
+      <span class="ops-meta" data-label="${t("dashboard.case")}">${escapeHtml(project.caseNumber)}</span>
       <span class="ops-row__primary">
         <strong>${escapeHtml(project.name || t("projects.untitled"))}</strong>
         <small>${escapeHtml(project.category || t("projects.uncategorised"))}</small>
@@ -179,7 +179,7 @@ function renderPipeline() {
         .map(
           (stage) => `
             <div class="dash-pipeline__row${stage.id === "WON" ? " dash-pipeline__row--won" : ""}">
-              <span class="dash-pipeline__label">${escapeHtml(stage.label)}</span>
+              <span class="dash-pipeline__label" data-status-label="${escapeAttribute(stage.id)}">${escapeHtml(statusLabel(stage.id))}</span>
               <span class="dash-pipeline__track">
                 <span class="dash-pipeline__fill" style="--dash-fill:${barPercent(stage.count, summary.max)}%"></span>
               </span>
@@ -273,8 +273,8 @@ function renderHealth({ projects, projectsOk, activityOk }) {
   const health = projectsOk ? projectHealth(projects) : null;
 
   return `
-    ${healthTile(t("dashboard.publicWebsite"), t("common.configured").toUpperCase(), spaceStatus.detail)}
-    ${healthTile(t("dashboard.adminData"), status.label, `${status.detail} · ${DATA_SOURCE} source`, status.tone)}
+    ${healthTile(t("dashboard.publicWebsite"), t("common.configured").toUpperCase(), t(spaceStatus.detailKey))}
+    ${healthTile(t("dashboard.adminData"), statusLabel(status.label), t("dashboard.dataSourceSuffix", { detail: t(status.detailKey), source: DATA_SOURCE }), status.tone)}
     ${healthTile(t("dashboard.publishedCases"), health ? String(health.published) : "—", health ? t("dashboard.archivedCount", { count: health.archived }) : t("dashboard.projectDataUnavailable"), "", "published")}
     ${healthTile(t("dashboard.draftCases"), health ? String(health.drafts) : "—", health ? t("dashboard.hiddenCount", { count: health.hidden }) : t("dashboard.projectDataUnavailable"), "", "drafts")}
     ${healthTile(
@@ -305,7 +305,7 @@ export const dashboardPage = {
           <select data-dash-period>
             ${PERIODS.map(
               (period) =>
-                `<option value="${escapeHtml(period.id)}"${period.id === DEFAULT_PERIOD ? " selected" : ""}>${escapeHtml(period.label)}</option>`,
+                `<option value="${escapeHtml(period.id)}"${period.id === DEFAULT_PERIOD ? " selected" : ""}>${escapeHtml(t(period.labelKey))}</option>`,
             ).join("")}
           </select>
         </label>
@@ -358,7 +358,7 @@ export const dashboardPage = {
 
       <article class="panel dash-panel--followups" aria-labelledby="dash-followups-title">
         ${panelHead(t("dashboard.followUps"), t("dashboard.peopleToContactNext"), "dash-followups-title")}
-        ${renderQueue(followUps({ clients: demoClients, opportunities: demoOpportunities }), "No follow ups queued.")}
+        ${renderQueue(followUps({ clients: demoClients, opportunities: demoOpportunities }), t("dashboard.noFollowUps"))}
       </article>
 
       <article class="panel dash-panel--activity" aria-labelledby="dash-activity-title">
@@ -401,41 +401,55 @@ export const dashboardPage = {
     const projectsOk = projectsResult.status === "fulfilled";
     const projects = projectsOk ? projectsResult.value : [];
 
-    if (projectsOk) {
-      attentionEl.innerHTML = renderAttention(projectChecks(projects));
-      pulseEl.innerHTML = renderPulse(projects);
-    } else {
-      const message = describeError(projectsResult.reason, "Unable to load project data.");
-      attentionEl.innerHTML = renderAttention([], { projectsFailed: true });
-      pulseEl.innerHTML = `<p class="empty-inline">${escapeHtml(message)}</p>`;
-    }
-
     // An outage and an empty log are different facts: getActivityWithStatus()
     // reports the read failure that getActivity() deliberately swallows.
     const activity = activityResult.status === "fulfilled" ? activityResult.value : { items: [], ok: false };
     const activityOk = activity.ok;
     const entries = activity.items.slice(0, 6);
 
-    if (!activityOk) {
-      activityEl.innerHTML = `<p class="empty-inline">${t("dashboard.activityUnavailable")}</p>`;
-    } else if (!entries.length) {
-      activityEl.innerHTML = `<p class="empty-inline">${t("dashboard.noRecentActivity")}</p>`;
-    } else {
-      activityEl.innerHTML = entries
-        .map(
-          (item) => `
-            <div>
-              <span></span>
-              <strong>${escapeHtml(item.title || item.action || t("dashboard.administrativeEvent"))}</strong>
-              <p>${escapeHtml(item.detail || t("dashboard.noAdditionalDetail"))}</p>
-              <small>${escapeHtml(activityTime(item.time))}</small>
-            </div>
-          `,
-        )
-        .join("");
+    // Everything below renders from the two results already in hand. A locale
+    // change replays this, so the Dashboard re-reads in the other language
+    // without issuing a single new query.
+    function paintData() {
+      if (projectsOk) {
+        attentionEl.innerHTML = renderAttention(projectChecks(projects));
+        pulseEl.innerHTML = renderPulse(projects);
+      } else {
+        const message = describeError(projectsResult.reason, t("dashboard.loadProjectsError"));
+        attentionEl.innerHTML = renderAttention([], { projectsFailed: true });
+        pulseEl.innerHTML = `<p class="empty-inline">${escapeHtml(message)}</p>`;
+      }
+
+      if (!activityOk) {
+        activityEl.innerHTML = `<p class="empty-inline">${t("dashboard.activityUnavailable")}</p>`;
+      } else if (!entries.length) {
+        activityEl.innerHTML = `<p class="empty-inline">${t("dashboard.noRecentActivity")}</p>`;
+      } else {
+        activityEl.innerHTML = entries
+          .map(
+            (item) => `
+              <div>
+                <span></span>
+                <strong>${escapeHtml(item.title || item.action || t("dashboard.administrativeEvent"))}</strong>
+                <p>${escapeHtml(item.detail || t("dashboard.noAdditionalDetail"))}</p>
+                <small>${escapeHtml(activityTime(item.time))}</small>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      healthEl.innerHTML = renderHealth({ projects, projectsOk, activityOk });
     }
 
-    healthEl.innerHTML = renderHealth({ projects, projectsOk, activityOk });
+    paintData();
+
+    // The selected period is read back from the live control, so switching
+    // locale keeps whatever range the user had chosen.
+    onLocaleChange(pulseEl, () => {
+      paintData();
+      financeEl.innerHTML = renderFinancial(periodEl.value);
+    });
 
     attentionEl?.removeAttribute("aria-busy");
     pulseEl.removeAttribute("aria-busy");

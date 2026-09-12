@@ -1,4 +1,5 @@
 import { DataError } from "../errors.js";
+import { t } from "../../i18n/index.js";
 
 // Mock media lives as a data URL inside the project record, so images survive a
 // reload in development just like they do against Supabase Storage. localStorage
@@ -10,7 +11,7 @@ function readAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new DataError("Unable to read the image file.", { code: "read_failed" }));
+    reader.onerror = () => reject(new DataError(t("errors.data.readImageFile"), { code: "read_failed" }));
     reader.readAsDataURL(file);
   });
 }

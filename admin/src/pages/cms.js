@@ -5,52 +5,18 @@ import { getPlans } from "../services/plan-service.js";
 import { getProjects } from "../services/project-service.js";
 import { getSiteSettings } from "../services/settings-service.js";
 import { describeError } from "../services/errors.js";
+import { onLocaleChange, plural, t } from "../i18n/index.js";
 import { formatRelativeDay } from "../utils/format.js";
 import { escapeHtml } from "../utils/html.js";
 
 const CONTENT_KEYS = ["hero", "about", "capabilities", "process", "contact", "footer"];
 
 const MODULES = [
-  {
-    key: "projects",
-    eyebrow: "PROJECTS / CASES",
-    title: "Portfolio records",
-    description: "Public case studies, presentation data and publishing state.",
-    action: "Open Projects",
-    href: "#/projects",
-  },
-  {
-    key: "media",
-    eyebrow: "MEDIA",
-    title: "Project assets",
-    description: "Posters, galleries and Storage-backed project media.",
-    action: "Open Media",
-    href: "#/media",
-  },
-  {
-    key: "content",
-    eyebrow: "SITE CONTENT",
-    title: "Public sections",
-    description: "Hero, About, Capabilities, Process, Contact and Footer.",
-    action: "Edit Content",
-    href: "#/content",
-  },
-  {
-    key: "plans",
-    eyebrow: "PLANS / PRICING",
-    title: "Commercial plans",
-    description: "Public offers, pricing, delivery and feature lists.",
-    action: "Manage Plans",
-    href: "#/services",
-  },
-  {
-    key: "seo",
-    eyebrow: "SEO / PUBLIC SETTINGS",
-    title: "Site identity",
-    description: "Metadata, public URL, contact identity and social preview.",
-    action: "Open Settings",
-    href: "#/settings",
-  },
+  { key: "projects", href: "#/projects" },
+  { key: "media", href: "#/media" },
+  { key: "content", href: "#/content" },
+  { key: "plans", href: "#/services" },
+  { key: "seo", href: "#/settings" },
 ];
 
 function hasText(value) {
@@ -76,6 +42,8 @@ function countMedia(projects) {
   return projects.reduce((total, project) => total + (project.poster ? 1 : 0) + (project.gallery?.length || 0), 0);
 }
 
+// Checks carry keys and counts rather than finished sentences, so the same
+// derived state renders in either language without being recomputed.
 function deriveState({ projects, content, plans, settings }) {
   const published = projects.filter((project) => project.editorialStatus === "PUBLISHED" && project.visible);
   const drafts = projects.filter((project) => project.editorialStatus === "DRAFT");
@@ -90,16 +58,33 @@ function deriveState({ projects, content, plans, settings }) {
   const plansWithoutFeatures = visiblePlans.filter((plan) => !(plan.features || []).length);
   const seoReady = hasText(settings.seoTitle) && hasText(settings.seoDescription);
   const ogReady = hasText(settings.ogImagePath);
+  const emptySections = CONTENT_KEYS.length - configuredContent;
 
   const attention = [];
-  if (!published.length) attention.push({ label: "No live cases", detail: "No visible published projects are available.", href: "#/projects" });
-  if (drafts.length) attention.push({ label: `${drafts.length} draft case${drafts.length === 1 ? "" : "s"}`, detail: "Review publishing state before release.", href: "#/projects" });
-  if (missingPoster.length) attention.push({ label: `${missingPoster.length} case${missingPoster.length === 1 ? "" : "s"} without poster`, detail: "Public presentation is missing a primary visual.", href: "#/projects" });
-  if (missingPresentation.length) attention.push({ label: `${missingPresentation.length} incomplete presentation${missingPresentation.length === 1 ? "" : "s"}`, detail: "Presentation metadata or modules are incomplete.", href: "#/projects" });
-  if (configuredContent < CONTENT_KEYS.length) attention.push({ label: `${CONTENT_KEYS.length - configuredContent} empty content section${CONTENT_KEYS.length - configuredContent === 1 ? "" : "s"}`, detail: "Some public sections still rely on build-time copy.", href: "#/content" });
-  if (!seoReady) attention.push({ label: "SEO metadata incomplete", detail: "Title and description should both be configured.", href: "#/settings" });
-  if (!ogReady) attention.push({ label: "OG image missing", detail: "Social previews do not have a configured image yet.", href: "#/settings" });
-  if (plansWithoutFeatures.length) attention.push({ label: `${plansWithoutFeatures.length} visible plan${plansWithoutFeatures.length === 1 ? "" : "s"} without features`, detail: "Offer cards need a clear feature list.", href: "#/services" });
+  if (!published.length) {
+    attention.push({ labelKey: "cms.checks.noLiveCases", detailKey: "cms.checks.noLiveCasesDetail", href: "#/projects" });
+  }
+  if (drafts.length) {
+    attention.push({ pluralKey: "cms.checks.draftCases", count: drafts.length, detailKey: "cms.checks.draftCasesDetail", href: "#/projects" });
+  }
+  if (missingPoster.length) {
+    attention.push({ pluralKey: "cms.checks.withoutPoster", count: missingPoster.length, detailKey: "cms.checks.withoutPosterDetail", href: "#/projects" });
+  }
+  if (missingPresentation.length) {
+    attention.push({ pluralKey: "cms.checks.incompletePresentation", count: missingPresentation.length, detailKey: "cms.checks.incompletePresentationDetail", href: "#/projects" });
+  }
+  if (emptySections > 0) {
+    attention.push({ pluralKey: "cms.checks.emptySections", count: emptySections, detailKey: "cms.checks.emptySectionsDetail", href: "#/content" });
+  }
+  if (!seoReady) {
+    attention.push({ labelKey: "cms.checks.seoIncomplete", detailKey: "cms.checks.seoIncompleteDetail", href: "#/settings" });
+  }
+  if (!ogReady) {
+    attention.push({ labelKey: "cms.checks.ogMissing", detailKey: "cms.checks.ogMissingDetail", href: "#/settings" });
+  }
+  if (plansWithoutFeatures.length) {
+    attention.push({ pluralKey: "cms.checks.plansWithoutFeatures", count: plansWithoutFeatures.length, detailKey: "cms.checks.plansWithoutFeaturesDetail", href: "#/services" });
+  }
 
   return {
     published,
@@ -118,37 +103,61 @@ function deriveState({ projects, content, plans, settings }) {
   };
 }
 
+function checkLabel(item) {
+  return item.pluralKey ? plural(item.pluralKey, item.count) : t(item.labelKey);
+}
+
 function statusChip(label, tone = "neutral") {
   return `<span class="cms-status cms-status--${tone}">${escapeHtml(label)}</span>`;
 }
 
 function renderStatus(state) {
   const healthTone = state.attention.length ? "warning" : "success";
-  const healthLabel = state.attention.length ? `${state.attention.length} ITEM${state.attention.length === 1 ? "" : "S"}` : "GOOD";
+  const healthLabel = state.attention.length ? plural("cms.itemCount", state.attention.length) : t("cms.good");
   return `
-    <section class="cms-status-grid" aria-label="CMS status">
-      <article><span>PUBLIC WEBSITE</span><strong>ONLINE</strong><small>Runtime content enabled</small></article>
-      <article><span>DATA SOURCE</span><strong>${escapeHtml(DATA_SOURCE.toUpperCase())}</strong><small>Admin editorial source</small></article>
-      <article><span>PUBLISHED CASES</span><strong>${state.published.length}</strong><small>${state.drafts.length} draft · ${state.archived.length} archived</small></article>
-      <article><span>CONTENT HEALTH</span><strong>${escapeHtml(healthLabel)}</strong><small>${statusChip(state.attention.length ? "Attention" : "Healthy", healthTone)}</small></article>
+    <section class="cms-status-grid" aria-label="${t("cms.status")}" data-i18n-aria-label="cms.status">
+      <article><span>${t("cms.publicWebsite")}</span><strong>${t("cms.online")}</strong><small>${t("cms.runtimeContentEnabled")}</small></article>
+      <article><span>${t("cms.dataSource")}</span><strong>${escapeHtml(DATA_SOURCE.toUpperCase())}</strong><small>${t("cms.adminEditorialSource")}</small></article>
+      <article><span>${t("cms.publishedCases")}</span><strong>${state.published.length}</strong><small>${escapeHtml(t("cms.draftArchived", { drafts: state.drafts.length, archived: state.archived.length }))}</small></article>
+      <article><span>${t("cms.contentHealth")}</span><strong>${escapeHtml(healthLabel)}</strong><small>${statusChip(state.attention.length ? t("cms.attention") : t("cms.healthy"), healthTone)}</small></article>
     </section>
   `;
 }
 
 function moduleMeta(module, state, plans) {
   if (module.key === "projects") {
-    return [`${state.published.length} published`, `${state.drafts.length} draft`, `${state.missingPoster.length + state.missingPresentation.length} needs attention`];
+    return [
+      t("cms.meta.publishedCount", { count: state.published.length }),
+      t("cms.meta.draftCount", { count: state.drafts.length }),
+      t("cms.meta.needsAttentionCount", { count: state.missingPoster.length + state.missingPresentation.length }),
+    ];
   }
   if (module.key === "media") {
-    return [`${state.attachedAssets} attached asset${state.attachedAssets === 1 ? "" : "s"}`, `${state.galleryItems} gallery item${state.galleryItems === 1 ? "" : "s"}`, `${state.missingPoster.length} missing poster`];
+    return [
+      plural("cms.meta.attachedAssets", state.attachedAssets),
+      plural("cms.meta.galleryItems", state.galleryItems),
+      t("cms.meta.missingPoster", { count: state.missingPoster.length }),
+    ];
   }
   if (module.key === "content") {
-    return [`${state.configuredContent} / ${CONTENT_KEYS.length} configured`, `${CONTENT_KEYS.length - state.configuredContent} using fallback`, "Structured content"];
+    return [
+      t("cms.meta.configured", { count: state.configuredContent, total: CONTENT_KEYS.length }),
+      t("cms.meta.usingFallback", { count: CONTENT_KEYS.length - state.configuredContent }),
+      t("cms.meta.structuredContent"),
+    ];
   }
   if (module.key === "plans") {
-    return [`${state.visiblePlans.length} visible`, `${plans.length - state.visiblePlans.length} hidden`, `${plans.filter((plan) => !(plan.features || []).length).length} without features`];
+    return [
+      t("cms.meta.visibleCount", { count: state.visiblePlans.length }),
+      t("cms.meta.hiddenCount", { count: plans.length - state.visiblePlans.length }),
+      t("cms.meta.withoutFeatures", { count: plans.filter((plan) => !(plan.features || []).length).length }),
+    ];
   }
-  return [state.seoReady ? "Metadata configured" : "Metadata incomplete", state.ogReady ? "OG image configured" : "OG image missing", "Public identity"];
+  return [
+    state.seoReady ? t("cms.meta.metadataConfigured") : t("cms.meta.metadataIncomplete"),
+    state.ogReady ? t("cms.meta.ogConfigured") : t("cms.meta.ogMissing"),
+    t("cms.meta.publicIdentity"),
+  ];
 }
 
 function moduleCard(module, state, plans) {
@@ -156,15 +165,15 @@ function moduleCard(module, state, plans) {
     <article class="panel cms-module-card">
       <header class="panel__head">
         <div>
-          <span>${escapeHtml(module.eyebrow)}</span>
-          <h3>${escapeHtml(module.title)}</h3>
+          <span>${escapeHtml(t(`cms.cards.${module.key}`))}</span>
+          <h3>${escapeHtml(t(`cms.cards.${module.key}Title`))}</h3>
         </div>
       </header>
-      <p>${escapeHtml(module.description)}</p>
+      <p>${escapeHtml(t(`cms.cards.${module.key}Description`))}</p>
       <div class="cms-module-card__meta">
         ${moduleMeta(module, state, plans).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
       </div>
-      <a class="button" href="${escapeHtml(module.href)}">${escapeHtml(module.action)}</a>
+      <a class="button" href="${escapeHtml(module.href)}">${escapeHtml(t(`cms.cards.${module.key}Action`))}</a>
     </article>
   `;
 }
@@ -173,8 +182,8 @@ function renderAttention(items) {
   if (!items.length) {
     return `
       <div class="cms-healthy-state">
-        ${statusChip("Healthy", "success")}
-        <div><strong>Everything looks healthy.</strong><p>No editorial issues need attention right now.</p></div>
+        ${statusChip(t("cms.healthy"), "success")}
+        <div><strong>${t("cms.everythingHealthy")}</strong><p>${t("cms.noIssues")}</p></div>
       </div>
     `;
   }
@@ -184,7 +193,7 @@ function renderAttention(items) {
       ${items.map((item) => `
         <a href="${item.href}" class="cms-attention-item">
           <span aria-hidden="true"></span>
-          <div><strong>${escapeHtml(item.label)}</strong><p>${escapeHtml(item.detail)}</p></div>
+          <div><strong>${escapeHtml(checkLabel(item))}</strong><p>${escapeHtml(t(item.detailKey))}</p></div>
           <b aria-hidden="true">→</b>
         </a>
       `).join("")}
@@ -197,17 +206,19 @@ function isContentActivity(entry) {
   return ["project", "publish", "media", "content", "settings", "plan"].some((token) => value.includes(token));
 }
 
+// Activity titles and details are the recorded audit text and are shown as
+// stored; only the surrounding copy is localized.
 function renderActivity(entries) {
   const visible = entries.filter(isContentActivity).slice(0, 6);
-  if (!visible.length) return '<p class="empty-inline">No content activity recorded yet.</p>';
+  if (!visible.length) return `<p class="empty-inline">${t("cms.noContentActivity")}</p>`;
 
   return `
     <div class="cms-activity-list">
       ${visible.map((entry) => `
         <div>
           <span></span>
-          <strong>${escapeHtml(entry.title || entry.action || "Editorial event")}</strong>
-          <p>${escapeHtml(entry.detail || "No additional detail.")}</p>
+          <strong>${escapeHtml(entry.title || entry.action || t("cms.editorialEvent"))}</strong>
+          <p>${escapeHtml(entry.detail || t("cms.noAdditionalDetail"))}</p>
           <small>${escapeHtml(formatRelativeDay(entry.time))}</small>
         </div>
       `).join("")}
@@ -223,32 +234,32 @@ function controlCenter({ projects, content, plans, settings, activity }) {
     <section class="cms-control-grid">
       <article class="panel cms-attention-panel">
         <header class="panel__head">
-          <div><span>NEEDS ATTENTION</span><h3>Editorial checks</h3></div>
-          ${statusChip(state.attention.length ? String(state.attention.length) : "Clear", state.attention.length ? "warning" : "success")}
+          <div><span>${t("cms.needsAttention")}</span><h3>${t("cms.editorialChecks")}</h3></div>
+          ${statusChip(state.attention.length ? String(state.attention.length) : t("cms.clear"), state.attention.length ? "warning" : "success")}
         </header>
         ${renderAttention(state.attention)}
       </article>
 
       <article class="panel cms-summary-panel">
-        <header class="panel__head"><div><span>PUBLICATION</span><h3>Case state</h3></div></header>
+        <header class="panel__head"><div><span>${t("cms.publication")}</span><h3>${t("cms.caseState")}</h3></div></header>
         <div class="cms-mini-stats">
-          <div><span>Published</span><strong>${state.published.length}</strong></div>
-          <div><span>Draft</span><strong>${state.drafts.length}</strong></div>
-          <div><span>Archived</span><strong>${state.archived.length}</strong></div>
-          <div><span>Hidden</span><strong>${state.hidden.length}</strong></div>
+          <div><span>${t("cms.published")}</span><strong>${state.published.length}</strong></div>
+          <div><span>${t("cms.draft")}</span><strong>${state.drafts.length}</strong></div>
+          <div><span>${t("cms.archived")}</span><strong>${state.archived.length}</strong></div>
+          <div><span>${t("cms.hidden")}</span><strong>${state.hidden.length}</strong></div>
         </div>
       </article>
     </section>
 
     <section>
-      <header class="cms-section-head"><div><span>MODULES</span><h3>Publishing workspaces</h3></div></header>
+      <header class="cms-section-head"><div><span>${t("cms.modules")}</span><h3>${t("cms.publishingWorkspaces")}</h3></div></header>
       <div class="cms-grid">${MODULES.map((module) => moduleCard(module, state, plans)).join("")}</div>
     </section>
 
     <section class="panel cms-activity-panel">
       <header class="panel__head">
-        <div><span>RECENT CONTENT ACTIVITY</span><h3>Editorial changes</h3></div>
-        <a class="text-link" href="#/logs">View all logs</a>
+        <div><span>${t("cms.recentContentActivity")}</span><h3>${t("cms.editorialChanges")}</h3></div>
+        <a class="text-link" href="#/logs">${t("cms.viewAllLogs")}</a>
       </header>
       ${renderActivity(activity)}
     </section>
@@ -256,23 +267,32 @@ function controlCenter({ projects, content, plans, settings, activity }) {
 }
 
 export const cmsPage = {
-  title: "CMS",
-  breadcrumb: "CONTENT / CMS",
+  title: () => t("cms.title"),
+  breadcrumb: () => t("cms.breadcrumb"),
   render: () => `
     <section class="page-heading page-heading--split">
       <div>
-        <span>CMS CONTROL CENTER</span>
-        <h2>Content control.</h2>
-        <p>Manage, review and publish everything visible on the Space Underground website.</p>
+        <span data-i18n="cms.eyebrow">${t("cms.eyebrow")}</span>
+        <h2 data-i18n="cms.heading">${t("cms.heading")}</h2>
+        <p data-i18n="cms.intro">${t("cms.intro")}</p>
       </div>
-      <div class="heading-actions"><a class="button" href="../" target="_blank" rel="noreferrer">View Website</a></div>
+      <div class="heading-actions"><a class="button" href="../" target="_blank" rel="noreferrer" data-i18n="cms.viewWebsite">${t("cms.viewWebsite")}</a></div>
     </section>
     <div data-cms-control aria-busy="true">
-      <section class="panel"><p class="empty-inline">Loading editorial state...</p></section>
+      <section class="panel"><p class="empty-inline" data-i18n="cms.loading">${t("cms.loading")}</p></section>
     </div>
   `,
   afterRender: async () => {
     const root = document.querySelector("[data-cms-control]");
+    let snapshot = null;
+
+    // The whole control centre is derived from one snapshot. A locale change
+    // re-derives it from that same snapshot rather than re-running the five
+    // queries behind it.
+    onLocaleChange(root, () => {
+      if (snapshot) root.innerHTML = controlCenter(snapshot);
+    });
+
     try {
       const [projects, content, plans, settings, activity] = await Promise.all([
         getProjects(),
@@ -282,10 +302,11 @@ export const cmsPage = {
         getActivity({ limit: 40 }),
       ]);
       if (!root?.isConnected) return;
-      root.innerHTML = controlCenter({ projects, content, plans, settings, activity });
+      snapshot = { projects, content, plans, settings, activity };
+      root.innerHTML = controlCenter(snapshot);
     } catch (error) {
       if (!root?.isConnected) return;
-      root.innerHTML = `<section class="panel"><p class="empty-inline">${escapeHtml(describeError(error, "Unable to load CMS status."))}</p></section>`;
+      root.innerHTML = `<section class="panel"><p class="empty-inline">${escapeHtml(describeError(error, t("cms.loadError")))}</p></section>`;
     } finally {
       root?.removeAttribute("aria-busy");
     }

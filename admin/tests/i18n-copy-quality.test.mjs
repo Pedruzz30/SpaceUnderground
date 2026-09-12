@@ -112,8 +112,9 @@ describe("pt-BR copy quality", () => {
     const accented = PT_ENTRIES.filter(([, value]) => /[áàâãéêíóôõúüç]/i.test(value));
     assert.ok(accented.length > 50, `expected accented pt-BR copy, found ${accented.length} entries`);
 
-    // Mojibake from a bad encoding round-trip.
-    const mangled = PT_ENTRIES.filter(([, value]) => /Ã[-¿]|â|Â./.test(value));
+    // Mojibake from a bad encoding round-trip. A lone Â only counts when it
+    // is not starting a real word, so "Âncora" is left alone.
+    const mangled = PT_ENTRIES.filter(([, value]) => /Ã[-¿]|â|Â[^A-Za-zÀ-ÿ]/.test(value));
     assert.deepEqual(mangled.map(([key]) => key), []);
   });
 });

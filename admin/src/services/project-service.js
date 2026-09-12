@@ -1,6 +1,7 @@
 import { logActivity } from "./activity-service.js";
 import { toDataError } from "./errors.js";
 import { getProjectRepository } from "./repositories/index.js";
+import { t } from "../i18n/index.js";
 
 // Async contract used by every admin page. Pages call these functions and never
 // learn whether the data came from localStorage, Supabase or anything else.
@@ -36,7 +37,7 @@ export async function getProjects() {
     const repository = await getProjectRepository();
     return await repository.list();
   } catch (error) {
-    throw toDataError(error, "Unable to load projects.");
+    throw toDataError(error, t("errors.data.loadProjects"));
   }
 }
 
@@ -45,7 +46,7 @@ export async function getProjectById(id) {
     const repository = await getProjectRepository();
     return await repository.getById(id);
   } catch (error) {
-    throw toDataError(error, "Unable to load project.");
+    throw toDataError(error, t("errors.data.loadProject"));
   }
 }
 
@@ -54,7 +55,7 @@ export async function nextAvailableCaseNumber() {
     const repository = await getProjectRepository();
     return await repository.nextCaseNumber();
   } catch (error) {
-    throw toDataError(error, "Unable to determine the next case number.");
+    throw toDataError(error, t("errors.data.nextCaseNumber"));
   }
 }
 
@@ -70,7 +71,7 @@ export async function createProject(data = {}) {
     await logActivity("Project created", `CASE ${created.caseNumber} created`, projectMeta("project.created", created));
     return created;
   } catch (error) {
-    throw toDataError(error, "Unable to create project.");
+    throw toDataError(error, t("errors.data.createProject"));
   }
 }
 
@@ -100,7 +101,7 @@ export async function updateProject(id, patch) {
     await logActivity(title, detail, projectMeta(action, updated));
     return updated;
   } catch (error) {
-    throw toDataError(error, "Unable to save changes.");
+    throw toDataError(error, t("errors.data.saveChanges"));
   }
 }
 
@@ -113,7 +114,7 @@ export async function deleteProject(id) {
     }
     return removed;
   } catch (error) {
-    throw toDataError(error, "Unable to delete project.");
+    throw toDataError(error, t("errors.data.deleteProject"));
   }
 }
 
@@ -126,6 +127,6 @@ export async function archiveProject(id) {
     await logActivity("Project archived", `CASE ${archived.caseNumber} archived`, projectMeta("project.archived", archived));
     return archived;
   } catch (error) {
-    throw toDataError(error, "Unable to archive project.");
+    throw toDataError(error, t("errors.data.archiveProject"));
   }
 }

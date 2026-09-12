@@ -1,39 +1,85 @@
 import { showToast } from "../components/toast.js";
+import { BASE_LOCALE, TRANSLATION_LOCALE, localeTabs } from "../components/locale-fields.js";
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
 import { logActivity } from "../services/activity-service.js";
 import { getSiteContent, saveSiteContent } from "../services/content-service.js";
 import { describeError } from "../services/errors.js";
+import { onLocaleChange, plural, t } from "../i18n/index.js";
 import { formatRelativeDay } from "../utils/format.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
-const SECTIONS = [
-  { key: "hero", label: "Hero", description: "Primary message and calls to action." },
-  { key: "about", label: "About", description: "Studio positioning, introductory copy and notes." },
-  { key: "capabilities", label: "Capabilities", description: "Public capability cards and links." },
-  { key: "process", label: "Process", description: "Process heading, supporting copy and timeline steps." },
-  { key: "contact", label: "Contact", description: "Contact section message, availability and call to action." },
-  { key: "footer", label: "Footer", description: "Footer identity, legal line and closing statement." },
+const SECTIONS = ["hero", "about", "capabilities", "process", "contact", "footer"];
+
+// `translatable: false` marks a technical or structural field: a URL, an accent
+// colour or a brand name. Those live once, in the base record, and stay
+// read-only while the English tab is open so editing a translation can never
+// change a link, a colour or an item's position.
+const TEXT = (name, labelKey, hintKey) => ({ name, labelKey, hintKey, translatable: true });
+const SHARED = (name, labelKey, hintKey) => ({ name, labelKey, hintKey, translatable: false });
+const AREA = (name, labelKey, hintKey, rows = 5) => ({ name, labelKey, hintKey, rows, type: "textarea", translatable: true });
+
+const GENERIC_HEAD = [
+  TEXT("kicker", "content.fields.kicker", "content.fields.kickerHint"),
+  TEXT("title", "content.fields.title", "content.fields.titleHint"),
+  AREA("description", "content.fields.description", "content.fields.sectionDescriptionHint", 6),
 ];
 
-const CAPABILITY_FIELDS = [
-  { name: "kicker", label: "Kicker" },
-  { name: "title", label: "Title" },
-  { name: "link", label: "Link" },
-  { name: "accent", label: "Accent" },
-  { name: "description", label: "Description", type: "textarea" },
-];
+const SECTION_FIELDS = {
+  hero: [
+    TEXT("eyebrow", "content.fields.eyebrow", "content.fields.eyebrowHint"),
+    TEXT("headline", "content.fields.headline", "content.fields.headlineHint"),
+    TEXT("primaryCtaLabel", "content.fields.primaryCtaLabel"),
+    SHARED("primaryCtaUrl", "content.fields.primaryCtaUrl", "content.fields.ctaUrlHint"),
+    TEXT("secondaryCtaLabel", "content.fields.secondaryCtaLabel"),
+    SHARED("secondaryCtaUrl", "content.fields.secondaryCtaUrl", "content.fields.ctaUrlHint"),
+    AREA("description", "content.fields.description", "content.fields.heroDescriptionHint"),
+  ],
+  about: [
+    ...GENERIC_HEAD,
+    TEXT("notePrimary", "content.fields.notePrimary"),
+    TEXT("noteSecondary", "content.fields.noteSecondary"),
+  ],
+  capabilities: GENERIC_HEAD,
+  process: GENERIC_HEAD,
+  contact: [
+    ...GENERIC_HEAD,
+    TEXT("availability", "content.fields.availability"),
+    TEXT("buttonLabel", "content.fields.buttonLabel"),
+  ],
+  footer: [
+    ...GENERIC_HEAD,
+    SHARED("brand", "content.fields.brand"),
+    TEXT("legal", "content.fields.legal"),
+  ],
+};
 
-const PROCESS_FIELDS = [
-  { name: "title", label: "Title" },
-  { name: "description", label: "Description", type: "textarea" },
-];
+const REPEATABLE = {
+  capabilities: {
+    kind: "capability",
+    fields: [
+      TEXT("kicker", "content.fields.kicker"),
+      TEXT("title", "content.fields.title"),
+      SHARED("link", "content.fields.link"),
+      SHARED("accent", "content.fields.accent"),
+      AREA("description", "content.fields.description", "", 3),
+    ],
+  },
+  process: {
+    kind: "step",
+    fields: [TEXT("title", "content.fields.title"), AREA("description", "content.fields.description", "", 3)],
+  },
+};
 
-function sectionFor(key) {
-  return SECTIONS.find((section) => section.key === key) || SECTIONS[0];
+function sectionLabel(key) {
+  return t(`content.sections.${key}`);
 }
 
-function titleFor(key) {
-  return sectionFor(key).label;
+function sectionDescription(key) {
+  return t(`content.sections.${key}Description`);
+}
+
+function fieldsFor(key) {
+  return SECTION_FIELDS[key] || GENERIC_HEAD;
 }
 
 function hasConfiguredContent(entry) {
@@ -45,137 +91,177 @@ function hasConfiguredContent(entry) {
   return Object.values(content).some((value) => String(value || "").trim());
 }
 
-function input(label, name, value = "", hint = "") {
+function hasTranslation(entry) {
+  const translation = entry?.translations?.[TRANSLATION_LOCALE];
+  return Boolean(translation) && Object.keys(translation).length > 0;
+}
+
+function fieldControl(field, value, { readOnly = false, placeholder = "" } = {}) {
+  const id = `content-${field.name}`;
+  const hint = field.hintKey ? `<small>${escapeHtml(t(field.hintKey))}</small>` : "";
+  const sharedNote = readOnly ? `<small class="locale-hint">${escapeHtml(t("content.sharedField"))}</small>` : "";
+  const attrs = [
+    `id="${id}"`,
+    `name="${escapeAttribute(field.name)}"`,
+    readOnly ? "readonly" : "",
+    placeholder ? `placeholder="${escapeAttribute(placeholder)}"` : "",
+    field.translatable ? "" : 'data-shared-field="true"',
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const control =
+    field.type === "textarea"
+      ? `<textarea ${attrs} rows="${field.rows || 5}">${escapeHtml(value || "")}</textarea>`
+      : `<input ${attrs} value="${escapeAttribute(value || "")}">`;
+
   return `
-    <div class="field">
-      <label for="content-${name}">${escapeHtml(label)}</label>
-      <input id="content-${name}" name="${name}" value="${escapeAttribute(value || "")}">
-      ${hint ? `<small>${escapeHtml(hint)}</small>` : ""}
+    <div class="field${field.type === "textarea" ? " field--wide" : ""}">
+      <label for="${id}">${escapeHtml(t(field.labelKey))}</label>
+      ${control}
+      ${hint}
+      ${sharedNote}
     </div>
   `;
 }
 
-function textarea(label, name, value = "", rows = 5, hint = "") {
+function repeatableItem(kind, fields, item, index, { editLocale, baseItem = {} }) {
+  const showingBase = editLocale === BASE_LOCALE;
   return `
-    <div class="field field--wide">
-      <label for="content-${name}">${escapeHtml(label)}</label>
-      <textarea id="content-${name}" name="${name}" rows="${rows}">${escapeHtml(value || "")}</textarea>
-      ${hint ? `<small>${escapeHtml(hint)}</small>` : ""}
-    </div>
-  `;
-}
-
-function heroForm(content = {}) {
-  return `
-    <div class="form-grid">
-      ${input("Eyebrow", "eyebrow", content.eyebrow, "Short context line above the main headline.")}
-      ${input("Headline", "headline", content.headline, "Primary public message.")}
-      ${input("Primary CTA Label", "primaryCtaLabel", content.primaryCtaLabel)}
-      ${input("Primary CTA URL", "primaryCtaUrl", content.primaryCtaUrl, "Anchor or absolute URL.")}
-      ${input("Secondary CTA Label", "secondaryCtaLabel", content.secondaryCtaLabel)}
-      ${input("Secondary CTA URL", "secondaryCtaUrl", content.secondaryCtaUrl, "Anchor or absolute URL.")}
-      ${textarea("Description", "description", content.description, 5, "Supporting copy beneath the headline.")}
-    </div>
-  `;
-}
-
-function genericForm(content = {}, extra = "") {
-  return `
-    <div class="form-grid">
-      ${input("Kicker", "kicker", content.kicker, "Small editorial label above the title.")}
-      ${input("Title", "title", content.title, "Main heading for this section.")}
-      ${textarea("Description", "description", content.description, 6, "Public supporting copy for this section.")}
-      ${extra}
-    </div>
-  `;
-}
-
-function repeatableItem(kind, fields, item = {}, index = 0) {
-  return `
-    <article class="module-card" data-repeatable-item>
+    <article class="module-card" data-repeatable-item data-item-position="${index}">
       <header class="module-card__head">
-        <div><span>${escapeHtml(kind.toUpperCase())} ${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title || "Untitled")}</strong></div>
-        <button type="button" class="button button--danger" data-remove-repeatable>Remove</button>
+        <div><span>${escapeHtml(kind.toUpperCase())} ${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title || baseItem.title || t("content.untitled"))}</strong></div>
+        <button type="button" class="button button--danger" data-remove-repeatable ${showingBase ? "" : "disabled"}>${escapeHtml(t("content.removeItem"))}</button>
       </header>
       <div class="form-grid">
-        ${fields.map((field) => field.type === "textarea"
-          ? `<div class="field field--wide"><label>${escapeHtml(field.label)}</label><textarea rows="3" data-repeatable-field="${escapeAttribute(field.name)}">${escapeHtml(item[field.name] || "")}</textarea></div>`
-          : `<div class="field"><label>${escapeHtml(field.label)}</label><input data-repeatable-field="${escapeAttribute(field.name)}" value="${escapeAttribute(item[field.name] || "")}"></div>`).join("")}
+        ${fields
+          .map((field) => {
+            const readOnly = !showingBase && !field.translatable;
+            const value = readOnly ? baseItem[field.name] : item[field.name];
+            const placeholder = !showingBase && field.translatable ? String(baseItem[field.name] || "") : "";
+            const control =
+              field.type === "textarea"
+                ? `<textarea rows="${field.rows || 3}" data-repeatable-field="${escapeAttribute(field.name)}"${readOnly ? " readonly" : ""}${placeholder ? ` placeholder="${escapeAttribute(placeholder)}"` : ""}>${escapeHtml(value || "")}</textarea>`
+                : `<input data-repeatable-field="${escapeAttribute(field.name)}" value="${escapeAttribute(value || "")}"${readOnly ? " readonly" : ""}${placeholder ? ` placeholder="${escapeAttribute(placeholder)}"` : ""}>`;
+            return `<div class="field${field.type === "textarea" ? " field--wide" : ""}"><label>${escapeHtml(t(field.labelKey))}</label>${control}${readOnly ? `<small class="locale-hint">${escapeHtml(t("content.sharedField"))}</small>` : ""}</div>`;
+          })
+          .join("")}
       </div>
     </article>
   `;
 }
 
-function repeatableForm(content = {}, kind, fields) {
-  const items = Array.isArray(content.items) ? content.items : [];
+function formFor(key, draft, { editLocale, baseContent }) {
+  const showingBase = editLocale === BASE_LOCALE;
+  const body = fieldsFor(key)
+    .map((field) => {
+      const readOnly = !showingBase && !field.translatable;
+      const value = readOnly ? baseContent[field.name] : draft[field.name];
+      const placeholder = !showingBase && field.translatable ? String(baseContent[field.name] || "") : "";
+      return fieldControl(field, value, { readOnly, placeholder });
+    })
+    .join("");
+
+  const repeatable = REPEATABLE[key];
+  if (!repeatable) return `<div class="form-grid">${body}</div>`;
+
+  const baseItems = Array.isArray(baseContent.items) ? baseContent.items : [];
+  const items = Array.isArray(draft.items) ? draft.items : [];
+  // Position is the identity shared between the base items and their
+  // translations, so the two lists stay aligned even when only one has entries.
+  const rows = showingBase ? items : baseItems.map((_, index) => items[index] || {});
+
   return `
-    ${genericForm(content)}
-    <div class="module-list" data-repeatable-list="${escapeAttribute(kind)}">
-      ${items.map((item, index) => repeatableItem(kind, fields, item, index)).join("") || '<p class="empty-inline">No items configured.</p>'}
+    <div class="form-grid">${body}</div>
+    <div class="module-list" data-repeatable-list="${escapeAttribute(repeatable.kind)}">
+      ${rows
+        .map((item, index) =>
+          repeatableItem(repeatable.kind, repeatable.fields, item, index, {
+            editLocale,
+            baseItem: baseItems[index] || {},
+          }),
+        )
+        .join("") || `<p class="empty-inline">${escapeHtml(t("content.noItems"))}</p>`}
     </div>
-    <button class="button" type="button" data-add-repeatable>Add Item</button>
+    <button class="button" type="button" data-add-repeatable ${showingBase ? "" : "disabled"}>${escapeHtml(t("content.addItem"))}</button>
   `;
 }
 
-function formFor(key, content = {}) {
-  if (key === "hero") return heroForm(content);
-  if (key === "about") {
-    return genericForm(content, `
-      ${input("Primary note", "notePrimary", content.notePrimary)}
-      ${input("Secondary note", "noteSecondary", content.noteSecondary)}
-    `);
-  }
-  if (key === "capabilities") return repeatableForm(content, "capability", CAPABILITY_FIELDS);
-  if (key === "process") return repeatableForm(content, "step", PROCESS_FIELDS);
-  if (key === "contact") {
-    return genericForm(content, `
-      ${input("Availability", "availability", content.availability)}
-      ${input("Button Label", "buttonLabel", content.buttonLabel)}
-    `);
-  }
-  return genericForm(content, `
-    ${input("Brand", "brand", content.brand)}
-    ${input("Legal line", "legal", content.legal)}
-  `);
+function readRepeatable(form, fields, { translatableOnly }) {
+  return [...form.querySelectorAll("[data-repeatable-item]")]
+    .map((card, index) => {
+      const item = { position: index };
+      card.querySelectorAll("[data-repeatable-field]").forEach((inputEl) => {
+        const name = inputEl.dataset.repeatableField;
+        const field = fields.find((entry) => entry.name === name);
+        if (translatableOnly && !field?.translatable) return;
+        item[name] = inputEl.value.trim();
+      });
+      return item;
+    })
+    .filter((item) => Object.entries(item).some(([key, value]) => key !== "position" && value));
 }
 
-function readRepeatable(form) {
-  return [...form.querySelectorAll("[data-repeatable-item]")].map((card, index) => {
-    const item = { position: index };
-    card.querySelectorAll("[data-repeatable-field]").forEach((inputEl) => {
-      item[inputEl.dataset.repeatableField] = inputEl.value.trim();
+function draftFromForm(key, form, { translatableOnly }) {
+  const fields = fieldsFor(key);
+  const draft = {};
+  fields.forEach((field) => {
+    if (translatableOnly && !field.translatable) return;
+    const control = form.elements[field.name];
+    if (control) draft[field.name] = String(control.value ?? "").trim();
+  });
+
+  const repeatable = REPEATABLE[key];
+  if (repeatable) draft.items = readRepeatable(form, repeatable.fields, { translatableOnly });
+  return draft;
+}
+
+// What the public site will actually render for the chosen locale: an English
+// field that has not been filled in falls back to the Portuguese one.
+function resolvedContent(baseContent, translation, key) {
+  if (!translation) return baseContent;
+  const merged = { ...baseContent };
+  Object.entries(translation).forEach(([name, value]) => {
+    if (name === "items") return;
+    if (String(value ?? "").trim()) merged[name] = value;
+  });
+
+  const repeatable = REPEATABLE[key];
+  if (repeatable && Array.isArray(baseContent.items)) {
+    merged.items = baseContent.items.map((item, index) => {
+      const localized = translation.items?.[index] || {};
+      const next = { ...item };
+      Object.entries(localized).forEach(([name, value]) => {
+        if (name === "position") return;
+        if (String(value ?? "").trim()) next[name] = value;
+      });
+      return next;
     });
-    return item;
-  }).filter((item) => Object.entries(item).some(([key, value]) => key !== "position" && value));
-}
-
-function contentFromForm(key, form) {
-  const content = Object.fromEntries([...new FormData(form).entries()].map(([name, value]) => [name, String(value).trim()]));
-  if (key === "capabilities" || key === "process") content.items = readRepeatable(form);
-  return content;
+  }
+  return merged;
 }
 
 function previewFor(key, content = {}) {
   if (key === "hero") {
     return `
       <div class="cms-preview cms-preview--hero">
-        <span>${escapeHtml(content.eyebrow || "Independent digital studio")}</span>
-        <strong>${escapeHtml(content.headline || "Build what shouldn't exist yet.")}</strong>
-        <p>${escapeHtml(content.description || "Supporting hero copy appears here.")}</p>
-        <div><b>${escapeHtml(content.primaryCtaLabel || "Primary action")}</b><small>${escapeHtml(content.secondaryCtaLabel || "Secondary action")}</small></div>
+        <span>${escapeHtml(content.eyebrow || t("content.previewDefaults.eyebrow"))}</span>
+        <strong>${escapeHtml(content.headline || t("content.previewDefaults.headline"))}</strong>
+        <p>${escapeHtml(content.description || t("content.previewDefaults.description"))}</p>
+        <div><b>${escapeHtml(content.primaryCtaLabel || t("content.previewDefaults.primaryCta"))}</b><small>${escapeHtml(content.secondaryCtaLabel || t("content.previewDefaults.secondaryCta"))}</small></div>
       </div>
     `;
   }
 
-  if (key === "capabilities" || key === "process") {
+  if (REPEATABLE[key]) {
     const items = Array.isArray(content.items) ? content.items : [];
     return `
       <div class="cms-preview">
-        <span>${escapeHtml(sectionFor(key).label.toUpperCase())} / PREVIEW</span>
-        <strong>${items.length ? `${items.length} structured item${items.length === 1 ? "" : "s"}` : `No ${sectionFor(key).label.toLowerCase()} configured`}</strong>
-        <p>${escapeHtml(content.description || "Section copy will appear here.")}</p>
+        <span>${escapeHtml(sectionLabel(key).toUpperCase())} / ${escapeHtml(t("content.preview"))}</span>
+        <strong>${escapeHtml(items.length ? plural("content.structuredItems", items.length) : t("content.noneConfigured", { section: sectionLabel(key).toLowerCase() }))}</strong>
+        <p>${escapeHtml(content.description || t("content.sectionCopyHere"))}</p>
         <div class="cms-preview-list">
-          ${items.slice(0, 4).map((item, index) => `<p><i>${String(index + 1).padStart(2, "0")}</i>${escapeHtml(item.title || item.description || "Untitled item")}</p>`).join("") || '<p class="empty-inline">Add items to preview them here.</p>'}
+          ${items.slice(0, 4).map((item, index) => `<p><i>${String(index + 1).padStart(2, "0")}</i>${escapeHtml(item.title || item.description || t("content.untitledItem"))}</p>`).join("") || `<p class="empty-inline">${escapeHtml(t("content.addItemsToPreview"))}</p>`}
         </div>
       </div>
     `;
@@ -183,39 +269,39 @@ function previewFor(key, content = {}) {
 
   return `
     <div class="cms-preview">
-      <span>${escapeHtml(content.kicker || `${sectionFor(key).label.toUpperCase()} / PREVIEW`)}</span>
-      <strong>${escapeHtml(content.headline || content.title || content.brand || titleFor(key))}</strong>
-      <p>${escapeHtml(content.description || content.availability || content.legal || "Section copy will appear here.")}</p>
+      <span>${escapeHtml(content.kicker || `${sectionLabel(key).toUpperCase()} / ${t("content.preview")}`)}</span>
+      <strong>${escapeHtml(content.headline || content.title || content.brand || sectionLabel(key))}</strong>
+      <p>${escapeHtml(content.description || content.availability || content.legal || t("content.sectionCopyHere"))}</p>
     </div>
   `;
 }
 
 function stateLabel(entry, dirty, saving, saveError) {
-  if (saving) return '<span class="cms-editor-state cms-editor-state--saving">Saving...</span>';
-  if (saveError) return '<span class="cms-editor-state cms-editor-state--error">Error saving</span>';
-  if (dirty) return '<span class="cms-editor-state cms-editor-state--dirty">Unsaved changes</span>';
-  return `<span class="cms-editor-state cms-editor-state--saved">${entry ? "Saved" : "Loaded"}</span>`;
+  if (saving) return `<span class="cms-editor-state cms-editor-state--saving">${escapeHtml(t("content.saving"))}</span>`;
+  if (saveError) return `<span class="cms-editor-state cms-editor-state--error">${escapeHtml(t("content.errorSaving"))}</span>`;
+  if (dirty) return `<span class="cms-editor-state cms-editor-state--dirty">${escapeHtml(t("content.unsavedChanges"))}</span>`;
+  return `<span class="cms-editor-state cms-editor-state--saved">${escapeHtml(entry ? t("content.savedState") : t("content.loadedState"))}</span>`;
 }
 
 export const contentPage = {
-  title: "Site Content",
-  breadcrumb: "CONTENT / CMS / SITE CONTENT",
+  title: () => t("content.title"),
+  breadcrumb: () => t("content.breadcrumb"),
   render: () => `
     <section class="page-heading page-heading--split">
       <div>
-        <span>SITE CONTENT</span>
-        <h2>Editorial workspace.</h2>
-        <p>Edit structured public content with clear save state and contextual preview.</p>
+        <span data-i18n="content.eyebrow">${t("content.eyebrow")}</span>
+        <h2 data-i18n="content.heading">${t("content.heading")}</h2>
+        <p data-i18n="content.intro">${t("content.intro")}</p>
       </div>
-      <div class="heading-actions"><a class="button" href="#/cms">Back to CMS</a></div>
+      <div class="heading-actions"><a class="button" href="#/cms" data-i18n="content.backToCms">${t("content.backToCms")}</a></div>
     </section>
 
     <section class="cms-content-shell" data-content-workspace aria-busy="true">
-      <aside class="panel cms-content-nav" aria-label="Site content sections">
-        <p class="empty-inline">Loading sections...</p>
+      <aside class="panel cms-content-nav" aria-label="${t("content.sectionsNav")}" data-i18n-aria-label="content.sectionsNav">
+        <p class="empty-inline" data-i18n="content.loadingSections">${t("content.loadingSections")}</p>
       </aside>
-      <div class="panel cms-content-editor"><p class="empty-inline">Loading content...</p></div>
-      <aside class="panel cms-content-preview"><p class="empty-inline">Loading preview...</p></aside>
+      <div class="panel cms-content-editor"><p class="empty-inline" data-i18n="content.loadingContent">${t("content.loadingContent")}</p></div>
+      <aside class="panel cms-content-preview"><p class="empty-inline" data-i18n="content.loadingPreview">${t("content.loadingPreview")}</p></aside>
     </section>
   `,
   afterRender: async () => {
@@ -227,23 +313,51 @@ export const contentPage = {
 
     let entries = new Map();
     let active = "hero";
+    let editLocale = BASE_LOCALE;
     let dirty = false;
     let saving = false;
     let saveError = false;
 
+    // Drafts for both languages are held per section, so switching the content
+    // language (or the interface language) never drops an unsaved edit.
+    const drafts = new Map();
+
     setNavigationGuard(() => dirty);
+
+    function entryFor(key) {
+      return entries.get(key) || { key, content: {}, translations: {}, updatedAt: null };
+    }
+
+    function draftsFor(key) {
+      if (!drafts.has(key)) {
+        const entry = entryFor(key);
+        drafts.set(key, {
+          [BASE_LOCALE]: structuredClone(entry.content ?? {}),
+          [TRANSLATION_LOCALE]: structuredClone(entry.translations?.[TRANSLATION_LOCALE] ?? {}),
+        });
+      }
+      return drafts.get(key);
+    }
+
+    function captureDraft() {
+      const form = editor.querySelector("[data-content-form]");
+      if (!form) return;
+      draftsFor(active)[editLocale] = draftFromForm(active, form, {
+        translatableOnly: editLocale !== BASE_LOCALE,
+      });
+    }
 
     function renderNav() {
       nav.innerHTML = `
-        <header class="panel__head"><div><span>SECTIONS</span><h3>Public content</h3></div></header>
+        <header class="panel__head"><div><span>${escapeHtml(t("content.sectionsLabel"))}</span><h3>${escapeHtml(t("content.publicContent"))}</h3></div></header>
         <div class="cms-section-list">
-          ${SECTIONS.map((section) => {
-            const entry = entries.get(section.key);
+          ${SECTIONS.map((key) => {
+            const entry = entries.get(key);
             const configured = hasConfiguredContent(entry);
             return `
-              <button type="button" class="cms-section-button${section.key === active ? " is-active" : ""}" data-content-section="${section.key}" aria-pressed="${section.key === active}">
-                <span>${escapeHtml(section.label)}</span>
-                <small>${configured ? "Configured" : "Using fallback"}</small>
+              <button type="button" class="cms-section-button${key === active ? " is-active" : ""}" data-content-section="${key}" aria-pressed="${key === active}">
+                <span>${escapeHtml(sectionLabel(key))}</span>
+                <small>${escapeHtml(configured ? t("content.configured") : t("content.usingFallback"))}</small>
               </button>
             `;
           }).join("")}
@@ -255,7 +369,7 @@ export const contentPage = {
           const next = button.dataset.contentSection;
           if (next === active) return;
           if (dirty) {
-            showToast("Save or discard the current section before switching.");
+            showToast(t("content.saveOrDiscard"));
             return;
           }
           active = next;
@@ -272,22 +386,42 @@ export const contentPage = {
 
     function renderPreview() {
       const form = editor.querySelector("[data-content-form]");
-      const entry = entries.get(active) || { content: {} };
-      const content = form ? contentFromForm(active, form) : entry.content;
+      if (form) captureDraft();
+      const sectionDrafts = draftsFor(active);
+      const baseContent = sectionDrafts[BASE_LOCALE];
+      const shown =
+        editLocale === BASE_LOCALE
+          ? baseContent
+          : resolvedContent(baseContent, sectionDrafts[TRANSLATION_LOCALE], active);
+
+      const fallbackNote =
+        editLocale === BASE_LOCALE
+          ? ""
+          : `<p class="locale-hint">${escapeHtml(
+              Object.keys(sectionDrafts[TRANSLATION_LOCALE] ?? {}).length
+                ? t("content.translationReady")
+                : t("content.translationFallback"),
+            )}</p>`;
+
       preview.innerHTML = `
-        <header class="panel__head"><div><span>PREVIEW</span><h3>Editorial structure</h3></div></header>
-        ${previewFor(active, content)}
-        <p class="ops-note">Structural preview · the public site keeps its own layout and motion system</p>
+        <header class="panel__head"><div><span>${escapeHtml(t("content.preview"))}</span><h3>${escapeHtml(t("content.editorialStructure"))}</h3></div></header>
+        ${previewFor(active, shown)}
+        ${fallbackNote}
+        <p class="ops-note">${escapeHtml(t("content.structuralNote"))}</p>
       `;
     }
 
     function addRepeatableItem(form) {
       const list = form.querySelector("[data-repeatable-list]");
-      if (!list) return;
-      const kind = active === "process" ? "step" : "capability";
-      const fields = active === "process" ? PROCESS_FIELDS : CAPABILITY_FIELDS;
+      const repeatable = REPEATABLE[active];
+      if (!list || !repeatable || editLocale !== BASE_LOCALE) return;
       if (list.querySelector(".empty-inline")) list.innerHTML = "";
-      list.insertAdjacentHTML("beforeend", repeatableItem(kind, fields, {}, list.querySelectorAll("[data-repeatable-item]").length));
+      list.insertAdjacentHTML(
+        "beforeend",
+        repeatableItem(repeatable.kind, repeatable.fields, {}, list.querySelectorAll("[data-repeatable-item]").length, {
+          editLocale,
+        }),
+      );
       dirty = true;
       saveError = false;
       renderEditorState();
@@ -295,32 +429,52 @@ export const contentPage = {
     }
 
     function renderEditor() {
-      const entry = entries.get(active) || { key: active, content: {}, updatedAt: null };
-      const section = sectionFor(active);
+      const entry = entryFor(active);
+      const sectionDrafts = draftsFor(active);
+      const draft = sectionDrafts[editLocale];
+      const showingBase = editLocale === BASE_LOCALE;
+
       editor.innerHTML = `
         <form data-content-form>
           <header class="panel__head cms-editor-head">
             <div>
-              <span>${escapeHtml(section.label.toUpperCase())}</span>
-              <h3>${escapeHtml(section.label)}</h3>
-              <p>${escapeHtml(section.description)}</p>
+              <span>${escapeHtml(sectionLabel(active).toUpperCase())}</span>
+              <h3>${escapeHtml(sectionLabel(active))}</h3>
+              <p>${escapeHtml(sectionDescription(active))}</p>
             </div>
             <div class="cms-editor-actions">
+              ${localeTabs("site-content")}
               <span data-content-state>${stateLabel(entry, dirty, saving, saveError)}</span>
-              <button class="button button--primary" type="submit" ${saving ? "disabled" : ""}>${saving ? "Saving..." : "Save Section"}</button>
+              <button class="button button--primary" type="submit" data-action-save ${saving ? "disabled" : ""}>${escapeHtml(saving ? t("content.saving") : t("content.saveSection"))}</button>
             </div>
           </header>
           <div class="cms-editor-meta">
-            <span>${hasConfiguredContent(entry) ? "CONFIGURED" : "FALLBACK"}</span>
-            <span>${entry.updatedAt ? `UPDATED ${escapeHtml(formatRelativeDay(entry.updatedAt))}` : "NO SAVED REVISION"}</span>
+            <span>${escapeHtml(hasConfiguredContent(entry) ? t("content.configuredBadge") : t("content.fallbackBadge"))}</span>
+            <span>${escapeHtml(entry.updatedAt ? t("content.updatedPrefix", { when: formatRelativeDay(entry.updatedAt) }) : t("content.noSavedRevision"))}</span>
+            <span data-translation-state>${escapeHtml(hasTranslation(entry) ? t("content.translationReady") : t("content.translationFallback"))}</span>
           </div>
           <p class="field-error" data-content-error hidden></p>
-          ${formFor(active, entry.content)}
+          ${formFor(active, draft, { editLocale, baseContent: sectionDrafts[BASE_LOCALE] })}
         </form>
       `;
 
       const form = editor.querySelector("[data-content-form]");
       const error = form.querySelector("[data-content-error]");
+
+      form.querySelectorAll("[data-locale-edit]").forEach((button) => {
+        const target = button.dataset.localeEdit;
+        const isActive = target === editLocale;
+        button.classList.toggle("is-active", isActive);
+        button.setAttribute("aria-pressed", String(isActive));
+        button.addEventListener("click", () => {
+          if (target === editLocale) return;
+          captureDraft();
+          editLocale = target;
+          renderEditor();
+          renderPreview();
+        });
+      });
+
       form.addEventListener("input", () => {
         dirty = true;
         saveError = false;
@@ -331,38 +485,59 @@ export const contentPage = {
       form.querySelector("[data-add-repeatable]")?.addEventListener("click", () => addRepeatableItem(form));
       form.addEventListener("click", (event) => {
         const remove = event.target.closest("[data-remove-repeatable]");
-        if (!remove) return;
+        if (!remove || !showingBase) return;
         remove.closest("[data-repeatable-item]")?.remove();
         dirty = true;
         saveError = false;
         renderEditorState();
         renderPreview();
       });
+
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         if (saving) return;
+        captureDraft();
         saving = true;
         saveError = false;
         renderEditorState();
         const button = form.querySelector('button[type="submit"]');
         button.disabled = true;
-        button.textContent = "Saving...";
+        button.textContent = t("content.saving");
+
+        const sectionDraftsNow = draftsFor(active);
+        const translation = sectionDraftsNow[TRANSLATION_LOCALE] ?? {};
+        // An entirely empty English draft is not persisted, so the record keeps
+        // no translation at all and the site falls back to Portuguese.
+        const hasAnyTranslation = Object.entries(translation).some(([key, value]) =>
+          key === "items" ? (value || []).length > 0 : String(value ?? "").trim() !== "",
+        );
+
         try {
-          const saved = await saveSiteContent({ key: active, content: contentFromForm(active, form) });
+          const saved = await saveSiteContent({
+            key: active,
+            content: sectionDraftsNow[BASE_LOCALE],
+            // Merging preserves any other locale the Admin does not edit yet.
+            translations: hasAnyTranslation
+              ? { ...(entry.translations ?? {}), [TRANSLATION_LOCALE]: translation }
+              : Object.fromEntries(
+                  Object.entries(entry.translations ?? {}).filter(([locale]) => locale !== TRANSLATION_LOCALE),
+                ),
+          });
           entries.set(active, saved);
+          drafts.delete(active);
           dirty = false;
-          await logActivity("Site content updated", `${section.label} updated`, {
+          await logActivity("Site content updated", `${sectionLabel(active)} updated`, {
             action: "site_content.updated",
             entityType: "site_content",
             entityId: active,
           });
-          showToast("Content saved.");
+          showToast(t("content.contentSaved"));
           saving = false;
           renderWorkspace();
         } catch (err) {
           saveError = true;
           saving = false;
-          const message = describeError(err, "Unable to save content.");
+          const message = describeError(err, t("content.saveError"));
           error.textContent = message;
           error.hidden = false;
           showToast(message);
@@ -370,7 +545,7 @@ export const contentPage = {
         } finally {
           if (button?.isConnected) {
             button.disabled = false;
-            button.textContent = "Save Section";
+            button.textContent = t("content.saveSection");
           }
         }
       });
@@ -382,13 +557,22 @@ export const contentPage = {
       renderPreview();
     }
 
+    // Changing the interface language keeps the active section, the content
+    // language being edited and every unsaved draft: the drafts are captured
+    // first and the workspace is rebuilt from them, not re-fetched.
+    onLocaleChange(workspace, () => {
+      if (!entries.size) return;
+      captureDraft();
+      renderWorkspace();
+    });
+
     try {
       entries = new Map((await getSiteContent()).map((entry) => [entry.key, entry]));
       renderWorkspace();
     } catch (error) {
-      editor.innerHTML = `<p class="empty-inline">${escapeHtml(describeError(error, "Unable to load site content."))}</p>`;
-      nav.innerHTML = '<p class="empty-inline">Sections unavailable.</p>';
-      preview.innerHTML = '<p class="empty-inline">Preview unavailable.</p>';
+      editor.innerHTML = `<p class="empty-inline">${escapeHtml(describeError(error, t("content.loadError")))}</p>`;
+      nav.innerHTML = `<p class="empty-inline">${escapeHtml(t("content.sectionsUnavailable"))}</p>`;
+      preview.innerHTML = `<p class="empty-inline">${escapeHtml(t("content.previewUnavailable"))}</p>`;
     } finally {
       workspace.removeAttribute("aria-busy");
     }

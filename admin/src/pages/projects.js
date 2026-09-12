@@ -1,7 +1,7 @@
 import { badge, badgeType } from "../components/badge.js";
 import { getProjects } from "../services/project-service.js";
 import { describeError } from "../services/errors.js";
-import { t } from "../i18n/index.js";
+import { onLocaleChange, t } from "../i18n/index.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
 function formatUpdated(iso) {
@@ -141,6 +141,12 @@ export const projectsPage = {
     search.addEventListener("input", renderList);
     sort.addEventListener("change", renderList);
 
+    // Re-renders from the projects already in memory, so switching locale keeps
+    // the typed search, the editorial filter and the sort without re-querying.
+    onLocaleChange(list, () => {
+      if (projects.length) renderList();
+    });
+
     try {
       projects = await getProjects();
       if (!list.isConnected) return;
@@ -149,7 +155,7 @@ export const projectsPage = {
       renderList();
     } catch (error) {
       if (!list.isConnected) return;
-      list.innerHTML = `<p class="empty-inline">${escapeHtml(describeError(error, "Unable to load projects."))}</p>`;
+      list.innerHTML = `<p class="empty-inline">${escapeHtml(describeError(error, t("projects.loadError")))}</p>`;
     } finally {
       list.removeAttribute("aria-busy");
     }

@@ -2,6 +2,7 @@ import { getSupabaseClient } from "../../lib/supabase.js";
 import { toDataError } from "../errors.js";
 import { formatCaseNumber, mapProjectFromDatabase, mapProjectToDatabase, parseCaseNumber } from "../mappers/project-mapper.js";
 import { supabaseMediaRepository } from "./supabase-media-repository.js";
+import { t } from "../../i18n/index.js";
 
 const TABLE = "projects";
 const GALLERY_TABLE = "project_gallery";
@@ -23,13 +24,13 @@ async function findRow(id, columns = "*") {
   const supabase = getSupabaseClient();
 
   if (UUID_PATTERN.test(String(id))) {
-    return unwrap(await supabase.from(TABLE).select(columns).eq("id", id).maybeSingle(), "Unable to load project.");
+    return unwrap(await supabase.from(TABLE).select(columns).eq("id", id).maybeSingle(), t("errors.data.loadProject"));
   }
 
   const caseNumber = parseCaseNumber(id);
   if (caseNumber === null) return null;
 
-  return unwrap(await supabase.from(TABLE).select(columns).eq("case_number", caseNumber).maybeSingle(), "Unable to load project.");
+  return unwrap(await supabase.from(TABLE).select(columns).eq("case_number", caseNumber).maybeSingle(), t("errors.data.loadProject"));
 }
 
 // Reconciles the gallery the editor holds with the rows already stored:
@@ -39,7 +40,7 @@ async function syncGallery(projectDbId, gallery) {
 
   const existing = unwrap(
     await supabase.from(GALLERY_TABLE).select("id").eq("project_id", projectDbId),
-    "Unable to load the gallery.",
+    t("errors.data.loadGallery"),
   );
   const existingIds = new Set(existing.map((row) => row.id));
 
@@ -63,7 +64,7 @@ async function syncGallery(projectDbId, gallery) {
 
   const removedIds = [...existingIds].filter((id) => !keptIds.has(id));
   if (removedIds.length) {
-    unwrap(await supabase.from(GALLERY_TABLE).delete().in("id", removedIds), "Unable to update the gallery.");
+    unwrap(await supabase.from(GALLERY_TABLE).delete().in("id", removedIds), t("errors.data.updateGallery"));
   }
 
   // Rewrite positions for the rows that stayed, so reordering persists.
@@ -71,13 +72,13 @@ async function syncGallery(projectDbId, gallery) {
     if (keptIds.has(item.id)) {
       unwrap(
         await supabase.from(GALLERY_TABLE).update({ position: index }).eq("id", item.id),
-        "Unable to update the gallery.",
+        t("errors.data.updateGallery"),
       );
     }
   }
 
   if (inserts.length) {
-    unwrap(await supabase.from(GALLERY_TABLE).insert(inserts), "Unable to save the gallery.");
+    unwrap(await supabase.from(GALLERY_TABLE).insert(inserts), t("errors.data.saveGallery"));
   }
 }
 
@@ -89,21 +90,21 @@ async function syncModules(projectDbId, modules) {
 
   const existing = unwrap(
     await supabase.from(MODULES_TABLE).select("id").eq("project_id", projectDbId),
-    "Unable to load project modules.",
+    t("errors.data.loadProjectModules"),
   );
   const existingIds = new Set(existing.map((row) => row.id));
   const keptIds = new Set(modules.filter((item) => item.id && existingIds.has(item.id)).map((item) => item.id));
   const removedIds = [...existingIds].filter((id) => !keptIds.has(id));
 
   if (removedIds.length) {
-    unwrap(await supabase.from(MODULES_TABLE).delete().in("id", removedIds), "Unable to update project modules.");
+    unwrap(await supabase.from(MODULES_TABLE).delete().in("id", removedIds), t("errors.data.updateProjectModules"));
   }
 
   for (const [index, item] of modules.entries()) {
     if (!keptIds.has(item.id)) continue;
     unwrap(
       await supabase.from(MODULES_TABLE).update({ position: 100000 + index }).eq("id", item.id),
-      "Unable to update project modules.",
+      t("errors.data.updateProjectModules"),
     );
   }
 
@@ -120,7 +121,7 @@ async function syncModules(projectDbId, modules) {
           translations: item.translations ?? {},
         })
         .eq("id", item.id),
-      "Unable to update project modules.",
+      t("errors.data.updateProjectModules"),
     );
   }
 
@@ -137,7 +138,7 @@ async function syncModules(projectDbId, modules) {
     }));
 
   if (inserts.length) {
-    unwrap(await supabase.from(MODULES_TABLE).insert(inserts), "Unable to save project modules.");
+    unwrap(await supabase.from(MODULES_TABLE).insert(inserts), t("errors.data.saveProjectModules"));
   }
 }
 
@@ -146,7 +147,7 @@ export const supabaseProjectRepository = {
     const supabase = getSupabaseClient();
     // The list view never renders images, so the gallery is left out here.
     const result = await supabase.from(TABLE).select("*").order("case_number", { ascending: true });
-    return unwrap(result, "Unable to load projects.").map(mapProjectFromDatabase);
+    return unwrap(result, t("errors.data.loadProjects")).map(mapProjectFromDatabase);
   },
 
   async getById(id) {
@@ -163,7 +164,7 @@ export const supabaseProjectRepository = {
       .limit(1)
       .maybeSingle();
 
-    const row = unwrap(result, "Unable to determine the next case number.");
+    const row = unwrap(result, t("errors.data.nextCaseNumber"));
     return formatCaseNumber((row?.case_number ?? 0) + 1);
   },
 
@@ -177,7 +178,7 @@ export const supabaseProjectRepository = {
 
     // published_at and the timestamps are owned by the database triggers.
     const created = mapProjectFromDatabase(
-      unwrap(await supabase.from(TABLE).insert(row).select("*").single(), "Unable to create project."),
+      unwrap(await supabase.from(TABLE).insert(row).select("*").single(), t("errors.data.createProject")),
     );
 
     if (data.gallery?.length) {
@@ -204,7 +205,7 @@ export const supabaseProjectRepository = {
     // Case number is editorial identity: it is assigned once and never patched.
     delete row.case_number;
 
-    unwrap(await supabase.from(TABLE).update(row).eq("id", existing.id).select("*").single(), "Unable to save changes.");
+    unwrap(await supabase.from(TABLE).update(row).eq("id", existing.id).select("*").single(), t("errors.data.saveChanges"));
 
     if (Array.isArray(patch.gallery)) {
       await syncGallery(existing.id, patch.gallery);
@@ -228,7 +229,7 @@ export const supabaseProjectRepository = {
     await supabaseMediaRepository.removeProjectFolder(existing.id).catch(() => ({ removed: 0 }));
 
     // project_gallery rows disappear through the foreign key cascade.
-    unwrap(await supabase.from(TABLE).delete().eq("id", existing.id), "Unable to delete project.");
+    unwrap(await supabase.from(TABLE).delete().eq("id", existing.id), t("errors.data.deleteProject"));
     return mapProjectFromDatabase(existing);
   },
 };

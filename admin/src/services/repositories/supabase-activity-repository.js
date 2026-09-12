@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "../../lib/supabase.js";
 import { toDataError } from "../errors.js";
+import { t } from "../../i18n/index.js";
 
 function mapRow(row) {
   return {
@@ -21,7 +22,7 @@ export const supabaseActivityRepository = {
       .select("*")
       .order("created_at", { ascending: false })
       .limit(limit);
-    if (error) throw toDataError(error, "Unable to load activity.");
+    if (error) throw toDataError(error, t("errors.data.loadActivity"));
     return (data ?? []).map(mapRow);
   },
 
@@ -40,7 +41,7 @@ export const supabaseActivityRepository = {
       })
       .select("*")
       .single();
-    if (error) throw toDataError(error, "Unable to record activity.");
+    if (error) throw toDataError(error, t("errors.data.recordActivity"));
     return mapRow(data);
   },
 };

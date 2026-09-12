@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "../../lib/supabase.js";
 import { toDataError } from "../errors.js";
+import { t } from "../../i18n/index.js";
 
 function mapRow(row) {
   row = row ?? {};
@@ -40,7 +41,7 @@ function unwrap(result, fallbackMessage) {
 export const supabaseSettingsRepository = {
   async get() {
     const result = await getSupabaseClient().from("site_settings").select("*").eq("key", "public").maybeSingle();
-    return mapRow(unwrap(result, "Unable to load site settings."));
+    return mapRow(unwrap(result, t("errors.data.loadSettings")));
   },
 
   async save(settings) {
@@ -51,6 +52,6 @@ export const supabaseSettingsRepository = {
       .upsert(toRow(settings, sessionData?.session?.user?.id ?? null), { onConflict: "key" })
       .select("*")
       .single();
-    return mapRow(unwrap(result, "Unable to save site settings."));
+    return mapRow(unwrap(result, t("errors.data.saveSettings")));
   },
 };

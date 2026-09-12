@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "../../lib/supabase.js";
 import { toDataError } from "../errors.js";
+import { t } from "../../i18n/index.js";
 
 function mapRow(row) {
   return {
@@ -19,7 +20,7 @@ function unwrap(result, fallbackMessage) {
 export const supabaseContentRepository = {
   async list() {
     const result = await getSupabaseClient().from("site_content").select("*").order("key", { ascending: true });
-    return unwrap(result, "Unable to load site content.").map(mapRow);
+    return unwrap(result, t("errors.data.loadContent")).map(mapRow);
   },
 
   async upsert(entry) {
@@ -35,6 +36,6 @@ export const supabaseContentRepository = {
       }, { onConflict: "key" })
       .select("*")
       .single();
-    return mapRow(unwrap(result, "Unable to save site content."));
+    return mapRow(unwrap(result, t("errors.data.saveContent")));
   },
 };

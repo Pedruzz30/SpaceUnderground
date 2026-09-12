@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "../../lib/supabase.js";
 import { toDataError } from "../errors.js";
+import { t } from "../../i18n/index.js";
 
 const BUCKET = "project-media";
 const SIGNED_URL_TTL_SECONDS = 3600;
@@ -78,7 +79,7 @@ export const supabaseMediaRepository = {
       cacheControl: "3600",
       upsert: false,
     });
-    if (error) throw toDataError(error, "Unable to upload the image.");
+    if (error) throw toDataError(error, t("errors.data.uploadImage"));
 
     return path;
   },
@@ -90,7 +91,7 @@ export const supabaseMediaRepository = {
 
     for (let attempt = 0; attempt < 3 && pending.length; attempt += 1) {
       const { error } = await supabase.storage.from(BUCKET).remove(pending);
-      if (error) throw toDataError(error, "Unable to remove the image.");
+      if (error) throw toDataError(error, t("errors.data.removeImage"));
 
       if (attempt < 2) {
         await sleep(450);
