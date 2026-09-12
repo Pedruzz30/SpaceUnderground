@@ -40,15 +40,53 @@ function productOptions() {
   }));
 }
 
-// Editorial copy only.
+// Editorial copy only, resolved for a given locale. Blank translations fall
+// through to the base value.
+function localizedFor(row, field, locale) {
+  const translated = row?.translations?.[locale]?.[field];
+  return String(translated ?? "").trim() !== "" ? translated : row?.[field];
+}
+
 function localized(row, field) {
-  const translated = row?.translations?.[getLocale()]?.[field];
-  return translated || row?.[field];
+  return localizedFor(row, field, getLocale());
 }
 
 // Structural values, read straight from the record.
 function base(value) {
   return typeof value === "string" ? value.trim() : value || "";
+}
+
+// Which plan fields follow the locale and which do not. Names ("Plus", "Pro",
+// "Max"), slug, monogram, price range, year, accent and position identify or
+// price the product and read identically in both languages; category, scope,
+// status, description and timeline are editorial copy.
+const LOCALIZED_PLAN_FIELDS = {
+  category: "category",
+  scope: "scope",
+  scopeShort: "scope_short",
+  status: "status",
+  description: "description",
+  timeline: "timeline",
+};
+
+/**
+ * Pure resolution of one plan row for a locale. Exported for tests so the
+ * structural/editorial split is pinned down rather than implied.
+ */
+export function localizePlanRow(row, basePlan = {}, locale = "pt-BR") {
+  const resolved = {
+    name: base(row?.name) || basePlan.name,
+    monogram: row?.monogram || basePlan.monogram,
+    range: base(row?.range) || basePlan.range,
+    year: row?.year ? String(row.year) : basePlan.year,
+    accent: row?.accent || basePlan.accent,
+  };
+
+  for (const [field, column] of Object.entries(LOCALIZED_PLAN_FIELDS)) {
+    resolved[field] = localizedFor(row, column, locale) || basePlan[field];
+  }
+
+  return resolved;
 }
 
 const scopeLines = (plan) => [
@@ -153,30 +191,16 @@ function applyPlanRow(row) {
         .filter(Boolean)
     : plan.included;
 
+  const resolved = localizePlanRow(row, plan, getLocale());
+  const commercial = plan.commercial || {};
+
   Object.assign(plan, {
-    name: base(row.name) || plan.name,
-    monogram: row.monogram || plan.monogram,
-    category: localized(row, "category") || plan.category,
-    range: base(row.range) || plan.range,
-    scope: localized(row, "scope") || plan.scope,
-    scopeShort: localized(row, "scope_short") || plan.scopeShort,
-    status: localized(row, "status") || plan.status,
-    description: localized(row, "description") || plan.description,
+    ...resolved,
     included,
-    timeline: row.timeline || plan.timeline,
-    year: row.year ? String(row.year) : plan.year,
-    accent: row.accent || plan.accent,
     commercial: {
-      ...(plan.commercial || {}),
-      category: localized(row, "category") || plan.commercial?.category || plan.category,
-      range: base(row.range) || plan.commercial?.range || plan.range,
-      scope: localized(row, "scope") || plan.commercial?.scope || plan.scope,
-      scopeShort: localized(row, "scope_short") || plan.commercial?.scopeShort || plan.scopeShort,
-      status: localized(row, "status") || plan.commercial?.status || plan.status,
-      description: localized(row, "description") || plan.commercial?.description || plan.description,
+      ...commercial,
+      ...localizePlanRow(row, { ...commercial, name: commercial.name ?? plan.name }, getLocale()),
       included,
-      timeline: row.timeline || plan.commercial?.timeline || plan.timeline,
-      accent: row.accent || plan.commercial?.accent,
     },
   });
 }
