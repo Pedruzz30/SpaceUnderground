@@ -1,0 +1,435 @@
+/* Dashboard command center. Composition, typography and hierarchy carry the
+   weight here — no new tokens, no extra effects, no parallel component set.
+   Shared primitives (.panel, .button, .badge, .ops-row, .ops-figures,
+   .ops-amount, .activity-list, .stats-grid) are reused as-is. */
+
+.dash-legend {
+  margin: calc(var(--space-3) * -1) 0 var(--space-4);
+}
+
+.dash-period {
+  display: grid;
+  min-width: 11rem;
+  gap: 0.4rem;
+}
+
+.dash-period > span {
+  color: var(--text-muted);
+  font: 600 0.62rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* --- modular grid ------------------------------------------------------- */
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.dash-grid > .panel {
+  min-width: 0;
+}
+
+/* --- needs attention / follow ups --------------------------------------- */
+
+.dash-queue {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.dash-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.75rem;
+  color: inherit;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.dash-queue-item:hover,
+.dash-queue-item:focus-visible {
+  border-color: var(--border);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.dash-queue-item__body {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+  flex: 1;
+}
+
+.dash-queue-item__category {
+  color: var(--text-muted);
+  font: 600 0.56rem/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dash-queue-item strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.dash-queue-item__detail {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.dash-queue-item > b {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.dash-queue-item:hover > b,
+.dash-queue-item:focus-visible > b {
+  color: var(--accent);
+}
+
+.dash-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.dash-dot--danger {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.dash-dot--warning {
+  background: var(--warning);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--warning) 12%, transparent);
+}
+
+.dash-inline-note {
+  margin: var(--space-3) 0 0;
+  color: var(--text-muted);
+  font: 500 0.6rem/1.5 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dash-inline-note--warn {
+  color: var(--warning);
+}
+
+/* --- quick actions ------------------------------------------------------ */
+
+.dash-actions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.dash-actions .button {
+  width: 100%;
+}
+
+/* --- project pulse ------------------------------------------------------ */
+
+.dash-pulse .ops-table__head,
+.dash-pulse .ops-row {
+  grid-template-columns: 4rem minmax(8rem, 1.5fr) 7.5rem 7.5rem 6rem 1.5rem;
+}
+
+.dash-skeleton {
+  position: relative;
+  min-height: 3.4rem;
+  margin-bottom: 0.4rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* Reuses the skeleton-shimmer keyframes already defined in components.css. */
+.dash-skeleton::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.055), transparent),
+    rgba(255, 255, 255, 0.018);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+/* --- commercial pipeline rail ------------------------------------------- */
+
+.dash-pipeline {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.dash-pipeline__row {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) 1.75rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dash-pipeline__label {
+  color: var(--text-muted);
+  font: 600 0.6rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.dash-pipeline__track,
+.dash-bar__track {
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dash-pipeline__track {
+  height: 6px;
+}
+
+/* The fill width is the one data-driven value on this page: it is set as a
+   custom property so the measurement stays in the markup and the styling
+   stays here. */
+.dash-pipeline__fill,
+.dash-bar__fill {
+  display: block;
+  width: var(--dash-fill, 0%);
+  height: 100%;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.dash-pipeline__row--won .dash-pipeline__fill {
+  background: color-mix(in srgb, var(--success) 75%, transparent);
+}
+
+.dash-pipeline__count {
+  color: var(--text-primary);
+  font: 600 0.78rem/1 var(--mono);
+  text-align: right;
+}
+
+.dash-figures {
+  margin-top: var(--space-3);
+}
+
+/* --- financial snapshot -------------------------------------------------- */
+
+.dash-hero {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0 0 var(--space-4);
+}
+
+.dash-hero > span {
+  color: var(--text-muted);
+  font: 600 0.6rem/1 var(--mono);
+  letter-spacing: 0.12em;
+}
+
+.dash-hero strong {
+  color: var(--accent);
+  font-size: clamp(1.9rem, 3.1vw, 2.5rem);
+  font-weight: 650;
+  line-height: 1;
+}
+
+.dash-bars {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: var(--space-4);
+}
+
+.dash-bar {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dash-bar__label {
+  color: var(--text-soft);
+  font: 500 0.72rem/1 var(--mono);
+}
+
+.dash-bar__track {
+  height: 8px;
+}
+
+.dash-bar__fill--in {
+  background: color-mix(in srgb, var(--success) 70%, transparent);
+}
+
+.dash-bar__fill--out {
+  background: color-mix(in srgb, var(--danger) 62%, transparent);
+}
+
+.dash-ledger {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  border-top: 1px solid var(--border);
+  padding: var(--space-3) 0 0;
+  list-style: none;
+}
+
+.dash-ledger li {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dash-ledger__type {
+  color: var(--text-muted);
+  font: 600 0.58rem/1 var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.dash-ledger__description {
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- system health ------------------------------------------------------- */
+
+.dash-health {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.dash-health small {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--text-muted);
+  font: 500 0.6rem/1.45 var(--mono);
+}
+
+.dash-health .dash-health-value--ok {
+  color: var(--success);
+}
+
+.dash-health .dash-health-value--warn {
+  color: var(--warning);
+}
+
+.dash-health .dash-health-value--danger {
+  color: var(--danger);
+}
+
+/* --- layout ------------------------------------------------------------- */
+
+/* Explicit areas rather than auto-placement: the DOM order is the mobile
+   reading order, and desktop rearranges finance/commercial around it. */
+@media (min-width: 861px) {
+  .dash-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .dash-panel--attention {
+    grid-area: 1 / 1 / 2 / 8;
+  }
+
+  /* Five shortcuts should not stretch to match a six-item attention list. */
+  .dash-panel--actions {
+    grid-area: 1 / 8 / 2 / 13;
+    align-self: start;
+  }
+
+  .dash-panel--pulse {
+    grid-area: 2 / 1 / 3 / 13;
+  }
+
+  .dash-panel--commercial {
+    grid-area: 3 / 1 / 4 / 7;
+  }
+
+  .dash-panel--finance {
+    grid-area: 3 / 7 / 4 / 13;
+  }
+
+  .dash-panel--followups {
+    grid-area: 4 / 1 / 5 / 7;
+  }
+
+  .dash-panel--activity {
+    grid-area: 4 / 7 / 5 / 13;
+  }
+
+  .dash-panel--health {
+    grid-area: 5 / 1 / 6 / 13;
+  }
+}
+
+@media (max-width: 1400px) {
+  .dash-pulse {
+    min-width: 41rem;
+  }
+}
+
+@media (max-width: 860px) {
+  .dash-pulse {
+    min-width: 0;
+  }
+
+  /* dashboard.css loads after operations.css, so the stacked-row template has
+     to be restated here or the desktop columns survive on a phone. */
+  .dash-pulse .ops-table__head,
+  .dash-pulse .ops-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .dash-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dash-actions .button:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  /* Two compact KPI tiles read better than a single column on a phone; the
+     selector outweighs the generic .stats-grid rule in responsive.css. */
+  .stats-grid.dash-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dash-period {
+    width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .dash-queue-item > b {
+    display: none;
+  }
+
+  .dash-ledger li,
+  .dash-bar,
+  .dash-pipeline__row {
+    gap: 0.5rem;
+  }
+
+  .dash-ledger li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .dash-ledger__type {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Four stacked KPI cards cost a full screen of scrolling before the first
+   panel; two compact tiles keep the strip readable on a phone. */
+@media (max-width: 360px) {
+  .stats-grid.dash-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

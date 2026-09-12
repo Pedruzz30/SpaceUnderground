@@ -1,6 +1,7 @@
 // Ponto de entrada. Cada modulo cuida de uma parte da pagina e se
 // inicializa sozinho; a ORDEM abaixo e a mesma do arquivo original.
 import { initCapabilitiesSection } from "./capabilities-section.js";
+import { initPublicContent } from "./public-content.js";
 import { initCommercialPositioning } from "./commercial-positioning.js";
 import { initScrollProgress } from "./scroll-progress.js";
 import { initMenu } from "./menu.js";
@@ -10,18 +11,18 @@ import { initFooterYear } from "./footer-year.js";
 import { initProjectDialog } from "./project-dialog.js";
 import { initProjectHydrator } from "./project-hydrator.js";
 import { initSignalFrame } from "./signal-frame.js";
+import { initPublicProjects } from "./public-projects.js";
 import { initProjectForm } from "./project-form.js";
 import { initPointerEffects } from "./pointer-effects.js";
+import { initI18n } from "./i18n/index.js";
 
 document.documentElement.classList.add("js");
-
-// A localizacao do HTML e feita no build pelo vite.config.js. Nao mantemos
-// MutationObserver de traducao no navegador: ele era redundante, podia
-// retransladar textos ja em pt-BR e gerar trabalho continuo no DOM.
+initI18n();
 
 // Insere a camada de posicionamento Sites > Sistemas > Automacao > IA antes
 // do sistema de reveal e da navegacao observarem as secoes da pagina.
 initCapabilitiesSection();
+initPublicContent();
 
 // Reposiciona a area comercial e expande o formulario antes de dialog/form
 // capturarem os elementos e conectarem seus listeners.
@@ -39,3 +40,7 @@ initProjectDialog();
 initSignalFrame();
 initProjectForm();
 initPointerEffects();
+
+// Live data arrives after the page is already usable: the database decides
+// which cases stay published, never blocking the first paint.
+initPublicProjects();

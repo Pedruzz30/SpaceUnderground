@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,32 +22,36 @@
     <script type="module" src="src/scripts/main.js"></script>
   </head>
   <body>
-    <a class="skip-link" href="#main-content">Skip to content</a>
+    <a class="skip-link" href="#main-content" data-i18n="accessibility.skip">Pular para o conteúdo</a>
     <div class="scroll-progress" aria-hidden="true"><span></span></div>
     <div class="cursor-aura" aria-hidden="true"></div>
 
     <header class="site-header" data-header>
       <div class="container header__inner">
-        <a class="brand" href="#home" aria-label="Space Underground home">
+        <a class="brand" href="#home" aria-label="Início da SPACE UNDERGROUND" data-i18n-aria-label="accessibility.home">
           <span class="brand__mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
           <span class="brand__name">SPACE<br>UNDERGROUND</span>
         </a>
 
-        <nav class="site-nav" id="site-nav" aria-label="Primary navigation" data-nav>
-          <a class="nav-link is-active" href="#home" aria-current="location">Home</a>
-          <a class="nav-link" href="#services">Studio</a>
-          <a class="nav-link" href="#work">Work</a>
-          <a class="nav-link" href="#labs">Labs</a>
-          <a class="nav-link" href="#plans">Plans</a>
-          <a class="nav-link" href="#about">About</a>
-          <a class="nav-link" href="#contact">Contact</a>
+        <nav class="site-nav" id="site-nav" aria-label="Navegação principal" data-nav data-i18n-aria-label="accessibility.primaryNavigation">
+          <a class="nav-link is-active" href="#home" aria-current="location" data-i18n="navigation.home">Início</a>
+          <a class="nav-link" href="#services" data-i18n="navigation.studio">Studio</a>
+          <a class="nav-link" href="#work" data-i18n="navigation.work">Projetos</a>
+          <a class="nav-link" href="#labs" data-i18n="navigation.labs">Labs</a>
+          <a class="nav-link" href="#plans" data-i18n="navigation.plans">Planos</a>
+          <a class="nav-link" href="#about" data-i18n="navigation.about">Sobre</a>
+          <a class="nav-link" href="#contact" data-i18n="navigation.contact">Contato</a>
           <a class="button button--primary nav-cta" href="#project-request">
-            <span>Start a Project</span>
+            <span data-i18n="navigation.startProject">Iniciar um Projeto</span>
             <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
           </a>
+          <span class="site-locale-switcher" role="group" aria-label="Idioma do site" data-i18n-aria-label="accessibility.language">
+            <button type="button" data-locale-switch="pt-BR" aria-pressed="true" aria-current="true" data-i18n="locale.pt">PT</button>
+            <button type="button" data-locale-switch="en" aria-pressed="false" data-i18n="locale.en">EN</button>
+          </span>
         </nav>
 
-        <button class="menu-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Open menu" data-menu-toggle>
+        <button class="menu-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Abrir menu" data-menu-toggle data-i18n-aria-label="accessibility.openMenu">
           <span></span><span></span>
         </button>
       </div>
@@ -60,24 +64,24 @@
           <div class="hero__copy">
             <p class="eyebrow reveal" data-reveal>
               <span class="status-dot" aria-hidden="true"></span>
-              Independent digital studio
+              <span data-i18n="hero.eyebrow">Estúdio digital independente</span>
               <span class="eyebrow__code">SU / 001</span>
             </p>
 
-            <h1 class="hero__title" id="hero-title" aria-label="Build what shouldn't exist yet.">
-              <span class="title-line"><span>Build what</span></span>
-              <span class="title-line title-line--offset"><span>shouldn't</span></span>
-              <span class="title-line"><span class="title-accent">exist</span> <span>yet.</span></span>
+            <h1 class="hero__title" id="hero-title" aria-label="Crie o que ainda não deveria existir." data-i18n-aria-label="hero.title">
+              <span class="title-line"><span data-i18n="hero.line1">Crie o que</span></span>
+              <span class="title-line title-line--offset"><span data-i18n="hero.line2">ainda não deveria</span></span>
+              <span class="title-line"><span class="title-accent" data-i18n="hero.line3Accent">existir</span> <span data-i18n="hero.line3">ainda.</span></span>
             </h1>
 
             <div class="hero__lower reveal" data-reveal>
-              <p class="hero__lede">Digital experiences, websites, systems and products built below the obvious.</p>
+              <p class="hero__lede" data-i18n="hero.lede">Experiências digitais, sites, sistemas e produtos criados além do óbvio.</p>
               <div class="hero__actions">
                 <a class="button button--primary" href="#project-request">
-                  <span>Start a Project</span>
+                  <span data-i18n="navigation.startProject">Iniciar um Projeto</span>
                   <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
                 </a>
-                <a class="text-link" href="#work"><span>Explore Our Work</span><i aria-hidden="true"></i></a>
+                <a class="text-link" href="#work"><span data-i18n="hero.explore">Conheça nossos projetos</span><i aria-hidden="true"></i></a>
               </div>
             </div>
           </div>
@@ -106,8 +110,8 @@
           </div>
 
           <div class="hero__footer reveal" data-reveal>
-            <a class="scroll-cue" href="#services"><span>Scroll to explore</span><i aria-hidden="true"></i></a>
-            <p>STUDIO <span>+</span> SYSTEMS <span>+</span> LABS</p>
+            <a class="scroll-cue" href="#services"><span data-i18n="hero.scroll">Role para explorar</span><i aria-hidden="true"></i></a>
+            <p data-i18n="hero.footer">STUDIO + SISTEMAS + LABS</p>
           </div>
         </div>
       </section>
@@ -115,40 +119,40 @@
       <section class="section services" id="services" aria-labelledby="services-title">
         <div class="container">
           <header class="section-heading reveal" data-reveal>
-            <p class="section-label"><span>01</span> Space / Studio</p>
-            <h2 id="services-title">What we <em>build.</em></h2>
-            <p class="section-intro">Client work for brands and businesses that need digital experiences with structure, intent and a sharper point of view.</p>
+            <p class="section-label"><span>01</span> <span data-i18n="services.label">SPACE / ESTÚDIO</span></p>
+            <h2 id="services-title" data-i18n-html="services.title">O que <em>construímos.</em></h2>
+            <p class="section-intro" data-i18n="services.intro">Projetos para marcas e empresas que precisam de experiências digitais com estrutura, intenção e uma identidade mais marcante.</p>
           </header>
 
           <div class="service-list">
             <a class="service-item reveal" data-reveal href="#project-request">
               <span class="service-item__number">01</span>
-              <h3>Landing Pages</h3>
-              <p>Conversion-focused digital experiences designed around a specific product, service or campaign.</p>
+              <h3 data-i18n="services.landingTitle">Landing Pages</h3>
+              <p data-i18n="services.landingText">Experiências digitais focadas em conversão, criadas para um produto, serviço ou campanha específica.</p>
               <span class="service-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19 19 5M8 5h11v11"/></svg></span>
             </a>
             <a class="service-item reveal" data-reveal href="#project-request">
               <span class="service-item__number">02</span>
-              <h3>Portfolio Websites</h3>
-              <p>Custom digital portfolios for professionals, creators and brands.</p>
+              <h3 data-i18n="services.portfolioTitle">Sites de Portfólio</h3>
+              <p data-i18n="services.portfolioText">Portfólios digitais personalizados para profissionais, criadores e marcas.</p>
               <span class="service-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19 19 5M8 5h11v11"/></svg></span>
             </a>
             <a class="service-item reveal" data-reveal href="#project-request">
               <span class="service-item__number">03</span>
-              <h3>Institutional Websites</h3>
-              <p>Complete multi-page digital experiences for companies and businesses.</p>
+              <h3 data-i18n="services.institutionalTitle">Sites Institucionais</h3>
+              <p data-i18n="services.institutionalText">Experiências digitais completas, com múltiplas páginas, para empresas e negócios.</p>
               <span class="service-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19 19 5M8 5h11v11"/></svg></span>
             </a>
             <a class="service-item reveal" data-reveal href="#project-request">
               <span class="service-item__number">04</span>
-              <h3>E-commerce</h3>
-              <p>Online stores designed around product discovery, usability and conversion.</p>
+              <h3 data-i18n="services.ecommerceTitle">E-commerce</h3>
+              <p data-i18n="services.ecommerceText">Lojas virtuais pensadas para descoberta de produtos, usabilidade e conversão.</p>
               <span class="service-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19 19 5M8 5h11v11"/></svg></span>
             </a>
             <a class="service-item reveal" data-reveal href="#project-request">
               <span class="service-item__number">05</span>
-              <h3>Web Systems</h3>
-              <p>Custom dashboards, internal platforms and business tools.</p>
+              <h3 data-i18n="services.systemsTitle">Sistemas Web</h3>
+              <p data-i18n="services.systemsText">Dashboards, plataformas internas e ferramentas de negócio sob medida.</p>
               <span class="service-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19 19 5M8 5h11v11"/></svg></span>
             </a>
           </div>
@@ -159,163 +163,97 @@
         <div class="container">
           <header class="section-heading section-heading--row reveal" data-reveal>
             <div>
-              <p class="section-label"><span>02</span> Selected Work</p>
-              <h2 id="work-title">Live <em>projects.</em></h2>
+              <p class="section-label"><span>02</span> <span data-i18n="work.label">Projetos Selecionados</span></p>
+              <h2 id="work-title" data-i18n-html="work.title">Projetos <em>ao vivo.</em></h2>
             </div>
-            <p class="section-intro">Live client projects presented in a single frame. Switch between cases below; the reserved slots are next in line.</p>
+            <p class="section-intro" data-i18n="work.intro">Projetos reais de clientes apresentados em um único quadro.</p>
           </header>
 
           <div class="projects">
             <article class="project project--featured reveal" data-reveal>
               <div class="project__visual project__visual--signal">
                 <div class="visual-index" data-viewer-index>CASE / 001</div>
-                <div class="signal-ui signal-ui--website is-preview-sleeping" data-live-project data-project-viewer data-project-url="https://pedruzz30.github.io/TattooSite/" data-project-preview-url="https://pedruzz30.github.io/TattooSite/?embed=spaceunderground" data-project-poster="./tattoo-preview-poster.png">
+                <div class="signal-ui signal-ui--website is-preview-sleeping" data-live-project data-project-viewer data-project-url="" data-project-preview-url="" data-project-poster="">
                   <div class="signal-ui__rail">
                     <span class="signal-logo">S/</span>
-                    <span class="signal-ui__rail-track" role="group" aria-label="Selected work / project selector">
-                      <button class="signal-ui__slot is-active" type="button" data-project-slot="ink" aria-pressed="true" aria-label="Show project 001 — INK Tattoo">
-                        <i></i>
-                        <span class="signal-ui__slot-tip" aria-hidden="true"><em>PROJECT / 001</em>INK TATTOO</span>
-                      </button>
-                      <button class="signal-ui__slot" type="button" data-project-slot="lucas" aria-pressed="false" aria-label="Show project 002 — Lucas Souza">
-                        <i></i>
-                        <span class="signal-ui__slot-tip" aria-hidden="true"><em>PROJECT / 002</em>LUCAS SOUZA</span>
-                      </button>
-                      <button class="signal-ui__slot is-reserved" type="button" data-project-slot="slot-003" data-slot-reserved aria-disabled="true" aria-label="Project slot 003 — reserved">
-                        <i></i>
-                        <span class="signal-ui__slot-tip" aria-hidden="true"><em>PROJECT / 003</em>RESERVED</span>
-                      </button>
-                      <button class="signal-ui__slot is-reserved" type="button" data-project-slot="slot-004" data-slot-reserved aria-disabled="true" aria-label="Project slot 004 — reserved">
-                        <i></i>
-                        <span class="signal-ui__slot-tip" aria-hidden="true"><em>PROJECT / 004</em>RESERVED</span>
-                      </button>
-                      <button class="signal-ui__slot is-reserved" type="button" data-project-slot="slot-005" data-slot-reserved aria-disabled="true" aria-label="Project slot 005 — reserved">
-                        <i></i>
-                        <span class="signal-ui__slot-tip" aria-hidden="true"><em>PROJECT / 005</em>RESERVED</span>
-                      </button>
+                    <span class="signal-ui__rail-track" role="group" aria-label="Projetos selecionados / seletor de projeto" data-i18n-aria-label="work.projectSelector">
+                      <span class="empty-inline" data-i18n="work.loading">Carregando projetos...</span>
                     </span>
                   </div>
                   <div class="signal-ui__case">
                     <div class="signal-ui__stage">
                       <div class="signal-ui__editorial">
-                        <span class="signal-ui__eyebrow" data-viewer-eyebrow>CLIENT / 001</span>
-                        <strong data-viewer-client>INK TATTOO</strong>
-                        <small data-viewer-category>DIGITAL IDENTITY &amp; PORTFOLIO</small>
-                        <p data-viewer-description>A dark editorial experience built around tattoo culture, motion and visual depth.</p>
-                        <button class="signal-ui__ghost-cta" type="button" data-signal-open><i aria-hidden="true"></i>VIEW LIVE</button>
+                        <span class="signal-ui__eyebrow" data-viewer-eyebrow data-i18n="work.clientPending">CLIENTE / --</span>
+                        <strong data-viewer-client>SPACE UNDERGROUND</strong>
+                        <small data-viewer-category data-i18n="work.categoryPending">VISUALIZADOR DE PROJETO</small>
+                        <p data-viewer-description data-i18n="work.unavailable">Projetos temporariamente indisponíveis.</p>
+                        <button class="signal-ui__ghost-cta" type="button" data-signal-open><i aria-hidden="true"></i><span data-i18n="work.viewLive">VER AO VIVO</span></button>
                       </div>
                       <div class="signal-ui__browser">
                         <div class="signal-ui__toolbar">
-                          <span class="signal-ui__dots" role="group" aria-label="Preview view mode">
-                            <button class="is-active" type="button" data-signal-mode="overview" aria-label="View mode: overview" aria-pressed="true"><i></i></button>
-                            <button type="button" data-signal-mode="site" aria-label="View mode: site" aria-pressed="false"><i></i></button>
-                            <button type="button" data-signal-mode="detail" aria-label="View mode: detail" aria-pressed="false"><i></i></button>
+                          <span class="signal-ui__dots" role="group" aria-label="Modo de visualização da prévia" data-i18n-aria-label="work.previewModes">
+                            <button class="is-active" type="button" data-signal-mode="overview" aria-label="Modo de visualização: visão geral" data-i18n-aria-label="work.modeOverview" aria-pressed="true"><i></i></button>
+                            <button type="button" data-signal-mode="site" aria-label="Modo de visualização: site" data-i18n-aria-label="work.modeSite" aria-pressed="false"><i></i></button>
+                            <button type="button" data-signal-mode="detail" aria-label="Modo de visualização: detalhes" data-i18n-aria-label="work.modeDetail" aria-pressed="false"><i></i></button>
                           </span>
-                          <button class="signal-ui__address" type="button" data-signal-open><i aria-hidden="true"></i><span data-viewer-address>INK TATTOO / PRODUCTION</span></button>
-                          <button class="signal-ui__expand" type="button" data-signal-open data-viewer-open aria-label="Open INK Tattoo website in a new tab"></button>
+                          <button class="signal-ui__address" type="button" data-signal-open><i aria-hidden="true"></i><span data-viewer-address data-i18n="work.addressPending">AGUARDANDO DADOS</span></button>
+                          <button class="signal-ui__expand" type="button" data-signal-open data-viewer-open aria-label="Abrir projeto em uma nova aba" data-i18n-aria-label="work.openProjectTab"></button>
                         </div>
                         <div class="signal-ui__website-viewport">
                           <picture>
-                            <source data-poster-source="avif" srcset="./tattoo-preview-poster.avif" type="image/avif">
-                            <source data-poster-source="webp" srcset="./tattoo-preview-poster.webp" type="image/webp">
-                            <img class="signal-ui__poster" src="./tattoo-preview-poster.png" alt="" width="1440" height="900" loading="lazy" decoding="async" onerror="this.onerror=null;this.parentNode.querySelectorAll('source').forEach(s=>s.srcset=s.srcset.replace('./','./public/'));this.src='./public/tattoo-preview-poster.png'">
+                            <source data-poster-source="avif" srcset="" type="image/avif">
+                            <source data-poster-source="webp" srcset="" type="image/webp">
+                            <img class="signal-ui__poster" src="" alt="" width="1440" height="900" loading="lazy" decoding="async">
                           </picture>
                           <div class="signal-ui__website-surface">
-                            <iframe src="about:blank" data-src="https://pedruzz30.github.io/TattooSite/?embed=spaceunderground" title="INK Tattoo live website preview" loading="lazy" tabindex="-1"></iframe>
+                            <iframe src="about:blank" data-src="" title="Prévia do site ao vivo" data-i18n-title="work.livePreviewTitle" loading="lazy" tabindex="-1"></iframe>
                           </div>
                         </div>
                       </div>
                     </div>
                     <div class="signal-ui__summary">
-                      <button class="signal-ui__direction signal-ui__module" type="button" data-signal-mode="overview" aria-label="Restore overview mode" aria-pressed="true">
-                        <span data-viewer-system>EXPERIENCE SYSTEM / 01</span>
-                        <strong data-viewer-client>INK TATTOO</strong>
-                        <small data-viewer-label>PORTFOLIO</small>
+                      <button class="signal-ui__direction signal-ui__module" type="button" data-signal-mode="overview" aria-label="Restaurar visão geral" data-i18n-aria-label="work.restoreOverview" aria-pressed="true">
+                        <span data-viewer-system data-i18n="work.systemPending">SISTEMA DO PROJETO</span>
+                        <strong data-viewer-client>SPACE UNDERGROUND</strong>
+                        <small data-viewer-label data-i18n="work.labelPending">AGUARDANDO</small>
                       </button>
                       <ol class="signal-ui__pillars">
-                        <li><button class="signal-ui__module" type="button" data-signal-mode="detail" data-viewer-module="0" aria-pressed="false"><span>01</span><div><strong>ART DIRECTION</strong><small>MONOCHROME DEPTH</small></div></button></li>
-                        <li><button class="signal-ui__module" type="button" data-signal-mode="site" data-viewer-module="1" aria-pressed="false"><span>02</span><div><strong>INTERACTION</strong><small>FLUID MOTION</small></div></button></li>
-                        <li><button class="signal-ui__module" type="button" data-signal-mode="detail" data-viewer-module="2" aria-pressed="false"><span>03</span><div><strong>EXPERIENCE</strong><small>EDITORIAL RHYTHM</small></div></button></li>
+                        <li><button class="signal-ui__module" type="button" data-signal-mode="detail" data-viewer-module="0" aria-pressed="false" hidden><span>01</span><div><strong></strong><small></small></div></button></li>
+                        <li><button class="signal-ui__module" type="button" data-signal-mode="site" data-viewer-module="1" aria-pressed="false" hidden><span>02</span><div><strong></strong><small></small></div></button></li>
+                        <li><button class="signal-ui__module" type="button" data-signal-mode="detail" data-viewer-module="2" aria-pressed="false" hidden><span>03</span><div><strong></strong><small></small></div></button></li>
                       </ol>
-                      <button class="signal-ui__signature signal-ui__module" type="button" data-signal-mode="origin" aria-label="Inspect studio origin" aria-pressed="false">
-                        <span data-preview-status>PREVIEW / SLEEP</span>
-                        <strong data-viewer-origin>RJ / BR</strong>
-                        <small data-viewer-coordinates>22&deg;54&#39;S
-43&deg;12&#39;W</small>
+                      <button class="signal-ui__signature signal-ui__module" type="button" data-signal-mode="origin" aria-label="Inspecionar origem do estúdio" data-i18n-aria-label="work.inspectOrigin" aria-pressed="false">
+                        <span data-preview-status>PRÉVIA / EM ESPERA</span>
+                        <strong data-viewer-origin>--</strong>
+                        <small data-viewer-coordinates>--</small>
                         <i></i>
                       </button>
                     </div>
                   </div>
                 </div>
-                <a class="project__visual-link" data-viewer-link href="https://pedruzz30.github.io/TattooSite/" target="_blank" rel="noopener noreferrer" aria-label="View INK Tattoo website (opens in a new tab)"></a>
+                <a class="project__visual-link" data-viewer-link href="#" target="_blank" rel="noopener noreferrer" aria-label="Ver projeto (abre em uma nova aba)" data-i18n-aria-label="work.viewProjectTab"></a>
               </div>
               <div class="project__details">
                 <div>
-                  <p class="project__meta">LIVE PROJECT <span data-viewer-year>YEAR — 2026</span></p>
-                  <h3 data-viewer-name>INK Tattoo</h3>
+                  <p class="project__meta"><span data-i18n="work.activeProject">PROJETO ATIVO</span> <span data-viewer-year data-i18n="work.yearPending">ANO — --</span></p>
+                  <h3 data-viewer-name data-i18n="work.namePending">Projetos Selecionados</h3>
                 </div>
-                <p data-viewer-specs>TYPE — PORTFOLIO WEBSITE
-TECH — HTML / CSS / JAVASCRIPT
-STATUS — LIVE</p>
-                <a class="text-link" data-viewer-link href="https://pedruzz30.github.io/TattooSite/" target="_blank" rel="noopener noreferrer" aria-label="View INK Tattoo website (opens in a new tab)"><span>View Project</span><i aria-hidden="true"></i></a>
+                <p data-viewer-specs data-i18n="work.statusUnavailable">STATUS — TEMPORARIAMENTE INDISPONÍVEL</p>
+                <a class="text-link" data-viewer-link href="#" target="_blank" rel="noopener noreferrer" aria-label="Ver projeto (abre em uma nova aba)" data-i18n-aria-label="work.viewProjectTab"><span data-i18n="work.viewProject">Ver Projeto</span><i aria-hidden="true"></i></a>
               </div>
+              <div class="project-gallery" data-viewer-gallery hidden></div>
             </article>
           </div>
 
           <div class="case-index reveal" data-case-index data-reveal>
             <div class="case-index__head">
-              <span>Index / 001—005</span>
-              <span>One frame, one project at a time</span>
+              <span data-i18n="work.indexPending">Índice / --</span>
+              <span data-i18n="work.indexNote">Um quadro, um projeto por vez</span>
             </div>
             <ol class="case-index__list">
               <li>
-                <button class="case-index__row is-active" type="button" data-project-slot="ink" aria-pressed="true">
-                  <span class="case-index__id">001</span>
-                  <span class="case-index__name">INK Tattoo</span>
-                  <span class="case-index__type">Portfolio website</span>
-                  <span class="case-index__year">2026</span>
-                  <span class="case-index__status"><i aria-hidden="true"></i>Live</span>
-                  <span class="case-index__go" aria-hidden="true">↗</span>
-                </button>
-              </li>
-              <li>
-                <button class="case-index__row" type="button" data-project-slot="lucas" aria-pressed="false">
-                  <span class="case-index__id">002</span>
-                  <span class="case-index__name">Lucas Souza</span>
-                  <span class="case-index__type">Sports nutrition website</span>
-                  <span class="case-index__year">2026</span>
-                  <span class="case-index__status"><i aria-hidden="true"></i>Live</span>
-                  <span class="case-index__go" aria-hidden="true">↗</span>
-                </button>
-              </li>
-              <li>
-                <span class="case-index__row is-reserved" data-project-slot="slot-003" data-slot-reserved>
-                  <span class="case-index__id">003</span>
-                  <span class="case-index__name">—</span>
-                  <span class="case-index__type">Slot reserved</span>
-                  <span class="case-index__year">—</span>
-                  <span class="case-index__status">Reserved</span>
-                  <span class="case-index__go" aria-hidden="true"></span>
-                </span>
-              </li>
-              <li>
-                <span class="case-index__row is-reserved" data-project-slot="slot-004" data-slot-reserved>
-                  <span class="case-index__id">004</span>
-                  <span class="case-index__name">—</span>
-                  <span class="case-index__type">Slot reserved</span>
-                  <span class="case-index__year">—</span>
-                  <span class="case-index__status">Reserved</span>
-                  <span class="case-index__go" aria-hidden="true"></span>
-                </span>
-              </li>
-              <li>
-                <span class="case-index__row is-reserved" data-project-slot="slot-005" data-slot-reserved>
-                  <span class="case-index__id">005</span>
-                  <span class="case-index__name">—</span>
-                  <span class="case-index__type">Slot reserved</span>
-                  <span class="case-index__year">—</span>
-                  <span class="case-index__status">Reserved</span>
-                  <span class="case-index__go" aria-hidden="true"></span>
+                <span class="case-index__row is-reserved">
+                  <span class="case-index__name" data-i18n="work.unavailable">Projetos temporariamente indisponíveis.</span>
                 </span>
               </li>
             </ol>
@@ -327,17 +265,17 @@ STATUS — LIVE</p>
         <div class="labs__grid" aria-hidden="true"></div>
         <div class="container labs__inner">
           <div class="labs__copy reveal" data-reveal>
-            <p class="section-label"><span>03</span> Space / Labs</p>
-            <h2 id="labs-title">Products built <em>underground.</em></h2>
-            <p>Independent software, experiments and digital products researched inside Space Underground. Nothing is announced before it exists.</p>
-            <p class="labs__status">Research / Active</p>
+            <p class="section-label"><span>03</span> <span data-i18n="labs.label">SPACE / LABORATÓRIO</span></p>
+            <h2 id="labs-title" data-i18n-html="labs.title">Produtos criados <em>no subterrâneo.</em></h2>
+            <p data-i18n="labs.copy">Softwares independentes, experimentos e produtos digitais pesquisados dentro da SPACE UNDERGROUND. Nada é anunciado antes de existir.</p>
+            <p class="labs__status" data-i18n="labs.status">Pesquisa / Ativo</p>
           </div>
-          <article class="labs-product reveal" data-reveal aria-label="Space Labs research status">
+          <article class="labs-product reveal" data-reveal aria-label="Status de pesquisa do laboratório da SPACE UNDERGROUND" data-i18n-aria-label="accessibility.labsResearch">
             <div class="labs-product__top">
               <span>LAB_001</span>
-              <span>STATUS — RESEARCH</span>
+              <span data-i18n="labs.productStatus">STATUS — PESQUISA</span>
             </div>
-            <p>First system currently under research.</p>
+            <p data-i18n="labs.productText">Primeiro sistema atualmente em pesquisa.</p>
             <div class="labs-product__signal" aria-hidden="true">
               <span></span><span></span><span></span><span></span>
             </div>
@@ -348,19 +286,19 @@ STATUS — LIVE</p>
       <section class="statement" id="philosophy" aria-labelledby="statement-title">
         <div class="statement__grid" aria-hidden="true"></div>
         <div class="container statement__inner">
-          <p class="section-label reveal" data-reveal><span>04</span> Point of view</p>
+          <p class="section-label reveal" data-reveal><span>04</span> <span data-i18n="statement.label">Ponto de vista</span></p>
           <p class="statement__coordinate statement__coordinate--a" aria-hidden="true">X: 046.6333<br>Y: -23.5505</p>
           <p class="statement__coordinate statement__coordinate--b" aria-hidden="true">MEM_00A<br>EST. 2026</p>
           <h2 id="statement-title" class="statement__title">
-            <span class="statement-line"><span>We don't build websites</span></span>
-            <span class="statement-line"><span>just to <em>exist.</em></span></span>
-            <span class="statement-line statement-line--gap"><span>We build digital spaces</span></span>
-            <span class="statement-line"><span>designed to be <strong>remembered.</strong></span></span>
+            <span class="statement-line"><span data-i18n="statement.line1">Não criamos sites</span></span>
+            <span class="statement-line"><span data-i18n-html="statement.line2">apenas para <em>existir.</em></span></span>
+            <span class="statement-line statement-line--gap"><span data-i18n="statement.line3">Criamos espaços digitais</span></span>
+            <span class="statement-line"><span data-i18n-html="statement.line4">feitos para serem <strong>lembrados.</strong></span></span>
           </h2>
           <div class="statement__seal reveal" data-reveal aria-hidden="true">
             <svg viewBox="0 0 120 120">
               <defs><path id="sealPath" d="M60,60 m-43,0 a43,43 0 1,1 86,0 a43,43 0 1,1 -86,0"/></defs>
-              <text><textPath href="#sealPath">SPACE UNDERGROUND — DIGITAL STUDIO — </textPath></text>
+              <text><textPath href="#sealPath" data-i18n="statement.seal">SPACE UNDERGROUND — ESTÚDIO DIGITAL — </textPath></text>
             </svg>
             <span>SU</span>
           </div>
@@ -371,36 +309,36 @@ STATUS — LIVE</p>
         <div class="container">
           <header class="section-heading section-heading--row reveal" data-reveal>
             <div>
-              <p class="section-label"><span>05</span> Process</p>
-              <h2 id="process-title">From idea <em>to launch.</em></h2>
+              <p class="section-label"><span>05</span> <span data-i18n="process.label">Processo</span></p>
+              <h2 id="process-title" data-i18n-html="process.title">Da ideia <em>ao lançamento.</em></h2>
             </div>
-            <p class="section-intro">A focused, collaborative process that keeps decisions clear and momentum high.</p>
+            <p class="section-intro" data-i18n="process.intro">Um processo focado e colaborativo que mantém as decisões claras e o ritmo alto.</p>
           </header>
 
           <ol class="timeline">
             <li class="timeline__item reveal" data-reveal>
               <span class="timeline__dot" aria-hidden="true"></span>
               <span class="timeline__number">01</span>
-              <h3>Discovery</h3>
-              <p>Understand the business, audience and problem.</p>
+              <h3 data-i18n="process.step1Title">Descoberta</h3>
+              <p data-i18n="process.step1Text">Entender o negócio, o público e o problema.</p>
             </li>
             <li class="timeline__item reveal" data-reveal>
               <span class="timeline__dot" aria-hidden="true"></span>
               <span class="timeline__number">02</span>
-              <h3>Direction</h3>
-              <p>Define strategy, structure and visual identity.</p>
+              <h3 data-i18n="process.step2Title">Direção</h3>
+              <p data-i18n="process.step2Text">Definir estratégia, estrutura e identidade visual.</p>
             </li>
             <li class="timeline__item reveal" data-reveal>
               <span class="timeline__dot" aria-hidden="true"></span>
               <span class="timeline__number">03</span>
-              <h3>Build</h3>
-              <p>Design and develop the digital experience.</p>
+              <h3 data-i18n="process.step3Title">Construção</h3>
+              <p data-i18n="process.step3Text">Projetar e desenvolver a experiência digital.</p>
             </li>
             <li class="timeline__item reveal" data-reveal>
               <span class="timeline__dot" aria-hidden="true"></span>
               <span class="timeline__number">04</span>
-              <h3>Launch</h3>
-              <p>Test, optimize and put the project into production.</p>
+              <h3 data-i18n="process.step4Title">Lançamento</h3>
+              <p data-i18n="process.step4Text">Testar, otimizar e colocar o projeto em produção.</p>
             </li>
           </ol>
         </div>
@@ -410,10 +348,10 @@ STATUS — LIVE</p>
         <div class="container">
           <header class="section-heading section-heading--row reveal" data-reveal>
             <div>
-              <p class="section-label"><span>06</span> Plans / Engagement</p>
-              <h2 id="plans-title">Three ways <em>to start.</em></h2>
+              <p class="section-label"><span>06</span> <span data-i18n="commercial.plansSectionLabel">Planos / Contratação</span></p>
+              <h2 id="plans-title" data-i18n-html="commercial.plansTitle">Três formas de <em>começar.</em></h2>
             </div>
-            <p class="section-intro">Transparent ranges by project level. Final scope and quote are defined together, before anything starts.</p>
+            <p class="section-intro" data-i18n="commercial.plansIntro">Faixas de investimento por nível de projeto. O escopo final, prazo e proposta são definidos antes do início do desenvolvimento.</p>
           </header>
 
           <div class="plans__grid">
@@ -422,74 +360,74 @@ STATUS — LIVE</p>
                  rode `npm run plans` para reescrever este bloco. O `npm run
                  build` confere e falha se os dois sairem de sincronia. -->
             <article class="project project--compact reveal" data-reveal>
-              <a class="project__visual project__visual--plan" href="#project-preview" data-project="plan-plus" aria-label="View plan: Plus">
-                <div class="visual-index">PLAN / 001</div>
+              <a class="project__visual project__visual--plan" href="#project-preview" data-project="plan-plus" aria-label="Ver plano: Plus">
+                <div class="visual-index">PLANO / 001</div>
                 <div class="plan-card" aria-hidden="true">
-                  <div class="plan-card__top"><span>PRICING PLAN</span><strong>P+</strong></div>
+                  <div class="plan-card__top"><span>PLANO COMERCIAL</span><strong>P+</strong></div>
                   <div class="plan-card__body">
-                    <span class="plan-card__eyebrow">PLAN</span>
+                    <span class="plan-card__eyebrow">PLANO</span>
                     <strong class="plan-card__name">Plus</strong>
                     <span class="plan-card__range">R$ 800 – R$ 2.500</span>
                   </div>
-                  <div class="plan-card__footer"><span>LANDING PAGES · PORTFOLIOS</span><span>AVAILABLE</span></div>
+                  <div class="plan-card__footer"><span>LANDING PAGES · PORTFÓLIOS</span><span>DISPONÍVEL</span></div>
                 </div>
-                <span class="project__hover-mark" aria-hidden="true">VIEW</span>
+                <span class="project__hover-mark" aria-hidden="true">VER</span>
               </a>
               <div class="project__details project__details--stacked">
                 <div>
-                  <p class="project__meta">PRICING PLAN <span>YEAR — 2026</span></p>
+                  <p class="project__meta">PLANO COMERCIAL <span>ANO — 2026</span></p>
                   <h3>Plus</h3>
                 </div>
-                <p>SCOPE — LANDING PAGES · PORTFOLIOS<br>RANGE — R$ 800 – R$ 2.500<br>STATUS — AVAILABLE</p>
-                <a class="text-link" href="#project-preview" data-project="plan-plus" aria-label="View plan: Plus"><span>View Plan</span><i aria-hidden="true"></i></a>
+                <p>ESCOPO — LANDING PAGES · PORTFÓLIOS<br>INVESTIMENTO — R$ 800 – R$ 2.500<br>STATUS — DISPONÍVEL</p>
+                <a class="text-link" href="#project-preview" data-project="plan-plus" aria-label="Ver plano: Plus"><span>Ver plano</span><i aria-hidden="true"></i></a>
               </div>
             </article>
 
             <article class="project project--compact reveal" data-reveal>
-              <a class="project__visual project__visual--plan" href="#project-preview" data-project="plan-pro" aria-label="View plan: Pro">
-                <div class="visual-index">PLAN / 002</div>
+              <a class="project__visual project__visual--plan" href="#project-preview" data-project="plan-pro" aria-label="Ver plano: Pro">
+                <div class="visual-index">PLANO / 002</div>
                 <div class="plan-card" aria-hidden="true">
-                  <div class="plan-card__top"><span>PRICING PLAN</span><strong>P•</strong></div>
+                  <div class="plan-card__top"><span>PLANO COMERCIAL</span><strong>P•</strong></div>
                   <div class="plan-card__body">
-                    <span class="plan-card__eyebrow">PLAN</span>
+                    <span class="plan-card__eyebrow">PLANO</span>
                     <strong class="plan-card__name">Pro</strong>
                     <span class="plan-card__range">R$ 2.500 – R$ 4.500</span>
                   </div>
-                  <div class="plan-card__footer"><span>INSTITUTIONAL WEBSITES</span><span>AVAILABLE</span></div>
+                  <div class="plan-card__footer"><span>SITES INSTITUCIONAIS</span><span>DISPONÍVEL</span></div>
                 </div>
-                <span class="project__hover-mark" aria-hidden="true">VIEW</span>
+                <span class="project__hover-mark" aria-hidden="true">VER</span>
               </a>
               <div class="project__details project__details--stacked">
                 <div>
-                  <p class="project__meta">PRICING PLAN <span>YEAR — 2026</span></p>
+                  <p class="project__meta">PLANO COMERCIAL <span>ANO — 2026</span></p>
                   <h3>Pro</h3>
                 </div>
-                <p>SCOPE — MULTI-PAGE INSTITUTIONAL SITES<br>RANGE — R$ 2.500 – R$ 4.500<br>STATUS — AVAILABLE</p>
-                <a class="text-link" href="#project-preview" data-project="plan-pro" aria-label="View plan: Pro"><span>View Plan</span><i aria-hidden="true"></i></a>
+                <p>ESCOPO — SITES INSTITUCIONAIS · EXPERIÊNCIAS MULTIPÁGINA<br>INVESTIMENTO — R$ 2.500 – R$ 4.500<br>STATUS — DISPONÍVEL</p>
+                <a class="text-link" href="#project-preview" data-project="plan-pro" aria-label="Ver plano: Pro"><span>Ver plano</span><i aria-hidden="true"></i></a>
               </div>
             </article>
 
             <article class="project project--compact reveal" data-reveal>
-              <a class="project__visual project__visual--plan" href="#project-preview" data-project="plan-max" aria-label="View plan: Max">
-                <div class="visual-index">PLAN / 003</div>
+              <a class="project__visual project__visual--plan" href="#project-preview" data-project="plan-max" aria-label="Ver plano: Max">
+                <div class="visual-index">PLANO / 003</div>
                 <div class="plan-card" aria-hidden="true">
-                  <div class="plan-card__top"><span>PRICING PLAN</span><strong>P×</strong></div>
+                  <div class="plan-card__top"><span>PLANO COMERCIAL</span><strong>P×</strong></div>
                   <div class="plan-card__body">
-                    <span class="plan-card__eyebrow">PLAN</span>
+                    <span class="plan-card__eyebrow">PLANO</span>
                     <strong class="plan-card__name">Max</strong>
-                    <span class="plan-card__range">FROM R$ 5.000</span>
+                    <span class="plan-card__range">A PARTIR DE R$ 5.000</span>
                   </div>
-                  <div class="plan-card__footer"><span>E-COMMERCE · SYSTEMS</span><span>AVAILABLE</span></div>
+                  <div class="plan-card__footer"><span>SISTEMAS · AUTOMAÇÃO · IA</span><span>SOB CONSULTA</span></div>
                 </div>
-                <span class="project__hover-mark" aria-hidden="true">VIEW</span>
+                <span class="project__hover-mark" aria-hidden="true">VER</span>
               </a>
               <div class="project__details project__details--stacked">
                 <div>
-                  <p class="project__meta">PRICING PLAN <span>YEAR — 2026</span></p>
+                  <p class="project__meta">PLANO COMERCIAL <span>ANO — 2026</span></p>
                   <h3>Max</h3>
                 </div>
-                <p>SCOPE — E-COMMERCE · WEB SYSTEMS · CUSTOM BUILDS<br>RANGE — FROM R$ 5.000<br>STATUS — AVAILABLE</p>
-                <a class="text-link" href="#project-preview" data-project="plan-max" aria-label="View plan: Max"><span>View Plan</span><i aria-hidden="true"></i></a>
+                <p>ESCOPO — SISTEMAS · AUTOMAÇÃO · IA · INTEGRAÇÕES<br>INVESTIMENTO — A PARTIR DE R$ 5.000<br>STATUS — SOB CONSULTA</p>
+                <a class="text-link" href="#project-preview" data-project="plan-max" aria-label="Ver plano: Max"><span>Ver plano</span><i aria-hidden="true"></i></a>
               </div>
             </article>
             <!-- @plans:end -->
@@ -500,18 +438,18 @@ STATUS — LIVE</p>
       <section class="why" id="why" aria-labelledby="why-title">
         <div class="container why__inner">
           <div class="why__heading reveal" data-reveal>
-            <p class="section-label"><span>07</span> The difference</p>
-            <h2 id="why-title">Built without<br>the <em>usual.</em></h2>
-            <p>Every decision earns its place. Nothing is added simply because everyone else is doing it.</p>
+            <p class="section-label"><span>07</span> <span data-i18n="why.label">O diferencial</span></p>
+            <h2 id="why-title" data-i18n-html="why.title">Feito sem<br>o <em>de sempre.</em></h2>
+            <p data-i18n="why.copy">Cada decisão precisa justificar seu lugar. Nada é adicionado apenas porque todos estão fazendo igual.</p>
           </div>
-          <ul class="principles" aria-label="Space Underground principles">
-            <li class="reveal" data-reveal><span>01</span><strong>Custom design</strong><i aria-hidden="true">↗</i></li>
-            <li class="reveal" data-reveal><span>02</span><strong>No generic templates</strong><i aria-hidden="true">↗</i></li>
-            <li class="reveal" data-reveal><span>03</span><strong>Performance-focused</strong><i aria-hidden="true">↗</i></li>
-            <li class="reveal" data-reveal><span>04</span><strong>Responsive by default</strong><i aria-hidden="true">↗</i></li>
-            <li class="reveal" data-reveal><span>05</span><strong>Clean code</strong><i aria-hidden="true">↗</i></li>
-            <li class="reveal" data-reveal><span>06</span><strong>Scalable architecture</strong><i aria-hidden="true">↗</i></li>
-            <li class="reveal" data-reveal><span>07</span><strong>Direct communication</strong><i aria-hidden="true">↗</i></li>
+          <ul class="principles" aria-label="Princípios da SPACE UNDERGROUND" data-i18n-aria-label="accessibility.principles">
+            <li class="reveal" data-reveal><span>01</span><strong data-i18n="why.item1">Design personalizado</strong><i aria-hidden="true">↗</i></li>
+            <li class="reveal" data-reveal><span>02</span><strong data-i18n="why.item2">Sem templates genéricos</strong><i aria-hidden="true">↗</i></li>
+            <li class="reveal" data-reveal><span>03</span><strong data-i18n="why.item3">Foco em performance</strong><i aria-hidden="true">↗</i></li>
+            <li class="reveal" data-reveal><span>04</span><strong data-i18n="why.item4">Responsivo por padrão</strong><i aria-hidden="true">↗</i></li>
+            <li class="reveal" data-reveal><span>05</span><strong data-i18n="why.item5">Código limpo</strong><i aria-hidden="true">↗</i></li>
+            <li class="reveal" data-reveal><span>06</span><strong data-i18n="why.item6">Arquitetura escalável</strong><i aria-hidden="true">↗</i></li>
+            <li class="reveal" data-reveal><span>07</span><strong data-i18n="why.item7">Comunicação direta</strong><i aria-hidden="true">↗</i></li>
           </ul>
         </div>
       </section>
@@ -519,23 +457,23 @@ STATUS — LIVE</p>
       <section class="section about" id="about" aria-labelledby="about-title">
         <div class="container about__inner">
           <div class="about__visual reveal" data-reveal aria-hidden="true">
-            <div class="about__stamp"><span>INDEPENDENT</span><strong>SU</strong><span>DIGITAL STUDIO</span></div>
+            <div class="about__stamp"><span data-i18n="about.stampTop">INDEPENDENTE</span><strong>SU</strong><span data-i18n="about.stampBottom">ESTÚDIO DIGITAL</span></div>
             <div class="about__grid"></div>
             <span class="about__orbit about__orbit--one"></span>
             <span class="about__orbit about__orbit--two"></span>
             <span class="about__point"></span>
-            <p>OPERATING BELOW<br>THE SURFACE</p>
+            <p data-i18n-html="about.stampCaption">OPERANDO ABAIXO<br>DA SUPERFÍCIE</p>
           </div>
           <div class="about__copy">
-            <p class="section-label reveal" data-reveal><span>08</span> About</p>
-            <h2 id="about-title" class="reveal" data-reveal>Independent<br>by <em>design.</em></h2>
-            <p class="about__lead reveal" data-reveal>Space Underground is an independent technology and digital product studio based in Brazil. We started underground — small by choice, earning the name before the scale.</p>
+            <p class="section-label reveal" data-reveal><span>08</span> <span data-i18n="about.label">Sobre</span></p>
+            <h2 id="about-title" class="reveal" data-reveal data-i18n-html="about.title">Independente<br>por <em>escolha.</em></h2>
+            <p class="about__lead reveal" data-reveal data-i18n="about.lead">A SPACE UNDERGROUND é um estúdio independente de tecnologia e produtos digitais com base no Brasil. Começamos no subterrâneo — pequenos por escolha, conquistando o nome antes da escala.</p>
             <div class="about__notes reveal" data-reveal>
-              <p>We work at the intersection of design, development and digital products. The point is space — a site that earns trust, a system that gives back the hours. We're starting too, so we build for people who are. Underground by origin. Upward by intent.</p>
+              <p data-i18n="about.notes">Trabalhamos na interseção entre design, desenvolvimento e produtos digitais. O objetivo é criar espaço — um site que gera confiança, um sistema que devolve tempo. Também estamos começando, por isso construímos para quem está construindo. Subterrâneos na origem. Para cima na intenção.</p>
               <dl>
-                <div><dt>BASE</dt><dd>Brazil</dd></div>
-                <div><dt>RANGE</dt><dd>Worldwide</dd></div>
-                <div><dt>STATUS</dt><dd><span></span>Taking projects</dd></div>
+                <div><dt data-i18n="about.baseLabel">BASE</dt><dd data-i18n="about.baseValue">Brasil</dd></div>
+                <div><dt data-i18n="about.rangeLabel">ALCANCE</dt><dd data-i18n="about.rangeValue">Mundial</dd></div>
+                <div><dt data-i18n="about.statusLabel">STATUS</dt><dd><span></span><span data-i18n="about.statusValue">Aceitando projetos</span></dd></div>
               </dl>
             </div>
           </div>
@@ -546,135 +484,135 @@ STATUS — LIVE</p>
         <div class="contact__grid" aria-hidden="true"></div>
         <div class="container contact__inner">
           <div class="contact__top reveal" data-reveal>
-            <p class="section-label"><span>09</span> Contact</p>
-            <p class="contact__availability"><i aria-hidden="true"></i> Available for select projects</p>
+            <p class="section-label"><span>09</span> <span data-i18n="contact.section">Contato</span></p>
+            <p class="contact__availability"><i aria-hidden="true"></i> <span data-i18n="contact.available">Disponível para projetos selecionados</span></p>
           </div>
           <h2 id="contact-title" class="contact__title">
-            <span class="contact-line"><span>Have something</span></span>
-            <span class="contact-line"><span>worth <em>building?</em></span></span>
+            <span class="contact-line"><span data-i18n="contact.titleLine1">Tem algo</span></span>
+            <span class="contact-line"><span data-i18n="contact.titleLine2">que vale construir?</span></span>
           </h2>
           <div class="contact__bottom reveal" data-reveal>
-            <p>Tell us what you're building. The first reply is human, direct and practical.</p>
+            <p data-i18n="contact.intro">Conte o que você está construindo. A primeira resposta é humana, direta e prática.</p>
           </div>
           <form class="project-form reveal" id="project-request" data-reveal data-project-form action="https://formspree.io/f/mjyvkpay" method="POST" novalidate>
             <div class="project-form__grid">
               <div class="visually-hidden" aria-hidden="true">
-                <label for="project-gotcha">Leave this field empty</label>
+                <label for="project-gotcha" data-i18n="contact.gotcha">Deixe este campo vazio</label>
                 <input id="project-gotcha" name="_gotcha" type="text" tabindex="-1" autocomplete="off">
               </div>
               <div class="form-field">
-                <label for="project-name">Name</label>
+                <label for="project-name" data-i18n="contact.name">Nome</label>
                 <input id="project-name" aria-describedby="project-name-error" name="name" type="text" autocomplete="name" required>
-                <small id="project-name-error">Required field.</small>
+                <small id="project-name-error" data-i18n="contact.required">Campo obrigatório.</small>
               </div>
               <div class="form-field">
-                <label for="project-email">Email</label>
+                <label for="project-email" data-i18n="contact.email">Email</label>
                 <input id="project-email" aria-describedby="project-email-error" name="email" type="email" autocomplete="email" required>
-                <small id="project-email-error">Use a valid email.</small>
+                <small id="project-email-error" data-i18n="contact.invalidEmail">Use um email válido.</small>
               </div>
               <div class="form-field">
-                <label for="project-company">Company / Brand</label>
+                <label for="project-company" data-i18n="contact.company">Empresa / Marca</label>
                 <input id="project-company" name="company" type="text" autocomplete="organization">
               </div>
               <div class="form-field">
-                <label for="project-need">What do you need?</label>
+                <label for="project-need" data-i18n="contact.need">Do que você precisa?</label>
                 <select id="project-need" aria-describedby="project-need-error" name="project_type" required>
-                  <option value="">Select one option</option>
-                  <option value="landing-page">Landing Page</option>
-                  <option value="portfolio">Portfolio</option>
-                  <option value="institutional-website">Institutional Website</option>
-                  <option value="e-commerce">E-commerce</option>
-                  <option value="web-system">Web System</option>
-                  <option value="other">Other</option>
+                  <option value="" data-i18n="contact.selectOne">Selecione uma opção</option>
+                  <option value="landing-page" data-i18n="contact.optionLanding">Landing Page</option>
+                  <option value="portfolio" data-i18n="contact.optionPortfolio">Portfólio</option>
+                  <option value="institutional-website" data-i18n="contact.optionInstitutional">Site Institucional</option>
+                  <option value="e-commerce" data-i18n="contact.optionEcommerce">E-commerce</option>
+                  <option value="web-system" data-i18n="contact.optionSystem">Sistema Web</option>
+                  <option value="other" data-i18n="contact.optionOther">Outro</option>
                 </select>
-                <small id="project-need-error">Select a project type.</small>
+                <small id="project-need-error" data-i18n="contact.selectType">Selecione um tipo de projeto.</small>
               </div>
-              <div class="product-picker form-field--wide" data-product-picker role="group" aria-label="Project type selector">
+              <div class="product-picker form-field--wide" data-product-picker role="group" aria-label="Seletor de tipo de projeto" data-i18n-aria-label="contact.projectTypeSelector">
                 <div class="product-picker__header">
-                  <p>Choose the build</p>
+                  <p data-i18n="contact.pickerHeading">Escolha o projeto</p>
                   <span data-product-count>00 / 06</span>
                 </div>
                 <div class="product-options">
-                  <button class="product-option" type="button" data-product-option data-value="landing-page" data-budget="R$ 800 – R$ 1.500" data-timeline="1–3 weeks" aria-pressed="false">
+                  <button class="product-option" type="button" data-product-option data-value="landing-page" data-budget="R$ 800 – R$ 1.500" data-timeline="1–3 semanas" aria-pressed="false">
                     <span class="product-option__index">01</span>
-                    <strong>Landing Page</strong>
-                    <small>Campaign, offer or launch page.</small>
-                    <i>CONVERSION</i>
+                    <strong data-i18n="contact.optionLanding">Landing Page</strong>
+                    <small data-i18n="contact.optionLandingText">Página de campanha, oferta ou lançamento.</small>
+                    <i data-i18n="contact.optionLandingTag">CONVERSÃO</i>
                   </button>
-                  <button class="product-option" type="button" data-product-option data-value="portfolio" data-budget="R$ 1.200 – R$ 2.500" data-timeline="2–4 weeks" aria-pressed="false">
+                  <button class="product-option" type="button" data-product-option data-value="portfolio" data-budget="R$ 1.200 – R$ 2.500" data-timeline="2–4 semanas" aria-pressed="false">
                     <span class="product-option__index">02</span>
-                    <strong>Portfolio</strong>
-                    <small>Personal, creative or brand presence.</small>
-                    <i>IDENTITY</i>
+                    <strong data-i18n="contact.optionPortfolio">Portfólio</strong>
+                    <small data-i18n="contact.optionPortfolioText">Presença pessoal, criativa ou de marca.</small>
+                    <i data-i18n="contact.optionPortfolioTag">IDENTIDADE</i>
                   </button>
-                  <button class="product-option" type="button" data-product-option data-value="institutional-website" data-budget="R$ 2.500 – R$ 4.500" data-timeline="3–6 weeks" aria-pressed="false">
+                  <button class="product-option" type="button" data-product-option data-value="institutional-website" data-budget="R$ 2.500 – R$ 4.500" data-timeline="3–6 semanas" aria-pressed="false">
                     <span class="product-option__index">03</span>
-                    <strong>Institutional Website</strong>
-                    <small>Multi-page company experience.</small>
-                    <i>STRUCTURE</i>
+                    <strong data-i18n="contact.optionInstitutional">Site Institucional</strong>
+                    <small data-i18n="contact.optionInstitutionalText">Experiência empresarial com múltiplas páginas.</small>
+                    <i data-i18n="contact.optionInstitutionalTag">ESTRUTURA</i>
                   </button>
-                  <button class="product-option" type="button" data-product-option data-value="e-commerce" data-budget="R$ 4.000 – R$ 8.000" data-timeline="5–9 weeks" aria-pressed="false">
+                  <button class="product-option" type="button" data-product-option data-value="e-commerce" data-budget="R$ 4.000 – R$ 8.000" data-timeline="5–9 semanas" aria-pressed="false">
                     <span class="product-option__index">04</span>
-                    <strong>E-commerce</strong>
-                    <small>Storefront built around discovery.</small>
-                    <i>COMMERCE</i>
+                    <strong data-i18n="contact.optionEcommerce">E-commerce</strong>
+                    <small data-i18n="contact.optionEcommerceText">Loja virtual pensada para descoberta de produtos.</small>
+                    <i data-i18n="contact.optionEcommerceTag">COMÉRCIO</i>
                   </button>
-                  <button class="product-option" type="button" data-product-option data-value="web-system" data-budget="R$ 6.000 – R$ 12.000" data-timeline="6–12 weeks" aria-pressed="false">
+                  <button class="product-option" type="button" data-product-option data-value="web-system" data-budget="R$ 6.000 – R$ 12.000" data-timeline="6–12 semanas" aria-pressed="false">
                     <span class="product-option__index">05</span>
-                    <strong>Web System</strong>
-                    <small>Dashboard, platform or internal tool.</small>
-                    <i>SYSTEM</i>
+                    <strong data-i18n="contact.optionSystem">Sistema Web</strong>
+                    <small data-i18n="contact.optionSystemText">Dashboard, plataforma ou ferramenta interna.</small>
+                    <i data-i18n="contact.optionSystemTag">SISTEMA</i>
                   </button>
-                  <button class="product-option" type="button" data-product-option data-value="other" data-budget="To define" data-timeline="To define" aria-pressed="false">
+                  <button class="product-option" type="button" data-product-option data-value="other" data-budget="A definir" data-timeline="A definir" aria-pressed="false">
                     <span class="product-option__index">06</span>
-                    <strong>Other</strong>
-                    <small>Something that does not fit the map yet.</small>
-                    <i>CUSTOM</i>
+                    <strong data-i18n="contact.optionOther">Outro</strong>
+                    <small data-i18n="contact.optionOtherText">Algo que ainda não cabe no mapa.</small>
+                    <i data-i18n="contact.optionOtherTag">SOB MEDIDA</i>
                   </button>
                 </div>
                 <div class="product-summary" data-product-summary>
-                  <span>NO PRODUCT SELECTED</span>
-                  <strong>Choose a build type to calibrate the request.</strong>
-                  <p data-product-summary-text>Budget range and timeline hints will appear here. You can still edit the fields manually.</p>
+                  <span data-i18n="contact.summaryEmpty">NENHUM PRODUTO SELECIONADO</span>
+                  <strong data-i18n="contact.summaryTitle">Escolha um tipo de projeto para calibrar a solicitação.</strong>
+                  <p data-product-summary-text data-i18n="contact.summaryText">A faixa de orçamento e a estimativa de prazo aparecerão aqui. Você ainda pode editar os campos manualmente.</p>
                 </div>
               </div>
               <div class="form-field form-field--wide">
-                <label for="project-message">Tell us about the project</label>
+                <label for="project-message" data-i18n="contact.message">Conte sobre o projeto</label>
                 <textarea id="project-message" aria-describedby="project-message-error" name="message" rows="5" required></textarea>
-                <small id="project-message-error">Tell us enough to understand the first move.</small>
+                <small id="project-message-error" data-i18n="contact.describe">Conte o suficiente para entendermos o primeiro passo.</small>
               </div>
               <div class="form-field">
-                <label for="project-budget">Estimated budget</label>
-                <input id="project-budget" name="budget" type="text" inputmode="text" placeholder="Example: R$ 1.500 – R$ 3.000">
-                <div class="field-options" role="group" aria-label="Budget presets">
+                <label for="project-budget">Orçamento estimado</label>
+                <input id="project-budget" name="budget" type="text" inputmode="text" placeholder="Exemplo: R$ 1.500 - R$ 3.000">
+                <div class="field-options" role="group" aria-label="Faixas de orçamento">
                   <button type="button" data-budget-choice="R$ 800 – R$ 1.500">R$ 800 – R$ 1.500</button>
                   <button type="button" data-budget-choice="R$ 1.200 – R$ 2.500">R$ 1.200 – R$ 2.500</button>
                   <button type="button" data-budget-choice="R$ 2.500 – R$ 4.500">R$ 2.500 – R$ 4.500</button>
                   <button type="button" data-budget-choice="R$ 4.000 – R$ 8.000">R$ 4.000 – R$ 8.000</button>
                   <button type="button" data-budget-choice="R$ 6.000 – R$ 12.000">R$ 6.000 – R$ 12.000</button>
-                  <button type="button" data-budget-choice="To define">TO DEFINE</button>
+                  <button type="button" data-budget-choice="A definir" data-i18n="contact.toDefine">A DEFINIR</button>
                 </div>
               </div>
               <div class="form-field">
-                <label for="project-timeline">Desired timeline</label>
-                <input id="project-timeline" name="timeline" type="text" placeholder="Example: 4–6 weeks">
-                <div class="field-options" role="group" aria-label="Timeline presets">
-                  <button type="button" data-timeline-choice="1–3 weeks">1–3 WEEKS</button>
-                  <button type="button" data-timeline-choice="2–4 weeks">2–4 WEEKS</button>
-                  <button type="button" data-timeline-choice="3–6 weeks">3–6 WEEKS</button>
-                  <button type="button" data-timeline-choice="5–9 weeks">5–9 WEEKS</button>
-                  <button type="button" data-timeline-choice="6–12 weeks">6–12 WEEKS</button>
-                  <button type="button" data-timeline-choice="To define">TO DEFINE</button>
+                <label for="project-timeline">Prazo desejado</label>
+                <input id="project-timeline" name="timeline" type="text" placeholder="Exemplo: 4-6 semanas">
+                <div class="field-options" role="group" aria-label="Opções de prazo">
+                  <button type="button" data-timeline-choice="1–3 semanas">1–3 SEMANAS</button>
+                  <button type="button" data-timeline-choice="2–4 semanas">2–4 SEMANAS</button>
+                  <button type="button" data-timeline-choice="3–6 semanas">3–6 SEMANAS</button>
+                  <button type="button" data-timeline-choice="5–9 semanas">5–9 SEMANAS</button>
+                  <button type="button" data-timeline-choice="6–12 semanas">6–12 SEMANAS</button>
+                  <button type="button" data-timeline-choice="A definir" data-i18n="contact.toDefine">A DEFINIR</button>
                 </div>
               </div>
             </div>
             <button class="contact-button project-form__submit" type="submit">
-              <span>Send Project Request</span>
+              <span data-i18n="contact.send">Enviar Solicitação</span>
               <i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19 19 5M8 5h11v11"/></svg></i>
             </button>
             <p class="project-form__status" data-form-status role="status" aria-live="polite"></p>
           </form>
-          <p class="contact__coordinate" aria-hidden="true">BASED IN BRAZIL<br>AVAILABLE WORLDWIDE</p>
+          <p class="contact__coordinate" aria-hidden="true" data-i18n-html="contact.coordinate">COM BASE NO BRASIL<br>ATENDIMENTO MUNDIAL</p>
         </div>
       </section>
     </main>
@@ -683,18 +621,18 @@ STATUS — LIVE</p>
       <div class="container">
         <div class="footer__top">
           <a class="footer-brand" href="#home">SPACE<br>UNDERGROUND<span>®</span></a>
-          <nav class="footer__nav" aria-label="Footer navigation">
+          <nav class="footer__nav" aria-label="Navegação do rodapé" data-i18n-aria-label="accessibility.footerNavigation">
             <div>
-              <p>Navigate</p>
-              <a href="#services">Studio</a>
-              <a href="#work">Work</a>
-              <a href="#labs">Labs</a>
-              <a href="#plans">Plans</a>
-              <a href="#about">About</a>
-              <a href="#contact">Contact</a>
+              <p data-i18n="footer.navigate">Navegar</p>
+              <a href="#services" data-i18n="navigation.studio">Studio</a>
+              <a href="#work" data-i18n="navigation.work">Projetos</a>
+              <a href="#labs" data-i18n="navigation.labs">Labs</a>
+              <a href="#plans" data-i18n="navigation.plans">Planos</a>
+              <a href="#about" data-i18n="navigation.about">Sobre</a>
+              <a href="#contact" data-i18n="navigation.contact">Contato</a>
             </div>
             <div>
-              <p>Social</p>
+              <p data-i18n="footer.social">Social</p>
               <a href="https://github.com/" target="_blank" rel="noreferrer">GitHub <span>↗</span></a>
               <a href="https://instagram.com/" target="_blank" rel="noreferrer">Instagram <span>↗</span></a>
               <a href="https://linkedin.com/" target="_blank" rel="noreferrer">LinkedIn <span>↗</span></a>
@@ -703,52 +641,52 @@ STATUS — LIVE</p>
         </div>
         <div class="footer__bottom">
           <p>© <span data-year>2026</span> SPACE UNDERGROUND</p>
-          <p>Built below the surface.</p>
-          <a href="#home">Back to top <span>↑</span></a>
+          <p data-i18n="footer.tagline">Criado abaixo da superfície.</p>
+          <a href="#home"><span data-i18n="footer.backToTop">Voltar ao topo</span> <span>↑</span></a>
         </div>
       </div>
     </footer>
 
     <dialog class="project-dialog" id="project-preview" data-project-dialog aria-labelledby="project-dialog-title">
       <div class="project-dialog__surface">
-        <button class="project-dialog__close" type="button" data-dialog-close aria-label="Close project preview">
+        <button class="project-dialog__close" type="button" data-dialog-close aria-label="Fechar prévia do projeto" data-i18n-aria-label="dialog.close">
           <span></span><span></span>
         </button>
         <div class="project-dialog__content">
-          <p class="section-label"><span data-dialog-index>001</span> <span data-dialog-kind>Pricing plan</span></p>
-          <p class="project-dialog__meta"><span data-dialog-category>PLAN / LANDING PAGES &amp; PORTFOLIOS</span> / <span data-dialog-year>2026</span></p>
+          <p class="section-label"><span data-dialog-index>001</span> <span data-dialog-kind data-i18n="dialog.kind">Plano de investimento</span></p>
+          <p class="project-dialog__meta"><span data-dialog-category>PLANO / LANDING PAGES &amp; PORTFÓLIOS</span> / <span data-dialog-year>2026</span></p>
           <h2 id="project-dialog-title" data-dialog-title>Plus</h2>
-          <p class="project-dialog__description" data-dialog-description>For getting online with clarity — fast, focused, done right.</p>
+          <p class="project-dialog__description" data-dialog-description>Para entrar no digital com clareza — rápido, focado e bem feito.</p>
           <div class="project-dialog__scope">
-            <p>Selected scope</p>
+            <p data-i18n="dialog.scopeLabel">Escopo selecionado</p>
             <ul>
-              <li data-dialog-scope="0">SCOPE — LANDING PAGES · PORTFOLIOS</li>
-              <li data-dialog-scope="1">RANGE — R$ 800 – R$ 2.500</li>
-              <li data-dialog-scope="2">STATUS — AVAILABLE</li>
+              <li data-dialog-scope="0">ESCOPO — LANDING PAGES · PORTFÓLIOS</li>
+              <li data-dialog-scope="1">FAIXA — R$ 800 – R$ 2.500</li>
+              <li data-dialog-scope="2">STATUS — DISPONÍVEL</li>
             </ul>
           </div>
-          <p class="project-dialog__note" data-dialog-note>Investment range by project level. The final quote is set once the scope is defined — talk to the studio for a proposal.</p>
+          <p class="project-dialog__note" data-dialog-note data-i18n="dialog.note">Faixa de investimento por nível de projeto. O valor final é definido após o escopo — fale com o estúdio para receber uma proposta.</p>
           <a class="button button--primary" href="#project-request" data-dialog-contact>
-            <span data-dialog-cta>Request a Proposal</span>
+            <span data-dialog-cta data-i18n="dialog.cta">Solicitar Proposta</span>
             <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
           </a>
         </div>
         <div class="project-dialog__visual">
-          <span class="project-dialog__code"><span data-dialog-namespace>PLAN</span> / <i data-dialog-code>PLUS_001</i></span>
+          <span class="project-dialog__code"><span data-dialog-namespace data-i18n="dialog.namespace">PLANO</span> / <i data-dialog-code>PLUS_001</i></span>
           <div class="project-dialog__orbit project-dialog__orbit--one" aria-hidden="true"></div>
           <div class="project-dialog__orbit project-dialog__orbit--two" aria-hidden="true"></div>
           <strong data-dialog-monogram aria-hidden="true">P+</strong>
           <div class="project-dialog__included" data-dialog-included hidden>
-            <p class="project-dialog__included-label">What&rsquo;s included</p>
+            <p class="project-dialog__included-label" data-i18n="dialog.included">O que está incluído</p>
             <ul>
               <li data-dialog-included-item></li>
               <li data-dialog-included-item></li>
               <li data-dialog-included-item></li>
               <li data-dialog-included-item></li>
             </ul>
-            <p class="project-dialog__timeline">Typical timeline — <i data-dialog-timeline></i></p>
+            <p class="project-dialog__timeline"><span data-i18n="dialog.timeline">Prazo típico —</span> <i data-dialog-timeline></i></p>
           </div>
-          <p>SPACE UNDERGROUND<br>DIGITAL STUDIO</p>
+          <p>SPACE UNDERGROUND<br><span data-i18n="about.stampBottom">ESTÚDIO DIGITAL</span></p>
         </div>
       </div>
     </dialog>

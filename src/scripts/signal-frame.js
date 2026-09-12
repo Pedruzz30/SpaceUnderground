@@ -1,4 +1,5 @@
 import { projects, defaultProjectKey } from "./project-registry.js";
+import { subscribeLocaleChange, t } from "./i18n/index.js";
 
 const LIVE_PREVIEW_SELECTOR = "[data-live-project]";
 const MOBILE_QUERY = "(max-width: 759px)";
@@ -8,14 +9,17 @@ const LOAD_TIMEOUT = 8000;
 const STATE_CLASS_NAMES = ["is-preview-loading", "is-preview-live", "is-preview-sleeping", "is-preview-fallback"];
 const VIEW_CLASS_NAMES = ["is-view-site", "is-view-detail", "is-view-origin"];
 
-const STATE_LABELS = {
-  loading: "PRÉVIA / INICIALIZANDO",
-  live: "● PRÉVIA AO VIVO",
-  sleeping: "PRÉVIA / EM ESPERA",
-  fallback: "PRÉVIA / ALTERNATIVA",
+// Resolved through t() at paint time rather than frozen into a lookup, so the
+// status follows the locale like the rest of the viewer's copy.
+const STATE_KEYS = {
+  loading: "work.previewStatus.loading",
+  live: "work.previewStatus.live",
+  sleeping: "work.previewStatus.sleeping",
+  fallback: "work.previewStatus.fallback",
 };
 
 let activePreview = null;
+let viewer = null;
 
 function openProject(url) {
   window.open(url, "_blank", "noopener,noreferrer");
@@ -41,6 +45,18 @@ function originOf(url) {
   }
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replace(/'/g, "&#39;");
+}
+
 function setPreviewStatus(frame, label) {
   const status = frame.querySelector("[data-preview-status]");
   if (status && status.textContent !== label) status.textContent = label;
@@ -49,7 +65,19 @@ function setPreviewStatus(frame, label) {
 function setPreviewState(frame, state) {
   frame.classList.remove(...STATE_CLASS_NAMES);
   frame.classList.add(`is-preview-${state}`);
-  setPreviewStatus(frame, STATE_LABELS[state] || STATE_LABELS.sleeping);
+  // Stamped so a locale change can re-label the status it is actually in,
+  // rather than assuming standby.
+  frame.dataset.previewState = state;
+  setPreviewStatus(frame, t(STATE_KEYS[state] || STATE_KEYS.sleeping));
+}
+
+// Re-labels the status of every viewer from the state it is already in. Touches
+// nothing else: not the mode, the project, the source or the iframe.
+function relabelPreviewStatuses() {
+  document.querySelectorAll(LIVE_PREVIEW_SELECTOR).forEach((frame) => {
+    const state = frame.dataset.previewState || "sleeping";
+    setPreviewStatus(frame, t(STATE_KEYS[state] || STATE_KEYS.sleeping));
+  });
 }
 
 function createCalibration(frame) {
@@ -82,6 +110,9 @@ function setMode(frame, mode, modeButtons) {
 }
 
 function createLivePreview(frame, mobileMedia) {
+  // The display mode the viewer is in. Kept here so a locale change can put it
+  // back exactly as it was instead of inferring it from CSS classes.
+  let currentMode = "overview";
   const finePointerMedia = window.matchMedia(FINE_POINTER_QUERY);
   const visual = frame.closest(".project__visual");
   const hoverMark = visual?.querySelector(".project__hover-mark");
@@ -177,12 +208,36 @@ function createLivePreview(frame, mobileMedia) {
     sleepTimer = window.setTimeout(unload, SLEEP_DELAY);
   };
 
-  const setSource = ({ url, previewUrl: nextPreviewUrl, poster: nextPoster, title }) => {
+  // A remote poster (a signed Storage URL) can fail: an expired token, an
+  // offline backend. Fall back to the poster shipped with the page instead of
+  // leaving a broken image in the frame.
+  let posterFallback = null;
+  let posterFailed = false;
+
+  poster?.addEventListener("error", () => {
+    if (posterFailed || !posterFallback) return;
+    posterFailed = true;
+    applyPoster(posterFallback);
+  });
+
+  const setSource = ({ url, previewUrl: nextPreviewUrl, poster: nextPoster, posterFallback: fallback, title }) => {
+    const resolvedPreview = resolveUrl(nextPreviewUrl || url);
+    // Re-applying the same project -- which is what a locale change does -- must
+    // not tear down a preview that is already loaded. Only the surrounding copy
+    // changes, so the iframe is left exactly as it is.
+    if (resolvedPreview === previewUrl && (nextPoster || "") === posterUrl) {
+      projectUrl = url || "";
+      if (iframe && title) iframe.title = title;
+      return;
+    }
+
     unload();
     projectUrl = url || "";
     previewUrl = resolveUrl(nextPreviewUrl || url);
     previewOrigin = originOf(previewUrl);
     posterUrl = nextPoster || "";
+    posterFallback = fallback || null;
+    posterFailed = false;
     if (iframe) {
       iframe.dataset.src = previewUrl;
       if (title) iframe.title = title;
@@ -222,6 +277,7 @@ function createLivePreview(frame, mobileMedia) {
       event.preventDefault();
       event.stopPropagation();
       const nextMode = setMode(frame, button.dataset.signalMode || "overview", modeButtons);
+      currentMode = nextMode;
       calibrate();
 
       if (nextMode === "site" && !mobileMedia.matches) load();
@@ -271,7 +327,7 @@ function createLivePreview(frame, mobileMedia) {
     if (event.matches) unload();
   });
 
-  setMode(frame, "overview", modeButtons);
+  currentMode = setMode(frame, "overview", modeButtons);
   applyPoster(posterUrl);
   setPreviewState(frame, "sleeping");
   activeObserver.observe(frame);
@@ -279,7 +335,11 @@ function createLivePreview(frame, mobileMedia) {
   return {
     setSource,
     calibrate,
-    setMode: (mode) => setMode(frame, mode, modeButtons),
+    setMode: (mode) => {
+      currentMode = setMode(frame, mode, modeButtons);
+      return currentMode;
+    },
+    getMode: () => currentMode,
     refresh: () => {
       if (!mobileMedia.matches && frame.classList.contains("is-view-site")) load();
     },
@@ -291,7 +351,7 @@ function createProjectViewer(frame, preview) {
   const root = frame.closest("section") || article;
   const caseIndex = root.querySelector("[data-case-index]");
   const accentTargets = [article, caseIndex].filter(Boolean);
-  const slots = [...root.querySelectorAll("[data-project-slot]")];
+  let slots = [];
 
   const pick = (attribute, scope = article) => [...scope.querySelectorAll(`[${attribute}]`)];
   const fields = {
@@ -311,50 +371,58 @@ function createProjectViewer(frame, preview) {
     links: pick("data-viewer-link"),
     open: pick("data-viewer-open"),
     modules: [...article.querySelectorAll("[data-viewer-module]")],
+    gallery: [...root.querySelectorAll("[data-viewer-gallery]")],
   };
 
   const write = (nodes, value) => nodes.forEach((node) => { node.textContent = value; });
   let activeKey = "";
 
-  const apply = (key) => {
+  // `preserveMode` is for re-applying the same project after a locale change:
+  // the copy around the viewer is rewritten, but the visitor stays in whatever
+  // mode they had open. Choosing a different project still resets to overview.
+  const apply = (key, { force = false, preserveMode = false } = {}) => {
     const project = projects[key];
-    if (!project || project.reserved || key === activeKey) return;
+    if (!project || project.reserved || (key === activeKey && !force)) return;
     activeKey = key;
 
     preview.setSource({
       url: project.url,
       previewUrl: project.previewUrl,
       poster: project.poster,
-      title: `Prévia ao vivo de ${project.name}`,
+      // Set when the poster came from Supabase Storage: the bundled artwork
+      // stays available as the fallback.
+      posterFallback: project.posterFallback,
+      title: t("work.livePreviewOf", { name: project.name }),
     });
 
-    accentTargets.forEach((target) => target.style.setProperty("--accent", project.accent));
+    accentTargets.forEach((target) => target.style.setProperty("--accent", project.accent || "#c6ff00"));
 
-    write(fields.index, `CASE / ${project.id}`);
-    write(fields.eyebrow, `CLIENTE / ${project.id}`);
-    write(fields.client, project.client);
-    write(fields.category, project.category);
-    write(fields.description, project.description);
-    write(fields.address, project.address);
-    write(fields.system, project.system);
-    write(fields.label, project.label);
-    write(fields.origin, project.origin);
-    write(fields.coordinates, project.coordinates.join("\n"));
-    write(fields.name, project.name);
-    write(fields.year, `ANO — ${project.year}`);
-    write(fields.specs, `TIPO — ${project.type}\nTECNOLOGIA — ${project.tech}\nSTATUS — ${project.status}`);
+    write(fields.index, t("work.caseIndex", { id: project.id }));
+    write(fields.eyebrow, t("work.clientIndex", { id: project.id }));
+    write(fields.client, project.client || "");
+    write(fields.category, project.category || "");
+    write(fields.description, project.description || "");
+    write(fields.address, project.address || "");
+    write(fields.system, project.system || "");
+    write(fields.label, project.label || "");
+    write(fields.origin, project.origin || "");
+    write(fields.coordinates, (project.coordinates || []).join("\n"));
+    write(fields.name, project.name || "");
+    write(fields.year, t("work.yearValue", { year: project.year }));
+    write(fields.specs, t("work.specs", { type: project.type, tech: project.tech, status: project.status }));
 
-    const openLabel = `Ver ${project.name} (abre em uma nova aba)`;
+    const openLabel = t("work.openNamedTab", { name: project.name });
     fields.links.forEach((link) => {
       link.href = project.url;
       link.setAttribute("aria-label", openLabel);
     });
     fields.open.forEach((button) => {
-      button.setAttribute("aria-label", `Abrir ${project.name} em uma nova aba`);
+      button.setAttribute("aria-label", t("work.openNamed", { name: project.name }));
     });
 
     fields.modules.forEach((button) => {
-      const module = project.modules[Number(button.dataset.viewerModule)];
+      const module = (project.modules || [])[Number(button.dataset.viewerModule)];
+      button.hidden = !module;
       if (!module) return;
       const [number, title, caption] = module;
       const numberNode = button.querySelector("span");
@@ -363,7 +431,20 @@ function createProjectViewer(frame, preview) {
       if (numberNode) numberNode.textContent = number;
       if (titleNode) titleNode.textContent = title;
       if (captionNode) captionNode.textContent = caption;
-      button.setAttribute("aria-label", `Inspecionar ${title.toLowerCase()}`);
+      button.setAttribute("aria-label", t("work.inspectModule", { title: title.toLowerCase() }));
+    });
+
+    fields.gallery.forEach((node) => {
+      const gallery = project.gallery || [];
+      node.hidden = !gallery.length;
+      node.innerHTML = gallery.length
+        ? gallery.map((image) => `
+          <figure class="project-gallery__item">
+            <img src="${escapeAttribute(image.url)}" alt="${escapeAttribute(image.alt || project.name || "")}" loading="lazy" decoding="async">
+            ${image.caption ? `<figcaption>${escapeHtml(image.caption)}</figcaption>` : ""}
+          </figure>
+        `).join("")
+        : "";
     });
 
     slots.forEach((slot) => {
@@ -373,29 +454,62 @@ function createProjectViewer(frame, preview) {
       slot.setAttribute("aria-pressed", String(isActive));
     });
 
-    preview.setMode("overview");
+    preview.setMode(preserveMode ? preview.getMode() : "overview");
     preview.calibrate();
   };
 
+  function bindSlots() {
+    slots = [...root.querySelectorAll("[data-project-slot]")];
+    slots.forEach((slot) => {
+      if (slot.dataset.viewerBound === "true") return;
+      slot.dataset.viewerBound = "true";
+      slot.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (slot.hasAttribute("data-slot-reserved")) return;
+        apply(slot.dataset.projectSlot || defaultProjectKey);
+        if (!slot.closest(".signal-ui")) {
+          article.querySelector(".project__visual")?.scrollIntoView({ block: "center" });
+        }
+      });
+    });
+  }
+
+  bindSlots();
+
   slots.forEach((slot) => {
-    slot.addEventListener("click", (event) => {
+    slot.addEventListener("keydown", (event) => {
+      if (!["Enter", " "].includes(event.key)) return;
       event.preventDefault();
-      event.stopPropagation();
-      if (slot.hasAttribute("data-slot-reserved")) return;
-      apply(slot.dataset.projectSlot || defaultProjectKey);
-      if (!slot.closest(".signal-ui")) {
-        article.querySelector(".project__visual")?.scrollIntoView({ block: "center" });
-      }
+      slot.click();
     });
   });
 
-  apply(defaultProjectKey);
+  if (defaultProjectKey) apply(defaultProjectKey);
+
+  return { apply, bindSlots, getActiveKey: () => activeKey };
 }
 
 export function initSignalFrame() {
   const mobileMedia = window.matchMedia(MOBILE_QUERY);
   document.querySelectorAll(LIVE_PREVIEW_SELECTOR).forEach((frame) => {
     const preview = createLivePreview(frame, mobileMedia);
-    if (frame.hasAttribute("data-project-viewer")) createProjectViewer(frame, preview);
+    if (frame.hasAttribute("data-project-viewer")) viewer = createProjectViewer(frame, preview);
   });
+
+  subscribeLocaleChange(relabelPreviewStatuses);
+}
+
+export function getActiveProjectKey() {
+  return viewer?.getActiveKey() ?? "";
+}
+
+// Called once live data arrives, so the viewer repaints with it.
+export function showProject(key, { preserveMode = false } = {}) {
+  if (!viewer) return;
+  viewer.apply(key ?? viewer.getActiveKey(), { force: true, preserveMode });
+}
+
+export function refreshProjectViewerSlots() {
+  viewer?.bindSlots();
 }
