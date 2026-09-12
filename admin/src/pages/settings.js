@@ -1,6 +1,7 @@
 import { showToast } from "../components/toast.js";
 import { DATA_SOURCE, isSupabaseConfigured } from "../config/env.js";
 import { t } from "../i18n/index.js";
+import { BASE_LOCALE, TRANSLATION_LOCALE, localeHint, localeTabs } from "../components/locale-fields.js";
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
 import { describeError } from "../services/errors.js";
 import { getSiteSettings, saveSiteSettings } from "../services/settings-service.js";
@@ -90,8 +91,52 @@ export const settingsPage = {
       state.classList.toggle("is-saved", !dirty);
     };
 
+    // Only the two SEO copy fields are translatable. Site name, URL, contact
+    // email and the OG image path are single values, and the canonical URL is
+    // never affected by the selected language.
+    const SEO_FIELDS = { seoTitle: "seo_title", seoDescription: "seo_description" };
+    let seoLocale = BASE_LOCALE;
+    let seoBase = {};
+    let seoTranslation = {};
+    // Kept so saving preserves any locale the Admin does not edit yet.
+    let settingsTranslations = {};
+
+    function captureSeoDraft() {
+      Object.entries(SEO_FIELDS).forEach(([control, column]) => {
+        const field = form.elements[control];
+        if (!field) return;
+        if (seoLocale === BASE_LOCALE) seoBase[control] = field.value;
+        else seoTranslation[column] = field.value;
+      });
+    }
+
+    function paintSeoLocale() {
+      const showingBase = seoLocale === BASE_LOCALE;
+      Object.entries(SEO_FIELDS).forEach(([control, column]) => {
+        const field = form.elements[control];
+        if (!field) return;
+        field.value = showingBase ? seoBase[control] ?? "" : seoTranslation[column] ?? "";
+        field.placeholder = showingBase ? "" : seoBase[control] ?? "";
+        field.classList.toggle("is-translation", !showingBase);
+      });
+      form.querySelectorAll("[data-locale-edit]").forEach((button) => {
+        const active = button.dataset.localeEdit === seoLocale;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", String(active));
+      });
+      form.querySelectorAll("[data-locale-hint]").forEach((hint) => {
+        hint.hidden = showingBase;
+      });
+    }
+
     function readForm() {
-      return Object.fromEntries([...new FormData(form).entries()].map(([name, value]) => [name, String(value).trim()]));
+      const data = Object.fromEntries([...new FormData(form).entries()].map(([name, value]) => [name, String(value).trim()]));
+      captureSeoDraft();
+      // Always report the pt-BR values, whichever language the form shows.
+      Object.keys(SEO_FIELDS).forEach((control) => {
+        data[control] = String(seoBase[control] ?? "").trim();
+      });
+      return data;
     }
 
     function showErrors(errors) {
@@ -127,9 +172,15 @@ export const settingsPage = {
           <section class="panel settings-panel">
             <header class="panel__head"><div><span>${t("settings.seo")}</span><h3>${t("settings.searchMetadata")}</h3></div></header>
             <div class="form-grid">
+              <div class="field field--wide editor-locale-row">
+                <span class="field-label">${t("settings.editorialCopy")}</span>
+                ${localeTabs("settings-seo")}
+                ${localeHint("settings-seo")}
+              </div>
               ${field(t("settings.seoTitle"), "seoTitle", settings.seoTitle, "text", t("settings.seoTitleHint"))}
               ${field(t("settings.description"), "seoDescription", settings.seoDescription, "text", t("settings.descriptionHint"))}
               ${field(t("settings.ogImagePath"), "ogImagePath", settings.ogImagePath, "text", t("settings.ogImagePathHint"))}
+              <p class="locale-hint field--wide">${t("settings.seoSharedNote")}</p>
             </div>
           </section>
         </div>
@@ -152,6 +203,19 @@ export const settingsPage = {
         </aside>
       `;
       form.removeAttribute("aria-busy");
+      seoBase = { seoTitle: settings.seoTitle ?? "", seoDescription: settings.seoDescription ?? "" };
+      seoTranslation = { ...(settings.translations?.[TRANSLATION_LOCALE] ?? {}) };
+      settingsTranslations = settings.translations ?? {};
+      form.querySelectorAll("[data-locale-edit]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const next = button.dataset.localeEdit;
+          if (next === seoLocale) return;
+          captureSeoDraft();
+          seoLocale = next;
+          paintSeoLocale();
+        });
+      });
+      paintSeoLocale();
       await renderPreview();
       setState(t("settings.saved"), false);
     } catch (error) {
@@ -177,7 +241,18 @@ export const settingsPage = {
       button.disabled = true;
       setState(t("settings.saving"), true);
       try {
-        await saveSiteSettings(data);
+        // A blank English field is dropped rather than stored, so the public
+        // site falls back to the pt-BR value for it.
+        const translation = Object.fromEntries(
+          Object.values(SEO_FIELDS)
+            .map((column) => [column, String(seoTranslation[column] ?? "").trim()])
+            .filter(([, value]) => value !== ""),
+        );
+        const translations = { ...(settingsTranslations ?? {}) };
+        if (Object.keys(translation).length) translations[TRANSLATION_LOCALE] = translation;
+        else delete translations[TRANSLATION_LOCALE];
+
+        await saveSiteSettings({ ...data, translations });
         await logActivity("Settings updated", "Public settings updated", { action: "settings.updated", entityType: "settings", entityId: "public" });
         showToast(t("settings.savedToast"));
         setState(t("settings.saved"), false);

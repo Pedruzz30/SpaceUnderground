@@ -739,6 +739,8 @@ export default {
     editorialCopy: "Textos editoriais",
   },
   settings: {
+    editorialCopy: "Textos editoriais",
+    seoSharedNote: "Nome do site, URL, email e imagem OG são únicos e não mudam com o idioma.",
     title: "Configurações",
     breadcrumb: "SISTEMA / CONFIGURAÇÕES",
     eyebrow: "CONFIGURAÇÕES",
@@ -789,6 +791,9 @@ export default {
     saveError: "Não foi possível salvar as configurações.",
   },
   projectEditor: {
+    editorialCopy: "Textos editoriais",
+    sharedField: "Campo compartilhado · igual nos dois idiomas",
+    translationFallback: "Vazio em inglês usa o texto em português no site público.",
     title: "Editor de projeto",
     breadcrumb: "OPERAÇÕES / PROJETOS / CASE",
     newBreadcrumb: "CONTEÚDO / PROJETOS / NOVO",

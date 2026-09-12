@@ -739,6 +739,8 @@ export default {
     editorialCopy: "Editorial copy",
   },
   settings: {
+    editorialCopy: "Editorial copy",
+    seoSharedNote: "Site name, URL, email and OG image are single values and do not change with the language.",
     title: "Settings",
     breadcrumb: "SYSTEM / SETTINGS",
     eyebrow: "SETTINGS",
@@ -789,6 +791,9 @@ export default {
     saveError: "Unable to save settings.",
   },
   projectEditor: {
+    editorialCopy: "Editorial copy",
+    sharedField: "Shared field · identical in both languages",
+    translationFallback: "Left empty in English, the public site uses the Portuguese text.",
     title: "Project Editor",
     breadcrumb: "OPERATIONS / PROJECTS / CASE",
     newBreadcrumb: "CONTENT / PROJECTS / NEW",

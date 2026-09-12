@@ -922,3 +922,20 @@ textarea {
   font-style: italic;
   opacity: 0.55;
 }
+
+/* Row that pairs an editorial block's label with its PT-BR | EN control. */
+.editor-locale-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.editor-locale-row .field-label {
+  margin: 0;
+}
+
+.editor-locale-row .locale-hint {
+  flex-basis: 100%;
+  margin: 0;
+}

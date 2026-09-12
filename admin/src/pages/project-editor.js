@@ -21,6 +21,7 @@ import {
 } from "../services/storage-service.js";
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
 import { applyStaticTranslations, subscribeLocaleChange, t, statusLabel } from "../i18n/index.js";
+import { BASE_LOCALE, TRANSLATION_LOCALE, localeHint, localeTabs } from "../components/locale-fields.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
 const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/avif,image/gif";
@@ -148,7 +149,14 @@ function blankProject(caseNumber) {
   };
 }
 
-function moduleMarkup(module, index, total) {
+// `editLocale` decides whether the title/description inputs are bound to the
+// module's own pt-BR text or to its English translation. Code, order and
+// identity are structural and never change with the locale.
+function moduleMarkup(module, index, total, editLocale = BASE_LOCALE) {
+  const showingBase = editLocale === BASE_LOCALE;
+  const localized = module.translations?.[TRANSLATION_LOCALE] ?? {};
+  const valueFor = (field) => (showingBase ? module[field] ?? "" : localized[field] ?? "");
+  const placeholderFor = (field) => (showingBase ? "" : String(module[field] ?? ""));
   return `
     <article class="module-card" data-module-index="${index}">
       <header class="module-card__head">
@@ -163,11 +171,11 @@ function moduleMarkup(module, index, total) {
         </div>
       </header>
       <div class="form-grid">
-        ${fieldMarkup({ labelKey: "projectEditor.code", name: `module-code-${index}`, value: module.code, attrs: `data-module-field="code" data-module-index="${index}"` })}
-        ${fieldMarkup({ labelKey: "projectEditor.titleField", name: `module-title-${index}`, value: module.title, attrs: `data-module-field="title" data-module-index="${index}"` })}
+        ${fieldMarkup({ labelKey: "projectEditor.code", name: `module-code-${index}`, value: module.code, attrs: `data-module-field="code" data-module-index="${index}"${showingBase ? "" : " readonly"}` })}
+        ${fieldMarkup({ labelKey: "projectEditor.titleField", name: `module-title-${index}`, value: valueFor("title"), attrs: `data-module-field="title" data-module-index="${index}"${placeholderFor("title") ? ` placeholder="${escapeAttribute(placeholderFor("title"))}"` : ""}${showingBase ? "" : ' class="is-translation"'}` })}
         <div class="field field--wide">
           <label for="field-module-description-${index}" data-i18n="projectEditor.description"> ${t("projectEditor.description")}</label>
-          <textarea id="field-module-description-${index}" rows="3" data-module-field="description" data-module-index="${index}">${escapeHtml(module.description)}</textarea>
+          <textarea id="field-module-description-${index}" rows="3" data-module-field="description" data-module-index="${index}"${placeholderFor("description") ? ` placeholder="${escapeAttribute(placeholderFor("description"))}"` : ""}${showingBase ? "" : ' class="is-translation"'}>${escapeHtml(valueFor("description"))}</textarea>
         </div>
       </div>
     </article>
@@ -232,6 +240,11 @@ function renderEditor(project, isCreate) {
             </div>
             <p class="field-error" id="field-accent-error" hidden></p>
           </div>
+          <div class="field field--wide editor-locale-row">
+            <span class="field-label" data-i18n="projectEditor.editorialCopy">${t("projectEditor.editorialCopy")}</span>
+            ${localeTabs("project-general")}
+            ${localeHint("project-general")}
+          </div>
           <div class="field field--wide" data-field="description">
             <label for="field-description" data-i18n="projectEditor.description">${t("projectEditor.description")}</label>
             <textarea id="field-description" name="description" rows="5">${escapeHtml(project.description)}</textarea>
@@ -251,6 +264,11 @@ function renderEditor(project, isCreate) {
 
       <div class="tab-panel" id="panel-presentation" role="tabpanel" aria-labelledby="tab-presentation" hidden>
         <div class="form-grid">
+          <div class="field field--wide editor-locale-row">
+            <span class="field-label" data-i18n="projectEditor.editorialCopy">${t("projectEditor.editorialCopy")}</span>
+            ${localeTabs("project-presentation")}
+            ${localeHint("project-presentation")}
+          </div>
           ${fieldMarkup({ labelKey: "projectEditor.systemLabel", name: "presentationSystem", value: presentation.system || "", hintKey: "projectEditor.systemLabelHint" })}
           ${fieldMarkup({ labelKey: "projectEditor.viewerLabel", name: "presentationLabel", value: presentation.label || "", hintKey: "projectEditor.viewerLabelHint" })}
           ${fieldMarkup({ labelKey: "projectEditor.address", name: "presentationAddress", value: presentation.address || "", hintKey: "projectEditor.addressHint" })}
@@ -428,6 +446,20 @@ function mount(project, isCreate) {
   let posterUrl = project.poster || "";
   let slugTouched = Boolean(project.slug);
   let isDirty = false;
+
+  // Which language the editorial fields are currently bound to. pt-BR is the
+  // base record; English is a draft held here until the project is saved.
+  let editLocale = BASE_LOCALE;
+  // Form control name -> the database column the translation is stored under,
+  // which is what the public site reads back from translations.en.
+  const EDITORIAL_FIELDS = {
+    description: "description",
+    presentationSystem: "presentation_system",
+    presentationLabel: "presentation_label",
+    presentationType: "presentation_type",
+  };
+  const translationDraft = { ...(project.translations?.[TRANSLATION_LOCALE] ?? {}) };
+  const baseDraft = {};
   const originalPosterUrl = project.poster || "";
   const originalGalleryPaths = new Set((project.gallery || []).map((item) => item.path).filter(Boolean));
 
@@ -442,14 +474,78 @@ function mount(project, isCreate) {
 
   const run = createActionRunner();
 
+  // Moves the editorial inputs between the pt-BR record and the English draft.
+  // Both sides are kept in memory, so an unsaved translation survives switching
+  // back and forth, and nothing is copied from one locale into the other.
+  function captureEditorialDraft() {
+    Object.entries(EDITORIAL_FIELDS).forEach(([control, column]) => {
+      const field = form.elements[control];
+      if (!field) return;
+      if (editLocale === BASE_LOCALE) baseDraft[control] = field.value;
+      else translationDraft[column] = field.value;
+    });
+  }
+
+  function paintEditorialLocale() {
+    const showingBase = editLocale === BASE_LOCALE;
+    Object.entries(EDITORIAL_FIELDS).forEach(([control, column]) => {
+      const field = form.elements[control];
+      if (!field) return;
+      if (showingBase) {
+        field.value = baseDraft[control] ?? "";
+        field.placeholder = "";
+      } else {
+        field.value = translationDraft[column] ?? "";
+        // The Portuguese text is a placeholder only, never written to the
+        // record, so an untouched English field keeps the fallback.
+        field.placeholder = baseDraft[control] ?? "";
+      }
+      field.classList.toggle("is-translation", !showingBase);
+    });
+
+    form.querySelectorAll("[data-locale-edit]").forEach((button) => {
+      const active = button.dataset.localeEdit === editLocale;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    form.querySelectorAll("[data-locale-hint]").forEach((hint) => {
+      hint.hidden = showingBase;
+    });
+    renderModules();
+  }
+
+  function setEditLocale(next) {
+    if (next === editLocale) return;
+    captureEditorialDraft();
+    editLocale = next;
+    paintEditorialLocale();
+  }
+
   function collectFormValues() {
     const data = Object.fromEntries(new FormData(form).entries());
+    captureEditorialDraft();
+    // Editorial fields are read from the pt-BR draft rather than the live form,
+    // because the form may currently be showing the English translation.
+    const base = (control) => String(baseDraft[control] ?? data[control] ?? "");
+
+    // Blank English fields are dropped so an untranslated field stays absent
+    // and the public site falls back to pt-BR.
+    const projectTranslation = Object.fromEntries(
+      Object.values(EDITORIAL_FIELDS)
+        .map((column) => [column, String(translationDraft[column] ?? "").trim()])
+        .filter(([, value]) => value !== ""),
+    );
+    const translations = { ...(project.translations ?? {}) };
+    if (Object.keys(projectTranslation).length) translations[TRANSLATION_LOCALE] = projectTranslation;
+    else delete translations[TRANSLATION_LOCALE];
+
     return {
+      translations,
       name: (data.name || "").trim(),
       slug: (data.slug || "").trim(),
       client: (data.client || "").trim(),
       category: data.category,
-      description: data.description || "",
+      description: base("description"),
       status: data.status,
       year: data.year,
       accent: (data.accent || "").trim(),
@@ -460,20 +556,28 @@ function mount(project, isCreate) {
       featured: form.elements.featured.checked,
       techStack: [...techStack],
       presentation: {
-        system: (data.presentationSystem || "").trim(),
-        label: (data.presentationLabel || "").trim(),
+        system: base("presentationSystem").trim(),
+        label: base("presentationLabel").trim(),
         address: (data.presentationAddress || "").trim(),
-        type: (data.presentationType || "").trim(),
+        type: base("presentationType").trim(),
         origin: (data.presentationOrigin || "").trim(),
         coordinates: [data.presentationLatitude, data.presentationLongitude].map((value) => String(value || "").trim()).filter(Boolean),
       },
-      modules: modules.map((item, index) => ({
-        id: item.id ?? null,
-        position: index,
-        code: item.code ?? "",
-        title: item.title ?? "",
-        description: item.description ?? "",
-      })),
+      modules: modules.map((item, index) => {
+        const localized = Object.fromEntries(
+          ["title", "description"]
+            .map((field) => [field, String(item.translations?.[TRANSLATION_LOCALE]?.[field] ?? "").trim()])
+            .filter(([, value]) => value !== ""),
+        );
+        return {
+          id: item.id ?? null,
+          position: index,
+          code: item.code ?? "",
+          title: item.title ?? "",
+          description: item.description ?? "",
+          translations: Object.keys(localized).length ? { [TRANSLATION_LOCALE]: localized } : {},
+        };
+      }),
       // displayUrl is a short-lived signed URL that changes on every resolve,
       // so it must stay out of what we save and out of the dirty comparison.
       gallery: gallery.map((item) => ({
@@ -633,6 +737,9 @@ function mount(project, isCreate) {
       code: item.code ?? "",
       title: item.title ?? "",
       description: item.description ?? "",
+      // Held on the module so moving or removing one carries its English copy
+      // with it, rather than leaving translations aligned to a stale position.
+      translations: item.translations ?? {},
     };
   }
 
@@ -642,7 +749,7 @@ function mount(project, isCreate) {
 
     modules = modules.map(normalizeModule);
     list.innerHTML = modules.length
-      ? modules.map((module, index) => moduleMarkup(module, index, modules.length)).join("")
+      ? modules.map((module, index) => moduleMarkup(module, index, modules.length, editLocale)).join("")
       : `<p class="empty-inline">${t("projectEditor.noModules")}</p>`;
 
     list.querySelectorAll("[data-module-field]").forEach((input) => {
@@ -650,7 +757,22 @@ function mount(project, isCreate) {
         const index = Number(input.dataset.moduleIndex);
         const field = input.dataset.moduleField;
         if (!modules[index] || !field) return;
-        modules[index] = { ...modules[index], [field]: input.value };
+
+        if (editLocale === BASE_LOCALE) {
+          modules[index] = { ...modules[index], [field]: input.value };
+        } else {
+          // Only copy is translatable; `code` stays structural and is read-only
+          // while the English tab is open.
+          if (field === "code") return;
+          const existing = modules[index].translations?.[TRANSLATION_LOCALE] ?? {};
+          modules[index] = {
+            ...modules[index],
+            translations: {
+              ...(modules[index].translations ?? {}),
+              [TRANSLATION_LOCALE]: { ...existing, [field]: input.value },
+            },
+          };
+        }
         markDirty();
       });
     });
@@ -988,6 +1110,17 @@ function mount(project, isCreate) {
   const deleteBtn = document.querySelector("[data-action-delete]");
   deleteBtn?.addEventListener("click", () => run(deleteBtn, t("projectEditor.deleting"), handleDelete));
 
+  // Seed the pt-BR side from the rendered form, then wire both tab groups to
+  // the one editLocale so they always agree.
+  Object.keys(EDITORIAL_FIELDS).forEach((control) => {
+    const field = form.elements[control];
+    if (field) baseDraft[control] = field.value;
+  });
+  form.querySelectorAll("[data-locale-edit]").forEach((button) => {
+    button.addEventListener("click", () => setEditLocale(button.dataset.localeEdit));
+  });
+  paintEditorialLocale();
+
   const unsubscribe = subscribeLocaleChange(() => {
     if (!form.isConnected) {
       unsubscribe();
@@ -1002,7 +1135,8 @@ function mount(project, isCreate) {
     const breadcrumb = document.querySelector("[data-editor-breadcrumb]");
     if (breadcrumb) breadcrumb.textContent = isCreate ? t("projectEditor.newBreadcrumb") : t("projectEditor.caseBreadcrumb", { caseNumber: project.caseNumber });
     renderChips();
-    renderModules();
+    captureEditorialDraft();
+    paintEditorialLocale();
     renderGallery();
     updateSaveState();
     applyStaticTranslations(document);
