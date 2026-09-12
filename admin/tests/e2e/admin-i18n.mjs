@@ -280,14 +280,19 @@ try {
 
   await page.click('[data-locale-tabs="site-content"] [data-locale-edit="en"]');
   await settle();
-  check(
-    (await page.inputValue("#content-headline")) === "",
-    "cms: English headline starts empty",
-    await page.inputValue("#content-headline"),
-  );
+
+  // The seed ships a curated English headline, so the English tab shows that
+  // rather than the Portuguese text it falls back to.
+  const seededEnglish = await page.inputValue("#content-headline");
+  check(seededEnglish !== heroHeadline && seededEnglish !== "", "cms: English tab shows its own value", seededEnglish);
+  check(!/[áàâãéêíóôõúüç]/i.test(seededEnglish), "cms: English tab value is English", seededEnglish);
+
+  // Cleared, the field falls back to the pt-BR text through the placeholder.
+  await page.fill("#content-headline", "");
   check(
     (await page.locator("#content-headline").getAttribute("placeholder")) === heroHeadline,
-    "cms: English field shows the pt-BR fallback as placeholder",
+    "cms: cleared English field shows the pt-BR fallback as placeholder",
+    String(await page.locator("#content-headline").getAttribute("placeholder")),
   );
   check(
     (await page.locator('[data-locale-hint="site-content"]').isVisible()),
