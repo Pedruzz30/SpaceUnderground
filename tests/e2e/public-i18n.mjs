@@ -379,6 +379,16 @@ await withProjectFixture("pt-BR", async (page) => {
   check((await viewerMode(page)) === "site", "viewer is in site mode before the switch");
   check(Boolean(frameBefore.dataSrc), "iframe has a target before the switch", String(frameBefore.dataSrc));
 
+  // The preview status used to be a hardcoded Portuguese lookup, and the static
+  // data-i18n on the element reset it to standby on every locale change.
+  const statusText = (target) => target.evaluate(() => document.querySelector("[data-preview-status]")?.textContent.trim());
+  const previewState = () => page.evaluate(() => document.querySelector("[data-project-viewer]")?.dataset.previewState);
+
+  const stateBefore = await previewState();
+  const ptStatus = await statusText(page);
+  check(Boolean(stateBefore), "viewer records its preview state", String(stateBefore));
+  check(/^(●\s)?PRÉVIA/.test(String(ptStatus)), "PT preview status", String(ptStatus));
+
   await page.click('[data-locale-switch="en"]');
   await page.waitForFunction(() => document.documentElement.lang === "en");
   await page.waitForTimeout(300);
@@ -397,6 +407,16 @@ await withProjectFixture("pt-BR", async (page) => {
     "locale switch keeps the iframe target",
     `${frameBefore.dataSrc} -> ${frameAfter.dataSrc}`,
   );
+
+  // The status is relabelled from the state it is actually in, not reset.
+  const enStatus = await statusText(page);
+  check(/^(●\s)?(PREVIEW|LIVE)/.test(String(enStatus)), "EN preview status", String(enStatus));
+  check(
+    (await previewState()) === stateBefore,
+    "locale switch keeps the preview state itself",
+    `${stateBefore} -> ${await previewState()}`,
+  );
+  check(enStatus !== ptStatus, "preview status actually changed language", `${ptStatus} -> ${enStatus}`);
 
   // The copy around the viewer did follow the locale.
   const description = await page.locator("[data-viewer-description]").evaluate((node) => node.textContent.trim());

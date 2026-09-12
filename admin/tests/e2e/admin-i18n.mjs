@@ -40,6 +40,19 @@ async function setLocale(locale) {
   await settle();
 }
 
+// Some screens leave a dirty form behind on purpose, and the router then asks
+// before navigating away. These runs are not testing saving, so the guard is
+// discarded.
+async function gotoRoute(route, waitFor) {
+  await page.goto(`${BASE_URL}/${route}`);
+  const guard = page.locator("[data-modal-confirm]");
+  if (await guard.count()) {
+    await guard.click();
+    await page.waitForTimeout(250);
+  }
+  if (waitFor) await page.waitForSelector(waitFor);
+}
+
 async function assertMockMode() {
   await page.goto(`${BASE_URL}/#/login`);
   await page.waitForFunction(() => window.__spaceAdminDataSource !== undefined, null, { timeout: 20000 });
@@ -336,10 +349,12 @@ try {
 
   /* ------------------------------- CMS: partial repeatable translation */
 
-  // The bug this guards: a translation covering only some items used to replace
-  // the whole list, so the section collapsed and the surviving translation
-  // landed on the wrong card. pt-BR owns the structure; English fills in per
-  // position, per field.
+  // The bug this guards: the English tab bound each row to translations.en.items
+  // BY ARRAY INDEX. With only position 2 translated, the single surviving entry
+  // was handed to the first card, and saving rewrote its position to 0.
+  //
+  // The scenario is built to leave exactly one translated item, at position 2,
+  // which is the shape that slipped past the earlier suite.
   await setLocale("pt-BR");
   await page.goto(`${BASE_URL}/#/content`);
   await page.waitForSelector("[data-content-form]");
@@ -357,12 +372,39 @@ try {
   );
   check(baseTitles.length === 4, "cms: capabilities has four base items", baseTitles.join(", "));
 
+  // The card must carry the editorial position, not the visual index.
+  const stampedPositions = await page.evaluate(() =>
+    [...document.querySelectorAll("[data-repeatable-item]")].map((card) => card.dataset.itemPosition),
+  );
+  check(stampedPositions.join(",") === "0,1,2,3", "cms: cards carry their real position", stampedPositions.join(","));
+
+  // Localized kind label, not the internal identity.
+  const ptKind = await page.evaluate(
+    () => document.querySelector("[data-repeatable-item] .module-card__head span")?.textContent.trim(),
+  );
+  check(ptKind === "CAPACIDADE 01", "cms: PT capability label", String(ptKind));
+
+  // The kind label follows the interface language, not the content-language tab.
+  await setLocale("en");
+  const enKind = await page.evaluate(
+    () => document.querySelector("[data-repeatable-item] .module-card__head span")?.textContent.trim(),
+  );
+  check(enKind === "CAPABILITY 01", "cms: EN capability label", String(enKind));
+  await setLocale("pt-BR");
+
   await page.click('[data-locale-tabs="site-content"] [data-locale-edit="en"]');
   await page.waitForTimeout(250);
 
-  // Clear the first item's English title, leaving the other three translated.
-  const firstEnTitle = page.locator('[data-repeatable-item] [data-repeatable-field="title"]').first();
-  await firstEnTitle.fill("");
+  // Clear every English title except position 2, so the stored translation
+  // array ends up holding that one entry only.
+  const titleInputs = page.locator('[data-repeatable-item] [data-repeatable-field="title"]');
+  const descInputs = page.locator('[data-repeatable-item] [data-repeatable-field="description"]');
+  for (const index of [0, 1, 3]) {
+    await titleInputs.nth(index).fill("");
+    await descInputs.nth(index).fill("");
+  }
+  await descInputs.nth(2).fill("");
+
   await page.click("[data-action-save]");
   await page.waitForFunction(
     () => !document.querySelector("[data-content-state]")?.textContent.includes("..."),
@@ -378,34 +420,112 @@ try {
   await page.click('[data-locale-tabs="site-content"] [data-locale-edit="en"]');
   await page.waitForTimeout(250);
 
-  const afterTitles = await page.evaluate(() =>
+  const afterReload = await page.evaluate(() =>
     [...document.querySelectorAll("[data-repeatable-item]")].map((card) => ({
+      position: card.dataset.itemPosition,
       value: card.querySelector('[data-repeatable-field="title"]')?.value,
       placeholder: card.querySelector('[data-repeatable-field="title"]')?.placeholder,
     })),
   );
 
-  check(afterTitles.length === 4, "cms: partial translation keeps all four items", String(afterTitles.length));
-  check(afterTitles[0].value === "", "cms: cleared English title stayed empty", String(afterTitles[0].value));
+  check(afterReload.length === 4, "cms: partial translation keeps all four items", String(afterReload.length));
   check(
-    afterTitles[0].placeholder === baseTitles[0],
-    "cms: cleared item falls back to its own pt-BR title",
-    `${afterTitles[0].placeholder} vs ${baseTitles[0]}`,
+    afterReload.map((row) => row.position).join(",") === "0,1,2,3",
+    "cms: positions survive the save",
+    afterReload.map((row) => row.position).join(","),
+  );
+  check(afterReload[0].value === "", "cms: position 0 has no translation", String(afterReload[0].value));
+  check(
+    afterReload[0].placeholder === baseTitles[0],
+    "cms: position 0 falls back to its own pt-BR title",
+    `${afterReload[0].placeholder} vs ${baseTitles[0]}`,
+  );
+  check(afterReload[1].value === "", "cms: position 1 has no translation", String(afterReload[1].value));
+  check(
+    afterReload[1].placeholder === baseTitles[1],
+    "cms: position 1 falls back to its own pt-BR title",
+    `${afterReload[1].placeholder} vs ${baseTitles[1]}`,
   );
   check(
-    afterTitles[1].value === "Systems",
-    "cms: the other items keep their own translation, unshifted",
-    String(afterTitles[1].value),
+    afterReload[2].value === "Automation",
+    "cms: the only translation stayed on position 2",
+    String(afterReload[2].value),
   );
-  check(afterTitles[3].value === "AI", "cms: the last item keeps its translation", String(afterTitles[3].value));
+  check(
+    afterReload[2].placeholder === baseTitles[2],
+    "cms: position 2 shows its own pt-BR fallback",
+    `${afterReload[2].placeholder} vs ${baseTitles[2]}`,
+  );
+  check(afterReload[3].value === "", "cms: position 3 has no translation", String(afterReload[3].value));
 
-  // The preview resolves the same way the public site will.
+  // The preview resolves the same way the public site will: per position, per
+  // field.
   const previewItems = await page.evaluate(() =>
     [...document.querySelectorAll(".cms-preview-list p")].map((node) => node.textContent.replace(/^\d+/, "").trim()),
   );
   check(previewItems.length === 4, "cms: preview lists all four items", previewItems.join(", "));
-  check(previewItems[0] === baseTitles[0], "cms: preview falls back for the untranslated item", previewItems[0]);
-  check(previewItems[1] === "Systems", "cms: preview shows the translated item in place", previewItems[1]);
+  check(previewItems[0] === baseTitles[0], "cms: preview falls back for position 0", previewItems[0]);
+  check(previewItems[2] === "Automation", "cms: preview shows the translation on position 2", previewItems[2]);
+
+  /* ------------------------------------------- CMS: process kind label */
+
+  await setLocale("pt-BR");
+  await page.click('[data-content-section="process"]');
+  await page.waitForTimeout(300);
+  await page.click('[data-locale-tabs="site-content"] [data-locale-edit="pt-BR"]');
+  await page.waitForTimeout(200);
+
+  // The seed ships no process items, so one is added. An empty row is dropped
+  // when the draft is captured, so it is given a title first.
+  if ((await page.locator("[data-repeatable-item]").count()) === 0) {
+    await page.click("[data-add-repeatable]");
+    await page.waitForSelector("[data-repeatable-item]");
+    await page.locator('[data-repeatable-item] [data-repeatable-field="title"]').first().fill("Descoberta");
+    await page.waitForTimeout(200);
+  }
+
+  const stepKind = (label) =>
+    page.evaluate(() => document.querySelector("[data-repeatable-item] .module-card__head span")?.textContent.trim());
+
+  const ptStep = await stepKind();
+  check(ptStep === "ETAPA 01", "cms: PT step label", String(ptStep));
+
+  await setLocale("en");
+  await page.waitForTimeout(250);
+  const enStep = await stepKind();
+  check(enStep === "STEP 01", "cms: EN step label", String(enStep));
+  await setLocale("pt-BR");
+
+  /* --------------------------------------- Settings: SEO preview fallback */
+
+  // With no seoDescription stored, the preview must not fall back to English
+  // copy while the interface is in Portuguese.
+  await setLocale("pt-BR");
+  // The process section was left dirty by the step added above, so the guard
+  // asks before leaving.
+  await gotoRoute("#/settings", "[data-settings-form]:not([aria-busy])");
+  await page.fill("#settings-seoDescription", "");
+  await page.waitForTimeout(300);
+
+  const ptFallback = await page.evaluate(
+    () => document.querySelector(".settings-search-preview p")?.textContent.trim(),
+  );
+  check(
+    ptFallback === "Estúdio digital para sites, sistemas, automação e IA.",
+    "settings: PT SEO preview fallback",
+    String(ptFallback),
+  );
+
+  await setLocale("en");
+  await page.waitForTimeout(300);
+  const enFallback = await page.evaluate(
+    () => document.querySelector(".settings-search-preview p")?.textContent.trim(),
+  );
+  check(
+    enFallback === "Digital studio for websites, systems, automation and AI.",
+    "settings: EN SEO preview fallback",
+    String(enFallback),
+  );
 
   /* ----------------------------------------------------------- responsive */
 
@@ -424,8 +544,7 @@ try {
     for (const [route, waitFor, localeControl] of RESPONSIVE_ROUTES) {
       for (const width of WIDTHS) {
         await page.setViewportSize({ width, height: 900 });
-        await page.goto(`${BASE_URL}/${route}`);
-        await page.waitForSelector(waitFor);
+        await gotoRoute(route, waitFor);
 
         const overflow = await page.evaluate((w) => {
           const selectors = [".topbar", ".page-heading", ".locale-tabs", ".locale-switcher"];

@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 
-import { mergeLocalizedItems, mergeLocalizedRecord } from "../shared/localized-items.js";
+import { findByPosition, mergeLocalizedItems, mergeLocalizedRecord } from "../shared/localized-items.js";
 
 describe("mergeLocalizedItems", () => {
   it("applies a partial translation to the matching position only", () => {
@@ -132,5 +132,63 @@ describe("mergeLocalizedRecord", () => {
 
   it("survives an empty record", () => {
     assert.deepEqual(mergeLocalizedRecord(undefined, undefined), {});
+  });
+});
+
+describe("findByPosition", () => {
+  // The exact shape that slipped past the earlier suite: the translation array
+  // holds ONE entry, for position 2. Binding an editor row by array index would
+  // hand that translation to position 0.
+  const BASE = [
+    { position: 0, title: "Sites", description: "PT Sites" },
+    { position: 1, title: "Sistemas", description: "PT Sistemas" },
+    { position: 2, title: "Automação", description: "PT Automação" },
+  ];
+  const TRANSLATED = [{ position: 2, title: "Automation" }];
+
+  it("binds each base item to its own translation, or to none", () => {
+    assert.equal(findByPosition(TRANSLATED, 0), undefined);
+    assert.equal(findByPosition(TRANSLATED, 1), undefined);
+    assert.deepEqual(findByPosition(TRANSLATED, 2), { position: 2, title: "Automation" });
+  });
+
+  it("would not be satisfied by the index the item happens to sit at", () => {
+    // TRANSLATED[0] is the position-2 entry. Index lookup is exactly the bug.
+    assert.notEqual(findByPosition(TRANSLATED, 0), TRANSLATED[0]);
+  });
+
+  it("matches a position stored as a string", () => {
+    assert.deepEqual(findByPosition([{ position: "2", title: "EN" }], 2), { position: "2", title: "EN" });
+  });
+
+  it("tolerates a missing list", () => {
+    assert.equal(findByPosition(undefined, 0), undefined);
+    assert.equal(findByPosition([], 0), undefined);
+  });
+
+  it("resolves the whole row set the way the editor does", () => {
+    const rows = BASE.map((baseItem) => ({
+      position: baseItem.position,
+      baseItem,
+      item: findByPosition(TRANSLATED, baseItem.position) ?? { position: baseItem.position },
+    }));
+
+    assert.equal(rows.length, 3, "one row per base item");
+    assert.equal(rows[0].item.title, undefined, "position 0 has no translated title");
+    assert.equal(rows[0].baseItem.title, "Sites", "position 0 falls back to its own pt-BR title");
+    assert.equal(rows[1].item.title, undefined, "position 1 has no translated title");
+    assert.equal(rows[1].baseItem.title, "Sistemas");
+    assert.equal(rows[2].item.title, "Automation", "position 2 gets its translation");
+    assert.equal(rows[2].baseItem.title, "Automação");
+    assert.deepEqual(rows.map((row) => row.position), [0, 1, 2], "positions are preserved");
+  });
+
+  it("falls back per field for the item that is translated", () => {
+    const merged = mergeLocalizedItems(BASE, TRANSLATED);
+
+    assert.equal(merged[2].title, "Automation", "translated field wins");
+    assert.equal(merged[2].description, "PT Automação", "untranslated field keeps pt-BR");
+    assert.equal(merged[0].title, "Sites", "untranslated item is untouched");
+    assert.equal(merged[1].title, "Sistemas");
   });
 });
