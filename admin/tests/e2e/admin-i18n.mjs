@@ -334,6 +334,79 @@ try {
     "cms: locale switch keeps the English draft",
   );
 
+  /* ------------------------------- CMS: partial repeatable translation */
+
+  // The bug this guards: a translation covering only some items used to replace
+  // the whole list, so the section collapsed and the surviving translation
+  // landed on the wrong card. pt-BR owns the structure; English fills in per
+  // position, per field.
+  await setLocale("pt-BR");
+  await page.goto(`${BASE_URL}/#/content`);
+  await page.waitForSelector("[data-content-form]");
+  await page.click('[data-content-section="capabilities"]');
+  await page.waitForSelector("[data-repeatable-item]");
+  // The content-language tab persists across section switches, so it is set
+  // back to pt-BR explicitly before reading the base titles.
+  await page.click('[data-locale-tabs="site-content"] [data-locale-edit="pt-BR"]');
+  await page.waitForTimeout(250);
+
+  const baseTitles = await page.evaluate(() =>
+    [...document.querySelectorAll("[data-repeatable-item]")].map(
+      (card) => card.querySelector('[data-repeatable-field="title"]')?.value,
+    ),
+  );
+  check(baseTitles.length === 4, "cms: capabilities has four base items", baseTitles.join(", "));
+
+  await page.click('[data-locale-tabs="site-content"] [data-locale-edit="en"]');
+  await page.waitForTimeout(250);
+
+  // Clear the first item's English title, leaving the other three translated.
+  const firstEnTitle = page.locator('[data-repeatable-item] [data-repeatable-field="title"]').first();
+  await firstEnTitle.fill("");
+  await page.click("[data-action-save]");
+  await page.waitForFunction(
+    () => !document.querySelector("[data-content-state]")?.textContent.includes("..."),
+    null,
+    { timeout: 15000 },
+  );
+  await page.waitForTimeout(300);
+
+  await page.reload();
+  await page.waitForSelector("[data-content-form]");
+  await page.click('[data-content-section="capabilities"]');
+  await page.waitForSelector("[data-repeatable-item]");
+  await page.click('[data-locale-tabs="site-content"] [data-locale-edit="en"]');
+  await page.waitForTimeout(250);
+
+  const afterTitles = await page.evaluate(() =>
+    [...document.querySelectorAll("[data-repeatable-item]")].map((card) => ({
+      value: card.querySelector('[data-repeatable-field="title"]')?.value,
+      placeholder: card.querySelector('[data-repeatable-field="title"]')?.placeholder,
+    })),
+  );
+
+  check(afterTitles.length === 4, "cms: partial translation keeps all four items", String(afterTitles.length));
+  check(afterTitles[0].value === "", "cms: cleared English title stayed empty", String(afterTitles[0].value));
+  check(
+    afterTitles[0].placeholder === baseTitles[0],
+    "cms: cleared item falls back to its own pt-BR title",
+    `${afterTitles[0].placeholder} vs ${baseTitles[0]}`,
+  );
+  check(
+    afterTitles[1].value === "Systems",
+    "cms: the other items keep their own translation, unshifted",
+    String(afterTitles[1].value),
+  );
+  check(afterTitles[3].value === "AI", "cms: the last item keeps its translation", String(afterTitles[3].value));
+
+  // The preview resolves the same way the public site will.
+  const previewItems = await page.evaluate(() =>
+    [...document.querySelectorAll(".cms-preview-list p")].map((node) => node.textContent.replace(/^\d+/, "").trim()),
+  );
+  check(previewItems.length === 4, "cms: preview lists all four items", previewItems.join(", "));
+  check(previewItems[0] === baseTitles[0], "cms: preview falls back for the untranslated item", previewItems[0]);
+  check(previewItems[1] === "Systems", "cms: preview shows the translated item in place", previewItems[1]);
+
   /* ----------------------------------------------------------- responsive */
 
   // The topbar carries the locale switcher next to the account block, and the
