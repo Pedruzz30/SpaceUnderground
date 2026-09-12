@@ -1,3 +1,4 @@
+import { t } from "../i18n/index.js";
 import { escapeHtml } from "../utils/html.js";
 
 let active = null;
@@ -85,7 +86,9 @@ export function openModal({ title, body, actions = [], onDismiss }) {
   });
 }
 
-export function confirmModal({ title, body, confirmLabel, cancelLabel = "Cancel", danger = true }) {
+export function confirmModal({ title, body, confirmLabel, cancelLabel, danger = true }) {
+  // Resolved here rather than in the signature so it follows the active locale.
+  const cancel = cancelLabel ?? t("common.cancel");
   return new Promise((resolve) => {
     let settled = false;
     const settle = (value) => {
@@ -99,7 +102,7 @@ export function confirmModal({ title, body, confirmLabel, cancelLabel = "Cancel"
       body,
       onDismiss: () => settle(false),
       actions: [
-        { label: cancelLabel, onSelect: () => settle(false) },
+        { label: cancel, onSelect: () => settle(false) },
         { label: confirmLabel, variant: danger ? "danger" : "primary", onSelect: () => settle(true) },
       ],
     });

@@ -1,4 +1,5 @@
 import { initRouter } from "./router/router.js";
+import { t } from "./i18n/index.js";
 import "./services/dev-tools.js";
 
 document.documentElement.classList.add("js");
@@ -21,10 +22,10 @@ try {
             <span class="brand-mark" aria-hidden="true">SU</span>
             <div>
               <p>SPACE UNDERGROUND</p>
-              <h1 id="admin-error-title">ADMIN / ERROR</h1>
+              <h1 id="admin-error-title">${t("errors.bootTitle")}</h1>
             </div>
           </div>
-          <p class="login-panel__copy">Nao foi possivel carregar o painel. Recarregue o servidor Vite e tente novamente.</p>
+          <p class="login-panel__copy">${t("errors.bootBody")}</p>
         </section>
       </main>
     `;
