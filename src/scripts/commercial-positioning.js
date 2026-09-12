@@ -211,10 +211,15 @@ function hydrateProjectForm() {
 
   const select = form.querySelector("#project-need");
   if (select) {
+    // Rebuilding the options discards the select's value, which would silently
+    // clear the visitor's chosen project type on a locale change. Captured and
+    // restored so project-form can re-apply the selection afterwards.
+    const chosen = select.value;
     select.innerHTML = `
       <option value="">${t("commercial.selectPlaceholder")}</option>
       ${optionsData.map((option) => `<option value="${option.value}">${option.name}</option>`).join("")}
     `;
+    select.value = chosen;
   }
 
   const picker = form.querySelector("[data-product-picker]");
@@ -223,11 +228,15 @@ function hydrateProjectForm() {
 
   const pickerHeader = picker?.querySelector(".product-picker__header p");
   if (pickerHeader) pickerHeader.textContent = t("commercial.pickerTitle");
+
+  // The count and summary describe the current selection, so they are only
+  // reset when nothing is selected. project-form fills them in otherwise.
+  const hasSelection = Boolean(select?.value);
   const count = picker?.querySelector("[data-product-count]");
-  if (count) count.textContent = `00 / ${String(optionsData.length).padStart(2, "0")}`;
+  if (count && !hasSelection) count.textContent = `00 / ${String(optionsData.length).padStart(2, "0")}`;
 
   const summary = picker?.querySelector("[data-product-summary]");
-  if (summary) {
+  if (summary && !hasSelection) {
     const kicker = summary.querySelector("span");
     const title = summary.querySelector("strong");
     const text = summary.querySelector("[data-product-summary-text]");
