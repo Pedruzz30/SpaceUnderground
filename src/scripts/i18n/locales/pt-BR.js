@@ -76,6 +76,12 @@ export default {
     statementNote: "O projeto pode começar em qualquer nível e evoluir conforme a necessidade da operação.",
   },
   work: {
+    previewStatus: {
+      loading: "PRÉVIA / INICIALIZANDO",
+      live: "● PRÉVIA AO VIVO",
+      sleeping: "PRÉVIA / EM ESPERA",
+      fallback: "PRÉVIA / ALTERNATIVA",
+    },
     caseIndex: "CASE / {id}",
     clientIndex: "CLIENTE / {id}",
     yearValue: "ANO — {year}",
@@ -131,7 +137,6 @@ export default {
     addressPending: "AGUARDANDO DADOS",
     systemPending: "SISTEMA DO PROJETO",
     labelPending: "AGUARDANDO",
-    previewStandby: "PRÉVIA / EM ESPERA",
     yearPending: "ANO — --",
     namePending: "Projetos Selecionados",
   },

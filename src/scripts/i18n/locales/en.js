@@ -76,6 +76,12 @@ export default {
     statementNote: "A project can start at any level and grow as the operation needs it to.",
   },
   work: {
+    previewStatus: {
+      loading: "PREVIEW / INITIALIZING",
+      live: "● LIVE PREVIEW",
+      sleeping: "PREVIEW / STANDBY",
+      fallback: "PREVIEW / FALLBACK",
+    },
     caseIndex: "CASE / {id}",
     clientIndex: "CLIENT / {id}",
     yearValue: "YEAR — {year}",
@@ -131,7 +137,6 @@ export default {
     addressPending: "WAITING FOR DATA",
     systemPending: "PROJECT SYSTEM",
     labelPending: "WAITING",
-    previewStandby: "PREVIEW / STANDBY",
     yearPending: "YEAR — --",
     namePending: "Selected Work",
   },

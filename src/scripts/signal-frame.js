@@ -1,5 +1,5 @@
 import { projects, defaultProjectKey } from "./project-registry.js";
-import { t } from "./i18n/index.js";
+import { subscribeLocaleChange, t } from "./i18n/index.js";
 
 const LIVE_PREVIEW_SELECTOR = "[data-live-project]";
 const MOBILE_QUERY = "(max-width: 759px)";
@@ -9,11 +9,13 @@ const LOAD_TIMEOUT = 8000;
 const STATE_CLASS_NAMES = ["is-preview-loading", "is-preview-live", "is-preview-sleeping", "is-preview-fallback"];
 const VIEW_CLASS_NAMES = ["is-view-site", "is-view-detail", "is-view-origin"];
 
-const STATE_LABELS = {
-  loading: "PRÉVIA / INICIALIZANDO",
-  live: "● PRÉVIA AO VIVO",
-  sleeping: "PRÉVIA / EM ESPERA",
-  fallback: "PRÉVIA / ALTERNATIVA",
+// Resolved through t() at paint time rather than frozen into a lookup, so the
+// status follows the locale like the rest of the viewer's copy.
+const STATE_KEYS = {
+  loading: "work.previewStatus.loading",
+  live: "work.previewStatus.live",
+  sleeping: "work.previewStatus.sleeping",
+  fallback: "work.previewStatus.fallback",
 };
 
 let activePreview = null;
@@ -63,7 +65,19 @@ function setPreviewStatus(frame, label) {
 function setPreviewState(frame, state) {
   frame.classList.remove(...STATE_CLASS_NAMES);
   frame.classList.add(`is-preview-${state}`);
-  setPreviewStatus(frame, STATE_LABELS[state] || STATE_LABELS.sleeping);
+  // Stamped so a locale change can re-label the status it is actually in,
+  // rather than assuming standby.
+  frame.dataset.previewState = state;
+  setPreviewStatus(frame, t(STATE_KEYS[state] || STATE_KEYS.sleeping));
+}
+
+// Re-labels the status of every viewer from the state it is already in. Touches
+// nothing else: not the mode, the project, the source or the iframe.
+function relabelPreviewStatuses() {
+  document.querySelectorAll(LIVE_PREVIEW_SELECTOR).forEach((frame) => {
+    const state = frame.dataset.previewState || "sleeping";
+    setPreviewStatus(frame, t(STATE_KEYS[state] || STATE_KEYS.sleeping));
+  });
 }
 
 function createCalibration(frame) {
@@ -482,6 +496,8 @@ export function initSignalFrame() {
     const preview = createLivePreview(frame, mobileMedia);
     if (frame.hasAttribute("data-project-viewer")) viewer = createProjectViewer(frame, preview);
   });
+
+  subscribeLocaleChange(relabelPreviewStatuses);
 }
 
 export function getActiveProjectKey() {

@@ -1,6 +1,6 @@
 import { showToast } from "../components/toast.js";
 import { DATA_SOURCE, isSupabaseConfigured } from "../config/env.js";
-import { t } from "../i18n/index.js";
+import { onLocaleChange, t } from "../i18n/index.js";
 import { BASE_LOCALE, TRANSLATION_LOCALE, localeHint, localeTabs } from "../components/locale-fields.js";
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
 import { describeError } from "../services/errors.js";
@@ -46,12 +46,14 @@ function validate(data) {
   return errors;
 }
 
+// The site name and URL are identity, not copy, so they keep their literal
+// fallbacks. Only the description sentence is localized.
 function preview(data, imageUrl = "") {
   return `
     <div class="search-preview settings-search-preview">
       <strong>${escapeHtml(data.seoTitle || data.siteName || "Space Underground")}</strong>
       <span>${escapeHtml(data.siteUrl || "https://spaceunderground.dev")}</span>
-      <p>${escapeHtml(data.seoDescription || "Digital studio for sites, systems, automation and AI.")}</p>
+      <p>${escapeHtml(data.seoDescription || t("settings.previewDescriptionFallback"))}</p>
     </div>
     <div class="og-preview settings-og-preview">
       <span>${imageUrl ? `<img src="${escapeAttribute(imageUrl)}" alt="">` : "OG"}</span>
@@ -218,6 +220,14 @@ export const settingsPage = {
       paintSeoLocale();
       await renderPreview();
       setState(t("settings.saved"), false);
+
+      // The preview is generated markup, so applyStaticTranslations cannot
+      // reach it. Re-rendered from the values already in the form, which keeps
+      // any unsaved edit and the chosen content language.
+      onLocaleChange(form, () => {
+        renderPreview();
+        setState(isDirty ? t("settings.unsaved") : t("settings.saved"), isDirty);
+      });
     } catch (error) {
       form.innerHTML = `<section class="panel"><p class="empty-inline">${escapeHtml(describeError(error, t("settings.loadError")))}</p></section>`;
       setState(t("settings.loadFailed"), false);

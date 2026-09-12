@@ -20,6 +20,15 @@ function translatedEntries(item) {
 }
 
 /**
+ * Finds the translation belonging to a base item. Exported so editors can bind
+ * a form row to the right translation instead of trusting array order.
+ */
+export function findByPosition(items, position) {
+  if (!Array.isArray(items)) return undefined;
+  return items.find((item) => positionOf(item) === Number(position));
+}
+
+/**
  * Returns the base items with any matching translation applied on top.
  *
  * - items present only in the base keep their base copy;

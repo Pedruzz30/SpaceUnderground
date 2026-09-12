@@ -135,6 +135,10 @@ export default {
     error: "Unable to sign in.",
   },
   content: {
+    repeatables: {
+      capability: "CAPABILITY",
+      step: "STEP",
+    },
     title: "Site Content",
     breadcrumb: "CONTENT / CMS / SITE CONTENT",
     eyebrow: "SITE CONTENT",
@@ -739,6 +743,7 @@ export default {
     editorialCopy: "Editorial copy",
   },
   settings: {
+    previewDescriptionFallback: "Digital studio for websites, systems, automation and AI.",
     editorialCopy: "Editorial copy",
     seoSharedNote: "Site name, URL, email and OG image are single values and do not change with the language.",
     title: "Settings",

@@ -1,4 +1,4 @@
-import { mergeLocalizedRecord } from "../../../shared/localized-items.js";
+import { findByPosition, mergeLocalizedRecord } from "../../../shared/localized-items.js";
 import { showToast } from "../components/toast.js";
 import { BASE_LOCALE, TRANSLATION_LOCALE, localeHint, localeTabs } from "../components/locale-fields.js";
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
@@ -126,12 +126,15 @@ function fieldControl(field, value, { readOnly = false, placeholder = "" } = {})
   `;
 }
 
-function repeatableItem(kind, fields, item, index, { editLocale, baseItem = {} }) {
+// `position` is the editorial identity of the row and is stamped on the card;
+// `index` is only the visual number shown in the header. The two are not
+// interchangeable: a partial translation has gaps.
+function repeatableItem(kind, fields, item, index, { editLocale, baseItem = {}, position = index }) {
   const showingBase = editLocale === BASE_LOCALE;
   return `
-    <article class="module-card" data-repeatable-item data-item-position="${index}">
+    <article class="module-card" data-repeatable-item data-item-position="${position}">
       <header class="module-card__head">
-        <div><span>${escapeHtml(kind.toUpperCase())} ${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title || baseItem.title || t("content.untitled"))}</strong></div>
+        <div><span>${escapeHtml(t(`content.repeatables.${kind}`))} ${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title || baseItem.title || t("content.untitled"))}</strong></div>
         <button type="button" class="button button--danger" data-remove-repeatable ${showingBase ? "" : "disabled"}>${escapeHtml(t("content.removeItem"))}</button>
       </header>
       <div class="form-grid">
@@ -168,18 +171,26 @@ function formFor(key, draft, { editLocale, baseContent }) {
 
   const baseItems = Array.isArray(baseContent.items) ? baseContent.items : [];
   const items = Array.isArray(draft.items) ? draft.items : [];
-  // Position is the identity shared between the base items and their
-  // translations, so the two lists stay aligned even when only one has entries.
-  const rows = showingBase ? items : baseItems.map((_, index) => items[index] || {});
+
+  // pt-BR owns the structure, so the English tab always renders one row per base
+  // item and looks its translation up by position. A translation array covering
+  // only position 2 must fill the third card, not the first.
+  const rows = showingBase
+    ? items.map((item, index) => ({ item, baseItem: item, position: item.position ?? index }))
+    : baseItems.map((baseItem, index) => {
+        const position = baseItem.position ?? index;
+        return { item: findByPosition(items, position) ?? { position }, baseItem, position };
+      });
 
   return `
     <div class="form-grid">${body}</div>
     <div class="module-list" data-repeatable-list="${escapeAttribute(repeatable.kind)}">
       ${rows
-        .map((item, index) =>
+        .map(({ item, baseItem, position }, index) =>
           repeatableItem(repeatable.kind, repeatable.fields, item, index, {
             editLocale,
-            baseItem: baseItems[index] || {},
+            baseItem,
+            position,
           }),
         )
         .join("") || `<p class="empty-inline">${escapeHtml(t("content.noItems"))}</p>`}
@@ -191,7 +202,13 @@ function formFor(key, draft, { editLocale, baseContent }) {
 function readRepeatable(form, fields, { translatableOnly }) {
   return [...form.querySelectorAll("[data-repeatable-item]")]
     .map((card, index) => {
-      const item = { position: index };
+      // In the base language the visual order *is* the structure, so positions
+      // are renumbered from it. A translation must keep the position of the
+      // base item it belongs to: renumbering a partial translation would move
+      // it onto a different item.
+      const stamped = Number(card.dataset.itemPosition);
+      const position = translatableOnly && Number.isFinite(stamped) ? stamped : index;
+      const item = { position };
       card.querySelectorAll("[data-repeatable-field]").forEach((inputEl) => {
         const name = inputEl.dataset.repeatableField;
         const field = fields.find((entry) => entry.name === name);

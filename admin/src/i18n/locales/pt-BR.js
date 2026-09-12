@@ -135,6 +135,10 @@ export default {
     error: "Não foi possível entrar.",
   },
   content: {
+    repeatables: {
+      capability: "CAPACIDADE",
+      step: "ETAPA",
+    },
     title: "Conteúdo do site",
     breadcrumb: "CONTEÚDO / CMS / CONTEÚDO DO SITE",
     eyebrow: "CONTEÚDO DO SITE",
@@ -739,6 +743,7 @@ export default {
     editorialCopy: "Textos editoriais",
   },
   settings: {
+    previewDescriptionFallback: "Estúdio digital para sites, sistemas, automação e IA.",
     editorialCopy: "Textos editoriais",
     seoSharedNote: "Nome do site, URL, email e imagem OG são únicos e não mudam com o idioma.",
     title: "Configurações",
