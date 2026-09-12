@@ -499,7 +499,8 @@
 
 .signal-ui.is-preview-loading .signal-ui__poster,
 .signal-ui.is-preview-sleeping .signal-ui__poster,
-.signal-ui.is-preview-fallback .signal-ui__poster {
+.signal-ui.is-preview-fallback .signal-ui__poster,
+.signal-ui.is-preview-unavailable .signal-ui__poster {
   opacity: 1;
 }
 
@@ -521,7 +522,8 @@
 }
 
 .signal-ui.is-preview-fallback .signal-ui__website-surface,
-.signal-ui.is-preview-sleeping .signal-ui__website-surface {
+.signal-ui.is-preview-sleeping .signal-ui__website-surface,
+.signal-ui.is-preview-unavailable .signal-ui__website-surface {
   opacity: 0;
 }
 
@@ -678,6 +680,15 @@
 
 .signal-ui.is-preview-fallback .signal-ui__signature > span {
   color: #aeb0aa;
+}
+
+.signal-ui.is-preview-unavailable .signal-ui__signature > span {
+  color: #d8dad2;
+}
+
+.signal-ui [data-signal-mode="site"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .signal-ui__signature > strong {

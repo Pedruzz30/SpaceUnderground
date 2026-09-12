@@ -16,6 +16,11 @@ let lastSigned = new Map();
 const PLACEHOLDER_POSTER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900'%3E%3Crect width='1440' height='900' fill='%23050605'/%3E%3Cpath d='M120 450h1200' stroke='%23c6ff00' stroke-opacity='.22'/%3E%3Ccircle cx='720' cy='450' r='120' fill='none' stroke='%23c6ff00' stroke-opacity='.18'/%3E%3C/svg%3E";
 
+const APPROVED_LIVE_PREVIEWS = new Map([
+  ["001", "https://pedruzz30.github.io/TattooSite/?embed=spaceunderground"],
+  ["002", "https://pedruzz30.github.io/LucasNutri/?embed=spaceunderground"],
+]);
+
 const isStoragePath = (value) => Boolean(value) && !/^(https?:|data:|blob:|\/|\.{1,2}\/)/i.test(value);
 const text = (value) => (typeof value === "string" ? value.trim() : "");
 const pad = (value) => String(Number(value) || value || "").padStart(3, "0");
@@ -71,9 +76,17 @@ function normalizeStatus(row) {
   return (label === key ? status : label).toUpperCase();
 }
 
+function approvedPreviewUrl(row) {
+  const caseNumber = pad(row.case_number);
+  const previewUrl = text(row.preview_url);
+  const approved = APPROVED_LIVE_PREVIEWS.get(caseNumber);
+  return approved && previewUrl === approved ? previewUrl : "";
+}
+
 function projectFromRow(row, signed) {
   const key = keyFor(row);
   const posterPath = text(row.poster_url);
+  const previewUrl = approvedPreviewUrl(row);
   const gallery = Array.isArray(row.project_gallery)
     ? [...row.project_gallery]
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
@@ -108,7 +121,8 @@ function projectFromRow(row, signed) {
       category: categoryLabel(row),
       description: localized(row, "description"),
       url: text(row.project_url),
-      previewUrl: text(row.preview_url || row.project_url),
+      previewUrl,
+      hasLivePreview: Boolean(previewUrl),
       poster: isStoragePath(posterPath) ? signed.get(posterPath) || PLACEHOLDER_POSTER : posterPath || PLACEHOLDER_POSTER,
       accent: text(row.accent) || "#c6ff00",
       system: localized(row, "presentation_system"),

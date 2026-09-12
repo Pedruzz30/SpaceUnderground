@@ -81,6 +81,7 @@ export default {
       live: "● PRÉVIA AO VIVO",
       sleeping: "PRÉVIA / EM ESPERA",
       fallback: "PRÉVIA / ALTERNATIVA",
+      unavailable: "PRÉVIA / INDISPONÍVEL",
     },
     caseIndex: "CASE / {id}",
     clientIndex: "CLIENTE / {id}",
@@ -90,6 +91,7 @@ export default {
     openNamed: "Abrir {name} em uma nova aba",
     inspectModule: "Inspecionar {title}",
     livePreviewOf: "Prévia ao vivo de {name}",
+    liveDemoUnavailable: "Demonstração ao vivo indisponível",
     categories: {
       website: "SITE",
       system: "SISTEMA",
