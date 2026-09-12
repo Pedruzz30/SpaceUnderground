@@ -81,6 +81,7 @@ export default {
       live: "● LIVE PREVIEW",
       sleeping: "PREVIEW / STANDBY",
       fallback: "PREVIEW / FALLBACK",
+      unavailable: "PREVIEW / UNAVAILABLE",
     },
     caseIndex: "CASE / {id}",
     clientIndex: "CLIENT / {id}",
@@ -90,6 +91,7 @@ export default {
     openNamed: "Open {name} in a new tab",
     inspectModule: "Inspect {title}",
     livePreviewOf: "Live preview of {name}",
+    liveDemoUnavailable: "Live demo unavailable",
     categories: {
       website: "WEBSITE",
       system: "SYSTEM",

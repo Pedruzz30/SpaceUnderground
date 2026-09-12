@@ -4,9 +4,10 @@ import { subscribeLocaleChange, t } from "./i18n/index.js";
 const LIVE_PREVIEW_SELECTOR = "[data-live-project]";
 const MOBILE_QUERY = "(max-width: 759px)";
 const FINE_POINTER_QUERY = "(hover: hover) and (pointer: fine)";
-const SLEEP_DELAY = 4000;
+const SLEEP_DELAY = 10000;
 const LOAD_TIMEOUT = 8000;
-const STATE_CLASS_NAMES = ["is-preview-loading", "is-preview-live", "is-preview-sleeping", "is-preview-fallback"];
+const PRELOAD_MARGIN = "800px 0px";
+const STATE_CLASS_NAMES = ["is-preview-loading", "is-preview-live", "is-preview-sleeping", "is-preview-fallback", "is-preview-unavailable"];
 const VIEW_CLASS_NAMES = ["is-view-site", "is-view-detail", "is-view-origin"];
 
 // Resolved through t() at paint time rather than frozen into a lookup, so the
@@ -16,6 +17,7 @@ const STATE_KEYS = {
   live: "work.previewStatus.live",
   sleeping: "work.previewStatus.sleeping",
   fallback: "work.previewStatus.fallback",
+  unavailable: "work.previewStatus.unavailable",
 };
 
 let activePreview = null;
@@ -43,6 +45,10 @@ function originOf(url) {
   } catch {
     return "";
   }
+}
+
+function hasLivePreviewUrl(url) {
+  return Boolean(resolveUrl(url));
 }
 
 function escapeHtml(value) {
@@ -125,9 +131,10 @@ function createLivePreview(frame, mobileMedia) {
   const openButtons = [...frame.querySelectorAll("[data-signal-open]")];
 
   let projectUrl = frame.dataset.projectUrl || iframe?.dataset.src || "";
-  let previewUrl = resolveUrl(frame.dataset.projectPreviewUrl || iframe?.dataset.src || projectUrl);
+  let previewUrl = resolveUrl(frame.dataset.projectPreviewUrl || iframe?.dataset.src);
   let previewOrigin = originOf(previewUrl);
   let posterUrl = frame.dataset.projectPoster || "";
+  let hasLivePreview = hasLivePreviewUrl(previewUrl);
 
   const applyPoster = (next) => {
     if (!poster || !next) return;
@@ -167,22 +174,36 @@ function createLivePreview(frame, mobileMedia) {
     if (iframe.src !== "about:blank") iframe.src = "about:blank";
     hasLoaded = false;
     if (activePreview === frame) activePreview = null;
-    setPreviewState(frame, "sleeping");
+    setPreviewState(frame, hasLivePreview ? "sleeping" : "unavailable");
   };
 
-  const load = () => {
+  const updateLiveControls = () => {
+    const unavailableLabel = t("work.liveDemoUnavailable");
+    const availableLabel = t("work.modeSite");
+    modeButtons.forEach((button) => {
+      if (button.dataset.signalMode !== "site") return;
+      button.disabled = !hasLivePreview;
+      button.toggleAttribute("aria-disabled", !hasLivePreview);
+      button.setAttribute("aria-label", hasLivePreview ? availableLabel : unavailableLabel);
+      if (!hasLivePreview) button.title = unavailableLabel;
+      else button.removeAttribute("title");
+    });
+  };
+
+  const load = ({ preload = false } = {}) => {
     clearSleepTimer();
-    if (!iframe || mobileMedia.matches || !frame.classList.contains("is-view-site")) {
-      setPreviewState(frame, "sleeping");
+    if (!iframe || mobileMedia.matches) {
+      setPreviewState(frame, hasLivePreview ? "sleeping" : "unavailable");
       return;
     }
 
     if (!previewUrl) {
-      setPreviewState(frame, "fallback");
+      setPreviewState(frame, "unavailable");
       return;
     }
 
     if (activePreview && activePreview !== frame) {
+      if (preload && activePreview.classList.contains("is-preview-active")) return;
       activePreview.dispatchEvent(new CustomEvent("live-preview:release"));
     }
 
@@ -221,20 +242,22 @@ function createLivePreview(frame, mobileMedia) {
   });
 
   const setSource = ({ url, previewUrl: nextPreviewUrl, poster: nextPoster, posterFallback: fallback, title }) => {
-    const resolvedPreview = resolveUrl(nextPreviewUrl || url);
+    const resolvedPreview = resolveUrl(nextPreviewUrl);
     // Re-applying the same project -- which is what a locale change does -- must
     // not tear down a preview that is already loaded. Only the surrounding copy
     // changes, so the iframe is left exactly as it is.
     if (resolvedPreview === previewUrl && (nextPoster || "") === posterUrl) {
       projectUrl = url || "";
       if (iframe && title) iframe.title = title;
+      updateLiveControls();
       return;
     }
 
     unload();
     projectUrl = url || "";
-    previewUrl = resolveUrl(nextPreviewUrl || url);
+    previewUrl = resolvedPreview;
     previewOrigin = originOf(previewUrl);
+    hasLivePreview = hasLivePreviewUrl(previewUrl);
     posterUrl = nextPoster || "";
     posterFallback = fallback || null;
     posterFailed = false;
@@ -243,6 +266,8 @@ function createLivePreview(frame, mobileMedia) {
       if (title) iframe.title = title;
     }
     applyPoster(posterUrl);
+    updateLiveControls();
+    setPreviewState(frame, hasLivePreview ? "sleeping" : "unavailable");
   };
 
   iframe?.addEventListener("load", () => {
@@ -316,6 +341,7 @@ function createLivePreview(frame, mobileMedia) {
       if (entry.isIntersecting) {
         clearSleepTimer();
         frame.classList.add("is-preview-active");
+        load({ preload: true });
       } else {
         frame.classList.remove("is-preview-active");
         scheduleSleep();
@@ -323,13 +349,21 @@ function createLivePreview(frame, mobileMedia) {
     });
   }, { threshold: 0.12 });
 
+  const preloadObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) load({ preload: true });
+    });
+  }, { rootMargin: PRELOAD_MARGIN });
+
   mobileMedia.addEventListener("change", (event) => {
     if (event.matches) unload();
   });
 
   currentMode = setMode(frame, "overview", modeButtons);
   applyPoster(posterUrl);
-  setPreviewState(frame, "sleeping");
+  updateLiveControls();
+  setPreviewState(frame, hasLivePreview ? "sleeping" : "unavailable");
+  preloadObserver.observe(frame);
   activeObserver.observe(frame);
 
   return {
@@ -341,7 +375,7 @@ function createLivePreview(frame, mobileMedia) {
     },
     getMode: () => currentMode,
     refresh: () => {
-      if (!mobileMedia.matches && frame.classList.contains("is-view-site")) load();
+      if (!mobileMedia.matches) load({ preload: true });
     },
   };
 }
@@ -456,6 +490,7 @@ function createProjectViewer(frame, preview) {
 
     preview.setMode(preserveMode ? preview.getMode() : "overview");
     preview.calibrate();
+    preview.refresh();
   };
 
   function bindSlots() {

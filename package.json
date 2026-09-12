@@ -11,6 +11,7 @@
     "plans": "node scripts/render-plans.mjs",
     "test:e2e:public": "node --env-file-if-exists=admin/.env --env-file-if-exists=admin/.env.local tests/e2e/public-site.mjs",
     "test:e2e:i18n": "node tests/e2e/public-i18n.mjs",
+    "test:e2e:viewer": "node tests/e2e/public-viewer.mjs",
     "seed:supabase": "node --env-file-if-exists=admin/.env --env-file-if-exists=admin/.env.local scripts/seed-supabase-projects.mjs",
     "seed:projects:presentation": "node --env-file-if-exists=admin/.env --env-file-if-exists=admin/.env.local scripts/seed-supabase-project-presentation.mjs",
     "seed:plans": "node --env-file-if-exists=admin/.env --env-file-if-exists=admin/.env.local scripts/seed-supabase-plans.mjs",
