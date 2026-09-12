@@ -1,6 +1,7 @@
 import { badge, badgeType } from "../components/badge.js";
 import { statCard } from "../components/stat-card.js";
 import { demoOpportunities, demoPipelineStages } from "../data/operations-demo.js";
+import { t } from "../i18n/index.js";
 import { escapeHtml } from "../utils/html.js";
 
 function countStage(stage) {
@@ -11,10 +12,10 @@ function renderMetrics() {
   const openLeads = demoOpportunities.filter((opportunity) => ["NEW", "CONTACTED"].includes(opportunity.stage)).length;
 
   return `
-    ${statCard({ label: "OPEN LEADS", value: openLeads, detail: "New and contacted" })}
-    ${statCard({ label: "PROPOSALS", value: countStage("PROPOSAL"), detail: "Awaiting a decision" })}
-    ${statCard({ label: "IN NEGOTIATION", value: countStage("NEGOTIATION"), detail: "Scope under review" })}
-    ${statCard({ label: "WON THIS MONTH", value: countStage("WON"), detail: "Closed opportunities" })}
+    ${statCard({ label: t("commercial.openLeads"), value: openLeads, detail: t("commercial.openLeadsDetail") })}
+    ${statCard({ label: t("commercial.proposals"), value: countStage("PROPOSAL"), detail: t("commercial.proposalsDetail") })}
+    ${statCard({ label: t("commercial.inNegotiation"), value: countStage("NEGOTIATION"), detail: t("commercial.inNegotiationDetail") })}
+    ${statCard({ label: t("commercial.wonThisMonth"), value: countStage("WON"), detail: t("commercial.wonThisMonthDetail") })}
   `;
 }
 
@@ -36,44 +37,44 @@ function stageColumn(stage) {
   const cards = demoOpportunities.filter((opportunity) => opportunity.stage === stage.id);
 
   return `
-    <section class="pipeline__column" aria-label="${escapeHtml(stage.label)} stage">
+    <section class="pipeline__column" aria-label="${escapeHtml(stage.label)} ${t("common.status").toLowerCase()}">
       <header class="pipeline__head">
         <h3>${escapeHtml(stage.label)}</h3>
         <span class="pipeline__count">${cards.length}</span>
       </header>
       <div class="pipeline__body">
-        ${cards.length ? cards.map(opportunityCard).join("") : '<p class="empty-inline">Empty stage.</p>'}
+        ${cards.length ? cards.map(opportunityCard).join("") : `<p class="empty-inline">${t("commercial.emptyStage")}</p>`}
       </div>
     </section>
   `;
 }
 
 export const commercialPage = {
-  title: "Commercial",
-  breadcrumb: "OPERATIONS / COMMERCIAL",
+  title: () => t("commercial.title"),
+  breadcrumb: () => t("commercial.breadcrumb"),
   render: () => `
     <section class="page-heading">
-      <span>COMMERCIAL</span>
-      <h2>Sales pipeline.</h2>
-      <p>Track opportunities from first contact to closing.</p>
+      <span>${t("commercial.eyebrow")}</span>
+      <h2>${t("commercial.heading")}</h2>
+      <p>${t("commercial.intro")}</p>
     </section>
 
-    <section class="stats-grid stats-grid--quad" aria-label="Pipeline summary">
+    <section class="stats-grid stats-grid--quad" aria-label="${t("commercial.pipelineSummary")}">
       ${renderMetrics()}
     </section>
 
     <section class="panel">
       <header class="panel__head">
         <div>
-          <span>PIPELINE</span>
-          <h3>Opportunities by stage</h3>
+          <span>${t("commercial.pipeline")}</span>
+          <h3>${t("commercial.opportunitiesByStage")}</h3>
         </div>
-        <span class="ops-note">Scroll sideways for every stage</span>
+        <span class="ops-note">${t("commercial.scrollSideways")}</span>
       </header>
-      <div class="pipeline" role="group" aria-label="Sales pipeline stages" tabindex="0">
+      <div class="pipeline" role="group" aria-label="${t("commercial.salesPipelineStages")}" tabindex="0">
         ${demoPipelineStages.map(stageColumn).join("")}
       </div>
-      <p class="ops-note ops-note--spaced">Presentation data · moving a card is not persisted yet</p>
+      <p class="ops-note ops-note--spaced">${t("commercial.note")}</p>
     </section>
   `,
 };

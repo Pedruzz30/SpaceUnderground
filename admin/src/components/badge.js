@@ -1,4 +1,5 @@
 import { escapeHtml } from "../utils/html.js";
+import { statusLabel } from "../i18n/index.js";
 
 const SUCCESS = ["live", "published", "active", "paid", "won", "received"];
 const WARNING = ["draft", "pilot", "prototype", "mvp"];
@@ -6,7 +7,7 @@ const WARNING_EXACT = ["lead", "pending", "proposal", "negotiation", "contacted"
 const MUTED = ["archived", "inactive", "low"];
 
 export function badge(label, type = "neutral") {
-  return `<span class="badge badge--${type}">${escapeHtml(label)}</span>`;
+  return `<span class="badge badge--${type}">${escapeHtml(statusLabel(label))}</span>`;
 }
 
 export function badgeType(value) {

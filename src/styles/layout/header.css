@@ -163,6 +163,32 @@
   padding: 0.65rem 1rem 0.65rem 1.15rem;
 }
 
+.site-locale-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 0.18rem;
+}
+
+.site-locale-switcher button {
+  min-width: 2.05rem;
+  min-height: 1.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.site-locale-switcher button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--ink);
+}
+
 .menu-toggle {
   display: none;
   width: 48px;

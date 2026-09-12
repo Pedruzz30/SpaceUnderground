@@ -14,12 +14,10 @@ import { initSignalFrame } from "./signal-frame.js";
 import { initPublicProjects } from "./public-projects.js";
 import { initProjectForm } from "./project-form.js";
 import { initPointerEffects } from "./pointer-effects.js";
+import { initI18n } from "./i18n/index.js";
 
 document.documentElement.classList.add("js");
-
-// A localizacao do HTML e feita no build pelo vite.config.js. Nao mantemos
-// MutationObserver de traducao no navegador: ele era redundante, podia
-// retransladar textos ja em pt-BR e gerar trabalho continuo no DOM.
+initI18n();
 
 // Insere a camada de posicionamento Sites > Sistemas > Automacao > IA antes
 // do sistema de reveal e da navegacao observarem as secoes da pagina.

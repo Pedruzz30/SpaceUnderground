@@ -6,6 +6,7 @@ export function mapFeaturesFromDatabase(rows) {
       id: row.id ?? null,
       position: Number.isFinite(Number(row.position)) ? Number(row.position) : index,
       text: row.text ?? "",
+      translations: row.translations ?? {},
     }));
 }
 
@@ -30,6 +31,7 @@ export function mapPlanFromDatabase(row) {
     features: mapFeaturesFromDatabase(row.plan_features),
     createdAt: row.created_at ?? null,
     updatedAt: row.updated_at ?? null,
+    translations: row.translations ?? {},
   };
 }
 
@@ -49,5 +51,6 @@ export function mapPlanToDatabase(plan) {
   if (plan.accent !== undefined) row.accent = plan.accent || null;
   if (plan.visible !== undefined) row.visible = Boolean(plan.visible);
   if (plan.position !== undefined) row.position = Number(plan.position) || 0;
+  if (plan.translations !== undefined) row.translations = plan.translations ?? {};
   return row;
 }

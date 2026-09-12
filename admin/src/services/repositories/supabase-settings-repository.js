@@ -11,6 +11,7 @@ function mapRow(row) {
     seoTitle: row.seo_title ?? "",
     seoDescription: row.seo_description ?? "",
     ogImagePath: row.og_image_path ?? "",
+    translations: row.translations ?? {},
     updatedAt: row.updated_at ?? null,
     updatedBy: row.updated_by ?? null,
   };
@@ -26,6 +27,7 @@ function toRow(settings, userId = null) {
     seo_title: settings.seoTitle || null,
     seo_description: settings.seoDescription || null,
     og_image_path: settings.ogImagePath || null,
+    translations: settings.translations ?? {},
     updated_by: userId,
   };
 }

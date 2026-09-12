@@ -56,6 +56,7 @@ async function syncGallery(projectDbId, gallery) {
       url: item.path,
       alt: item.alt || null,
       caption: item.caption || null,
+      translations: item.translations ?? {},
       position: index,
     });
   });
@@ -116,6 +117,7 @@ async function syncModules(projectDbId, modules) {
           code: item.code || null,
           title: item.title,
           description: item.description || null,
+          translations: item.translations ?? {},
         })
         .eq("id", item.id),
       "Unable to update project modules.",
@@ -131,6 +133,7 @@ async function syncModules(projectDbId, modules) {
       code: item.code || null,
       title: item.title,
       description: item.description || null,
+      translations: item.translations ?? {},
     }));
 
   if (inserts.length) {

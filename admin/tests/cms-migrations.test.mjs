@@ -59,6 +59,7 @@ before(async () => {
     "005_site_content.sql",
     "006_site_settings.sql",
     "007_activity_log.sql",
+    "008_editorial_i18n.sql",
   ]) {
     await db.exec(migration(name));
   }
@@ -86,9 +87,35 @@ describe("cms migrations", () => {
       "005_site_content.sql",
       "006_site_settings.sql",
       "007_activity_log.sql",
+      "008_editorial_i18n.sql",
     ]) {
       await db.exec(migration(name));
     }
+  });
+});
+
+describe("editorial i18n", () => {
+  it("stores optional English translations without changing pt-BR base fields", async () => {
+    await asRole("authenticated", ADMIN_ID, () =>
+      db.query(
+        `update public.projects
+         set translations = $2
+         where id = $1`,
+        [PROJECT_ID, { en: { name: "Published", description: "English editorial description." } }],
+      ),
+    );
+
+    const { rows } = await db.query("select name, translations from public.projects where id = $1", [PROJECT_ID]);
+    assert.equal(rows[0].name, "Published");
+    assert.equal(rows[0].translations.en.description, "English editorial description.");
+  });
+
+  it("rejects unsupported translation locales", async () => {
+    const error = await asRole("authenticated", ADMIN_ID, () =>
+      failure("update public.projects set translations = $2 where id = $1", [PROJECT_ID, { es: { name: "Nope" } }]),
+    );
+
+    assert.equal(error?.code, "23514");
   });
 });
 

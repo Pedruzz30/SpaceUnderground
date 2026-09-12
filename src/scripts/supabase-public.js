@@ -36,8 +36,9 @@ const PROJECT_COLUMNS = [
   "poster_url",
   "project_url",
   "preview_url",
-  "project_gallery(url,alt,caption,position)",
-  "project_modules(code,title,description,position)",
+  "translations",
+  "project_gallery(url,alt,caption,position,translations)",
+  "project_modules(code,title,description,position,translations)",
 ].join(",");
 
 const PLAN_COLUMNS = [
@@ -55,7 +56,8 @@ const PLAN_COLUMNS = [
   "year",
   "accent",
   "position",
-  "plan_features(text,position)",
+  "translations",
+  "plan_features(text,position,translations)",
 ].join(",");
 
 export function isConfigured() {
@@ -103,13 +105,13 @@ export async function fetchVisiblePlans() {
 }
 
 export async function fetchSiteContent() {
-  const query = `${SUPABASE_URL}/rest/v1/site_content?select=key,content`;
+  const query = `${SUPABASE_URL}/rest/v1/site_content?select=key,content,translations`;
   const rows = await request(query, { headers: headers() });
   return Array.isArray(rows) ? rows : [];
 }
 
 export async function fetchSiteSettings() {
-  const query = `${SUPABASE_URL}/rest/v1/site_settings?select=site_name,site_url,contact_email,locale,seo_title,seo_description,og_image_path&key=eq.public`;
+  const query = `${SUPABASE_URL}/rest/v1/site_settings?select=site_name,site_url,contact_email,locale,seo_title,seo_description,og_image_path,translations&key=eq.public`;
   const rows = await request(query, { headers: headers() });
   return Array.isArray(rows) ? rows[0] ?? null : null;
 }

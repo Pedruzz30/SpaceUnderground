@@ -5,6 +5,7 @@ function mapRow(row) {
   return {
     key: row.key,
     content: row.content ?? {},
+    translations: row.translations ?? {},
     updatedAt: row.updated_at ?? null,
     updatedBy: row.updated_by ?? null,
   };
@@ -29,6 +30,7 @@ export const supabaseContentRepository = {
       .upsert({
         key: entry.key,
         content: entry.content ?? {},
+        translations: entry.translations ?? {},
         updated_by: sessionData?.session?.user?.id ?? null,
       }, { onConflict: "key" })
       .select("*")

@@ -11,6 +11,7 @@ import {
 import { getActivityWithStatus } from "../services/activity-service.js";
 import { getProjects } from "../services/project-service.js";
 import { describeError } from "../services/errors.js";
+import { t } from "../i18n/index.js";
 import { pendingReceivables } from "../utils/financial-metrics.js";
 import { formatCurrency, formatRelativeDay, formatSignedCurrency } from "../utils/format.js";
 import {
@@ -45,8 +46,8 @@ function activityTime(iso) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
   const sameDay = date.toDateString() === new Date().toDateString();
-  if (sameDay) return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  return date.toLocaleDateString(undefined, { month: "short", day: "2-digit" });
+  if (sameDay) return date.toLocaleTimeString(document.documentElement.lang || undefined, { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleDateString(document.documentElement.lang || undefined, { month: "short", day: "2-digit" });
 }
 
 function panelHead(eyebrow, title, id, action = "") {
@@ -71,24 +72,24 @@ function textLink(href, label) {
 function renderKpis() {
   return `
     ${statCard({
-      label: "ACTIVE PROJECTS",
+      label: t("dashboard.activeProjects"),
       value: activeEngagements(demoClients),
-      detail: "Client engagements in delivery",
+      detail: t("dashboard.activeProjectsDetail"),
     })}
     ${statCard({
-      label: "ACTIVE CLIENTS",
+      label: t("dashboard.activeClients"),
       value: activeClients(demoClients),
-      detail: "Current relationships",
+      detail: t("dashboard.activeClientsDetail"),
     })}
     ${statCard({
-      label: "OPEN OPPORTUNITIES",
+      label: t("dashboard.openOpportunities"),
       value: openOpportunities(demoOpportunities),
-      detail: "Still in the pipeline",
+      detail: t("dashboard.openOpportunitiesDetail"),
     })}
     ${statCard({
-      label: "TO RECEIVE",
+      label: t("dashboard.toReceive"),
       value: escapeHtml(formatCurrency(pendingReceivables(demoTransactions))),
-      detail: "Open receivables",
+      detail: t("dashboard.toReceiveDetail"),
     })}
   `;
 }
@@ -124,9 +125,9 @@ function renderAttention(projectItems, { projectsFailed = false, pending = false
   ]);
 
   const note = pending
-    ? '<p class="dash-inline-note">Checking project records…</p>'
+    ? `<p class="dash-inline-note">${t("dashboard.checkingProjects")}</p>`
     : projectsFailed
-      ? '<p class="dash-inline-note dash-inline-note--warn">Project checks unavailable.</p>'
+      ? `<p class="dash-inline-note dash-inline-note--warn">${t("dashboard.projectChecksUnavailable")}</p>`
       : "";
 
   return `${renderQueue(items, "Nothing needs attention right now.")}${note}`;
@@ -139,12 +140,12 @@ function pulseRow(project) {
     <a class="ops-row ops-row--link" href="#/projects/${encodeURIComponent(project.id)}" data-pulse-row>
       <span class="ops-meta" data-label="Case">${escapeHtml(project.caseNumber)}</span>
       <span class="ops-row__primary">
-        <strong>${escapeHtml(project.name || "Untitled project")}</strong>
-        <small>${escapeHtml(project.category || "Uncategorised")}</small>
+        <strong>${escapeHtml(project.name || t("projects.untitled"))}</strong>
+        <small>${escapeHtml(project.category || t("projects.uncategorised"))}</small>
       </span>
-      <span data-label="Status">${badge(project.status, badgeType(project.status))}</span>
-      <span data-label="Editorial">${badge(project.editorialStatus, badgeType(project.editorialStatus))}</span>
-      <span class="ops-meta" data-label="Updated">${escapeHtml(formatRelativeDay(project.updatedAt))}</span>
+      <span data-label="${t("common.status")}">${badge(project.status, badgeType(project.status))}</span>
+      <span data-label="${t("common.editorial")}">${badge(project.editorialStatus, badgeType(project.editorialStatus))}</span>
+      <span class="ops-meta" data-label="${t("common.updated")}">${escapeHtml(formatRelativeDay(project.updatedAt))}</span>
       <span class="ops-row__arrow" aria-hidden="true">&rarr;</span>
     </a>
   `;
@@ -155,12 +156,12 @@ function renderPulse(projects) {
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 5);
 
-  if (!recent.length) return '<p class="empty-inline">No projects yet. Create the first case to start the portfolio.</p>';
+  if (!recent.length) return `<p class="empty-inline">${t("dashboard.noProjectsYet")}</p>`;
 
   return `
     <div class="ops-table dash-pulse">
       <div class="ops-table__head" aria-hidden="true">
-        <span>CASE</span><span>PROJECT</span><span>STATUS</span><span>EDITORIAL</span><span>UPDATED</span><span></span>
+        <span>${t("dashboard.case")}</span><span>${t("dashboard.project")}</span><span>${t("common.status").toUpperCase()}</span><span>${t("common.editorial").toUpperCase()}</span><span>${t("common.updated").toUpperCase()}</span><span></span>
       </div>
       ${recent.map(pulseRow).join("")}
     </div>
@@ -190,8 +191,8 @@ function renderPipeline() {
     </div>
 
     <div class="ops-figures dash-figures">
-      <div><span>Open pipeline</span><strong>${summary.open}</strong></div>
-      <div><span>High priority</span><strong class="is-accent">${summary.highPriority}</strong></div>
+      <div><span>${t("dashboard.openOpportunities")}</span><strong>${summary.open}</strong></div>
+      <div><span>${t("status.high")}</span><strong class="is-accent">${summary.highPriority}</strong></div>
     </div>
   `;
 }
@@ -224,20 +225,20 @@ function renderFinancial(periodId) {
 
   return `
     <p class="dash-hero">
-      <span>RESULT · ${escapeHtml(periodLabel(periodId).toUpperCase())}</span>
+      <span>${t("dashboard.result")} · ${escapeHtml(periodLabel(periodId).toUpperCase())}</span>
       <strong>${escapeHtml(formatCurrency(totals.result))}</strong>
     </p>
 
     <div class="dash-bars">
       <div class="dash-bar">
-        <span class="dash-bar__label">Revenue</span>
+        <span class="dash-bar__label">${t("dashboard.revenue")}</span>
         <span class="dash-bar__track">
           <span class="dash-bar__fill dash-bar__fill--in" style="--dash-fill:${barPercent(totals.revenue, max)}%"></span>
         </span>
         <span class="ops-amount ops-amount--positive">${escapeHtml(formatCurrency(totals.revenue))}</span>
       </div>
       <div class="dash-bar">
-        <span class="dash-bar__label">Expenses</span>
+        <span class="dash-bar__label">${t("dashboard.expenses")}</span>
         <span class="dash-bar__track">
           <span class="dash-bar__fill dash-bar__fill--out" style="--dash-fill:${barPercent(totals.expenses, max)}%"></span>
         </span>
@@ -248,7 +249,7 @@ function renderFinancial(periodId) {
     ${
       recent.length
         ? `<ul class="dash-ledger">${recent.map(ledgerLine).join("")}</ul>`
-        : '<p class="empty-inline">No transactions in this period.</p>'
+        : `<p class="empty-inline">${t("dashboard.noTransactionsInPeriod")}</p>`
     }
   `;
 }
@@ -272,14 +273,14 @@ function renderHealth({ projects, projectsOk, activityOk }) {
   const health = projectsOk ? projectHealth(projects) : null;
 
   return `
-    ${healthTile("PUBLIC WEBSITE", "CONFIGURED", spaceStatus.detail)}
-    ${healthTile("ADMIN DATA", status.label, `${status.detail} · ${DATA_SOURCE} source`, status.tone)}
-    ${healthTile("PUBLISHED CASES", health ? String(health.published) : "—", health ? `${health.archived} archived` : "Project data unavailable", "", "published")}
-    ${healthTile("DRAFT CASES", health ? String(health.drafts) : "—", health ? `${health.hidden} hidden` : "Project data unavailable", "", "drafts")}
+    ${healthTile(t("dashboard.publicWebsite"), t("common.configured").toUpperCase(), spaceStatus.detail)}
+    ${healthTile(t("dashboard.adminData"), status.label, `${status.detail} · ${DATA_SOURCE} source`, status.tone)}
+    ${healthTile(t("dashboard.publishedCases"), health ? String(health.published) : "—", health ? t("dashboard.archivedCount", { count: health.archived }) : t("dashboard.projectDataUnavailable"), "", "published")}
+    ${healthTile(t("dashboard.draftCases"), health ? String(health.drafts) : "—", health ? t("dashboard.hiddenCount", { count: health.hidden }) : t("dashboard.projectDataUnavailable"), "", "drafts")}
     ${healthTile(
-      "CONTENT ISSUES",
+      t("dashboard.contentIssues"),
       health ? String(health.issues) : "—",
-      health ? (health.issues ? "Editorial checks pending" : "Editorial checks clear") : "Project data unavailable",
+      health ? (health.issues ? t("dashboard.editorialChecksPending") : t("dashboard.editorialChecksClear")) : t("dashboard.projectDataUnavailable"),
       health && health.issues ? "warn" : "",
       "issues",
     )}
@@ -289,18 +290,18 @@ function renderHealth({ projects, projectsOk, activityOk }) {
 /* ------------------------------------------------------------------- page */
 
 export const dashboardPage = {
-  title: "Dashboard",
-  breadcrumb: "OVERVIEW / DASHBOARD",
+  title: () => t("dashboard.title"),
+  breadcrumb: () => t("dashboard.breadcrumb"),
   render: () => `
     <section class="page-heading page-heading--split">
       <div>
-        <span>COMMAND CENTER</span>
-        <h2>Space Underground at a glance.</h2>
-        <p>Operations, commercial activity, finance and system health in one view.</p>
+        <span>${t("dashboard.eyebrow")}</span>
+        <h2>${t("dashboard.heading")}</h2>
+        <p>${t("dashboard.intro")}</p>
       </div>
       <div class="heading-actions">
         <label class="dash-period">
-          <span>Period</span>
+          <span>${t("dashboard.period")}</span>
           <select data-dash-period>
             ${PERIODS.map(
               (period) =>
@@ -311,33 +312,33 @@ export const dashboardPage = {
       </div>
     </section>
 
-    <section class="stats-grid stats-grid--quad dash-kpis" aria-label="Primary indicators">
+    <section class="stats-grid stats-grid--quad dash-kpis" aria-label="${t("dashboard.primaryIndicators")}">
       ${renderKpis()}
     </section>
 
-    <p class="ops-note dash-legend">Operational figures are presentation data · projects and activity come from the admin database · the period applies to the financial snapshot</p>
+    <p class="ops-note dash-legend">${t("dashboard.legend")}</p>
 
     <div class="dash-grid">
       <article class="panel dash-panel--attention" aria-labelledby="dash-attention-title">
-        ${panelHead("NEEDS ATTENTION", "Items requiring action", "dash-attention-title")}
+        ${panelHead(t("dashboard.needsAttention"), t("dashboard.itemsRequiringAction"), "dash-attention-title")}
         <div data-attention aria-busy="true">
           ${renderAttention([], { pending: true })}
         </div>
       </article>
 
       <article class="panel dash-panel--actions" aria-labelledby="dash-actions-title">
-        ${panelHead("QUICK ACTIONS", "Jump into work", "dash-actions-title")}
+        ${panelHead(t("dashboard.quickActions"), t("dashboard.jumpIntoWork"), "dash-actions-title")}
         <div class="dash-actions">
-          <a class="button button--primary" href="#/projects/new">New Project</a>
-          <a class="button" href="#/clients">Clients</a>
-          <a class="button" href="#/commercial">Commercial</a>
-          <a class="button" href="#/financial">Financial</a>
+          <a class="button button--primary" href="#/projects/new">${t("dashboard.newProject")}</a>
+          <a class="button" href="#/clients">${t("nav.clients")}</a>
+          <a class="button" href="#/commercial">${t("nav.commercial")}</a>
+          <a class="button" href="#/financial">${t("nav.financial")}</a>
           <a class="button" href="#/cms">CMS</a>
         </div>
       </article>
 
       <article class="panel dash-panel--pulse" aria-labelledby="dash-pulse-title">
-        ${panelHead("PROJECT PULSE", "Current project activity", "dash-pulse-title", textLink("#/projects", "View all projects"))}
+        ${panelHead(t("dashboard.projectPulse"), t("dashboard.currentProjectActivity"), "dash-pulse-title", textLink("#/projects", t("dashboard.viewAllProjects")))}
         <div class="ops-table-scroll" data-pulse aria-busy="true">
           <div class="dash-skeleton"></div>
           <div class="dash-skeleton"></div>
@@ -346,29 +347,29 @@ export const dashboardPage = {
       </article>
 
       <article class="panel dash-panel--finance" aria-labelledby="dash-finance-title">
-        ${panelHead("FINANCIAL SNAPSHOT", "Revenue against expenses", "dash-finance-title", textLink("#/financial", "Open financial"))}
+        ${panelHead(t("dashboard.financialSnapshot"), t("dashboard.revenueAgainstExpenses"), "dash-finance-title", textLink("#/financial", t("dashboard.openFinancial")))}
         <div data-finance>${renderFinancial(DEFAULT_PERIOD)}</div>
       </article>
 
       <article class="panel dash-panel--commercial" aria-labelledby="dash-commercial-title">
-        ${panelHead("COMMERCIAL PIPELINE", "Opportunities by stage", "dash-commercial-title", textLink("#/commercial", "Open commercial"))}
+        ${panelHead(t("dashboard.commercialPipeline"), t("dashboard.opportunitiesByStage"), "dash-commercial-title", textLink("#/commercial", t("dashboard.openCommercial")))}
         ${renderPipeline()}
       </article>
 
       <article class="panel dash-panel--followups" aria-labelledby="dash-followups-title">
-        ${panelHead("FOLLOW UPS", "People to contact next", "dash-followups-title")}
+        ${panelHead(t("dashboard.followUps"), t("dashboard.peopleToContactNext"), "dash-followups-title")}
         ${renderQueue(followUps({ clients: demoClients, opportunities: demoOpportunities }), "No follow ups queued.")}
       </article>
 
       <article class="panel dash-panel--activity" aria-labelledby="dash-activity-title">
-        ${panelHead("RECENT ACTIVITY", "Administrative log", "dash-activity-title", textLink("#/logs", "View all logs"))}
+        ${panelHead(t("dashboard.recentActivity"), t("dashboard.administrativeLog"), "dash-activity-title", textLink("#/logs", t("dashboard.viewAllLogs")))}
         <div class="activity-list" data-activity aria-busy="true">
-          <p class="empty-inline">Loading activity…</p>
+          <p class="empty-inline">${t("common.loading")}...</p>
         </div>
       </article>
 
       <article class="panel dash-panel--health" aria-labelledby="dash-health-title">
-        ${panelHead("SYSTEM HEALTH", "Admin and website state", "dash-health-title", textLink("#/cms", "Open CMS"))}
+        ${panelHead(t("dashboard.systemHealth"), t("dashboard.adminAndWebsiteState"), "dash-health-title", textLink("#/cms", t("dashboard.openCms")))}
         <div class="ops-figures dash-health" data-health aria-busy="true">
           ${renderHealth({ projects: [], projectsOk: false, activityOk: false })}
         </div>
@@ -416,17 +417,17 @@ export const dashboardPage = {
     const entries = activity.items.slice(0, 6);
 
     if (!activityOk) {
-      activityEl.innerHTML = '<p class="empty-inline">Activity unavailable.</p>';
+      activityEl.innerHTML = `<p class="empty-inline">${t("dashboard.activityUnavailable")}</p>`;
     } else if (!entries.length) {
-      activityEl.innerHTML = '<p class="empty-inline">No recent activity yet.</p>';
+      activityEl.innerHTML = `<p class="empty-inline">${t("dashboard.noRecentActivity")}</p>`;
     } else {
       activityEl.innerHTML = entries
         .map(
           (item) => `
             <div>
               <span></span>
-              <strong>${escapeHtml(item.title || item.action || "Administrative event")}</strong>
-              <p>${escapeHtml(item.detail || "No additional detail.")}</p>
+              <strong>${escapeHtml(item.title || item.action || t("dashboard.administrativeEvent"))}</strong>
+              <p>${escapeHtml(item.detail || t("dashboard.noAdditionalDetail"))}</p>
               <small>${escapeHtml(activityTime(item.time))}</small>
             </div>
           `,

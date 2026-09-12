@@ -1,5 +1,6 @@
 import { showToast } from "../components/toast.js";
 import { DATA_SOURCE, isSupabaseConfigured } from "../config/env.js";
+import { t } from "../i18n/index.js";
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
 import { describeError } from "../services/errors.js";
 import { getSiteSettings, saveSiteSettings } from "../services/settings-service.js";
@@ -36,10 +37,10 @@ function isEmail(value) {
 
 function validate(data) {
   const errors = {};
-  if (!isUrl(data.siteUrl)) errors.siteUrl = "Use a full http or https URL.";
-  if (!isEmail(data.contactEmail)) errors.contactEmail = "Use a valid email address.";
+  if (!isUrl(data.siteUrl)) errors.siteUrl = t("settings.invalidUrl");
+  if (!isEmail(data.contactEmail)) errors.contactEmail = t("settings.invalidEmail");
   if (data.ogImagePath && !isUrl(data.ogImagePath) && data.ogImagePath.startsWith("/")) {
-    errors.ogImagePath = "Use an absolute URL or a Supabase storage path.";
+    errors.ogImagePath = t("settings.invalidOgPath");
   }
   return errors;
 }
@@ -55,26 +56,26 @@ function preview(data, imageUrl = "") {
       <span>${imageUrl ? `<img src="${escapeAttribute(imageUrl)}" alt="">` : "OG"}</span>
       <div>
         <strong>${escapeHtml(data.seoTitle || data.siteName || "Space Underground")}</strong>
-        <p>${escapeHtml(data.seoDescription || "Social card preview uses the public title, description and image.")}</p>
+      <p>${escapeHtml(data.seoDescription || t("settings.socialPreviewFallback"))}</p>
       </div>
     </div>
   `;
 }
 
 export const settingsPage = {
-  title: "Settings",
-  breadcrumb: "SYSTEM / SETTINGS",
+  title: () => t("settings.title"),
+  breadcrumb: () => t("settings.breadcrumb"),
   render: () => `
     <section class="page-heading page-heading--split">
       <div>
-        <span>SETTINGS</span>
-        <h2>Public configuration.</h2>
-        <p>Safe runtime fields only. Secrets and build keys are not editable here.</p>
+        <span>${t("settings.eyebrow")}</span>
+        <h2>${t("settings.heading")}</h2>
+        <p>${t("settings.intro")}</p>
       </div>
-      <strong class="save-state is-saved" data-settings-state>Loading</strong>
+      <strong class="save-state is-saved" data-settings-state>${t("common.loading")}</strong>
     </section>
     <form class="settings-grid" data-settings-form aria-busy="true">
-      <section class="panel"><p class="empty-inline">Loading settings...</p></section>
+      <section class="panel"><p class="empty-inline">${t("settings.loadingSettings")}</p></section>
     </form>
   `,
   afterRender: async () => {
@@ -115,52 +116,52 @@ export const settingsPage = {
       form.innerHTML = `
         <div class="settings-main">
           <section class="panel settings-panel">
-            <header class="panel__head"><div><span>GENERAL</span><h3>Site identity</h3></div></header>
+            <header class="panel__head"><div><span>${t("settings.general")}</span><h3>${t("settings.siteIdentity")}</h3></div></header>
             <div class="form-grid">
-              ${field("Site Name", "siteName", settings.siteName, "text", "Updates public brand labels.")}
-              ${field("Public URL", "siteUrl", settings.siteUrl, "url", "Updates canonical and social URLs.")}
-              ${field("Contact Email", "contactEmail", settings.contactEmail, "email", "Updates public mail links when present.")}
-              ${field("Locale", "locale", settings.locale, "text", "Updates the html lang attribute.")}
+              ${field(t("settings.siteName"), "siteName", settings.siteName, "text", t("settings.siteNameHint"))}
+              ${field(t("settings.publicUrl"), "siteUrl", settings.siteUrl, "url", t("settings.publicUrlHint"))}
+              ${field(t("settings.contactEmail"), "contactEmail", settings.contactEmail, "email", t("settings.contactEmailHint"))}
+              ${field(t("settings.locale"), "locale", settings.locale, "text", t("settings.localeHint"))}
             </div>
           </section>
           <section class="panel settings-panel">
-            <header class="panel__head"><div><span>SEO</span><h3>Search metadata</h3></div></header>
+            <header class="panel__head"><div><span>${t("settings.seo")}</span><h3>${t("settings.searchMetadata")}</h3></div></header>
             <div class="form-grid">
-              ${field("Title", "seoTitle", settings.seoTitle, "text", "Updates document title and social title.")}
-              ${field("Description", "seoDescription", settings.seoDescription, "text", "Updates meta description and social description.")}
-              ${field("OG Image path", "ogImagePath", settings.ogImagePath, "text", "Absolute URL or project-media storage path.")}
+              ${field(t("settings.seoTitle"), "seoTitle", settings.seoTitle, "text", t("settings.seoTitleHint"))}
+              ${field(t("settings.description"), "seoDescription", settings.seoDescription, "text", t("settings.descriptionHint"))}
+              ${field(t("settings.ogImagePath"), "ogImagePath", settings.ogImagePath, "text", t("settings.ogImagePathHint"))}
             </div>
           </section>
         </div>
         <aside class="settings-aside">
           <section class="panel settings-panel settings-panel--preview">
-            <header class="panel__head"><div><span>PREVIEW</span><h3>Search and social</h3></div></header>
+            <header class="panel__head"><div><span>${t("settings.preview")}</span><h3>${t("settings.searchAndSocial")}</h3></div></header>
             <div class="settings-preview" data-settings-preview>${preview(settings)}</div>
           </section>
           <section class="panel settings-panel settings-panel--runtime">
-            <header class="panel__head"><div><span>INTEGRATIONS</span><h3>Runtime status</h3></div></header>
+            <header class="panel__head"><div><span>${t("settings.integrations")}</span><h3>${t("settings.runtimeStatus")}</h3></div></header>
             <div class="integration-grid settings-integration-grid">
-              <div><span>Supabase</span><strong>${DATA_SOURCE === "supabase" ? "Enabled" : "Mock mode"}</strong></div>
-              <div><span>Database</span><strong>${isSupabaseConfigured() ? "Configured" : "Not configured"}</strong></div>
-              <div><span>Storage</span><strong>${isSupabaseConfigured() ? "Project media" : "Local mock"}</strong></div>
-              <div><span>Public Site</span><strong>Read-only anon key</strong></div>
+              <div><span>${t("settings.supabase")}</span><strong>${DATA_SOURCE === "supabase" ? t("common.enabled") : t("common.mockMode")}</strong></div>
+              <div><span>${t("settings.database")}</span><strong>${isSupabaseConfigured() ? t("common.configured") : t("common.notConfigured")}</strong></div>
+              <div><span>${t("settings.storage")}</span><strong>${isSupabaseConfigured() ? t("common.projectMedia") : t("common.mockMode")}</strong></div>
+              <div><span>${t("settings.publicSite")}</span><strong>${t("settings.readOnlyAnonKey")}</strong></div>
             </div>
-            <p>No keys or secrets are shown in this interface.</p>
+            <p>${t("settings.noSecrets")}</p>
           </section>
-          <div class="form-actions settings-actions"><button class="button button--primary" type="submit">Save Settings</button></div>
+          <div class="form-actions settings-actions"><button class="button button--primary" type="submit">${t("settings.saveSettings")}</button></div>
         </aside>
       `;
       form.removeAttribute("aria-busy");
       await renderPreview();
-      setState("Saved", false);
+      setState(t("settings.saved"), false);
     } catch (error) {
-      form.innerHTML = `<section class="panel"><p class="empty-inline">${escapeHtml(describeError(error, "Unable to load settings."))}</p></section>`;
-      setState("Load failed", false);
+      form.innerHTML = `<section class="panel"><p class="empty-inline">${escapeHtml(describeError(error, t("settings.loadError")))}</p></section>`;
+      setState(t("settings.loadFailed"), false);
     }
 
     setNavigationGuard(() => isDirty);
     form.addEventListener("input", () => {
-      setState("Unsaved changes", true);
+      setState(t("settings.unsaved"), true);
       renderPreview();
     });
     form.addEventListener("submit", async (event) => {
@@ -169,20 +170,20 @@ export const settingsPage = {
       const errors = validate(data);
       showErrors(errors);
       if (Object.keys(errors).length) {
-        setState("Fix fields", true);
+        setState(t("settings.fixFields"), true);
         return;
       }
       const button = form.querySelector('button[type="submit"]');
       button.disabled = true;
-      setState("Saving...", true);
+      setState(t("settings.saving"), true);
       try {
         await saveSiteSettings(data);
         await logActivity("Settings updated", "Public settings updated", { action: "settings.updated", entityType: "settings", entityId: "public" });
-        showToast("Settings saved.");
-        setState("Saved", false);
+        showToast(t("settings.savedToast"));
+        setState(t("settings.saved"), false);
       } catch (error) {
-        showToast(describeError(error, "Unable to save settings."));
-        setState("Save failed", true);
+        showToast(describeError(error, t("settings.saveError")));
+        setState(t("settings.saveFailed"), true);
       } finally {
         button.disabled = false;
       }

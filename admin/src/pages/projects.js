@@ -1,6 +1,7 @@
 import { badge, badgeType } from "../components/badge.js";
 import { getProjects } from "../services/project-service.js";
 import { describeError } from "../services/errors.js";
+import { t } from "../i18n/index.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
 function formatUpdated(iso) {
@@ -8,13 +9,13 @@ function formatUpdated(iso) {
   if (Number.isNaN(date.getTime())) return "—";
   const diff = Date.now() - date.getTime();
   const day = 24 * 60 * 60 * 1000;
-  if (diff >= 0 && diff < day) return "today";
-  if (diff >= 0 && diff < day * 7) return `${Math.max(1, Math.round(diff / day))}d ago`;
-  return date.toLocaleDateString(undefined, { month: "short", day: "2-digit" });
+  if (diff >= 0 && diff < day) return t("format.today");
+  if (diff >= 0 && diff < day * 7) return t("format.daysAgo", { count: Math.max(1, Math.round(diff / day)) });
+  return date.toLocaleDateString(document.documentElement.lang || undefined, { month: "short", day: "2-digit" });
 }
 
 function visibilityLabel(project) {
-  return project.visible ? "VISIBLE" : "HIDDEN";
+  return project.visible ? t("common.visible").toUpperCase() : t("common.hidden").toUpperCase();
 }
 
 function projectCard(project) {
@@ -22,54 +23,54 @@ function projectCard(project) {
     <button class="project-row" type="button" data-project-id="${escapeAttribute(project.id)}">
       <span class="project-row__case">${escapeHtml(project.caseNumber)}</span>
       <span class="project-row__project">
-        <strong>${escapeHtml(project.name || "Untitled project")}</strong>
-        <small>${escapeHtml(project.client || project.slug || "No client")}</small>
+        <strong>${escapeHtml(project.name || t("projects.untitled"))}</strong>
+        <small>${escapeHtml(project.client || project.slug || t("projects.noClient"))}</small>
       </span>
-      <span data-label="Category">${escapeHtml(project.category)}</span>
-      <span data-label="Status">${badge(project.status, badgeType(project.status))}</span>
-      <span data-label="Editorial">${badge(project.editorialStatus, badgeType(project.editorialStatus))}</span>
-      <span data-label="Visibility">${escapeHtml(visibilityLabel(project))}</span>
-      <span data-label="Updated">${escapeHtml(formatUpdated(project.updatedAt))}</span>
+      <span data-label="${t("common.category")}">${escapeHtml(project.category || t("projects.uncategorised"))}</span>
+      <span data-label="${t("common.status")}">${badge(project.status, badgeType(project.status))}</span>
+      <span data-label="${t("common.editorial")}">${badge(project.editorialStatus, badgeType(project.editorialStatus))}</span>
+      <span data-label="${t("common.visibility")}">${escapeHtml(visibilityLabel(project))}</span>
+      <span data-label="${t("common.updated")}">${escapeHtml(formatUpdated(project.updatedAt))}</span>
       <span class="project-row__arrow" aria-hidden="true">&rarr;</span>
     </button>
   `;
 }
 
 export const projectsPage = {
-  title: "Projects",
-  breadcrumb: "OPERATIONS / PROJECTS",
+  title: () => t("projects.title"),
+  breadcrumb: () => t("projects.breadcrumb"),
   render: () => `
     <section class="page-heading page-heading--split">
       <div>
-        <span>PROJECTS</span>
-        <h2>Portfolio control.</h2>
-        <p>Search, filter and manage project records.</p>
+        <span>${t("projects.eyebrow")}</span>
+        <h2>${t("projects.heading")}</h2>
+        <p>${t("projects.intro")}</p>
       </div>
       <div class="heading-actions">
-        <button class="button button--primary" type="button" data-new-project>New Project</button>
+        <button class="button button--primary" type="button" data-new-project>${t("projects.newProject")}</button>
       </div>
     </section>
 
     <section class="panel projects-panel">
       <div class="toolbar">
         <label class="search-field">
-          <span>Search projects</span>
-          <input data-search-projects type="search" placeholder="Search projects..." disabled>
+          <span>${t("projects.searchProjects")}</span>
+          <input data-search-projects type="search" placeholder="${t("projects.searchPlaceholder")}" disabled>
         </label>
         <div class="toolbar__controls">
           <label class="sort-field">
-            <span>Sort by</span>
+            <span>${t("projects.sortBy")}</span>
             <select data-project-sort disabled>
-              <option value="updated">Updated</option>
-              <option value="case">Case</option>
-              <option value="name">Name</option>
+              <option value="updated">${t("projects.sortUpdated")}</option>
+              <option value="case">${t("projects.sortCase")}</option>
+              <option value="name">${t("projects.sortName")}</option>
             </select>
           </label>
-          <div class="segmented" role="group" aria-label="Filtrar projetos por editorial">
-            <button type="button" class="is-active" data-editorial-filter="ALL" aria-pressed="true">ALL</button>
-            <button type="button" data-editorial-filter="PUBLISHED" aria-pressed="false">PUBLISHED</button>
-            <button type="button" data-editorial-filter="DRAFT" aria-pressed="false">DRAFT</button>
-            <button type="button" data-editorial-filter="ARCHIVED" aria-pressed="false">ARCHIVED</button>
+          <div class="segmented" role="group" aria-label="${t("projects.filterEditorial")}">
+            <button type="button" class="is-active" data-editorial-filter="ALL" aria-pressed="true">${t("common.all").toUpperCase()}</button>
+            <button type="button" data-editorial-filter="PUBLISHED" aria-pressed="false">${t("common.published").toUpperCase()}</button>
+            <button type="button" data-editorial-filter="DRAFT" aria-pressed="false">${t("common.draft").toUpperCase()}</button>
+            <button type="button" data-editorial-filter="ARCHIVED" aria-pressed="false">${t("common.archived").toUpperCase()}</button>
           </div>
         </div>
       </div>
@@ -108,12 +109,12 @@ export const projectsPage = {
       });
 
       const emptyMessage = projects.length
-        ? "No projects match the current search or filter."
-        : "No projects yet. Create the first project to start the portfolio system.";
+        ? t("projects.noMatch")
+        : t("projects.empty");
 
       list.innerHTML = `
         <div class="project-table__head" aria-hidden="true">
-          <span>CASE</span><span>PROJECT</span><span>CATEGORY</span><span>STATUS</span><span>EDITORIAL</span><span>VISIBILITY</span><span>UPDATED</span><span></span>
+          <span>CASE</span><span>${t("dashboard.project")}</span><span>${t("common.category").toUpperCase()}</span><span>${t("common.status").toUpperCase()}</span><span>${t("common.editorial").toUpperCase()}</span><span>${t("common.visibility").toUpperCase()}</span><span>${t("common.updated").toUpperCase()}</span><span></span>
         </div>
         ${visible.length ? visible.map(projectCard).join("") : `<p class="empty-inline">${emptyMessage}</p>`}
       `;

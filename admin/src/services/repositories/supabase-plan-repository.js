@@ -29,13 +29,19 @@ async function syncFeatures(planId, features) {
 
   for (const [index, item] of features.entries()) {
     if (!keptIds.has(item.id)) continue;
-    unwrap(await supabase.from(FEATURES_TABLE).update({ position: index, text: item.text }).eq("id", item.id), "Unable to update plan features.");
+    unwrap(
+      await supabase
+        .from(FEATURES_TABLE)
+        .update({ position: index, text: item.text, translations: item.translations ?? {} })
+        .eq("id", item.id),
+      "Unable to update plan features.",
+    );
   }
 
   const inserts = features
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => !item.id || !existingIds.has(item.id))
-    .map(({ item, index }) => ({ plan_id: planId, position: index, text: item.text }));
+    .map(({ item, index }) => ({ plan_id: planId, position: index, text: item.text, translations: item.translations ?? {} }));
 
   if (inserts.length) {
     unwrap(await supabase.from(FEATURES_TABLE).insert(inserts), "Unable to save plan features.");

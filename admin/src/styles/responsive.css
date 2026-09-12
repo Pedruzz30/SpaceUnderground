@@ -81,6 +81,14 @@
     display: none;
   }
 
+  .locale-switcher {
+    gap: 0;
+  }
+
+  .locale-switcher button {
+    min-width: 1.9rem;
+  }
+
   .page {
     padding: var(--space-3);
   }

@@ -55,6 +55,29 @@ async function signIn() {
 try {
   await assertMockMode();
   await signIn();
+
+  await page.goto(`${BASE_URL}/#/dashboard`);
+  await page.waitForSelector(".admin-shell");
+  assert.equal(await page.locator("html").getAttribute("lang"), "pt-BR", "admin starts in pt-BR");
+  assert.equal(await page.locator(".page-heading > div > span").innerText(), "CENTRAL DE CONTROLE", "dashboard starts in Portuguese");
+  await page.click('[data-locale-switch="en"]');
+  await settle();
+  assert.equal(await hash(), "#/dashboard", "locale switch keeps the current route");
+  assert.equal(await page.locator("html").getAttribute("lang"), "en", "admin switches html lang to English");
+  assert.equal(await page.locator('a[href="#/settings"]').innerText(), "Settings", "sidebar switches to English");
+  assert.equal(await page.locator(".page-heading > div > span").innerText(), "COMMAND CENTER", "dashboard switches to English");
+  await page.goto(`${BASE_URL}/#/financial`);
+  await page.waitForSelector("[data-financial]");
+  assert.equal(await page.locator(".page-heading h2").innerText(), "Financial control.", "financial switches to English");
+  await page.goto(`${BASE_URL}/#/settings`);
+  await page.waitForSelector("[data-settings-form]:not([aria-busy])");
+  assert.equal(await page.locator(".page-heading h2").innerText(), "Public configuration.", "settings switches to English");
+  await page.reload();
+  await page.waitForSelector("[data-settings-form]:not([aria-busy])");
+  assert.equal(await page.locator("html").getAttribute("lang"), "en", "admin reload preserves EN preference");
+  await page.click('[data-locale-switch="pt-BR"]');
+  await settle();
+
   await page.evaluate(() => window.__resetSpaceAdminMocks());
 
   // Dashboard reflects the seeded store.
@@ -156,7 +179,7 @@ try {
 
   await page.click("[data-action-publish]");
   await settle();
-  assert.equal(await page.locator(".editor-identity .badge").innerText(), "PUBLISHED", "published badge");
+  assert.equal(await page.locator(".editor-identity .badge").innerText(), "PUBLICADO", "published badge");
 
   // Changes survive a reload.
   await page.reload();
@@ -181,7 +204,7 @@ try {
   await page.waitForSelector(".modal");
   await page.click(".modal__actions >> text=Archive Project");
   await settle();
-  assert.equal(await page.locator(".editor-identity .badge").innerText(), "ARCHIVED", "archived badge");
+  assert.equal(await page.locator(".editor-identity .badge").innerText(), "ARQUIVADO", "archived badge");
 
   await page.click('a[href="#/projects"]');
   await waitForRows();

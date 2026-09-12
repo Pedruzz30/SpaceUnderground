@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
+    "test": "node --test \"tests/*.test.mjs\"",
     "preview": "vite preview --host 127.0.0.1",
     "plans": "node scripts/render-plans.mjs",
     "test:e2e:public": "node --env-file-if-exists=admin/.env --env-file-if-exists=admin/.env.local tests/e2e/public-site.mjs",

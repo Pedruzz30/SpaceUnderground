@@ -1,9 +1,27 @@
 import { fetchSiteContent, fetchSiteSettings, isConfigured, signPaths } from "./supabase-public.js";
+import { applyStaticTranslations, getLocale, subscribeLocaleChange } from "./i18n/index.js";
 
 const STORAGE_PATH = /^(?!https?:|data:|blob:|\/|\.{1,2}\/).+/i;
+let subscribedToLocale = false;
 
 function text(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function localizedRecord(row) {
+  const locale = getLocale();
+  return {
+    ...(row?.content || {}),
+    ...(row?.translations?.[locale] || {}),
+  };
+}
+
+function localizedSettings(settings = {}) {
+  const locale = getLocale();
+  return {
+    ...settings,
+    ...(settings.translations?.[locale] || {}),
+  };
 }
 
 function write(selector, value) {
@@ -197,8 +215,6 @@ async function applySettings(settings = {}) {
     }
   }
 
-  if (text(settings.locale)) document.documentElement.lang = settings.locale.trim();
-
   const siteUrl = absolutePublicUrl(settings.site_url || window.location.href);
   const seoTitle = text(settings.seo_title);
   const seoDescription = text(settings.seo_description);
@@ -250,9 +266,15 @@ async function applySettings(settings = {}) {
 
 export async function initPublicContent() {
   if (!isConfigured()) return;
+  if (!subscribedToLocale) {
+    subscribedToLocale = true;
+    subscribeLocaleChange(() => {
+      initPublicContent();
+    });
+  }
   try {
     const [contentRows, settings] = await Promise.all([fetchSiteContent(), fetchSiteSettings()]);
-    const content = new Map(contentRows.map((row) => [row.key, row.content || {}]));
+    const content = new Map(contentRows.map((row) => [row.key, localizedRecord(row)]));
 
     applyHero(content.get("hero"));
     applyAbout(content.get("about"));
@@ -260,7 +282,8 @@ export async function initPublicContent() {
     applyProcess(content.get("process"));
     applyContact(content.get("contact"));
     applyFooter(content.get("footer"));
-    if (settings) await applySettings(settings);
+    if (settings) await applySettings(localizedSettings(settings));
+    applyStaticTranslations();
   } catch (error) {
     console.warn("[content] Supabase content unavailable, keeping build-time copy.", error);
   }

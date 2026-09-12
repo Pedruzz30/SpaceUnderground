@@ -28,6 +28,7 @@ export function mapGalleryFromDatabase(rows) {
       path: row.url ?? "",
       alt: row.alt ?? "",
       caption: row.caption ?? "",
+      translations: row.translations ?? {},
     }));
 }
 
@@ -42,6 +43,7 @@ export function mapModulesFromDatabase(rows) {
       code: row.code ?? "",
       title: row.title ?? "",
       description: row.description ?? "",
+      translations: row.translations ?? {},
     }));
 }
 
@@ -82,6 +84,7 @@ export function mapProjectFromDatabase(row) {
     createdAt: row.created_at ?? null,
     updatedAt: row.updated_at ?? null,
     publishedAt: row.published_at ?? null,
+    translations: row.translations ?? {},
   };
 }
 
@@ -114,6 +117,7 @@ export function mapProjectToDatabase(model) {
   if (model.poster !== undefined) row.poster_url = model.poster || null;
   if (model.projectUrl !== undefined) row.project_url = model.projectUrl || null;
   if (model.previewUrl !== undefined) row.preview_url = model.previewUrl || null;
+  if (model.translations !== undefined) row.translations = model.translations ?? {};
 
   return row;
 }
