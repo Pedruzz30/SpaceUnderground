@@ -15,7 +15,10 @@ import { chromium } from "playwright";
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:5173";
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+// Explicit locale: this test asserts Portuguese copy, so it must not inherit
+// whatever language Playwright's default context happens to use.
+const context = await browser.newContext({ locale: "pt-BR", viewport: { width: 1280, height: 900 } });
+const page = await context.newPage();
 
 const errors = [];
 page.on("pageerror", (error) => errors.push(`pageerror: ${error}`));
@@ -55,6 +58,31 @@ async function signIn() {
 try {
   await assertMockMode();
   await signIn();
+
+  await page.goto(`${BASE_URL}/#/dashboard`);
+  await page.waitForSelector(".admin-shell");
+  assert.equal(await page.locator("html").getAttribute("lang"), "pt-BR", "admin starts in pt-BR");
+  assert.equal(await page.locator(".page-heading > div > span").innerText(), "CENTRAL DE CONTROLE", "dashboard starts in Portuguese");
+  await page.click('[data-locale-switch="en"]');
+  await settle();
+  assert.equal(await hash(), "#/dashboard", "locale switch keeps the current route");
+  assert.equal(await page.locator("html").getAttribute("lang"), "en", "admin switches html lang to English");
+  assert.equal(await page.locator('a[href="#/settings"]').innerText(), "Settings", "sidebar switches to English");
+  assert.equal(await page.locator(".page-heading > div > span").innerText(), "COMMAND CENTER", "dashboard switches to English");
+  await page.goto(`${BASE_URL}/#/financial`);
+  await page.waitForSelector("[data-financial]");
+  assert.equal(await page.locator(".page-heading h2").innerText(), "Financial control.", "financial switches to English");
+  await page.goto(`${BASE_URL}/#/settings`);
+  await page.waitForSelector("[data-settings-form]:not([aria-busy])");
+  assert.equal(await page.locator(".page-heading h2").innerText(), "Public configuration.", "settings switches to English");
+  // Everything after this point asserts behaviour, not copy, and runs in the
+  // context's pt-BR locale.
+  await page.reload();
+  await page.waitForSelector("[data-settings-form]:not([aria-busy])");
+  assert.equal(await page.locator("html").getAttribute("lang"), "en", "admin reload preserves EN preference");
+  await page.click('[data-locale-switch="pt-BR"]');
+  await settle();
+
   await page.evaluate(() => window.__resetSpaceAdminMocks());
 
   // Dashboard reflects the seeded store.
@@ -139,24 +167,24 @@ try {
   // Editing marks the editor dirty.
   await page.fill("#field-name", "Nebula Client Portal v2");
   await settle();
-  assert.equal(await page.locator("[data-save-state]").innerText(), "UNSAVED CHANGES", "dirty state");
+  assert.ok(await page.locator("[data-save-state].is-unsaved").count(), "dirty state");
 
   // Navigating away while dirty is blocked until confirmed.
   await page.click('a[href="#/dashboard"]');
   await page.waitForSelector(".modal");
   assert.equal(await hash(), "#/projects/003", "navigation blocked while dirty");
-  await page.click(".modal__actions >> text=Stay");
+  await page.click("[data-modal-cancel]");
   await settle();
   assert.equal(await hash(), "#/projects/003", "stay keeps the editor open");
 
   // Save, publish.
   await page.click("[data-action-save]");
   await page.waitForSelector("[data-save-state].is-saved");
-  assert.equal(await page.locator("[data-save-state]").innerText(), "SAVED", "saved state");
+  assert.ok(await page.locator("[data-save-state].is-saved").count(), "saved state");
 
   await page.click("[data-action-publish]");
   await settle();
-  assert.equal(await page.locator(".editor-identity .badge").innerText(), "PUBLISHED", "published badge");
+  assert.equal(await page.locator(".editor-identity .badge").getAttribute("data-status-label"), "PUBLISHED", "published badge");
 
   // Changes survive a reload.
   await page.reload();
@@ -179,9 +207,9 @@ try {
   // Archive, then confirm the Archived filter shows it.
   await page.click("[data-action-archive]");
   await page.waitForSelector(".modal");
-  await page.click(".modal__actions >> text=Archive Project");
+  await page.click("[data-modal-confirm]");
   await settle();
-  assert.equal(await page.locator(".editor-identity .badge").innerText(), "ARCHIVED", "archived badge");
+  assert.equal(await page.locator(".editor-identity .badge").getAttribute("data-status-label"), "ARCHIVED", "archived badge");
 
   await page.click('a[href="#/projects"]');
   await waitForRows();
@@ -194,7 +222,7 @@ try {
   await page.waitForSelector("[data-action-delete]");
   await page.click("[data-action-delete]");
   await page.waitForSelector(".modal");
-  await page.click(".modal__actions >> text=Delete Project");
+  await page.click("[data-modal-confirm]");
   await waitForRows();
   assert.equal(await hash(), "#/projects", "delete returns to the list");
   assert.equal(await rows().count(), 2, "back to the seeded rows");
@@ -210,5 +238,6 @@ try {
   assert.deepEqual(errors, [], "no console or page errors");
   console.log("admin flow: all checks passed");
 } finally {
+  await context.close();
   await browser.close();
 }

@@ -1,5 +1,6 @@
 import { toDataError } from "./errors.js";
 import { getAuthRepository } from "./repositories/index.js";
+import { t } from "../i18n/index.js";
 
 // The UI asks this service who the user is; it never knows whether the answer
 // came from a mock session or from Supabase Auth.
@@ -14,7 +15,7 @@ export async function login(credentials) {
     resolvedOnce = true;
     return cachedSession;
   } catch (error) {
-    throw toDataError(error, "Unable to sign in.");
+    throw toDataError(error, t("errors.data.signIn"));
   }
 }
 
@@ -23,7 +24,7 @@ export async function logout() {
     const repository = await getAuthRepository();
     await repository.signOut();
   } catch (error) {
-    throw toDataError(error, "Unable to sign out.");
+    throw toDataError(error, t("errors.data.signOut"));
   } finally {
     cachedSession = null;
     resolvedOnce = true;

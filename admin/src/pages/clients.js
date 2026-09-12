@@ -2,6 +2,7 @@ import { badge, badgeType } from "../components/badge.js";
 import { statCard } from "../components/stat-card.js";
 import { showToast } from "../components/toast.js";
 import { demoClients } from "../data/operations-demo.js";
+import { onLocaleChange, plural, t } from "../i18n/index.js";
 import { formatCurrency, formatRelativeDay } from "../utils/format.js";
 import { escapeHtml } from "../utils/html.js";
 
@@ -17,66 +18,92 @@ function renderMetrics(clients) {
   const inactive = clients.filter((client) => client.status === "INACTIVE").length;
 
   return `
-    ${statCard({ label: "TOTAL CLIENTS", value: clients.length, detail: "Relationships tracked" })}
-    ${statCard({ label: "ACTIVE", value: active, detail: "Currently engaged" })}
-    ${statCard({ label: "WITH ACTIVE PROJECTS", value: withProjects, detail: "Delivery in progress" })}
-    ${statCard({ label: "INACTIVE", value: inactive, detail: "No open scope" })}
+    ${statCard({
+      label: t("clients.totalClients"),
+      labelKey: "clients.totalClients",
+      value: clients.length,
+      detail: t("clients.totalClientsDetail"),
+      detailKey: "clients.totalClientsDetail",
+    })}
+    ${statCard({
+      label: t("clients.active"),
+      labelKey: "clients.active",
+      value: active,
+      detail: t("clients.activeDetail"),
+      detailKey: "clients.activeDetail",
+    })}
+    ${statCard({
+      label: t("clients.withActiveProjects"),
+      labelKey: "clients.withActiveProjects",
+      value: withProjects,
+      detail: t("clients.withActiveProjectsDetail"),
+      detailKey: "clients.withActiveProjectsDetail",
+    })}
+    ${statCard({
+      label: t("clients.inactive"),
+      labelKey: "clients.inactive",
+      value: inactive,
+      detail: t("clients.inactiveDetail"),
+      detailKey: "clients.inactiveDetail",
+    })}
   `;
 }
 
 function projectsLabel(client) {
   const total = client.projects.length;
-  if (!total) return "No projects";
-  return `${total} project${total === 1 ? "" : "s"}`;
+  if (!total) return t("clients.noProjects");
+  return plural("clients.projectCount", total);
 }
 
+// Client name, company, email and phone are records rather than copy: they read
+// identically in both locales.
 function clientRow(client) {
   return `
     <a class="ops-row ops-row--link" href="#/clients/${encodeURIComponent(client.id)}" data-client-row>
       <span class="ops-row__primary">
         <strong>${escapeHtml(client.name)}</strong>
-        <small>CLIENT / ${escapeHtml(client.code)} · ${escapeHtml(client.company || "—")}</small>
+        <small>${t("clients.clientPrefix")} / ${escapeHtml(client.code)} · ${escapeHtml(client.company || "—")}</small>
       </span>
-      <span class="ops-stack" data-label="Contact">
+      <span class="ops-stack" data-label="${t("clients.columnContact")}">
         <span class="ops-meta">${escapeHtml(client.email)}</span>
         <small>${escapeHtml(client.phone || "—")}</small>
       </span>
-      <span class="ops-meta" data-label="Projects">${escapeHtml(projectsLabel(client))}</span>
-      <span data-label="Status">${badge(client.status, badgeType(client.status))}</span>
-      <span class="ops-meta" data-label="Total value">${escapeHtml(formatCurrency(client.totalValue))}</span>
-      <span class="ops-meta" data-label="Updated">${escapeHtml(formatRelativeDay(client.updatedAt))}</span>
+      <span class="ops-meta" data-label="${t("clients.columnProjects")}">${escapeHtml(projectsLabel(client))}</span>
+      <span data-label="${t("clients.columnStatus")}">${badge(client.status, badgeType(client.status))}</span>
+      <span class="ops-meta" data-label="${t("clients.columnTotalValue")}">${escapeHtml(formatCurrency(client.totalValue))}</span>
+      <span class="ops-meta" data-label="${t("clients.columnUpdated")}">${escapeHtml(formatRelativeDay(client.updatedAt))}</span>
       <span class="ops-row__arrow" aria-hidden="true">&rarr;</span>
     </a>
   `;
 }
 
 export const clientsPage = {
-  title: "Clients",
-  breadcrumb: "OPERATIONS / CLIENTS",
+  title: () => t("clients.title"),
+  breadcrumb: () => t("clients.breadcrumb"),
   render: () => `
     <section class="page-heading page-heading--split">
       <div>
-        <span>CLIENTS</span>
-        <h2>Client directory.</h2>
-        <p>Manage relationships, projects and client history.</p>
+        <span data-i18n="clients.eyebrow">${t("clients.eyebrow")}</span>
+        <h2 data-i18n="clients.heading">${t("clients.heading")}</h2>
+        <p data-i18n="clients.intro">${t("clients.intro")}</p>
       </div>
       <div class="heading-actions">
-        <button class="button button--primary" type="button" data-new-client>New Client</button>
+        <button class="button button--primary" type="button" data-new-client data-i18n="clients.newClient">${t("clients.newClient")}</button>
       </div>
     </section>
 
-    <section class="stats-grid stats-grid--quad" aria-label="Client summary">
+    <section class="stats-grid stats-grid--quad" aria-label="${t("clients.summary")}" data-i18n-aria-label="clients.summary" data-client-metrics>
       ${renderMetrics(demoClients)}
     </section>
 
     <section class="panel">
       <div class="toolbar">
         <label class="search-field">
-          <span>Search clients</span>
-          <input data-search-clients type="search" placeholder="Search clients...">
+          <span data-i18n="clients.searchClients">${t("clients.searchClients")}</span>
+          <input data-search-clients type="search" placeholder="${t("clients.searchPlaceholder")}" data-i18n-placeholder="clients.searchPlaceholder">
         </label>
         <div class="toolbar__controls">
-          <div class="segmented" role="group" aria-label="Filter clients by status">
+          <div class="segmented" role="group" aria-label="${t("clients.filterByStatus")}" data-i18n-aria-label="clients.filterByStatus">
             ${FILTERS.map(
               (filter, index) => `
                 <button type="button" class="${index === 0 ? "is-active" : ""}" data-client-filter="${filter}" aria-pressed="${index === 0}">${filter}</button>
@@ -91,13 +118,13 @@ export const clientsPage = {
       <div class="ops-table-scroll">
         <div class="ops-table clients-table" data-client-list aria-live="polite">
           <div class="ops-table__head" aria-hidden="true">
-            <span>CLIENT</span><span>CONTACT</span><span>PROJECTS</span><span>STATUS</span><span>TOTAL VALUE</span><span>UPDATED</span><span></span>
+            <span data-i18n="clients.columnClient">${t("clients.columnClient")}</span><span data-i18n="clients.columnContact">${t("clients.columnContact")}</span><span data-i18n="clients.columnProjects">${t("clients.columnProjects")}</span><span data-i18n="clients.columnStatus">${t("clients.columnStatus")}</span><span data-i18n="clients.columnTotalValue">${t("clients.columnTotalValue")}</span><span data-i18n="clients.columnUpdated">${t("clients.columnUpdated")}</span><span></span>
           </div>
         </div>
       </div>
     </section>
 
-    <p class="ops-note ops-note--spaced">Presentation data · client records are not persisted yet</p>
+    <p class="ops-note ops-note--spaced" data-i18n="clients.presentationNote">${t("clients.presentationNote")}</p>
   `,
   afterRender: () => {
     const list = document.querySelector("[data-client-list]");
@@ -108,7 +135,7 @@ export const clientsPage = {
     let activeFilter = "ALL";
 
     document.querySelector("[data-new-client]")?.addEventListener("click", () => {
-      showToast("Client creation arrives with the clients backend.");
+      showToast(t("clients.creationSoon"));
     });
 
     const renderList = () => {
@@ -126,8 +153,8 @@ export const clientsPage = {
         .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
       const emptyMessage = query
-        ? `No clients match "${escapeHtml(search.value.trim())}".`
-        : "No clients with this status yet.";
+        ? t("clients.noMatch", { query: escapeHtml(search.value.trim()) })
+        : t("clients.emptyForStatus");
 
       list.innerHTML = "";
       list.append(head);
@@ -136,7 +163,12 @@ export const clientsPage = {
         visible.length ? visible.map(clientRow).join("") : `<p class="empty-inline">${emptyMessage}</p>`,
       );
 
-      count.textContent = `${visible.length} of ${demoClients.length} clients`;
+      // The noun agrees with the total, not with the filtered count, so a
+      // single match still reads "1 de 6 clientes".
+      count.textContent = plural("clients.countLabel", demoClients.length, {
+        visible: visible.length,
+        total: demoClients.length,
+      });
 
       list.querySelectorAll("[data-client-row]").forEach((row) => {
         // Immediate feedback while the detail route renders.
@@ -158,5 +190,13 @@ export const clientsPage = {
 
     search.addEventListener("input", renderList);
     renderList();
+
+    // Re-labels rows and metrics from the live search/filter state, so switching
+    // locale keeps the typed query, the active filter and the scroll position.
+    onLocaleChange(list, () => {
+      const metrics = document.querySelector("[data-client-metrics]");
+      if (metrics) metrics.innerHTML = renderMetrics(demoClients);
+      renderList();
+    });
   },
 };

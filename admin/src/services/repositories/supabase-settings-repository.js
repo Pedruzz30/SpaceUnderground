@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "../../lib/supabase.js";
 import { toDataError } from "../errors.js";
+import { t } from "../../i18n/index.js";
 
 function mapRow(row) {
   row = row ?? {};
@@ -11,6 +12,7 @@ function mapRow(row) {
     seoTitle: row.seo_title ?? "",
     seoDescription: row.seo_description ?? "",
     ogImagePath: row.og_image_path ?? "",
+    translations: row.translations ?? {},
     updatedAt: row.updated_at ?? null,
     updatedBy: row.updated_by ?? null,
   };
@@ -26,6 +28,7 @@ function toRow(settings, userId = null) {
     seo_title: settings.seoTitle || null,
     seo_description: settings.seoDescription || null,
     og_image_path: settings.ogImagePath || null,
+    translations: settings.translations ?? {},
     updated_by: userId,
   };
 }
@@ -38,7 +41,7 @@ function unwrap(result, fallbackMessage) {
 export const supabaseSettingsRepository = {
   async get() {
     const result = await getSupabaseClient().from("site_settings").select("*").eq("key", "public").maybeSingle();
-    return mapRow(unwrap(result, "Unable to load site settings."));
+    return mapRow(unwrap(result, t("errors.data.loadSettings")));
   },
 
   async save(settings) {
@@ -49,6 +52,6 @@ export const supabaseSettingsRepository = {
       .upsert(toRow(settings, sessionData?.session?.user?.id ?? null), { onConflict: "key" })
       .select("*")
       .single();
-    return mapRow(unwrap(result, "Unable to save site settings."));
+    return mapRow(unwrap(result, t("errors.data.saveSettings")));
   },
 };

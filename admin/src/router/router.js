@@ -1,5 +1,5 @@
 import { sidebar } from "../components/sidebar.js";
-import { topbar } from "../components/topbar.js";
+import { bindTopbar, topbar } from "../components/topbar.js";
 import { toastRegion } from "../components/toast.js";
 import { loginPage } from "../pages/login.js";
 import { dashboardPage } from "../pages/dashboard.js";
@@ -19,6 +19,7 @@ import { getCachedSession, getSession, hasResolvedSession, logout } from "../ser
 import { confirmModal } from "../components/modal.js";
 import { adminConfigurationErrorMessage, hasAdminConfigurationError } from "../config/env.js";
 import { escapeHtml } from "../utils/html.js";
+import { initI18n, t } from "../i18n/index.js";
 
 const pages = [
   { test: (route) => route === "/login", page: loginPage },
@@ -49,14 +50,14 @@ function routeParams(route) {
 
 function notFoundPage(route) {
   return {
-    title: "Route not found",
-    breadcrumb: "SYSTEM / 404",
+    title: t("errors.routeNotFoundTitle"),
+    breadcrumb: t("errors.routeNotFoundBreadcrumb"),
     render: () => `
       <section class="empty-state">
         <span>404</span>
-        <h2>Route not found</h2>
-        <p>The route <code>${escapeHtml(route)}</code> does not exist in this Admin.</p>
-        <a class="button" href="#/dashboard">Back to Dashboard</a>
+        <h2 data-i18n="errors.routeNotFoundHeading">${t("errors.routeNotFoundHeading")}</h2>
+        <p>${t("errors.routeNotFoundBody", { route: `<code>${escapeHtml(route)}</code>` })}</p>
+        <a class="button" href="#/dashboard" data-i18n="common.backToDashboard">${t("common.backToDashboard")}</a>
       </section>
     `,
   };
@@ -82,12 +83,14 @@ function statusScreen({ title, heading, copy, action = "" }) {
 }
 
 function shell(page, route, params, session) {
+  const title = typeof page.title === "function" ? page.title() : page.title;
+  const breadcrumb = typeof page.breadcrumb === "function" ? page.breadcrumb() : page.breadcrumb;
   return `
     <div class="admin-shell">
       ${sidebar(route)}
       <div class="drawer-backdrop" data-drawer-backdrop></div>
       <div class="admin-main">
-        ${topbar({ title: page.title, breadcrumb: page.breadcrumb, session })}
+        ${topbar({ title, breadcrumb, session })}
         <main class="page" tabindex="-1">${page.render(params)}</main>
       </div>
       ${toastRegion()}
@@ -102,6 +105,7 @@ function bindShell() {
   const backdrop = document.querySelector("[data-drawer-backdrop]");
 
   if (sidebarNode) sidebarNode.id = "admin-sidebar";
+  bindTopbar(document);
 
   const setOpen = (isOpen) => {
     shellNode?.classList.toggle("is-sidebar-open", isOpen);
@@ -156,6 +160,19 @@ async function runNavigationCleanup() {
 
 export function initRouter(root) {
   if (!root) return;
+  initI18n();
+
+  function refreshRouteChrome() {
+    const requestedRoute = currentRoute();
+    const match = pages.find((entry) => entry.test(requestedRoute));
+    const page = match?.page || notFoundPage(requestedRoute);
+    const title = typeof page.title === "function" ? page.title() : page.title;
+    const breadcrumb = typeof page.breadcrumb === "function" ? page.breadcrumb() : page.breadcrumb;
+    const titleNode = root.querySelector("[data-page-title]");
+    const breadcrumbNode = root.querySelector("[data-page-breadcrumb]");
+    if (titleNode) titleNode.textContent = title || "";
+    if (breadcrumbNode) breadcrumbNode.textContent = breadcrumb || "";
+  }
 
   const render = async () => {
     const requestedRoute = currentRoute();
@@ -164,8 +181,8 @@ export function initRouter(root) {
     if (hasAdminConfigurationError()) {
       activeRoute = requestedRoute;
       root.innerHTML = statusScreen({
-        title: "ADMIN / CONFIGURATION",
-        heading: "CONFIGURATION ERROR",
+        title: t("shell.configurationTitle"),
+        heading: t("shell.configurationError"),
         copy: adminConfigurationErrorMessage(),
       });
       return;
@@ -175,10 +192,10 @@ export function initRouter(root) {
       if (navigationGuard()) {
         window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#${activeRoute}`);
         confirmModal({
-          title: "UNSAVED CHANGES",
-          body: "<p>You have changes that haven't been saved.</p>",
-          confirmLabel: "Discard Changes",
-          cancelLabel: "Stay",
+          title: t("shell.unsavedChanges"),
+          body: `<p>${escapeHtml(t("shell.unsavedBody"))}</p>`,
+          confirmLabel: t("shell.discardChanges"),
+          cancelLabel: t("shell.stay"),
         }).then(async (discard) => {
           if (discard) {
             await runNavigationCleanup();
@@ -194,9 +211,9 @@ export function initRouter(root) {
     // state instead of flashing the dashboard before we know who the user is.
     if (!hasResolvedSession()) {
       root.innerHTML = statusScreen({
-        title: "ADMIN / SESSION",
-        heading: "VERIFYING SESSION",
-        copy: "Checking your administrative access...",
+        title: t("shell.sessionTitle"),
+        heading: t("shell.verifyingSession"),
+        copy: t("shell.checkingAccess"),
       });
     }
 
@@ -218,10 +235,10 @@ export function initRouter(root) {
     if (session && !session.isAdmin) {
       activeRoute = requestedRoute;
       root.innerHTML = statusScreen({
-        title: "ADMIN / DENIED",
-        heading: "ACCESS DENIED",
-        copy: "This account is not registered as an administrator.",
-        action: '<button class="button" type="button" data-logout>Sign out</button>',
+        title: t("shell.deniedTitle"),
+        heading: t("shell.accessDenied"),
+        copy: t("shell.accountNotAdmin"),
+        action: `<button class="button" type="button" data-logout data-i18n="shell.signOut">${t("shell.signOut")}</button>`,
       });
       root.querySelector("[data-logout]")?.addEventListener("click", async () => {
         await logout();
@@ -251,5 +268,6 @@ export function initRouter(root) {
   window.addEventListener("hashchange", () => {
     render();
   });
+  window.addEventListener("localechange", refreshRouteChrome);
   render();
 }

@@ -1,6 +1,7 @@
 import { getSupabaseClient } from "../../lib/supabase.js";
 import { toDataError } from "../errors.js";
 import { mapPlanFromDatabase, mapPlanToDatabase } from "../mappers/plan-mapper.js";
+import { t } from "../../i18n/index.js";
 
 const TABLE = "plans";
 const FEATURES_TABLE = "plan_features";
@@ -13,48 +14,54 @@ function unwrap(result, fallbackMessage) {
 
 async function syncFeatures(planId, features) {
   const supabase = getSupabaseClient();
-  const existing = unwrap(await supabase.from(FEATURES_TABLE).select("id").eq("plan_id", planId), "Unable to load plan features.");
+  const existing = unwrap(await supabase.from(FEATURES_TABLE).select("id").eq("plan_id", planId), t("errors.data.loadPlanFeatures"));
   const existingIds = new Set(existing.map((row) => row.id));
   const keptIds = new Set(features.filter((item) => item.id && existingIds.has(item.id)).map((item) => item.id));
   const removedIds = [...existingIds].filter((id) => !keptIds.has(id));
 
   if (removedIds.length) {
-    unwrap(await supabase.from(FEATURES_TABLE).delete().in("id", removedIds), "Unable to update plan features.");
+    unwrap(await supabase.from(FEATURES_TABLE).delete().in("id", removedIds), t("errors.data.updatePlanFeatures"));
   }
 
   for (const [index, item] of features.entries()) {
     if (!keptIds.has(item.id)) continue;
-    unwrap(await supabase.from(FEATURES_TABLE).update({ position: 100000 + index }).eq("id", item.id), "Unable to update plan features.");
+    unwrap(await supabase.from(FEATURES_TABLE).update({ position: 100000 + index }).eq("id", item.id), t("errors.data.updatePlanFeatures"));
   }
 
   for (const [index, item] of features.entries()) {
     if (!keptIds.has(item.id)) continue;
-    unwrap(await supabase.from(FEATURES_TABLE).update({ position: index, text: item.text }).eq("id", item.id), "Unable to update plan features.");
+    unwrap(
+      await supabase
+        .from(FEATURES_TABLE)
+        .update({ position: index, text: item.text, translations: item.translations ?? {} })
+        .eq("id", item.id),
+      t("errors.data.updatePlanFeatures"),
+    );
   }
 
   const inserts = features
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => !item.id || !existingIds.has(item.id))
-    .map(({ item, index }) => ({ plan_id: planId, position: index, text: item.text }));
+    .map(({ item, index }) => ({ plan_id: planId, position: index, text: item.text, translations: item.translations ?? {} }));
 
   if (inserts.length) {
-    unwrap(await supabase.from(FEATURES_TABLE).insert(inserts), "Unable to save plan features.");
+    unwrap(await supabase.from(FEATURES_TABLE).insert(inserts), t("errors.data.savePlanFeatures"));
   }
 }
 
 export const supabasePlanRepository = {
   async list() {
     const result = await getSupabaseClient().from(TABLE).select(SELECT).order("position", { ascending: true });
-    return unwrap(result, "Unable to load plans.").map(mapPlanFromDatabase);
+    return unwrap(result, t("errors.data.loadPlans")).map(mapPlanFromDatabase);
   },
 
   async update(id, patch) {
     const supabase = getSupabaseClient();
-    const existing = unwrap(await supabase.from(TABLE).select("id").eq("id", id).maybeSingle(), "Unable to load plan.");
+    const existing = unwrap(await supabase.from(TABLE).select("id").eq("id", id).maybeSingle(), t("errors.data.loadPlan"));
     if (!existing) return null;
 
-    unwrap(await supabase.from(TABLE).update(mapPlanToDatabase(patch)).eq("id", existing.id), "Unable to save plan.");
+    unwrap(await supabase.from(TABLE).update(mapPlanToDatabase(patch)).eq("id", existing.id), t("errors.data.savePlan"));
     if (Array.isArray(patch.features)) await syncFeatures(existing.id, patch.features);
-    return mapPlanFromDatabase(unwrap(await supabase.from(TABLE).select(SELECT).eq("id", existing.id).single(), "Unable to reload plan."));
+    return mapPlanFromDatabase(unwrap(await supabase.from(TABLE).select(SELECT).eq("id", existing.id).single(), t("errors.data.reloadPlan")));
   },
 };

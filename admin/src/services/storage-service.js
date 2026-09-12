@@ -1,5 +1,6 @@
 import { DataError, toDataError } from "./errors.js";
 import { getMediaRepository } from "./repositories/index.js";
+import { t } from "../i18n/index.js";
 
 // Media contract used by the editor. Pages never learn whether an image lives
 // in Supabase Storage or as a data URL in the mock store.
@@ -46,7 +47,7 @@ export async function uploadProjectImage({ projectId, kind, file }) {
   try {
     return await repository.upload({ projectId, kind, file });
   } catch (error) {
-    throw toDataError(error, "Unable to upload the image.");
+    throw toDataError(error, t("errors.data.uploadImage"));
   }
 }
 
@@ -99,6 +100,6 @@ export async function scanOrphanedAssets(usedPaths = []) {
     if (typeof repository.scanOrphans !== "function") return [];
     return await repository.scanOrphans(usedPaths);
   } catch (error) {
-    throw toDataError(error, "Unable to scan storage.");
+    throw toDataError(error, t("errors.data.scanStorage"));
   }
 }

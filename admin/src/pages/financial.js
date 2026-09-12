@@ -2,26 +2,27 @@ import { badge, badgeType } from "../components/badge.js";
 import { statCard } from "../components/stat-card.js";
 import { bindTabs } from "../components/tabs.js";
 import { demoTransactions } from "../data/operations-demo.js";
+import { t } from "../i18n/index.js";
 import { financialSummary, openReceivables, settledExpenses, settledIncome } from "../utils/financial-metrics.js";
 import { formatCurrency, formatDayMonth, formatSignedCurrency } from "../utils/format.js";
 import { escapeHtml } from "../utils/html.js";
 
 const TABS = [
-  { id: "overview", label: "Overview" },
-  { id: "income", label: "Income" },
-  { id: "expenses", label: "Expenses" },
-  { id: "receivables", label: "Receivables" },
-  { id: "reports", label: "Reports" },
+  { id: "overview", labelKey: "financial.overview" },
+  { id: "income", labelKey: "financial.income" },
+  { id: "expenses", labelKey: "financial.expenses" },
+  { id: "receivables", labelKey: "financial.receivables" },
+  { id: "reports", labelKey: "financial.reports" },
 ];
 
 function renderMetrics() {
   const summary = financialSummary(demoTransactions);
 
   return `
-    ${statCard({ label: "REVENUE", value: formatCurrency(summary.revenue), detail: "Confirmed income" })}
-    ${statCard({ label: "EXPENSES", value: formatCurrency(summary.expenses), detail: "Operational costs" })}
-    ${statCard({ label: "RESULT", value: formatCurrency(summary.result), detail: "Revenue minus expenses" })}
-    ${statCard({ label: "TO RECEIVE", value: formatCurrency(summary.toReceive), detail: "Open receivables" })}
+    ${statCard({ label: t("financial.revenue"), value: formatCurrency(summary.revenue), detail: t("financial.revenueDetail") })}
+    ${statCard({ label: t("financial.expenses"), value: formatCurrency(summary.expenses), detail: t("financial.expensesDetail") })}
+    ${statCard({ label: t("financial.result"), value: formatCurrency(summary.result), detail: t("financial.resultDetail") })}
+    ${statCard({ label: t("financial.toReceive"), value: formatCurrency(summary.toReceive), detail: t("financial.toReceiveDetail") })}
   `;
 }
 
@@ -29,18 +30,18 @@ function renderMetrics() {
 // instead of claiming a colour the ledger reserves for settled amounts.
 function amountCell(transaction) {
   if (transaction.status === "PENDING") {
-    return `<span class="ops-amount ops-amount--neutral" data-label="Value">${escapeHtml(formatCurrency(Math.abs(transaction.amount)))}</span>`;
+    return `<span class="ops-amount ops-amount--neutral" data-label="${t("financial.value")}">${escapeHtml(formatCurrency(Math.abs(transaction.amount)))}</span>`;
   }
 
   const tone = transaction.amount >= 0 ? "positive" : "negative";
-  return `<span class="ops-amount ops-amount--${tone}" data-label="Value">${escapeHtml(formatSignedCurrency(transaction.amount))}</span>`;
+  return `<span class="ops-amount ops-amount--${tone}" data-label="${t("financial.value")}">${escapeHtml(formatSignedCurrency(transaction.amount))}</span>`;
 }
 
 function clientCell(transaction) {
-  if (!transaction.client) return '<span class="ops-meta" data-label="Client" data-column="client">—</span>';
-  if (!transaction.clientId) return `<span class="ops-meta" data-label="Client" data-column="client">${escapeHtml(transaction.client)}</span>`;
+  if (!transaction.client) return `<span class="ops-meta" data-label="${t("common.client")}" data-column="client">—</span>`;
+  if (!transaction.clientId) return `<span class="ops-meta" data-label="${t("common.client")}" data-column="client">${escapeHtml(transaction.client)}</span>`;
   return `
-    <span data-label="Client" data-column="client">
+    <span data-label="${t("common.client")}" data-column="client">
       <a class="ops-link" href="#/clients/${encodeURIComponent(transaction.clientId)}">${escapeHtml(transaction.client)}</a>
     </span>
   `;
@@ -49,13 +50,13 @@ function clientCell(transaction) {
 function transactionRow(transaction) {
   return `
     <div class="ops-row">
-      <span class="ops-meta" data-label="Date">${escapeHtml(formatDayMonth(transaction.date))}</span>
-      <span class="ops-meta" data-label="Type">${escapeHtml(transaction.type)}</span>
+      <span class="ops-meta" data-label="${t("financial.date")}">${escapeHtml(formatDayMonth(transaction.date))}</span>
+      <span class="ops-meta" data-label="${t("financial.type")}">${escapeHtml(transaction.type)}</span>
       <span class="ops-row__primary">
         <strong>${escapeHtml(transaction.description)}</strong>
       </span>
       ${clientCell(transaction)}
-      <span data-label="Status">${badge(transaction.status, badgeType(transaction.status))}</span>
+      <span data-label="${t("common.status")}">${badge(transaction.status, badgeType(transaction.status))}</span>
       ${amountCell(transaction)}
     </div>
   `;
@@ -68,7 +69,7 @@ function ledger(transactions, emptyMessage) {
     <div class="ops-table-scroll">
       <div class="ops-table ledger-table">
         <div class="ops-table__head" aria-hidden="true">
-          <span>DATE</span><span>TYPE</span><span>DESCRIPTION</span><span>CLIENT</span><span>STATUS</span><span>VALUE</span>
+          <span>${t("financial.date").toUpperCase()}</span><span>${t("financial.type").toUpperCase()}</span><span>${t("financial.description").toUpperCase()}</span><span>${t("common.client").toUpperCase()}</span><span>${t("common.status").toUpperCase()}</span><span>${t("financial.value").toUpperCase()}</span>
         </div>
         ${transactions.map(transactionRow).join("")}
       </div>
@@ -107,8 +108,8 @@ function figures(entries) {
 }
 
 export const financialPage = {
-  title: "Financial",
-  breadcrumb: "OPERATIONS / FINANCIAL",
+  title: () => t("financial.title"),
+  breadcrumb: () => t("financial.breadcrumb"),
   render: () => {
     const income = settledIncome(demoTransactions);
     const expenses = settledExpenses(demoTransactions);
@@ -116,21 +117,21 @@ export const financialPage = {
 
     return `
       <section class="page-heading">
-        <span>FINANCIAL</span>
-        <h2>Financial control.</h2>
-        <p>Track revenue, expenses and receivables.</p>
+        <span data-i18n="financial.eyebrow">${t("financial.eyebrow")}</span>
+        <h2 data-i18n="financial.heading">${t("financial.heading")}</h2>
+        <p data-i18n="financial.intro">${t("financial.intro")}</p>
       </section>
 
-      <section class="stats-grid stats-grid--quad" aria-label="Financial summary">
+      <section class="stats-grid stats-grid--quad" aria-label="${t("financial.summary")}">
         ${renderMetrics()}
       </section>
 
       <section data-financial>
-        <div class="tabs" role="tablist" aria-label="Financial sections">
+        <div class="tabs" role="tablist" aria-label="${t("financial.sections")}">
           ${TABS.map(
             (tab, index) => `
               <button type="button" role="tab" id="financial-tab-${tab.id}" aria-selected="${index === 0}"
-                aria-controls="financial-panel-${tab.id}" tabindex="${index === 0 ? 0 : -1}">${tab.label}</button>
+                aria-controls="financial-panel-${tab.id}" tabindex="${index === 0 ? 0 : -1}">${t(tab.labelKey)}</button>
             `,
           ).join("")}
         </div>
@@ -138,38 +139,38 @@ export const financialPage = {
         ${panel(
           "overview",
           `
-            <h3 class="ops-subtitle">Recent transactions</h3>
-            ${ledger(demoTransactions, "No transactions recorded yet.")}
+            <h3 class="ops-subtitle" data-i18n="financial.recentTransactions">${t("financial.recentTransactions")}</h3>
+            ${ledger(demoTransactions, t("financial.noTransactions"))}
           `,
         )}
         ${panel(
           "income",
           `
-            ${figures([["Entries", String(income.length)], ["Total", formatCurrency(totalOf(income)), true]])}
-            ${ledger(income, "No income recorded yet.")}
+            ${figures([[t("financial.entries"), String(income.length)], [t("financial.total"), formatCurrency(totalOf(income)), true]])}
+            ${ledger(income, t("financial.noIncome"))}
           `,
         )}
         ${panel(
           "expenses",
           `
-            ${figures([["Entries", String(expenses.length)], ["Total", formatCurrency(totalOf(expenses)), true]])}
-            ${ledger(expenses, "No expenses recorded yet.")}
+            ${figures([[t("financial.entries"), String(expenses.length)], [t("financial.total"), formatCurrency(totalOf(expenses)), true]])}
+            ${ledger(expenses, t("financial.noExpenses"))}
           `,
         )}
         ${panel(
           "receivables",
           `
-            ${figures([["Open", String(receivables.length)], ["Total", formatCurrency(totalOf(receivables)), true]])}
-            ${ledger(receivables, "Nothing to receive right now.")}
+            ${figures([[t("financial.open"), String(receivables.length)], [t("financial.total"), formatCurrency(totalOf(receivables)), true]])}
+            ${ledger(receivables, t("financial.nothingToReceive"))}
           `,
         )}
         ${panel(
           "reports",
-          '<p class="empty-inline">Monthly reports and exports arrive once the financial backend is in place.</p>',
+          `<p class="empty-inline" data-i18n="financial.reportsSoon">${t("financial.reportsSoon")}</p>`,
         )}
       </section>
 
-      <p class="ops-note ops-note--spaced">Presentation data · no financial records are persisted yet</p>
+      <p class="ops-note ops-note--spaced" data-i18n="financial.note">${t("financial.note")}</p>
     `;
   },
   afterRender: () => {

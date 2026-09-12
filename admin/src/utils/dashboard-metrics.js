@@ -14,10 +14,10 @@
 import { financialSummary } from "./financial-metrics.js";
 
 export const PERIODS = [
-  { id: "month", label: "This month" },
-  { id: "30d", label: "Last 30 days" },
-  { id: "90d", label: "Last 90 days" },
-  { id: "year", label: "This year" },
+  { id: "month", label: "This month", labelKey: "dashboard.periods.month" },
+  { id: "30d", label: "Last 30 days", labelKey: "dashboard.periods.30d" },
+  { id: "90d", label: "Last 90 days", labelKey: "dashboard.periods.90d" },
+  { id: "year", label: "This year", labelKey: "dashboard.periods.year" },
 ];
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -121,6 +121,8 @@ export function operationalChecks({ transactions = [], opportunities = [] } = {}
         category: "FINANCIAL",
         title: transaction.client || transaction.description,
         detail: `${transaction.description} pending`,
+        detailKey: "dashboard.attention.transactionPending",
+        detailParams: { description: transaction.description },
         amount: Math.abs(transaction.amount),
         href: "#/financial",
       });
@@ -135,6 +137,8 @@ export function operationalChecks({ transactions = [], opportunities = [] } = {}
         category: "COMMERCIAL",
         title: opportunity.client,
         detail: `High priority · ${opportunity.activity.toLowerCase()}`,
+        detailKey: "dashboard.attention.highPriority",
+        detailParams: { activity: opportunity.activity.toLowerCase() },
         href: "#/commercial",
       });
     });
@@ -153,16 +157,16 @@ export function projectChecks(projects = []) {
     const reference = `CASE ${project.caseNumber}`;
 
     if (project.editorialStatus === "PUBLISHED" && !project.visible) {
-      items.push({ weight: WEIGHT.hidden, tone: "danger", category: "CMS", title, detail: `${reference} · published but hidden`, href });
+      items.push({ weight: WEIGHT.hidden, tone: "danger", category: "CMS", title, detail: `${reference} · published but hidden`, detailKey: "dashboard.attention.publishedHidden", detailParams: { reference }, href });
     }
     if (!project.poster) {
-      items.push({ weight: WEIGHT.poster, tone: "warning", category: "CMS", title, detail: `${reference} · missing poster`, href });
+      items.push({ weight: WEIGHT.poster, tone: "warning", category: "CMS", title, detail: `${reference} · missing poster`, detailKey: "dashboard.attention.missingPoster", detailParams: { reference }, href });
     }
     if (project.editorialStatus === "DRAFT") {
-      items.push({ weight: WEIGHT.draft, tone: "neutral", category: "CMS", title, detail: `${reference} · still a draft`, href });
+      items.push({ weight: WEIGHT.draft, tone: "neutral", category: "CMS", title, detail: `${reference} · still a draft`, detailKey: "dashboard.attention.stillDraft", detailParams: { reference }, href });
     }
     if (!String(project.description || "").trim()) {
-      items.push({ weight: WEIGHT.description, tone: "neutral", category: "CMS", title, detail: `${reference} · missing description`, href });
+      items.push({ weight: WEIGHT.description, tone: "neutral", category: "CMS", title, detail: `${reference} · missing description`, detailKey: "dashboard.attention.missingDescription", detailParams: { reference }, href });
     }
   });
 
@@ -212,6 +216,7 @@ export function followUps({ clients = [], opportunities = [] } = {}, now = new D
         category: "LEAD",
         title: client.name,
         detail: "New lead to qualify",
+        detailKey: "dashboard.followUp.newLead",
         href: `#/clients/${encodeURIComponent(client.id)}`,
       });
     });
@@ -224,6 +229,8 @@ export function followUps({ clients = [], opportunities = [] } = {}, now = new D
         category: "PROPOSAL",
         title: opportunity.client,
         detail: `${opportunity.activity} · awaiting reply`,
+        detailKey: "dashboard.followUp.awaitingReply",
+        detailParams: { activity: opportunity.activity },
         href: "#/commercial",
       });
     });
@@ -238,6 +245,8 @@ export function followUps({ clients = [], opportunities = [] } = {}, now = new D
         category: "CLIENT",
         title: client.name,
         detail: `No contact in ${days} days`,
+        detailKey: "dashboard.followUp.noContact",
+        detailParams: { days },
         href: `#/clients/${encodeURIComponent(client.id)}`,
       });
     });
@@ -261,7 +270,13 @@ export function projectHealth(projects = []) {
 // Never claims more than it verified: this reports whether the admin's own
 // queries came back, not the health of Supabase, Storage or Netlify.
 export function adminDataStatus({ projectsOk, activityOk }) {
-  if (projectsOk && activityOk) return { label: "CONNECTED", tone: "ok", detail: "Admin queries responding" };
-  if (!projectsOk && !activityOk) return { label: "UNAVAILABLE", tone: "danger", detail: "Admin queries failed" };
-  return { label: "DEGRADED", tone: "warn", detail: projectsOk ? "Activity query failed" : "Project query failed" };
+  if (projectsOk && activityOk) {
+    return { label: "CONNECTED", tone: "ok", detail: "Admin queries responding", detailKey: "dashboard.adminStatus.responding" };
+  }
+  if (!projectsOk && !activityOk) {
+    return { label: "UNAVAILABLE", tone: "danger", detail: "Admin queries failed", detailKey: "dashboard.adminStatus.failed" };
+  }
+  return projectsOk
+    ? { label: "DEGRADED", tone: "warn", detail: "Activity query failed", detailKey: "dashboard.adminStatus.activityFailed" }
+    : { label: "DEGRADED", tone: "warn", detail: "Project query failed", detailKey: "dashboard.adminStatus.projectFailed" };
 }

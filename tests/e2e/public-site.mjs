@@ -18,16 +18,7 @@ const SUPABASE_URL = String(process.env.VITE_SUPABASE_URL ?? "").replace(/\/+$/,
 const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 const EMAIL = process.env.ADMIN_EMAIL;
 const PASSWORD = process.env.ADMIN_PASSWORD;
-
-if (!SUPABASE_URL || !ANON_KEY || !EMAIL || !PASSWORD) {
-  console.error("Missing env: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, ADMIN_EMAIL, ADMIN_PASSWORD");
-  process.exit(2);
-}
-
-const PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-  "base64",
-);
+const RUN_SUPABASE_PUBLIC_E2E = process.env.RUN_SUPABASE_PUBLIC_E2E === "true";
 
 const checks = [];
 function check(ok, label, extra = "") {
@@ -35,7 +26,48 @@ function check(ok, label, extra = "") {
   console.log(`${ok ? "PASS" : "FAIL"}  ${label}${extra ? ` — ${extra}` : ""}`);
 }
 
+if (!RUN_SUPABASE_PUBLIC_E2E || !SUPABASE_URL || !ANON_KEY || !EMAIL || !PASSWORD) {
+  const browser = await chromium.launch();
+  // Explicit pt-BR context: these checks assert the Portuguese default, so they
+  // must not inherit whatever language Playwright's default context uses.
+  const context = await browser.newContext({ locale: "pt-BR", viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await page.evaluate(() => localStorage.clear());
+    await page.reload({ waitUntil: "domcontentloaded" });
+    check((await page.locator("html").getAttribute("lang")) === "pt-BR", "public starts in pt-BR");
+    check((await page.locator("#hero-title").getAttribute("aria-label")) === "Crie o que ainda não deveria existir.", "hero starts in Portuguese");
+    check((await page.locator('[data-nav] [href="#contact"]').innerText()) === "Contato", "navigation starts in Portuguese");
+
+    await page.click('[data-locale-switch="en"]');
+    const formLabelSwitched = await page.waitForFunction(() => document.querySelector('label[for="project-name"]')?.textContent.trim() === "Name");
+    check((await page.locator("html").getAttribute("lang")) === "en", "switching to EN updates html lang");
+    check((await page.locator("#hero-title").getAttribute("aria-label")) === "Build what shouldn't exist yet.", "hero switches to English");
+    check((await page.locator('[data-nav] [href="#contact"]').innerText()) === "Contact", "navigation switches to English");
+    check(Boolean(await formLabelSwitched.jsonValue()), "form labels switch to English");
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    check((await page.locator("html").getAttribute("lang")) === "en", "reload preserves EN preference");
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+
+  const failed = checks.filter((entry) => !entry.ok);
+  console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
+  if (failed.length) process.exit(1);
+  process.exit(0);
+}
+
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+
 // --- Supabase helpers (admin session, plain fetch, never service role) -------
+// This branch only runs with RUN_SUPABASE_PUBLIC_E2E=true because it mutates
+// real Supabase rows and storage objects before restoring them.
 let token = "";
 
 async function signIn() {

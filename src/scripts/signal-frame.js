@@ -1,4 +1,5 @@
 import { projects, defaultProjectKey } from "./project-registry.js";
+import { subscribeLocaleChange, t } from "./i18n/index.js";
 
 const LIVE_PREVIEW_SELECTOR = "[data-live-project]";
 const MOBILE_QUERY = "(max-width: 759px)";
@@ -8,11 +9,13 @@ const LOAD_TIMEOUT = 8000;
 const STATE_CLASS_NAMES = ["is-preview-loading", "is-preview-live", "is-preview-sleeping", "is-preview-fallback"];
 const VIEW_CLASS_NAMES = ["is-view-site", "is-view-detail", "is-view-origin"];
 
-const STATE_LABELS = {
-  loading: "PRÉVIA / INICIALIZANDO",
-  live: "● PRÉVIA AO VIVO",
-  sleeping: "PRÉVIA / EM ESPERA",
-  fallback: "PRÉVIA / ALTERNATIVA",
+// Resolved through t() at paint time rather than frozen into a lookup, so the
+// status follows the locale like the rest of the viewer's copy.
+const STATE_KEYS = {
+  loading: "work.previewStatus.loading",
+  live: "work.previewStatus.live",
+  sleeping: "work.previewStatus.sleeping",
+  fallback: "work.previewStatus.fallback",
 };
 
 let activePreview = null;
@@ -62,7 +65,19 @@ function setPreviewStatus(frame, label) {
 function setPreviewState(frame, state) {
   frame.classList.remove(...STATE_CLASS_NAMES);
   frame.classList.add(`is-preview-${state}`);
-  setPreviewStatus(frame, STATE_LABELS[state] || STATE_LABELS.sleeping);
+  // Stamped so a locale change can re-label the status it is actually in,
+  // rather than assuming standby.
+  frame.dataset.previewState = state;
+  setPreviewStatus(frame, t(STATE_KEYS[state] || STATE_KEYS.sleeping));
+}
+
+// Re-labels the status of every viewer from the state it is already in. Touches
+// nothing else: not the mode, the project, the source or the iframe.
+function relabelPreviewStatuses() {
+  document.querySelectorAll(LIVE_PREVIEW_SELECTOR).forEach((frame) => {
+    const state = frame.dataset.previewState || "sleeping";
+    setPreviewStatus(frame, t(STATE_KEYS[state] || STATE_KEYS.sleeping));
+  });
 }
 
 function createCalibration(frame) {
@@ -95,6 +110,9 @@ function setMode(frame, mode, modeButtons) {
 }
 
 function createLivePreview(frame, mobileMedia) {
+  // The display mode the viewer is in. Kept here so a locale change can put it
+  // back exactly as it was instead of inferring it from CSS classes.
+  let currentMode = "overview";
   const finePointerMedia = window.matchMedia(FINE_POINTER_QUERY);
   const visual = frame.closest(".project__visual");
   const hoverMark = visual?.querySelector(".project__hover-mark");
@@ -203,6 +221,16 @@ function createLivePreview(frame, mobileMedia) {
   });
 
   const setSource = ({ url, previewUrl: nextPreviewUrl, poster: nextPoster, posterFallback: fallback, title }) => {
+    const resolvedPreview = resolveUrl(nextPreviewUrl || url);
+    // Re-applying the same project -- which is what a locale change does -- must
+    // not tear down a preview that is already loaded. Only the surrounding copy
+    // changes, so the iframe is left exactly as it is.
+    if (resolvedPreview === previewUrl && (nextPoster || "") === posterUrl) {
+      projectUrl = url || "";
+      if (iframe && title) iframe.title = title;
+      return;
+    }
+
     unload();
     projectUrl = url || "";
     previewUrl = resolveUrl(nextPreviewUrl || url);
@@ -249,6 +277,7 @@ function createLivePreview(frame, mobileMedia) {
       event.preventDefault();
       event.stopPropagation();
       const nextMode = setMode(frame, button.dataset.signalMode || "overview", modeButtons);
+      currentMode = nextMode;
       calibrate();
 
       if (nextMode === "site" && !mobileMedia.matches) load();
@@ -298,7 +327,7 @@ function createLivePreview(frame, mobileMedia) {
     if (event.matches) unload();
   });
 
-  setMode(frame, "overview", modeButtons);
+  currentMode = setMode(frame, "overview", modeButtons);
   applyPoster(posterUrl);
   setPreviewState(frame, "sleeping");
   activeObserver.observe(frame);
@@ -306,7 +335,11 @@ function createLivePreview(frame, mobileMedia) {
   return {
     setSource,
     calibrate,
-    setMode: (mode) => setMode(frame, mode, modeButtons),
+    setMode: (mode) => {
+      currentMode = setMode(frame, mode, modeButtons);
+      return currentMode;
+    },
+    getMode: () => currentMode,
     refresh: () => {
       if (!mobileMedia.matches && frame.classList.contains("is-view-site")) load();
     },
@@ -344,7 +377,10 @@ function createProjectViewer(frame, preview) {
   const write = (nodes, value) => nodes.forEach((node) => { node.textContent = value; });
   let activeKey = "";
 
-  const apply = (key, { force = false } = {}) => {
+  // `preserveMode` is for re-applying the same project after a locale change:
+  // the copy around the viewer is rewritten, but the visitor stays in whatever
+  // mode they had open. Choosing a different project still resets to overview.
+  const apply = (key, { force = false, preserveMode = false } = {}) => {
     const project = projects[key];
     if (!project || project.reserved || (key === activeKey && !force)) return;
     activeKey = key;
@@ -356,13 +392,13 @@ function createProjectViewer(frame, preview) {
       // Set when the poster came from Supabase Storage: the bundled artwork
       // stays available as the fallback.
       posterFallback: project.posterFallback,
-      title: `Prévia ao vivo de ${project.name}`,
+      title: t("work.livePreviewOf", { name: project.name }),
     });
 
     accentTargets.forEach((target) => target.style.setProperty("--accent", project.accent || "#c6ff00"));
 
-    write(fields.index, `CASE / ${project.id}`);
-    write(fields.eyebrow, `CLIENTE / ${project.id}`);
+    write(fields.index, t("work.caseIndex", { id: project.id }));
+    write(fields.eyebrow, t("work.clientIndex", { id: project.id }));
     write(fields.client, project.client || "");
     write(fields.category, project.category || "");
     write(fields.description, project.description || "");
@@ -372,16 +408,16 @@ function createProjectViewer(frame, preview) {
     write(fields.origin, project.origin || "");
     write(fields.coordinates, (project.coordinates || []).join("\n"));
     write(fields.name, project.name || "");
-    write(fields.year, `ANO — ${project.year}`);
-    write(fields.specs, `TIPO — ${project.type}\nTECNOLOGIA — ${project.tech}\nSTATUS — ${project.status}`);
+    write(fields.year, t("work.yearValue", { year: project.year }));
+    write(fields.specs, t("work.specs", { type: project.type, tech: project.tech, status: project.status }));
 
-    const openLabel = `Ver ${project.name} (abre em uma nova aba)`;
+    const openLabel = t("work.openNamedTab", { name: project.name });
     fields.links.forEach((link) => {
       link.href = project.url;
       link.setAttribute("aria-label", openLabel);
     });
     fields.open.forEach((button) => {
-      button.setAttribute("aria-label", `Abrir ${project.name} em uma nova aba`);
+      button.setAttribute("aria-label", t("work.openNamed", { name: project.name }));
     });
 
     fields.modules.forEach((button) => {
@@ -395,7 +431,7 @@ function createProjectViewer(frame, preview) {
       if (numberNode) numberNode.textContent = number;
       if (titleNode) titleNode.textContent = title;
       if (captionNode) captionNode.textContent = caption;
-      button.setAttribute("aria-label", `Inspecionar ${title.toLowerCase()}`);
+      button.setAttribute("aria-label", t("work.inspectModule", { title: title.toLowerCase() }));
     });
 
     fields.gallery.forEach((node) => {
@@ -418,7 +454,7 @@ function createProjectViewer(frame, preview) {
       slot.setAttribute("aria-pressed", String(isActive));
     });
 
-    preview.setMode("overview");
+    preview.setMode(preserveMode ? preview.getMode() : "overview");
     preview.calibrate();
   };
 
@@ -460,6 +496,8 @@ export function initSignalFrame() {
     const preview = createLivePreview(frame, mobileMedia);
     if (frame.hasAttribute("data-project-viewer")) viewer = createProjectViewer(frame, preview);
   });
+
+  subscribeLocaleChange(relabelPreviewStatuses);
 }
 
 export function getActiveProjectKey() {
@@ -467,9 +505,9 @@ export function getActiveProjectKey() {
 }
 
 // Called once live data arrives, so the viewer repaints with it.
-export function showProject(key) {
+export function showProject(key, { preserveMode = false } = {}) {
   if (!viewer) return;
-  viewer.apply(key ?? viewer.getActiveKey(), { force: true });
+  viewer.apply(key ?? viewer.getActiveKey(), { force: true, preserveMode });
 }
 
 export function refreshProjectViewerSlots() {

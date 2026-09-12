@@ -1,4 +1,5 @@
 import { projects } from "./project-registry.js";
+import { subscribeLocaleChange, t } from "./i18n/index.js";
 
 const SELECTORS = {
   name: ".case-index__name",
@@ -67,11 +68,11 @@ function hydrateLabs(project) {
   labs.style.setProperty("--labs-accent", project.accent);
   product.style.setProperty("--accent", project.accent);
   product.classList.add("labs-product--jarvis");
-  product.setAttribute("aria-label", "JARVIS — laboratório experimental de IA da Space Underground");
+  product.setAttribute("aria-label", t("jarvis.productAria"));
 
   const top = product.querySelectorAll(".labs-product__top span");
   if (top[0]) top[0].textContent = "LAB_001 / JARVIS";
-  if (top[1]) top[1].textContent = "STATUS — PROTÓTIPO / ATIVO";
+  if (top[1]) top[1].textContent = t("jarvis.labStatus");
 
   const oldCopy = product.querySelector(":scope > p");
   if (oldCopy) oldCopy.remove();
@@ -80,16 +81,26 @@ function hydrateLabs(project) {
     const identity = document.createElement("div");
     identity.className = "labs-product__identity";
     identity.innerHTML = `
-      <span>AMBIENTE OPERACIONAL EXPERIMENTAL DE IA</span>
+      <span data-i18n="jarvis.identityKicker">${t("jarvis.identityKicker")}</span>
       <strong>JARVIS</strong>
-      <p>Inteligência artificial, interação por voz, automação e controle do computador.</p>
-      <a href="${project.url}" target="_blank" rel="noopener noreferrer">ABRIR LAB <i aria-hidden="true">↗</i></a>
+      <p data-i18n="jarvis.identityText">${t("jarvis.identityText")}</p>
+      <a href="${project.url}" target="_blank" rel="noopener noreferrer"><span data-i18n="jarvis.openLab">${t("jarvis.openLab")}</span> <i aria-hidden="true">↗</i></a>
     `;
     product.insertBefore(identity, product.querySelector(".labs-product__signal"));
   }
 
   const labsStatus = labs.querySelector(".labs__status");
-  if (labsStatus) labsStatus.textContent = "Protótipo / Ativo";
+  if (labsStatus) labsStatus.textContent = t("jarvis.labsStatus");
+}
+
+// The labels written imperatively below are not marked up in the DOM, so they
+// are re-applied on a locale change. The identity block itself is built once
+// and re-labelled by applyStaticTranslations().
+function applyHydratorCopy() {
+  hydrateLabs(projects.jarvis);
+
+  const workIntro = document.querySelector("#work .section-intro");
+  if (workIntro) workIntro.textContent = t("jarvis.workIntro");
 }
 
 export function initProjectHydrator() {
@@ -97,10 +108,6 @@ export function initProjectHydrator() {
     if (!project.reserved && project.slot) hydrateSlot(key, project);
   });
 
-  hydrateLabs(projects.jarvis);
-
-  const workIntro = document.querySelector("#work .section-intro");
-  if (workIntro) {
-    workIntro.textContent = "Projetos de clientes e sistemas experimentais apresentados em um único frame. Alterne entre os cases abaixo.";
-  }
+  applyHydratorCopy();
+  subscribeLocaleChange(applyHydratorCopy);
 }

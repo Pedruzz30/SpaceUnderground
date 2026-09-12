@@ -1,7 +1,6 @@
 import { defineConfig } from "vite";
 
 import { readPlansBlock } from "./scripts/plans-block.mjs";
-import { localizeHtmlSource } from "./src/scripts/localization.js";
 import { renderPlanCards } from "./src/scripts/plans-renderer.js";
 import {
   OG_IMAGE,
@@ -24,17 +23,6 @@ const escapeHtml = (value) =>
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-
-// O tradutor legado tem duas regras sobrepostas ("PLAN /" e "PLAN"). Como a
-// localizacao estatica ainda e aplicada uma unica vez no build, normalizamos a
-// unica colisao conhecida aqui. O navegador nao executa mais o tradutor.
-function normalizeLocalizedHtml(html) {
-  const normalized = String(html).replaceAll("PLANOO", "PLANO");
-  if (normalized.includes("PLANOO")) {
-    throw new Error("A localizacao gerou texto recursivo de plano.");
-  }
-  return normalized;
-}
 
 // JSON-LD com fatos que estao na pagina e mais nada: sem endereco de rua, sem
 // telefone, sem numero de funcionarios, sem nota/review. Se um dado nao aparece
@@ -205,11 +193,7 @@ function spaceUndergroundBuild() {
           );
         }
 
-        // A localizacao da fonte EN-first continua sendo feita uma unica vez no
-        // build. A camada runtime foi removida para eliminar mutacoes recursivas.
-        const localizedHtml = normalizeLocalizedHtml(localizeHtmlSource(html));
-
-        return localizedHtml
+        return html
           .replace("<!--@seo-->", renderSeoHead())
           .replace(/[ \t]*<!-- @plans:start[\s\S]*?-->\n?/, "")
           .replace(/[ \t]*<!-- @plans:end -->\n?/, "");

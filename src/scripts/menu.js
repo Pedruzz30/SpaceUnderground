@@ -1,4 +1,5 @@
 // Menu mobile: abre/fecha, trava o scroll, prende o foco (focus trap) e devolve o foco ao fechar.
+import { subscribeLocaleChange, t } from "./i18n/index.js";
 
 export function initMenu() {
   const menuToggle = document.querySelector("[data-menu-toggle]");
@@ -22,7 +23,7 @@ export function initMenu() {
     navigation.classList.toggle("is-open", open);
     navigation.style.visibility = open ? "visible" : "";
     menuToggle.setAttribute("aria-expanded", String(open));
-    menuToggle.setAttribute("aria-label", open ? "Fechar menu" : "Abrir menu");
+    menuToggle.setAttribute("aria-label", open ? t("accessibility.closeMenu") : t("accessibility.openMenu"));
     document.body.classList.toggle("menu-open", open);
     document.body.style.overflow = open ? "hidden" : "";
 
@@ -86,4 +87,8 @@ export function initMenu() {
       setMenuState(false, { restoreFocus: false });
     }
   }, { passive: true });
+
+  subscribeLocaleChange(() => {
+    menuToggle?.setAttribute("aria-label", menuOpen ? t("accessibility.closeMenu") : t("accessibility.openMenu"));
+  });
 }

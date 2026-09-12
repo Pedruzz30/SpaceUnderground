@@ -59,6 +59,7 @@ before(async () => {
     "005_site_content.sql",
     "006_site_settings.sql",
     "007_activity_log.sql",
+    "008_editorial_i18n.sql",
   ]) {
     await db.exec(migration(name));
   }
@@ -86,8 +87,116 @@ describe("cms migrations", () => {
       "005_site_content.sql",
       "006_site_settings.sql",
       "007_activity_log.sql",
+      "008_editorial_i18n.sql",
     ]) {
       await db.exec(migration(name));
+    }
+  });
+});
+
+describe("editorial i18n", () => {
+  it("stores optional English translations without changing pt-BR base fields", async () => {
+    await asRole("authenticated", ADMIN_ID, () =>
+      db.query(
+        `update public.projects
+         set translations = $2
+         where id = $1`,
+        [PROJECT_ID, { en: { name: "Published", description: "English editorial description." } }],
+      ),
+    );
+
+    const { rows } = await db.query("select name, translations from public.projects where id = $1", [PROJECT_ID]);
+    assert.equal(rows[0].name, "Published");
+    assert.equal(rows[0].translations.en.description, "English editorial description.");
+  });
+
+  it("rejects unsupported translation locales", async () => {
+    const error = await asRole("authenticated", ADMIN_ID, () =>
+      failure("update public.projects set translations = $2 where id = $1", [PROJECT_ID, { es: { name: "Nope" } }]),
+    );
+
+    assert.equal(error?.code, "23514");
+  });
+
+  it("defaults translations to an empty object on every editorial table", async () => {
+    const tables = [
+      "projects",
+      "project_modules",
+      "project_gallery",
+      "plans",
+      "plan_features",
+      "site_content",
+      "site_settings",
+    ];
+
+    for (const table of tables) {
+      const { rows } = await db.query(
+        `select column_default, is_nullable
+         from information_schema.columns
+         where table_schema = 'public' and table_name = $1 and column_name = 'translations'`,
+        [table],
+      );
+      assert.equal(rows.length, 1, `${table} has a translations column`);
+      assert.match(rows[0].column_default, /'\{\}'/, `${table} defaults translations to {}`);
+      assert.equal(rows[0].is_nullable, "NO", `${table} translations is not null`);
+    }
+  });
+
+  it("stores translations for a row that was inserted without them", async () => {
+    const { rows } = await db.query("select translations from public.site_content where key = 'hero'");
+    if (rows.length) assert.deepEqual(rows[0].translations, {});
+  });
+
+  it("rejects a locale whose value is not an object", async () => {
+    const error = await asRole("authenticated", ADMIN_ID, () =>
+      failure("update public.projects set translations = $2 where id = $1", [PROJECT_ID, { en: "not an object" }]),
+    );
+
+    assert.equal(error?.code, "23514");
+  });
+
+  it("accepts an empty translations object", async () => {
+    await asRole("authenticated", ADMIN_ID, () =>
+      db.query("update public.projects set translations = $2 where id = $1", [DRAFT_ID, {}]),
+    );
+
+    const { rows } = await db.query("select translations from public.projects where id = $1", [DRAFT_ID]);
+    assert.deepEqual(rows[0].translations, {});
+  });
+
+  // Scoped to the draft project and cleaned up, so the rows the RLS tests
+  // below assert on are left exactly as the fixture created them.
+  it("carries module and gallery translations alongside their base text", async () => {
+    try {
+      await asRole("authenticated", ADMIN_ID, async () => {
+        await db.query(
+          `insert into public.project_modules (project_id, position, code, title, description, translations)
+           values ($1, 90, '90', 'Módulo base', 'Descrição base', $2)`,
+          [DRAFT_ID, { en: { title: "Base module", description: "Base description" } }],
+        );
+        await db.query(
+          `insert into public.project_gallery (project_id, position, url, alt, caption, translations)
+           values ($1, 90, 'projects/i18n-fixture.png', 'Alt base', 'Legenda base', $2)`,
+          [DRAFT_ID, { en: { alt: "Base alt", caption: "Base caption" } }],
+        );
+      });
+
+      const modules = await db.query(
+        "select title, translations from public.project_modules where project_id = $1 and position = 90",
+        [DRAFT_ID],
+      );
+      assert.equal(modules.rows[0].title, "Módulo base");
+      assert.equal(modules.rows[0].translations.en.title, "Base module");
+
+      const gallery = await db.query(
+        "select alt, translations from public.project_gallery where project_id = $1 and position = 90",
+        [DRAFT_ID],
+      );
+      assert.equal(gallery.rows[0].alt, "Alt base");
+      assert.equal(gallery.rows[0].translations.en.caption, "Base caption");
+    } finally {
+      await db.query("delete from public.project_modules where project_id = $1 and position = 90", [DRAFT_ID]);
+      await db.query("delete from public.project_gallery where project_id = $1 and position = 90", [DRAFT_ID]);
     }
   });
 });

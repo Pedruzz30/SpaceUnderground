@@ -1,3 +1,4 @@
+import { t } from "../i18n/index.js";
 import { escapeHtml } from "../utils/html.js";
 
 let active = null;
@@ -33,7 +34,10 @@ export function openModal({ title, body, actions = [], onDismiss }) {
         ${actions
           .map((action, index) => {
             const variant = action.variant === "danger" ? "button--danger" : action.variant === "primary" ? "button--primary" : "";
-            return `<button type="button" class="button ${variant}" data-modal-action="${index}">${escapeHtml(action.label)}</button>`;
+            // A stable hook per role, so callers and tests can target the
+            // confirm or cancel button without matching translated copy.
+            const role = action.role ? ` data-modal-${action.role}` : "";
+            return `<button type="button" class="button ${variant}" data-modal-action="${index}"${role}>${escapeHtml(action.label)}</button>`;
           })
           .join("")}
       </div>
@@ -85,7 +89,9 @@ export function openModal({ title, body, actions = [], onDismiss }) {
   });
 }
 
-export function confirmModal({ title, body, confirmLabel, cancelLabel = "Cancel", danger = true }) {
+export function confirmModal({ title, body, confirmLabel, cancelLabel, danger = true }) {
+  // Resolved here rather than in the signature so it follows the active locale.
+  const cancel = cancelLabel ?? t("common.cancel");
   return new Promise((resolve) => {
     let settled = false;
     const settle = (value) => {
@@ -99,8 +105,8 @@ export function confirmModal({ title, body, confirmLabel, cancelLabel = "Cancel"
       body,
       onDismiss: () => settle(false),
       actions: [
-        { label: cancelLabel, onSelect: () => settle(false) },
-        { label: confirmLabel, variant: danger ? "danger" : "primary", onSelect: () => settle(true) },
+        { label: cancel, role: "cancel", onSelect: () => settle(false) },
+        { label: confirmLabel, role: "confirm", variant: danger ? "danger" : "primary", onSelect: () => settle(true) },
       ],
     });
   });

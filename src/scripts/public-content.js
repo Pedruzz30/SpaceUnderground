@@ -1,9 +1,32 @@
 import { fetchSiteContent, fetchSiteSettings, isConfigured, signPaths } from "./supabase-public.js";
+import { applyStaticTranslations, getLocale, subscribeLocaleChange } from "./i18n/index.js";
+import { mergeLocalizedRecord } from "../../shared/localized-items.js";
 
 const STORAGE_PATH = /^(?!https?:|data:|blob:|\/|\.{1,2}\/).+/i;
+let subscribedToLocale = false;
+// Content rows and settings are fetched once. A locale change re-applies the
+// localized view of the same rows instead of querying Supabase again.
+let lastContentRows = null;
+let lastSettings = null;
 
 function text(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+// Scalars merge normally; `items` is merged by position, so a translation that
+// only covers one of four capability cards localizes that card and leaves the
+// rest in pt-BR instead of collapsing the list. Shared with the Admin preview.
+function localizedRecord(row) {
+  const locale = getLocale();
+  return mergeLocalizedRecord(row?.content, row?.translations?.[locale]);
+}
+
+function localizedSettings(settings = {}) {
+  const locale = getLocale();
+  return {
+    ...settings,
+    ...(settings.translations?.[locale] || {}),
+  };
 }
 
 function write(selector, value) {
@@ -197,8 +220,6 @@ async function applySettings(settings = {}) {
     }
   }
 
-  if (text(settings.locale)) document.documentElement.lang = settings.locale.trim();
-
   const siteUrl = absolutePublicUrl(settings.site_url || window.location.href);
   const seoTitle = text(settings.seo_title);
   const seoDescription = text(settings.seo_description);
@@ -248,19 +269,33 @@ async function applySettings(settings = {}) {
   }
 }
 
+async function applyContentRows(contentRows, settings) {
+  const content = new Map(contentRows.map((row) => [row.key, localizedRecord(row)]));
+
+  applyHero(content.get("hero"));
+  applyAbout(content.get("about"));
+  applyCapabilities(content.get("capabilities"));
+  applyProcess(content.get("process"));
+  applyContact(content.get("contact"));
+  applyFooter(content.get("footer"));
+  if (settings) await applySettings(localizedSettings(settings));
+  applyStaticTranslations();
+}
+
 export async function initPublicContent() {
   if (!isConfigured()) return;
+  if (!subscribedToLocale) {
+    subscribedToLocale = true;
+    subscribeLocaleChange(() => {
+      if (lastContentRows) applyContentRows(lastContentRows, lastSettings);
+      else initPublicContent();
+    });
+  }
   try {
     const [contentRows, settings] = await Promise.all([fetchSiteContent(), fetchSiteSettings()]);
-    const content = new Map(contentRows.map((row) => [row.key, row.content || {}]));
-
-    applyHero(content.get("hero"));
-    applyAbout(content.get("about"));
-    applyCapabilities(content.get("capabilities"));
-    applyProcess(content.get("process"));
-    applyContact(content.get("contact"));
-    applyFooter(content.get("footer"));
-    if (settings) await applySettings(settings);
+    lastContentRows = contentRows;
+    lastSettings = settings;
+    await applyContentRows(contentRows, settings);
   } catch (error) {
     console.warn("[content] Supabase content unavailable, keeping build-time copy.", error);
   }

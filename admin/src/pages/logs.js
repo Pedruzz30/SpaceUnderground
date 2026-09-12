@@ -1,16 +1,24 @@
 import { getActivity } from "../services/activity-service.js";
+import { onLocaleChange, plural, t } from "../i18n/index.js";
 import { escapeHtml } from "../utils/html.js";
 
+// Channel and domain values are the filter identity and stay in English; only
+// their labels are localized, through logs.channels.* / logs.domains.*.
 const CHANNELS = ["ALL", "ACTIVITY", "SYSTEM", "SECURITY"];
 const DOMAINS = ["All", "Projects", "Media", "Publishing", "Content", "Plans", "Settings"];
 
 const SECURITY_HINTS = ["auth", "login", "logout", "session", "permission", "denied", "security"];
 const SYSTEM_HINTS = ["storage", "settings", "system", "migration", "upload", "failed", "error"];
 
-function formatTime(iso) {
+function formatTime(iso, locale) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", month: "short", day: "2-digit" });
+  return new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    day: "2-digit",
+  }).format(date);
 }
 
 function signature(entry) {
@@ -44,27 +52,33 @@ function matchesDomain(entry, domain) {
   return domainFor(entry) === domain;
 }
 
-function row(entry) {
+function channelLabel(channel) {
+  return t(`logs.channels.${channel}`);
+}
+
+// Log titles and details are written by the system as it records events, so
+// they are shown exactly as stored.
+function row(entry, locale) {
   const channel = channelFor(entry);
   return `
     <div class="activity-row" data-log-channel="${escapeHtml(channel)}">
-      <span>${escapeHtml(formatTime(entry.time))}</span>
+      <span>${escapeHtml(formatTime(entry.time, locale))}</span>
       <strong>${escapeHtml(entry.title)}</strong>
-      <p>${escapeHtml(entry.detail || entry.action || "No detail.")}</p>
-      <small>${escapeHtml(channel)}${entry.entityType ? ` · ${escapeHtml(entry.entityType)}` : ""}</small>
+      <p>${escapeHtml(entry.detail || entry.action || t("logs.noDetail"))}</p>
+      <small>${escapeHtml(channelLabel(channel))}${entry.entityType ? ` · ${escapeHtml(entry.entityType)}` : ""}</small>
     </div>
   `;
 }
 
-function filterGroup(label, name, options, activeOption) {
+function filterGroup({ labelKey, name, options, activeOption, ariaKey, optionKeyPrefix }) {
   return `
     <div class="ops-filters__group">
-      <span>${escapeHtml(label)}</span>
-      <div class="segmented" role="group" aria-label="Filter logs by ${escapeHtml(label.toLowerCase())}">
+      <span data-i18n="${labelKey}">${escapeHtml(t(labelKey))}</span>
+      <div class="segmented" role="group" aria-label="${escapeHtml(t(ariaKey))}" data-i18n-aria-label="${ariaKey}">
         ${options
           .map(
             (option) => `
-              <button type="button" class="${option === activeOption ? "is-active" : ""}" data-log-${name}="${escapeHtml(option)}" aria-pressed="${option === activeOption}">${escapeHtml(option)}</button>
+              <button type="button" class="${option === activeOption ? "is-active" : ""}" data-log-${name}="${escapeHtml(option)}" aria-pressed="${option === activeOption}" data-i18n="${optionKeyPrefix}.${option}">${escapeHtml(t(`${optionKeyPrefix}.${option}`))}</button>
             `,
           )
           .join("")}
@@ -74,25 +88,39 @@ function filterGroup(label, name, options, activeOption) {
 }
 
 export const logsPage = {
-  title: "Logs",
-  breadcrumb: "SYSTEM / LOGS",
+  title: () => t("logs.title"),
+  breadcrumb: () => t("logs.breadcrumb"),
   render: () => `
     <section class="page-heading">
-      <span>LOGS</span>
-      <h2>Administrative log.</h2>
-      <p>Trace administrative, system and security events.</p>
+      <span data-i18n="logs.eyebrow">${t("logs.eyebrow")}</span>
+      <h2 data-i18n="logs.heading">${t("logs.heading")}</h2>
+      <p data-i18n="logs.intro">${t("logs.intro")}</p>
     </section>
 
     <section class="panel">
       <div class="ops-filters">
-        ${filterGroup("Channel", "channel-filter", CHANNELS, "ALL")}
-        ${filterGroup("Domain", "domain-filter", DOMAINS, "All")}
+        ${filterGroup({
+          labelKey: "logs.channel",
+          name: "channel-filter",
+          options: CHANNELS,
+          activeOption: "ALL",
+          ariaKey: "logs.filterByChannel",
+          optionKeyPrefix: "logs.channels",
+        })}
+        ${filterGroup({
+          labelKey: "logs.domain",
+          name: "domain-filter",
+          options: DOMAINS,
+          activeOption: "All",
+          ariaKey: "logs.filterByDomain",
+          optionKeyPrefix: "logs.domains",
+        })}
       </div>
 
       <p class="ops-count" data-log-count></p>
 
       <div class="activity-table" data-log-table aria-live="polite" aria-busy="true">
-        <p class="empty-inline">Loading log...</p>
+        <p class="empty-inline" data-i18n="logs.loading">${t("logs.loading")}</p>
       </div>
     </section>
   `,
@@ -106,15 +134,19 @@ export const logsPage = {
     let entries = [];
 
     function render() {
+      const locale = document.documentElement.lang || undefined;
       const visible = entries.filter(
         (entry) =>
           (activeChannel === "ALL" || channelFor(entry) === activeChannel) && matchesDomain(entry, activeDomain),
       );
 
       table.innerHTML = visible.length
-        ? visible.map(row).join("")
-        : '<p class="empty-inline">No events for this filter.</p>';
-      count.textContent = `${visible.length} of ${entries.length} events`;
+        ? visible.map((entry) => row(entry, locale)).join("")
+        : `<p class="empty-inline" data-i18n="logs.noEvents">${t("logs.noEvents")}</p>`;
+      count.textContent = plural("logs.countLabel", entries.length, {
+        visible: visible.length,
+        total: entries.length,
+      });
     }
 
     function bindGroup(buttons, onSelect) {
@@ -136,6 +168,12 @@ export const logsPage = {
     });
     bindGroup(domainButtons, (button) => {
       activeDomain = button.dataset.logDomainFilter;
+    });
+
+    // Re-renders from the rows already in memory. Switching locale never asks
+    // the activity log for data again, and the active filters are preserved.
+    onLocaleChange(table, () => {
+      if (entries.length) render();
     });
 
     try {
