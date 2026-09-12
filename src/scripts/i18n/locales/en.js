@@ -230,6 +230,7 @@ export default {
     budgetPlaceholder: "Example: R$ 6,000 – R$ 12,000",
     budgetOptions: "Investment ranges",
     timelineLabel: "Preferred timeline",
+    timelinePlaceholder: "Example: 6–12 weeks",
     timelineOptions: "Timeline options",
     toDefine: "To be defined",
     available: "AVAILABLE",

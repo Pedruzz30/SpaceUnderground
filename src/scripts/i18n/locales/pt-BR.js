@@ -230,6 +230,7 @@ export default {
     budgetPlaceholder: "Exemplo: R$ 6.000 – R$ 12.000",
     budgetOptions: "Faixas de investimento",
     timelineLabel: "Prazo desejado",
+    timelinePlaceholder: "Exemplo: 6–12 semanas",
     timelineOptions: "Opções de prazo",
     toDefine: "A definir",
     available: "DISPONÍVEL",
