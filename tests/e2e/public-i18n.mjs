@@ -236,6 +236,55 @@ await withLocale("pt-BR", async (page) => {
   check(canonicalAfter === canonicalBefore, "locale switch leaves canonical untouched", String(canonicalAfter));
 });
 
+/* ------------------------------------------------------------- responsive */
+
+// The page already overflows slightly at narrow widths because of decorative
+// art (.hero-art, .orbital, .monolith), which predates this work and is not
+// copy-driven. What matters for i18n is that English -- which is longer in
+// several headings -- does not make the layout any worse than Portuguese, and
+// that the locale control stays reachable at every width.
+const WIDTHS = [1920, 1440, 1280, 1024, 768, 430, 390, 320];
+
+async function measure(locale, width) {
+  const context = await browser.newContext({ locale, viewport: { width, height: 900 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("#hero-title");
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    const switcherReachable =
+      (await page.locator('[data-locale-switch="en"]').isVisible()) ||
+      (await page.locator("[data-menu-toggle]").isVisible());
+    // Copy-bearing containers must stay inside the viewport in both languages.
+    const copyOverflow = await page.evaluate((w) => {
+      const selectors = [".container", ".section-heading", ".site-nav", ".project-form__grid", ".footer__top"];
+      return selectors.flatMap((selector) =>
+        [...document.querySelectorAll(selector)]
+          .filter((el) => el.getBoundingClientRect().right > w + 1)
+          .map(() => selector),
+      );
+    }, width);
+    return { scrollWidth, switcherReachable, copyOverflow };
+  } finally {
+    await context.close();
+  }
+}
+
+for (const width of WIDTHS) {
+  const pt = await measure("pt-BR", width);
+  const en = await measure("en-US", width);
+
+  check(pt.switcherReachable, `pt-BR @ ${width}px keeps the locale control reachable`);
+  check(en.switcherReachable, `en @ ${width}px keeps the locale control reachable`);
+  check(
+    en.scrollWidth <= pt.scrollWidth,
+    `en @ ${width}px is no wider than pt-BR`,
+    `en=${en.scrollWidth} pt=${pt.scrollWidth}`,
+  );
+  check(pt.copyOverflow.length === 0, `pt-BR @ ${width}px keeps copy inside the viewport`, pt.copyOverflow.join(", "));
+  check(en.copyOverflow.length === 0, `en @ ${width}px keeps copy inside the viewport`, en.copyOverflow.join(", "));
+}
+
 await browser.close();
 
 const failed = checks.filter((entry) => !entry.ok);

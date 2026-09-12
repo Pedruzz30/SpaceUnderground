@@ -334,6 +334,52 @@ try {
     "cms: locale switch keeps the English draft",
   );
 
+  /* ----------------------------------------------------------- responsive */
+
+  // The topbar carries the locale switcher next to the account block, and the
+  // CMS and Project Editor add PT-BR | EN controls. English labels are longer,
+  // so these are the places where a locale could break the layout.
+  const WIDTHS = [1920, 1440, 1280, 1024, 768, 430, 390, 320];
+  const RESPONSIVE_ROUTES = [
+    ["#/dashboard", ".topbar", null],
+    ["#/content", "[data-content-form]", '[data-locale-tabs="site-content"]'],
+    ["#/settings", "[data-settings-form]:not([aria-busy])", '[data-locale-tabs="settings-seo"]'],
+  ];
+
+  for (const locale of ["pt-BR", "en"]) {
+    await setLocale(locale);
+    for (const [route, waitFor, localeControl] of RESPONSIVE_ROUTES) {
+      for (const width of WIDTHS) {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto(`${BASE_URL}/${route}`);
+        await page.waitForSelector(waitFor);
+
+        const overflow = await page.evaluate((w) => {
+          const selectors = [".topbar", ".page-heading", ".locale-tabs", ".locale-switcher"];
+          return selectors.flatMap((selector) =>
+            [...document.querySelectorAll(selector)]
+              .filter((el) => el.getBoundingClientRect().right > w + 1)
+              .map(() => selector),
+          );
+        }, width);
+        check(
+          overflow.length === 0,
+          `${locale} ${route} @ ${width}px keeps the chrome inside the viewport`,
+          overflow.join(", "),
+        );
+
+        const switcherVisible = await page.locator('[data-locale-switch="en"]').isVisible();
+        check(switcherVisible, `${locale} ${route} @ ${width}px keeps the locale switcher visible`);
+
+        if (localeControl) {
+          const visible = await page.locator(localeControl).first().isVisible();
+          check(visible, `${locale} ${route} @ ${width}px keeps the PT-BR | EN control visible`);
+        }
+      }
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
   check(pageErrors.length === 0, "no page errors", pageErrors.join(" | "));
 } finally {
   await context.close();
