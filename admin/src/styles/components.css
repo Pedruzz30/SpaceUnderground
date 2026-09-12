@@ -876,3 +876,49 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* Bilingual editing: PT-BR | EN tab pair shown above an editorial field group.
+   Sized to sit inline with a panel heading without changing its layout. */
+.locale-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.18rem;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.locale-tabs button {
+  min-width: 3.1rem;
+  min-height: 1.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 700 0.58rem/1 var(--mono);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.locale-tabs button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #070806;
+}
+
+.locale-hint {
+  margin: 0.5rem 0 0;
+  color: var(--text-muted);
+  font: 400 0.68rem/1.5 var(--mono);
+}
+
+/* An input bound to the English draft, so it reads differently from the
+   pt-BR base it falls back to. */
+.is-translation {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.is-translation::placeholder {
+  font-style: italic;
+  opacity: 0.55;
+}

@@ -3,12 +3,15 @@ import { showToast } from "../components/toast.js";
 import { describeError } from "../services/errors.js";
 import { getProjects } from "../services/project-service.js";
 import { removeProjectImages, resolveImageUrl, scanOrphanedAssets } from "../services/storage-service.js";
+import { t } from "../i18n/index.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
 function filename(path) {
-  return String(path || "").split("/").pop() || path || "asset";
+  return String(path || "").split("/").pop() || path || t("media.asset");
 }
 
+// "Poster" and "Gallery" are the stored asset kinds; only the cell label reads
+// differently per locale.
 function assetRows(projects) {
   return projects.flatMap((project) => {
     const rows = [];
@@ -29,8 +32,8 @@ function renderAsset(asset, index) {
   return `
     <button class="asset-row" type="button" data-asset-index="${index}">
       <span class="asset-thumb" data-thumb="${index}"></span>
-      <span><strong>${escapeHtml(asset.project.name || "Untitled project")}</strong><small>${escapeHtml(asset.project.caseNumber)}</small></span>
-      <span>${escapeHtml(asset.type)}</span>
+      <span><strong>${escapeHtml(asset.project.name || t("media.untitledProject"))}</strong><small>${escapeHtml(asset.project.caseNumber)}</small></span>
+      <span data-i18n="media.types.${asset.type}">${escapeHtml(t(`media.types.${asset.type}`))}</span>
       <span>${escapeHtml(filename(asset.path))}</span>
       <span>${escapeHtml(asset.position)}</span>
     </button>
@@ -42,19 +45,19 @@ function mediaStats(assets) {
   const galleries = assets.filter((asset) => asset.type === "Gallery").length;
   const storage = assets.filter((asset) => !/^(https?:|data:|blob:|\/|\.{1,2}\/)/i.test(asset.path)).length;
   return [
-    { label: "Total", value: assets.length, hint: "attached assets" },
-    { label: "Posters", value: posters, hint: "project covers" },
-    { label: "Gallery", value: galleries, hint: "project gallery images" },
-    { label: "Storage", value: storage, hint: "Supabase paths" },
+    { labelKey: "media.statTotal", value: assets.length, hintKey: "media.statTotalHint" },
+    { labelKey: "media.statPosters", value: posters, hintKey: "media.statPostersHint" },
+    { labelKey: "media.statGallery", value: galleries, hintKey: "media.statGalleryHint" },
+    { labelKey: "media.statStorage", value: storage, hintKey: "media.statStorageHint" },
   ];
 }
 
 function statCard(stat) {
   return `
     <article class="stat-card">
-      <span>${escapeHtml(stat.label)}</span>
+      <span data-i18n="${stat.labelKey}">${escapeHtml(t(stat.labelKey))}</span>
       <strong>${escapeHtml(String(stat.value))}</strong>
-      <p>${escapeHtml(stat.hint)}</p>
+      <p data-i18n="${stat.hintKey}">${escapeHtml(t(stat.hintKey))}</p>
     </article>
   `;
 }
@@ -63,22 +66,22 @@ function renderOrphan(orphan, index) {
   return `
     <div class="asset-row asset-row--orphan">
       <span class="asset-thumb"></span>
-      <span><strong>${escapeHtml(orphan.path)}</strong><small>${escapeHtml(orphan.type || "asset")}</small></span>
-      <span>${orphan.size ? escapeHtml(`${orphan.size} bytes`) : "—"}</span>
-      <span>${orphan.createdAt ? escapeHtml(new Date(orphan.createdAt).toLocaleString()) : "—"}</span>
-      <button class="button button--danger" type="button" data-delete-orphan="${index}">Delete</button>
+      <span><strong>${escapeHtml(orphan.path)}</strong><small>${escapeHtml(orphan.type || t("media.asset"))}</small></span>
+      <span>${orphan.size ? escapeHtml(t("media.bytes", { size: orphan.size })) : "—"}</span>
+      <span>${orphan.createdAt ? escapeHtml(new Date(orphan.createdAt).toLocaleString(document.documentElement.lang || undefined)) : "—"}</span>
+      <button class="button button--danger" type="button" data-delete-orphan="${index}" data-i18n="common.delete">${t("common.delete")}</button>
     </div>
   `;
 }
 
 export const mediaPage = {
-  title: "Media",
-  breadcrumb: "CONTENT / CMS / MEDIA",
+  title: () => t("media.title"),
+  breadcrumb: () => t("media.breadcrumb"),
   render: () => `
     <section class="page-heading">
-      <span>MEDIA LIBRARY</span>
-      <h2>Project assets.</h2>
-      <p>Poster and gallery files currently attached to public portfolio records.</p>
+      <span data-i18n="media.eyebrow">${t("media.eyebrow")}</span>
+      <h2 data-i18n="media.heading">${t("media.heading")}</h2>
+      <p data-i18n="media.intro">${t("media.intro")}</p>
     </section>
 
     <div class="stats-grid stats-grid--four" data-media-stats></div>
@@ -86,30 +89,30 @@ export const mediaPage = {
     <section class="panel">
       <div class="toolbar">
         <label class="search-field">
-          <span>Search</span>
-          <input data-media-search type="search" placeholder="Search assets..." disabled>
+          <span data-i18n="media.search">${t("media.search")}</span>
+          <input data-media-search type="search" placeholder="${t("media.searchPlaceholder")}" data-i18n-placeholder="media.searchPlaceholder" disabled>
         </label>
-        <div class="segmented" role="group" aria-label="Filter media">
-          <button type="button" class="is-active" data-media-filter="All" aria-pressed="true">All</button>
-          <button type="button" data-media-filter="Poster" aria-pressed="false">Poster</button>
-          <button type="button" data-media-filter="Gallery" aria-pressed="false">Gallery</button>
+        <div class="segmented" role="group" aria-label="${t("media.filterMedia")}" data-i18n-aria-label="media.filterMedia">
+          <button type="button" class="is-active" data-media-filter="All" aria-pressed="true" data-i18n="media.types.All">${t("media.types.All")}</button>
+          <button type="button" data-media-filter="Poster" aria-pressed="false" data-i18n="media.types.Poster">${t("media.types.Poster")}</button>
+          <button type="button" data-media-filter="Gallery" aria-pressed="false" data-i18n="media.types.Gallery">${t("media.types.Gallery")}</button>
         </div>
       </div>
       <div class="asset-table" data-media-list aria-busy="true">
-        <p class="empty-inline">Loading assets...</p>
+        <p class="empty-inline" data-i18n="media.loading">${t("media.loading")}</p>
       </div>
     </section>
 
     <section class="panel">
       <header class="panel__head">
         <div>
-          <span>ORPHANED ASSETS</span>
+          <span data-i18n="media.orphanedAssets">${t("media.orphanedAssets")}</span>
           <h3 data-orphan-count>0</h3>
         </div>
-        <button class="button" type="button" data-scan-orphans>Scan Storage</button>
+        <button class="button" type="button" data-scan-orphans data-i18n="media.scanStorage">${t("media.scanStorage")}</button>
       </header>
       <div class="asset-table" data-orphan-list>
-        <p class="empty-inline">Run a storage scan to detect files not referenced by projects.</p>
+        <p class="empty-inline" data-i18n="media.scanHint">${t("media.scanHint")}</p>
       </div>
     </section>
   `,
@@ -132,6 +135,9 @@ export const mediaPage = {
       }));
     }
 
+    // Every localized cell on this screen carries a data-i18n key, so a locale
+    // change is handled by applyStaticTranslations() without re-rendering the
+    // list. That matters here: re-rendering would re-sign every storage URL.
     function renderList() {
       const query = search.value.trim().toLowerCase();
       const visible = assets.filter((asset) => {
@@ -142,29 +148,29 @@ export const mediaPage = {
 
       list.innerHTML = visible.length
         ? visible.map(renderAsset).join("")
-        : '<p class="empty-inline">No assets match the current filters.</p>';
+        : `<p class="empty-inline" data-i18n="media.noMatch">${t("media.noMatch")}</p>`;
       decorateThumbs(list, visible);
 
       list.querySelectorAll("[data-asset-index]").forEach((button) => {
         button.addEventListener("click", () => {
           const asset = visible[Number(button.dataset.assetIndex)];
           openModal({
-            title: "ASSET DETAILS",
+            title: t("media.assetDetails"),
             body: `
               <div class="asset-detail-preview" data-modal-thumb></div>
               <dl class="detail-list">
-                <div><dt>Project</dt><dd>${escapeHtml(asset.project.name)}</dd></div>
-                <div><dt>Case</dt><dd>${escapeHtml(asset.project.caseNumber)}</dd></div>
-                <div><dt>Type</dt><dd>${escapeHtml(asset.type)}</dd></div>
-                <div><dt>Storage path</dt><dd>${escapeHtml(asset.path)}</dd></div>
-                <div><dt>Alt</dt><dd>${escapeHtml(asset.alt || "—")}</dd></div>
-                <div><dt>Caption</dt><dd>${escapeHtml(asset.caption || "—")}</dd></div>
-                <div><dt>Position</dt><dd>${escapeHtml(asset.position)}</dd></div>
+                <div><dt>${t("media.project")}</dt><dd>${escapeHtml(asset.project.name)}</dd></div>
+                <div><dt>${t("media.case")}</dt><dd>${escapeHtml(asset.project.caseNumber)}</dd></div>
+                <div><dt>${t("media.type")}</dt><dd>${escapeHtml(t(`media.types.${asset.type}`))}</dd></div>
+                <div><dt>${t("media.storagePath")}</dt><dd>${escapeHtml(asset.path)}</dd></div>
+                <div><dt>${t("media.alt")}</dt><dd>${escapeHtml(asset.alt || "—")}</dd></div>
+                <div><dt>${t("media.caption")}</dt><dd>${escapeHtml(asset.caption || "—")}</dd></div>
+                <div><dt>${t("media.position")}</dt><dd>${escapeHtml(asset.position)}</dd></div>
               </dl>
             `,
             actions: [
-              { label: "View Project", onSelect: () => { window.location.hash = `#/projects/${asset.project.id}`; } },
-              { label: "Close" },
+              { label: t("media.viewProject"), onSelect: () => { window.location.hash = `#/projects/${asset.project.id}`; } },
+              { label: t("common.close") },
             ],
           });
           resolveImageUrl(asset.path).then((src) => {
@@ -192,13 +198,15 @@ export const mediaPage = {
     document.querySelector("[data-scan-orphans]")?.addEventListener("click", async (event) => {
       const button = event.currentTarget;
       button.disabled = true;
-      orphanList.innerHTML = '<p class="empty-inline">Scanning storage...</p>';
+      orphanList.innerHTML = `<p class="empty-inline" data-i18n="media.scanning">${t("media.scanning")}</p>`;
       try {
         orphans = await scanOrphanedAssets(assets.map((asset) => asset.path));
         orphanCount.textContent = String(orphans.length);
-        orphanList.innerHTML = orphans.length ? orphans.map(renderOrphan).join("") : '<p class="empty-inline">No orphaned assets found.</p>';
+        orphanList.innerHTML = orphans.length
+          ? orphans.map(renderOrphan).join("")
+          : `<p class="empty-inline" data-i18n="media.noOrphans">${t("media.noOrphans")}</p>`;
       } catch (error) {
-        orphanList.innerHTML = `<p class="empty-inline">${escapeHtml(describeError(error, "Unable to scan storage."))}</p>`;
+        orphanList.innerHTML = `<p class="empty-inline">${escapeHtml(describeError(error, t("media.scanError")))}</p>`;
       } finally {
         button.disabled = false;
       }
@@ -209,16 +217,19 @@ export const mediaPage = {
       if (!button) return;
       const orphan = orphans[Number(button.dataset.deleteOrphan)];
       const confirmed = await confirmModal({
-        title: "DELETE ORPHANED ASSET?",
-        body: `<p>This removes <code>${escapeHtml(orphan.path)}</code> from storage. It is not referenced by any loaded project.</p>`,
-        confirmLabel: "Delete Asset",
+        title: t("media.deleteOrphanTitle"),
+        // The path is escaped before it reaches the <code> element in the copy.
+        body: `<p>${t("media.deleteOrphanBody", { path: escapeHtml(orphan.path) })}</p>`,
+        confirmLabel: t("media.deleteAsset"),
       });
       if (!confirmed) return;
       await removeProjectImages([orphan.path]);
       orphans = orphans.filter((item) => item !== orphan);
       orphanCount.textContent = String(orphans.length);
-      orphanList.innerHTML = orphans.length ? orphans.map(renderOrphan).join("") : '<p class="empty-inline">No orphaned assets found.</p>';
-      showToast("Orphaned asset deleted.");
+      orphanList.innerHTML = orphans.length
+        ? orphans.map(renderOrphan).join("")
+        : `<p class="empty-inline" data-i18n="media.noOrphans">${t("media.noOrphans")}</p>`;
+      showToast(t("media.orphanDeleted"));
     });
 
     try {
@@ -227,7 +238,7 @@ export const mediaPage = {
       search.disabled = false;
       renderList();
     } catch (error) {
-      list.innerHTML = `<p class="empty-inline">${escapeHtml(describeError(error, "Unable to load media."))}</p>`;
+      list.innerHTML = `<p class="empty-inline">${escapeHtml(describeError(error, t("media.loadError")))}</p>`;
     } finally {
       list.removeAttribute("aria-busy");
     }
