@@ -116,10 +116,10 @@ function renderStatus(state) {
   const healthLabel = state.attention.length ? plural("cms.itemCount", state.attention.length) : t("cms.good");
   return `
     <section class="cms-status-grid" aria-label="${t("cms.status")}" data-i18n-aria-label="cms.status">
-      <article><span>${t("cms.publicWebsite")}</span><strong>${t("cms.online")}</strong><small>${t("cms.runtimeContentEnabled")}</small></article>
-      <article><span>${t("cms.dataSource")}</span><strong>${escapeHtml(DATA_SOURCE.toUpperCase())}</strong><small>${t("cms.adminEditorialSource")}</small></article>
-      <article><span>${t("cms.publishedCases")}</span><strong>${state.published.length}</strong><small>${escapeHtml(t("cms.draftArchived", { drafts: state.drafts.length, archived: state.archived.length }))}</small></article>
-      <article><span>${t("cms.contentHealth")}</span><strong>${escapeHtml(healthLabel)}</strong><small>${statusChip(state.attention.length ? t("cms.attention") : t("cms.healthy"), healthTone)}</small></article>
+      <article><span data-i18n="cms.publicWebsite">${t("cms.publicWebsite")}</span><strong data-i18n="cms.online">${t("cms.online")}</strong><small data-i18n="cms.runtimeContentEnabled">${t("cms.runtimeContentEnabled")}</small></article>
+      <article><span data-i18n="cms.dataSource">${t("cms.dataSource")}</span><strong>${escapeHtml(DATA_SOURCE.toUpperCase())}</strong><small data-i18n="cms.adminEditorialSource">${t("cms.adminEditorialSource")}</small></article>
+      <article><span data-i18n="cms.publishedCases">${t("cms.publishedCases")}</span><strong>${state.published.length}</strong><small>${escapeHtml(t("cms.draftArchived", { drafts: state.drafts.length, archived: state.archived.length }))}</small></article>
+      <article><span data-i18n="cms.contentHealth">${t("cms.contentHealth")}</span><strong>${escapeHtml(healthLabel)}</strong><small>${statusChip(state.attention.length ? t("cms.attention") : t("cms.healthy"), healthTone)}</small></article>
     </section>
   `;
 }
@@ -183,7 +183,7 @@ function renderAttention(items) {
     return `
       <div class="cms-healthy-state">
         ${statusChip(t("cms.healthy"), "success")}
-        <div><strong>${t("cms.everythingHealthy")}</strong><p>${t("cms.noIssues")}</p></div>
+        <div><strong data-i18n="cms.everythingHealthy">${t("cms.everythingHealthy")}</strong><p data-i18n="cms.noIssues">${t("cms.noIssues")}</p></div>
       </div>
     `;
   }
@@ -210,7 +210,7 @@ function isContentActivity(entry) {
 // stored; only the surrounding copy is localized.
 function renderActivity(entries) {
   const visible = entries.filter(isContentActivity).slice(0, 6);
-  if (!visible.length) return `<p class="empty-inline">${t("cms.noContentActivity")}</p>`;
+  if (!visible.length) return `<p class="empty-inline" data-i18n="cms.noContentActivity">${t("cms.noContentActivity")}</p>`;
 
   return `
     <div class="cms-activity-list">
@@ -234,32 +234,32 @@ function controlCenter({ projects, content, plans, settings, activity }) {
     <section class="cms-control-grid">
       <article class="panel cms-attention-panel">
         <header class="panel__head">
-          <div><span>${t("cms.needsAttention")}</span><h3>${t("cms.editorialChecks")}</h3></div>
+          <div><span data-i18n="cms.needsAttention">${t("cms.needsAttention")}</span><h3 data-i18n="cms.editorialChecks">${t("cms.editorialChecks")}</h3></div>
           ${statusChip(state.attention.length ? String(state.attention.length) : t("cms.clear"), state.attention.length ? "warning" : "success")}
         </header>
         ${renderAttention(state.attention)}
       </article>
 
       <article class="panel cms-summary-panel">
-        <header class="panel__head"><div><span>${t("cms.publication")}</span><h3>${t("cms.caseState")}</h3></div></header>
+        <header class="panel__head"><div><span data-i18n="cms.publication">${t("cms.publication")}</span><h3 data-i18n="cms.caseState">${t("cms.caseState")}</h3></div></header>
         <div class="cms-mini-stats">
-          <div><span>${t("cms.published")}</span><strong>${state.published.length}</strong></div>
-          <div><span>${t("cms.draft")}</span><strong>${state.drafts.length}</strong></div>
-          <div><span>${t("cms.archived")}</span><strong>${state.archived.length}</strong></div>
-          <div><span>${t("cms.hidden")}</span><strong>${state.hidden.length}</strong></div>
+          <div><span data-i18n="cms.published">${t("cms.published")}</span><strong>${state.published.length}</strong></div>
+          <div><span data-i18n="cms.draft">${t("cms.draft")}</span><strong>${state.drafts.length}</strong></div>
+          <div><span data-i18n="cms.archived">${t("cms.archived")}</span><strong>${state.archived.length}</strong></div>
+          <div><span data-i18n="cms.hidden">${t("cms.hidden")}</span><strong>${state.hidden.length}</strong></div>
         </div>
       </article>
     </section>
 
     <section>
-      <header class="cms-section-head"><div><span>${t("cms.modules")}</span><h3>${t("cms.publishingWorkspaces")}</h3></div></header>
+      <header class="cms-section-head"><div><span data-i18n="cms.modules">${t("cms.modules")}</span><h3 data-i18n="cms.publishingWorkspaces">${t("cms.publishingWorkspaces")}</h3></div></header>
       <div class="cms-grid">${MODULES.map((module) => moduleCard(module, state, plans)).join("")}</div>
     </section>
 
     <section class="panel cms-activity-panel">
       <header class="panel__head">
-        <div><span>${t("cms.recentContentActivity")}</span><h3>${t("cms.editorialChanges")}</h3></div>
-        <a class="text-link" href="#/logs">${t("cms.viewAllLogs")}</a>
+        <div><span data-i18n="cms.recentContentActivity">${t("cms.recentContentActivity")}</span><h3 data-i18n="cms.editorialChanges">${t("cms.editorialChanges")}</h3></div>
+        <a class="text-link" href="#/logs" data-i18n="cms.viewAllLogs">${t("cms.viewAllLogs")}</a>
       </header>
       ${renderActivity(activity)}
     </section>

@@ -42,24 +42,24 @@ export const projectsPage = {
   render: () => `
     <section class="page-heading page-heading--split">
       <div>
-        <span>${t("projects.eyebrow")}</span>
-        <h2>${t("projects.heading")}</h2>
-        <p>${t("projects.intro")}</p>
+        <span data-i18n="projects.eyebrow">${t("projects.eyebrow")}</span>
+        <h2 data-i18n="projects.heading">${t("projects.heading")}</h2>
+        <p data-i18n="projects.intro">${t("projects.intro")}</p>
       </div>
       <div class="heading-actions">
-        <button class="button button--primary" type="button" data-new-project>${t("projects.newProject")}</button>
+        <button class="button button--primary" type="button" data-new-project data-i18n="projects.newProject">${t("projects.newProject")}</button>
       </div>
     </section>
 
     <section class="panel projects-panel">
       <div class="toolbar">
         <label class="search-field">
-          <span>${t("projects.searchProjects")}</span>
+          <span data-i18n="projects.searchProjects">${t("projects.searchProjects")}</span>
           <input data-search-projects type="search" placeholder="${t("projects.searchPlaceholder")}" disabled>
         </label>
         <div class="toolbar__controls">
           <label class="sort-field">
-            <span>${t("projects.sortBy")}</span>
+            <span data-i18n="projects.sortBy">${t("projects.sortBy")}</span>
             <select data-project-sort disabled>
               <option value="updated">${t("projects.sortUpdated")}</option>
               <option value="case">${t("projects.sortCase")}</option>
@@ -114,7 +114,7 @@ export const projectsPage = {
 
       list.innerHTML = `
         <div class="project-table__head" aria-hidden="true">
-          <span>CASE</span><span>${t("dashboard.project")}</span><span>${t("common.category").toUpperCase()}</span><span>${t("common.status").toUpperCase()}</span><span>${t("common.editorial").toUpperCase()}</span><span>${t("common.visibility").toUpperCase()}</span><span>${t("common.updated").toUpperCase()}</span><span></span>
+          <span>CASE</span><span data-i18n="dashboard.project">${t("dashboard.project")}</span><span>${t("common.category").toUpperCase()}</span><span>${t("common.status").toUpperCase()}</span><span>${t("common.editorial").toUpperCase()}</span><span>${t("common.visibility").toUpperCase()}</span><span>${t("common.updated").toUpperCase()}</span><span></span>
         </div>
         ${visible.length ? visible.map(projectCard).join("") : `<p class="empty-inline">${emptyMessage}</p>`}
       `;

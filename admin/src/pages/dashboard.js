@@ -125,9 +125,9 @@ function renderAttention(projectItems, { projectsFailed = false, pending = false
   ]);
 
   const note = pending
-    ? `<p class="dash-inline-note">${t("dashboard.checkingProjects")}</p>`
+    ? `<p class="dash-inline-note" data-i18n="dashboard.checkingProjects">${t("dashboard.checkingProjects")}</p>`
     : projectsFailed
-      ? `<p class="dash-inline-note dash-inline-note--warn">${t("dashboard.projectChecksUnavailable")}</p>`
+      ? `<p class="dash-inline-note dash-inline-note--warn" data-i18n="dashboard.projectChecksUnavailable">${t("dashboard.projectChecksUnavailable")}</p>`
       : "";
 
   return `${renderQueue(items, t("dashboard.nothingNeedsAttention"))}${note}`;
@@ -156,12 +156,12 @@ function renderPulse(projects) {
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 5);
 
-  if (!recent.length) return `<p class="empty-inline">${t("dashboard.noProjectsYet")}</p>`;
+  if (!recent.length) return `<p class="empty-inline" data-i18n="dashboard.noProjectsYet">${t("dashboard.noProjectsYet")}</p>`;
 
   return `
     <div class="ops-table dash-pulse">
       <div class="ops-table__head" aria-hidden="true">
-        <span>${t("dashboard.case")}</span><span>${t("dashboard.project")}</span><span>${t("common.status").toUpperCase()}</span><span>${t("common.editorial").toUpperCase()}</span><span>${t("common.updated").toUpperCase()}</span><span></span>
+        <span data-i18n="dashboard.case">${t("dashboard.case")}</span><span data-i18n="dashboard.project">${t("dashboard.project")}</span><span>${t("common.status").toUpperCase()}</span><span>${t("common.editorial").toUpperCase()}</span><span>${t("common.updated").toUpperCase()}</span><span></span>
       </div>
       ${recent.map(pulseRow).join("")}
     </div>
@@ -191,8 +191,8 @@ function renderPipeline() {
     </div>
 
     <div class="ops-figures dash-figures">
-      <div><span>${t("dashboard.openOpportunities")}</span><strong>${summary.open}</strong></div>
-      <div><span>${t("status.high")}</span><strong class="is-accent">${summary.highPriority}</strong></div>
+      <div><span data-i18n="dashboard.openOpportunities">${t("dashboard.openOpportunities")}</span><strong>${summary.open}</strong></div>
+      <div><span data-i18n="status.high">${t("status.high")}</span><strong class="is-accent">${summary.highPriority}</strong></div>
     </div>
   `;
 }
@@ -231,14 +231,14 @@ function renderFinancial(periodId) {
 
     <div class="dash-bars">
       <div class="dash-bar">
-        <span class="dash-bar__label">${t("dashboard.revenue")}</span>
+        <span class="dash-bar__label" data-i18n="dashboard.revenue">${t("dashboard.revenue")}</span>
         <span class="dash-bar__track">
           <span class="dash-bar__fill dash-bar__fill--in" style="--dash-fill:${barPercent(totals.revenue, max)}%"></span>
         </span>
         <span class="ops-amount ops-amount--positive">${escapeHtml(formatCurrency(totals.revenue))}</span>
       </div>
       <div class="dash-bar">
-        <span class="dash-bar__label">${t("dashboard.expenses")}</span>
+        <span class="dash-bar__label" data-i18n="dashboard.expenses">${t("dashboard.expenses")}</span>
         <span class="dash-bar__track">
           <span class="dash-bar__fill dash-bar__fill--out" style="--dash-fill:${barPercent(totals.expenses, max)}%"></span>
         </span>
@@ -249,7 +249,7 @@ function renderFinancial(periodId) {
     ${
       recent.length
         ? `<ul class="dash-ledger">${recent.map(ledgerLine).join("")}</ul>`
-        : `<p class="empty-inline">${t("dashboard.noTransactionsInPeriod")}</p>`
+        : `<p class="empty-inline" data-i18n="dashboard.noTransactionsInPeriod">${t("dashboard.noTransactionsInPeriod")}</p>`
     }
   `;
 }
@@ -295,13 +295,13 @@ export const dashboardPage = {
   render: () => `
     <section class="page-heading page-heading--split">
       <div>
-        <span>${t("dashboard.eyebrow")}</span>
-        <h2>${t("dashboard.heading")}</h2>
-        <p>${t("dashboard.intro")}</p>
+        <span data-i18n="dashboard.eyebrow">${t("dashboard.eyebrow")}</span>
+        <h2 data-i18n="dashboard.heading">${t("dashboard.heading")}</h2>
+        <p data-i18n="dashboard.intro">${t("dashboard.intro")}</p>
       </div>
       <div class="heading-actions">
         <label class="dash-period">
-          <span>${t("dashboard.period")}</span>
+          <span data-i18n="dashboard.period">${t("dashboard.period")}</span>
           <select data-dash-period>
             ${PERIODS.map(
               (period) =>
@@ -316,7 +316,7 @@ export const dashboardPage = {
       ${renderKpis()}
     </section>
 
-    <p class="ops-note dash-legend">${t("dashboard.legend")}</p>
+    <p class="ops-note dash-legend" data-i18n="dashboard.legend">${t("dashboard.legend")}</p>
 
     <div class="dash-grid">
       <article class="panel dash-panel--attention" aria-labelledby="dash-attention-title">
@@ -329,10 +329,10 @@ export const dashboardPage = {
       <article class="panel dash-panel--actions" aria-labelledby="dash-actions-title">
         ${panelHead(t("dashboard.quickActions"), t("dashboard.jumpIntoWork"), "dash-actions-title")}
         <div class="dash-actions">
-          <a class="button button--primary" href="#/projects/new">${t("dashboard.newProject")}</a>
-          <a class="button" href="#/clients">${t("nav.clients")}</a>
-          <a class="button" href="#/commercial">${t("nav.commercial")}</a>
-          <a class="button" href="#/financial">${t("nav.financial")}</a>
+          <a class="button button--primary" href="#/projects/new" data-i18n="dashboard.newProject">${t("dashboard.newProject")}</a>
+          <a class="button" href="#/clients" data-i18n="nav.clients">${t("nav.clients")}</a>
+          <a class="button" href="#/commercial" data-i18n="nav.commercial">${t("nav.commercial")}</a>
+          <a class="button" href="#/financial" data-i18n="nav.financial">${t("nav.financial")}</a>
           <a class="button" href="#/cms">CMS</a>
         </div>
       </article>
@@ -421,9 +421,9 @@ export const dashboardPage = {
       }
 
       if (!activityOk) {
-        activityEl.innerHTML = `<p class="empty-inline">${t("dashboard.activityUnavailable")}</p>`;
+        activityEl.innerHTML = `<p class="empty-inline" data-i18n="dashboard.activityUnavailable">${t("dashboard.activityUnavailable")}</p>`;
       } else if (!entries.length) {
-        activityEl.innerHTML = `<p class="empty-inline">${t("dashboard.noRecentActivity")}</p>`;
+        activityEl.innerHTML = `<p class="empty-inline" data-i18n="dashboard.noRecentActivity">${t("dashboard.noRecentActivity")}</p>`;
       } else {
         activityEl.innerHTML = entries
           .map(

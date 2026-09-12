@@ -163,7 +163,9 @@ export const clientsPage = {
         visible.length ? visible.map(clientRow).join("") : `<p class="empty-inline">${emptyMessage}</p>`,
       );
 
-      count.textContent = plural("clients.countLabel", visible.length, {
+      // The noun agrees with the total, not with the filtered count, so a
+      // single match still reads "1 de 6 clientes".
+      count.textContent = plural("clients.countLabel", demoClients.length, {
         visible: visible.length,
         total: demoClients.length,
       });

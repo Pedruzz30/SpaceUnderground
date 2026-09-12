@@ -12,29 +12,29 @@ export const loginPage = {
           <span class="brand-mark" aria-hidden="true">SU</span>
           <div>
             <p>SPACE UNDERGROUND</p>
-            <h1 id="login-title">${t("login.heading")}</h1>
+            <h1 id="login-title" data-i18n="login.heading">${t("login.heading")}</h1>
           </div>
         </div>
         <div class="login-status" aria-label="${t("login.systemStatus")}">
           <span aria-hidden="true"></span>
           ${t("login.systemOnline")}
         </div>
-        <p class="login-panel__copy">${t("login.copy")}</p>
+        <p class="login-panel__copy" data-i18n="login.copy">${t("login.copy")}</p>
 
         <form class="login-form" data-login-form>
           <div class="field">
-            <label for="login-email">${t("login.email")}</label>
+            <label for="login-email" data-i18n="login.email">${t("login.email")}</label>
             <input id="login-email" name="email" type="email" autocomplete="email" required>
           </div>
           <div class="field">
-            <label for="login-password">${t("login.password")}</label>
+            <label for="login-password" data-i18n="login.password">${t("login.password")}</label>
             <input id="login-password" name="password" type="password" autocomplete="current-password" required>
           </div>
           <p class="field-error" data-login-error role="alert" hidden></p>
-          <button class="button button--primary" type="submit" data-login-submit>${t("login.submit")}</button>
+          <button class="button button--primary" type="submit" data-login-submit data-i18n="login.submit">${t("login.submit")}</button>
         </form>
 
-        <p class="login-panel__foot">${t("login.restricted")}</p>
+        <p class="login-panel__foot" data-i18n="login.restricted">${t("login.restricted")}</p>
       </section>
     </main>
   `,

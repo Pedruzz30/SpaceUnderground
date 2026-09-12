@@ -69,14 +69,14 @@ export const settingsPage = {
   render: () => `
     <section class="page-heading page-heading--split">
       <div>
-        <span>${t("settings.eyebrow")}</span>
-        <h2>${t("settings.heading")}</h2>
-        <p>${t("settings.intro")}</p>
+        <span data-i18n="settings.eyebrow">${t("settings.eyebrow")}</span>
+        <h2 data-i18n="settings.heading">${t("settings.heading")}</h2>
+        <p data-i18n="settings.intro">${t("settings.intro")}</p>
       </div>
-      <strong class="save-state is-saved" data-settings-state>${t("common.loading")}</strong>
+      <strong class="save-state is-saved" data-settings-state data-i18n="common.loading">${t("common.loading")}</strong>
     </section>
     <form class="settings-grid" data-settings-form aria-busy="true">
-      <section class="panel"><p class="empty-inline">${t("settings.loadingSettings")}</p></section>
+      <section class="panel"><p class="empty-inline" data-i18n="settings.loadingSettings">${t("settings.loadingSettings")}</p></section>
     </form>
   `,
   afterRender: async () => {
@@ -161,7 +161,7 @@ export const settingsPage = {
       form.innerHTML = `
         <div class="settings-main">
           <section class="panel settings-panel">
-            <header class="panel__head"><div><span>${t("settings.general")}</span><h3>${t("settings.siteIdentity")}</h3></div></header>
+            <header class="panel__head"><div><span data-i18n="settings.general">${t("settings.general")}</span><h3 data-i18n="settings.siteIdentity">${t("settings.siteIdentity")}</h3></div></header>
             <div class="form-grid">
               ${field(t("settings.siteName"), "siteName", settings.siteName, "text", t("settings.siteNameHint"))}
               ${field(t("settings.publicUrl"), "siteUrl", settings.siteUrl, "url", t("settings.publicUrlHint"))}
@@ -170,36 +170,36 @@ export const settingsPage = {
             </div>
           </section>
           <section class="panel settings-panel">
-            <header class="panel__head"><div><span>${t("settings.seo")}</span><h3>${t("settings.searchMetadata")}</h3></div></header>
+            <header class="panel__head"><div><span data-i18n="settings.seo">${t("settings.seo")}</span><h3 data-i18n="settings.searchMetadata">${t("settings.searchMetadata")}</h3></div></header>
             <div class="form-grid">
               <div class="field field--wide editor-locale-row">
-                <span class="field-label">${t("settings.editorialCopy")}</span>
+                <span class="field-label" data-i18n="settings.editorialCopy">${t("settings.editorialCopy")}</span>
                 ${localeTabs("settings-seo")}
                 ${localeHint("settings-seo")}
               </div>
               ${field(t("settings.seoTitle"), "seoTitle", settings.seoTitle, "text", t("settings.seoTitleHint"))}
               ${field(t("settings.description"), "seoDescription", settings.seoDescription, "text", t("settings.descriptionHint"))}
               ${field(t("settings.ogImagePath"), "ogImagePath", settings.ogImagePath, "text", t("settings.ogImagePathHint"))}
-              <p class="locale-hint field--wide">${t("settings.seoSharedNote")}</p>
+              <p class="locale-hint field--wide" data-i18n="settings.seoSharedNote">${t("settings.seoSharedNote")}</p>
             </div>
           </section>
         </div>
         <aside class="settings-aside">
           <section class="panel settings-panel settings-panel--preview">
-            <header class="panel__head"><div><span>${t("settings.preview")}</span><h3>${t("settings.searchAndSocial")}</h3></div></header>
+            <header class="panel__head"><div><span data-i18n="settings.preview">${t("settings.preview")}</span><h3 data-i18n="settings.searchAndSocial">${t("settings.searchAndSocial")}</h3></div></header>
             <div class="settings-preview" data-settings-preview>${preview(settings)}</div>
           </section>
           <section class="panel settings-panel settings-panel--runtime">
-            <header class="panel__head"><div><span>${t("settings.integrations")}</span><h3>${t("settings.runtimeStatus")}</h3></div></header>
+            <header class="panel__head"><div><span data-i18n="settings.integrations">${t("settings.integrations")}</span><h3 data-i18n="settings.runtimeStatus">${t("settings.runtimeStatus")}</h3></div></header>
             <div class="integration-grid settings-integration-grid">
-              <div><span>${t("settings.supabase")}</span><strong>${DATA_SOURCE === "supabase" ? t("common.enabled") : t("common.mockMode")}</strong></div>
-              <div><span>${t("settings.database")}</span><strong>${isSupabaseConfigured() ? t("common.configured") : t("common.notConfigured")}</strong></div>
-              <div><span>${t("settings.storage")}</span><strong>${isSupabaseConfigured() ? t("common.projectMedia") : t("common.mockMode")}</strong></div>
-              <div><span>${t("settings.publicSite")}</span><strong>${t("settings.readOnlyAnonKey")}</strong></div>
+              <div><span data-i18n="settings.supabase">${t("settings.supabase")}</span><strong>${DATA_SOURCE === "supabase" ? t("common.enabled") : t("common.mockMode")}</strong></div>
+              <div><span data-i18n="settings.database">${t("settings.database")}</span><strong>${isSupabaseConfigured() ? t("common.configured") : t("common.notConfigured")}</strong></div>
+              <div><span data-i18n="settings.storage">${t("settings.storage")}</span><strong>${isSupabaseConfigured() ? t("common.projectMedia") : t("common.mockMode")}</strong></div>
+              <div><span data-i18n="settings.publicSite">${t("settings.publicSite")}</span><strong data-i18n="settings.readOnlyAnonKey">${t("settings.readOnlyAnonKey")}</strong></div>
             </div>
-            <p>${t("settings.noSecrets")}</p>
+            <p data-i18n="settings.noSecrets">${t("settings.noSecrets")}</p>
           </section>
-          <div class="form-actions settings-actions"><button class="button button--primary" type="submit">${t("settings.saveSettings")}</button></div>
+          <div class="form-actions settings-actions"><button class="button button--primary" type="submit" data-i18n="settings.saveSettings">${t("settings.saveSettings")}</button></div>
         </aside>
       `;
       form.removeAttribute("aria-busy");

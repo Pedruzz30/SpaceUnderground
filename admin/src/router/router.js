@@ -55,9 +55,9 @@ function notFoundPage(route) {
     render: () => `
       <section class="empty-state">
         <span>404</span>
-        <h2>${t("errors.routeNotFoundHeading")}</h2>
+        <h2 data-i18n="errors.routeNotFoundHeading">${t("errors.routeNotFoundHeading")}</h2>
         <p>${t("errors.routeNotFoundBody", { route: `<code>${escapeHtml(route)}</code>` })}</p>
-        <a class="button" href="#/dashboard">${t("common.backToDashboard")}</a>
+        <a class="button" href="#/dashboard" data-i18n="common.backToDashboard">${t("common.backToDashboard")}</a>
       </section>
     `,
   };
@@ -238,7 +238,7 @@ export function initRouter(root) {
         title: t("shell.deniedTitle"),
         heading: t("shell.accessDenied"),
         copy: t("shell.accountNotAdmin"),
-        action: `<button class="button" type="button" data-logout>${t("shell.signOut")}</button>`,
+        action: `<button class="button" type="button" data-logout data-i18n="shell.signOut">${t("shell.signOut")}</button>`,
       });
       root.querySelector("[data-logout]")?.addEventListener("click", async () => {
         await logout();

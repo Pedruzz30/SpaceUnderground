@@ -43,7 +43,7 @@ function stageColumn(stage) {
         <span class="pipeline__count">${cards.length}</span>
       </header>
       <div class="pipeline__body">
-        ${cards.length ? cards.map(opportunityCard).join("") : `<p class="empty-inline">${t("commercial.emptyStage")}</p>`}
+        ${cards.length ? cards.map(opportunityCard).join("") : `<p class="empty-inline" data-i18n="commercial.emptyStage">${t("commercial.emptyStage")}</p>`}
       </div>
     </section>
   `;
@@ -54,9 +54,9 @@ export const commercialPage = {
   breadcrumb: () => t("commercial.breadcrumb"),
   render: () => `
     <section class="page-heading">
-      <span>${t("commercial.eyebrow")}</span>
-      <h2>${t("commercial.heading")}</h2>
-      <p>${t("commercial.intro")}</p>
+      <span data-i18n="commercial.eyebrow">${t("commercial.eyebrow")}</span>
+      <h2 data-i18n="commercial.heading">${t("commercial.heading")}</h2>
+      <p data-i18n="commercial.intro">${t("commercial.intro")}</p>
     </section>
 
     <section class="stats-grid stats-grid--quad" aria-label="${t("commercial.pipelineSummary")}">
@@ -66,15 +66,15 @@ export const commercialPage = {
     <section class="panel">
       <header class="panel__head">
         <div>
-          <span>${t("commercial.pipeline")}</span>
-          <h3>${t("commercial.opportunitiesByStage")}</h3>
+          <span data-i18n="commercial.pipeline">${t("commercial.pipeline")}</span>
+          <h3 data-i18n="commercial.opportunitiesByStage">${t("commercial.opportunitiesByStage")}</h3>
         </div>
-        <span class="ops-note">${t("commercial.scrollSideways")}</span>
+        <span class="ops-note" data-i18n="commercial.scrollSideways">${t("commercial.scrollSideways")}</span>
       </header>
       <div class="pipeline" role="group" aria-label="${t("commercial.salesPipelineStages")}" tabindex="0">
         ${demoPipelineStages.map(stageColumn).join("")}
       </div>
-      <p class="ops-note ops-note--spaced">${t("commercial.note")}</p>
+      <p class="ops-note ops-note--spaced" data-i18n="commercial.note">${t("commercial.note")}</p>
     </section>
   `,
 };

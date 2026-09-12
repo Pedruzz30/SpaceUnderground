@@ -165,9 +165,9 @@ function moduleMarkup(module, index, total, editLocale = BASE_LOCALE) {
           <strong>${escapeHtml(module.title || t("projectEditor.untitledModule"))}</strong>
         </div>
         <div class="module-card__actions">
-          <button type="button" class="button" data-module-up="${index}" ${index === 0 ? "disabled" : ""}>${t("projectEditor.moveUp")}</button>
-          <button type="button" class="button" data-module-down="${index}" ${index === total - 1 ? "disabled" : ""}>${t("projectEditor.moveDown")}</button>
-          <button type="button" class="button button--danger" data-module-remove="${index}">${t("projectEditor.removeModule")}</button>
+          <button type="button" class="button" data-module-up="${index}" ${index === 0 ? "disabled" : ""} data-i18n="projectEditor.moveUp">${t("projectEditor.moveUp")}</button>
+          <button type="button" class="button" data-module-down="${index}" ${index === total - 1 ? "disabled" : ""} data-i18n="projectEditor.moveDown">${t("projectEditor.moveDown")}</button>
+          <button type="button" class="button button--danger" data-module-remove="${index}" data-i18n="projectEditor.removeModule">${t("projectEditor.removeModule")}</button>
         </div>
       </header>
       <div class="form-grid">
@@ -208,11 +208,11 @@ function renderEditor(project, isCreate) {
     <form class="editor-form" data-project-editor data-project-id="${escapeAttribute(project.id || "")}" data-mode="${isCreate ? "create" : "edit"}" novalidate>
       <div class="editor-toolbar">
         ${isCreate
-          ? `<button type="submit" class="button button--primary" data-editor-action data-action-create>${t("projectEditor.createProject")}</button>`
+          ? `<button type="submit" class="button button--primary" data-editor-action data-action-create data-i18n="projectEditor.createProject">${t("projectEditor.createProject")}</button>`
           : `
-            <button type="button" class="button" data-editor-action data-action-preview>${t("projectEditor.preview")}</button>
-            <button type="submit" class="button" data-editor-action data-action-save>${t("projectEditor.saveChanges")}</button>
-            <button type="button" class="button button--primary" data-editor-action data-action-publish>${t("projectEditor.publishChanges")}</button>
+            <button type="button" class="button" data-editor-action data-action-preview data-i18n="projectEditor.preview">${t("projectEditor.preview")}</button>
+            <button type="submit" class="button" data-editor-action data-action-save data-i18n="projectEditor.saveChanges">${t("projectEditor.saveChanges")}</button>
+            <button type="button" class="button button--primary" data-editor-action data-action-publish data-i18n="projectEditor.publishChanges">${t("projectEditor.publishChanges")}</button>
           `}
       </div>
 
@@ -255,7 +255,7 @@ function renderEditor(project, isCreate) {
               <div class="chip-list" data-tech-list aria-labelledby="tech-stack-label"></div>
               <div class="chip-input-row">
                 <input type="text" data-tech-input placeholder="${t("projectEditor.addTechnology")}" aria-label="${t("projectEditor.addTechnology")}" data-i18n-placeholder="projectEditor.addTechnology" data-i18n-aria-label="projectEditor.addTechnology">
-                <button type="button" class="button" data-tech-add>${t("projectEditor.addTechnologyButton")}</button>
+                <button type="button" class="button" data-tech-add data-i18n="projectEditor.addTechnologyButton">${t("projectEditor.addTechnologyButton")}</button>
               </div>
             </div>
           </div>
@@ -284,7 +284,7 @@ function renderEditor(project, isCreate) {
               <span class="field-label" data-i18n="projectEditor.modules">${t("projectEditor.modules")}</span>
               <h3 id="modules-title" data-i18n="projectEditor.viewerModules">${t("projectEditor.viewerModules")}</h3>
             </div>
-            <button type="button" class="button" data-module-add>${t("projectEditor.addModule")}</button>
+            <button type="button" class="button" data-module-add data-i18n="projectEditor.addModule">${t("projectEditor.addModule")}</button>
           </div>
           <div class="module-list" data-module-list></div>
         </section>
@@ -295,15 +295,15 @@ function renderEditor(project, isCreate) {
           <span class="field-label" data-i18n="projectEditor.projectPoster">${t("projectEditor.projectPoster")}</span>
           <div class="media-preview">
             <img data-poster-preview src="${escapeAttribute(project.posterDisplayUrl || "")}" alt="${escapeAttribute(t("projectEditor.posterPreviewAlt", { name: project.name || t("projectEditor.project") }))}" ${project.posterDisplayUrl ? "" : "hidden"}>
-            <p class="media-preview__empty" data-poster-empty ${project.posterDisplayUrl ? "hidden" : ""}>${t("projectEditor.noPoster")}</p>
+            <p class="media-preview__empty" data-poster-empty ${project.posterDisplayUrl ? "hidden" : ""} data-i18n="projectEditor.noPoster">${t("projectEditor.noPoster")}</p>
           </div>
           <p class="media-meta">${project.poster ? `${t("projectEditor.path")}: ${escapeHtml(project.poster)}` : t("projectEditor.noStoragePath")}</p>
           <div class="media-actions">
-            <button type="button" class="button" data-editor-action data-replace-poster ${isCreate ? "disabled" : ""}>${t("projectEditor.replaceImage")}</button>
-            <button type="button" class="button button--danger" data-editor-action data-remove-poster ${project.poster ? "" : "hidden"}>${t("projectEditor.removePoster")}</button>
+            <button type="button" class="button" data-editor-action data-replace-poster ${isCreate ? "disabled" : ""} data-i18n="projectEditor.replaceImage">${t("projectEditor.replaceImage")}</button>
+            <button type="button" class="button button--danger" data-editor-action data-remove-poster ${project.poster ? "" : "hidden"} data-i18n="projectEditor.removePoster">${t("projectEditor.removePoster")}</button>
             <input type="file" accept="${IMAGE_ACCEPT}" data-poster-file hidden>
           </div>
-          ${isCreate ? `<p class="field-hint">${t("projectEditor.saveBeforeUpload")}</p>` : ""}
+          ${isCreate ? `<p class="field-hint" data-i18n="projectEditor.saveBeforeUpload">${t("projectEditor.saveBeforeUpload")}</p>` : ""}
         </div>
 
         <div class="form-grid">
@@ -314,7 +314,7 @@ function renderEditor(project, isCreate) {
         <div class="media-block">
           <span class="field-label" data-i18n="projectEditor.gallery">${t("projectEditor.gallery")}</span>
           <div class="gallery-grid" data-gallery></div>
-          <button type="button" class="button" data-editor-action data-gallery-add ${isCreate ? "disabled" : ""}>${t("projectEditor.addImage")}</button>
+          <button type="button" class="button" data-editor-action data-gallery-add ${isCreate ? "disabled" : ""} data-i18n="projectEditor.addImage">${t("projectEditor.addImage")}</button>
           <input type="file" accept="${IMAGE_ACCEPT}" data-gallery-file hidden>
         </div>
       </div>
@@ -360,8 +360,8 @@ function renderEditor(project, isCreate) {
         </header>
         <p data-i18n="projectEditor.dangerCopy">${t("projectEditor.dangerCopy")}</p>
         <div class="danger-zone__actions">
-          <button type="button" class="button" data-editor-action data-action-archive>${t("projectEditor.archiveProject")}</button>
-          <button type="button" class="button button--danger" data-editor-action data-action-delete>${t("projectEditor.deleteProject")}</button>
+          <button type="button" class="button" data-editor-action data-action-archive data-i18n="projectEditor.archiveProject">${t("projectEditor.archiveProject")}</button>
+          <button type="button" class="button button--danger" data-editor-action data-action-delete data-i18n="projectEditor.deleteProject">${t("projectEditor.deleteProject")}</button>
         </div>
       </section>
     `}
@@ -695,7 +695,7 @@ function mount(project, isCreate) {
             `,
           )
           .join("")
-      : `<p class="empty-inline">${t("projectEditor.noTechnologies")}</p>`;
+      : `<p class="empty-inline" data-i18n="projectEditor.noTechnologies">${t("projectEditor.noTechnologies")}</p>`;
 
     list.querySelectorAll("[data-remove-tech]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -750,7 +750,7 @@ function mount(project, isCreate) {
     modules = modules.map(normalizeModule);
     list.innerHTML = modules.length
       ? modules.map((module, index) => moduleMarkup(module, index, modules.length, editLocale)).join("")
-      : `<p class="empty-inline">${t("projectEditor.noModules")}</p>`;
+      : `<p class="empty-inline" data-i18n="projectEditor.noModules">${t("projectEditor.noModules")}</p>`;
 
     list.querySelectorAll("[data-module-field]").forEach((input) => {
       input.addEventListener("input", () => {
@@ -909,7 +909,7 @@ function mount(project, isCreate) {
             `,
           )
           .join("")
-      : `<p class="empty-inline">${t("projectEditor.noGalleryImages")}</p>`;
+      : `<p class="empty-inline" data-i18n="projectEditor.noGalleryImages">${t("projectEditor.noGalleryImages")}</p>`;
 
     grid.querySelectorAll("[data-remove-gallery]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -1080,9 +1080,9 @@ function mount(project, isCreate) {
           <h3>${escapeHtml(values.name || t("projects.untitled"))}</h3>
           <p>${escapeHtml(values.description || t("projectEditor.noDescription"))}</p>
           <dl>
-            <div><dt>${t("common.category")}</dt><dd>${escapeHtml(statusLabel(values.category))}</dd></div>
-            <div><dt>${t("common.status")}</dt><dd>${escapeHtml(statusLabel(values.status))}</dd></div>
-            <div><dt>${t("projectEditor.techStack")}</dt><dd>${values.techStack.map((tech) => escapeHtml(tech)).join(", ") || "—"}</dd></div>
+            <div><dt data-i18n="common.category">${t("common.category")}</dt><dd>${escapeHtml(statusLabel(values.category))}</dd></div>
+            <div><dt data-i18n="common.status">${t("common.status")}</dt><dd>${escapeHtml(statusLabel(values.status))}</dd></div>
+            <div><dt data-i18n="projectEditor.techStack">${t("projectEditor.techStack")}</dt><dd>${values.techStack.map((tech) => escapeHtml(tech)).join(", ") || "—"}</dd></div>
           </dl>
         </div>
       `,
@@ -1147,7 +1147,7 @@ function loadingMarkup() {
   return `
     <section class="empty-state" aria-busy="true">
       <span>PROJECT</span>
-      <h2>${t("projectEditor.loadingProject")}</h2>
+      <h2 data-i18n="projectEditor.loadingProject">${t("projectEditor.loadingProject")}</h2>
     </section>
   `;
 }
@@ -1156,9 +1156,9 @@ function notFoundMarkup(id) {
   return `
     <section class="empty-state">
       <span>CASE / ${escapeHtml(id)}</span>
-      <h2>${t("projectEditor.notFound")}</h2>
-      <p>${t("projectEditor.notFoundBody")}</p>
-      <a class="button" href="#/projects">${t("projectEditor.backToProjects")}</a>
+      <h2 data-i18n="projectEditor.notFound">${t("projectEditor.notFound")}</h2>
+      <p data-i18n="projectEditor.notFoundBody">${t("projectEditor.notFoundBody")}</p>
+      <a class="button" href="#/projects" data-i18n="projectEditor.backToProjects">${t("projectEditor.backToProjects")}</a>
     </section>
   `;
 }
@@ -1168,7 +1168,7 @@ function errorMarkup(message) {
     <section class="empty-state">
       <span>ERROR</span>
       <h2>${escapeHtml(message)}</h2>
-      <button class="button" type="button" data-retry-editor>${t("projectEditor.tryAgain")}</button>
+      <button class="button" type="button" data-retry-editor data-i18n="projectEditor.tryAgain">${t("projectEditor.tryAgain")}</button>
     </section>
   `;
 }

@@ -159,13 +159,13 @@ export const mediaPage = {
             body: `
               <div class="asset-detail-preview" data-modal-thumb></div>
               <dl class="detail-list">
-                <div><dt>${t("media.project")}</dt><dd>${escapeHtml(asset.project.name)}</dd></div>
-                <div><dt>${t("media.case")}</dt><dd>${escapeHtml(asset.project.caseNumber)}</dd></div>
-                <div><dt>${t("media.type")}</dt><dd>${escapeHtml(t(`media.types.${asset.type}`))}</dd></div>
-                <div><dt>${t("media.storagePath")}</dt><dd>${escapeHtml(asset.path)}</dd></div>
-                <div><dt>${t("media.alt")}</dt><dd>${escapeHtml(asset.alt || "—")}</dd></div>
-                <div><dt>${t("media.caption")}</dt><dd>${escapeHtml(asset.caption || "—")}</dd></div>
-                <div><dt>${t("media.position")}</dt><dd>${escapeHtml(asset.position)}</dd></div>
+                <div><dt data-i18n="media.project">${t("media.project")}</dt><dd>${escapeHtml(asset.project.name)}</dd></div>
+                <div><dt data-i18n="media.case">${t("media.case")}</dt><dd>${escapeHtml(asset.project.caseNumber)}</dd></div>
+                <div><dt data-i18n="media.type">${t("media.type")}</dt><dd>${escapeHtml(t(`media.types.${asset.type}`))}</dd></div>
+                <div><dt data-i18n="media.storagePath">${t("media.storagePath")}</dt><dd>${escapeHtml(asset.path)}</dd></div>
+                <div><dt data-i18n="media.alt">${t("media.alt")}</dt><dd>${escapeHtml(asset.alt || "—")}</dd></div>
+                <div><dt data-i18n="media.caption">${t("media.caption")}</dt><dd>${escapeHtml(asset.caption || "—")}</dd></div>
+                <div><dt data-i18n="media.position">${t("media.position")}</dt><dd>${escapeHtml(asset.position)}</dd></div>
               </dl>
             `,
             actions: [

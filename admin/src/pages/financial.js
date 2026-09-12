@@ -117,9 +117,9 @@ export const financialPage = {
 
     return `
       <section class="page-heading">
-        <span>${t("financial.eyebrow")}</span>
-        <h2>${t("financial.heading")}</h2>
-        <p>${t("financial.intro")}</p>
+        <span data-i18n="financial.eyebrow">${t("financial.eyebrow")}</span>
+        <h2 data-i18n="financial.heading">${t("financial.heading")}</h2>
+        <p data-i18n="financial.intro">${t("financial.intro")}</p>
       </section>
 
       <section class="stats-grid stats-grid--quad" aria-label="${t("financial.summary")}">
@@ -139,7 +139,7 @@ export const financialPage = {
         ${panel(
           "overview",
           `
-            <h3 class="ops-subtitle">${t("financial.recentTransactions")}</h3>
+            <h3 class="ops-subtitle" data-i18n="financial.recentTransactions">${t("financial.recentTransactions")}</h3>
             ${ledger(demoTransactions, t("financial.noTransactions"))}
           `,
         )}
@@ -166,11 +166,11 @@ export const financialPage = {
         )}
         ${panel(
           "reports",
-          `<p class="empty-inline">${t("financial.reportsSoon")}</p>`,
+          `<p class="empty-inline" data-i18n="financial.reportsSoon">${t("financial.reportsSoon")}</p>`,
         )}
       </section>
 
-      <p class="ops-note ops-note--spaced">${t("financial.note")}</p>
+      <p class="ops-note ops-note--spaced" data-i18n="financial.note">${t("financial.note")}</p>
     `;
   },
   afterRender: () => {

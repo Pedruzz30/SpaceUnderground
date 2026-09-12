@@ -143,7 +143,7 @@ export const logsPage = {
       table.innerHTML = visible.length
         ? visible.map((entry) => row(entry, locale)).join("")
         : `<p class="empty-inline" data-i18n="logs.noEvents">${t("logs.noEvents")}</p>`;
-      count.textContent = plural("logs.countLabel", visible.length, {
+      count.textContent = plural("logs.countLabel", entries.length, {
         visible: visible.length,
         total: entries.length,
       });

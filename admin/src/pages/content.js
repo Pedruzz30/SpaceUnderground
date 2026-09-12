@@ -1,5 +1,5 @@
 import { showToast } from "../components/toast.js";
-import { BASE_LOCALE, TRANSLATION_LOCALE, localeTabs } from "../components/locale-fields.js";
+import { BASE_LOCALE, TRANSLATION_LOCALE, localeHint, localeTabs } from "../components/locale-fields.js";
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
 import { logActivity } from "../services/activity-service.js";
 import { getSiteContent, saveSiteContent } from "../services/content-service.js";
@@ -444,6 +444,7 @@ export const contentPage = {
             </div>
             <div class="cms-editor-actions">
               ${localeTabs("site-content")}
+              ${localeHint("site-content")}
               <span data-content-state>${stateLabel(entry, dirty, saving, saveError)}</span>
               <button class="button button--primary" type="submit" data-action-save ${saving ? "disabled" : ""}>${escapeHtml(saving ? t("content.saving") : t("content.saveSection"))}</button>
             </div>
@@ -460,6 +461,11 @@ export const contentPage = {
 
       const form = editor.querySelector("[data-content-form]");
       const error = form.querySelector("[data-content-error]");
+
+      // The fallback note only makes sense while the English tab is open.
+      form.querySelectorAll("[data-locale-hint]").forEach((hint) => {
+        hint.hidden = showingBase;
+      });
 
       form.querySelectorAll("[data-locale-edit]").forEach((button) => {
         const target = button.dataset.localeEdit;
