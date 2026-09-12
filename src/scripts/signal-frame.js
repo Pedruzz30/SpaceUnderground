@@ -96,6 +96,9 @@ function setMode(frame, mode, modeButtons) {
 }
 
 function createLivePreview(frame, mobileMedia) {
+  // The display mode the viewer is in. Kept here so a locale change can put it
+  // back exactly as it was instead of inferring it from CSS classes.
+  let currentMode = "overview";
   const finePointerMedia = window.matchMedia(FINE_POINTER_QUERY);
   const visual = frame.closest(".project__visual");
   const hoverMark = visual?.querySelector(".project__hover-mark");
@@ -260,6 +263,7 @@ function createLivePreview(frame, mobileMedia) {
       event.preventDefault();
       event.stopPropagation();
       const nextMode = setMode(frame, button.dataset.signalMode || "overview", modeButtons);
+      currentMode = nextMode;
       calibrate();
 
       if (nextMode === "site" && !mobileMedia.matches) load();
@@ -309,7 +313,7 @@ function createLivePreview(frame, mobileMedia) {
     if (event.matches) unload();
   });
 
-  setMode(frame, "overview", modeButtons);
+  currentMode = setMode(frame, "overview", modeButtons);
   applyPoster(posterUrl);
   setPreviewState(frame, "sleeping");
   activeObserver.observe(frame);
@@ -317,7 +321,11 @@ function createLivePreview(frame, mobileMedia) {
   return {
     setSource,
     calibrate,
-    setMode: (mode) => setMode(frame, mode, modeButtons),
+    setMode: (mode) => {
+      currentMode = setMode(frame, mode, modeButtons);
+      return currentMode;
+    },
+    getMode: () => currentMode,
     refresh: () => {
       if (!mobileMedia.matches && frame.classList.contains("is-view-site")) load();
     },
@@ -355,7 +363,10 @@ function createProjectViewer(frame, preview) {
   const write = (nodes, value) => nodes.forEach((node) => { node.textContent = value; });
   let activeKey = "";
 
-  const apply = (key, { force = false } = {}) => {
+  // `preserveMode` is for re-applying the same project after a locale change:
+  // the copy around the viewer is rewritten, but the visitor stays in whatever
+  // mode they had open. Choosing a different project still resets to overview.
+  const apply = (key, { force = false, preserveMode = false } = {}) => {
     const project = projects[key];
     if (!project || project.reserved || (key === activeKey && !force)) return;
     activeKey = key;
@@ -429,7 +440,7 @@ function createProjectViewer(frame, preview) {
       slot.setAttribute("aria-pressed", String(isActive));
     });
 
-    preview.setMode("overview");
+    preview.setMode(preserveMode ? preview.getMode() : "overview");
     preview.calibrate();
   };
 
@@ -478,9 +489,9 @@ export function getActiveProjectKey() {
 }
 
 // Called once live data arrives, so the viewer repaints with it.
-export function showProject(key) {
+export function showProject(key, { preserveMode = false } = {}) {
   if (!viewer) return;
-  viewer.apply(key ?? viewer.getActiveKey(), { force: true });
+  viewer.apply(key ?? viewer.getActiveKey(), { force: true, preserveMode });
 }
 
 export function refreshProjectViewerSlots() {

@@ -195,7 +195,7 @@ function renderUnavailable(message = t("work.unavailable")) {
 
 // Renders the section from rows already in hand. Pure presentation: no network
 // calls, so it is safe to replay on every locale change.
-function renderFromRows(rows, signed, { preferredKey = "" } = {}) {
+function renderFromRows(rows, signed, { preferredKey = "", preserveMode = false } = {}) {
   clearRegistry();
 
   const entries = rows.map((row) => projectFromRow(row, signed));
@@ -211,7 +211,7 @@ function renderFromRows(rows, signed, { preferredKey = "" } = {}) {
 
   const activeKey = renderNavigation(entries, preferredKey);
   markSection("supabase");
-  showProject(activeKey);
+  showProject(activeKey, { preserveMode });
 }
 
 export async function initPublicProjects() {
@@ -219,9 +219,13 @@ export async function initPublicProjects() {
     subscribedToLocale = true;
     subscribeLocaleChange(() => {
       // Re-render the localized copy over the cached rows, keeping the project
-      // the visitor had open and leaving a loaded preview iframe alone.
-      if (lastRows) renderFromRows(lastRows, lastSigned, { preferredKey: getActiveProjectKey() });
-      else initPublicProjects();
+      // the visitor had open, the display mode they had chosen, and a loaded
+      // preview iframe exactly as it is.
+      if (lastRows) {
+        renderFromRows(lastRows, lastSigned, { preferredKey: getActiveProjectKey(), preserveMode: true });
+      } else {
+        initPublicProjects();
+      }
     });
   }
   if (!isConfigured()) {
