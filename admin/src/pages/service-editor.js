@@ -239,6 +239,11 @@ function renderEditor(plan, isCreate) {
           </div>
         </div>
         <div class="tab-panel" id="panel-features" role="tabpanel" aria-labelledby="tab-features" hidden>
+          <div class="field field--wide editor-locale-row">
+            <span class="field-label" data-i18n="services.editorialCopy">${escapeHtml(t("services.editorialCopy"))}</span>
+            ${localeTabs(SCOPE)}
+            ${localeHint(SCOPE)}
+          </div>
           <div class="module-builder service-feature-builder">
             <div class="module-builder__head">
               <div>

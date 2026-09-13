@@ -46,8 +46,8 @@ function fieldsIn(root, scope) {
  * @returns a controller exposing the current drafts for both locales
  */
 export function bindLocaleFields({ root, scope, initial = {}, onChange } = {}) {
-  const tabs = root.querySelector(`[data-locale-tabs="${CSS.escape(scope)}"]`);
-  const hint = root.querySelector(`[data-locale-hint="${CSS.escape(scope)}"]`);
+  const tabs = () => [...root.querySelectorAll(`[data-locale-tabs="${CSS.escape(scope)}"]`)];
+  const hints = () => [...root.querySelectorAll(`[data-locale-hint="${CSS.escape(scope)}"]`)];
 
   if (!fieldsIn(root, scope).length) return null;
 
@@ -91,22 +91,28 @@ export function bindLocaleFields({ root, scope, initial = {}, onChange } = {}) {
       field.placeholder = showingBase ? field.dataset.basePlaceholder ?? "" : base.get(name) ?? "";
       field.classList.toggle("is-translation", !showingBase);
     });
-    if (hint) hint.hidden = showingBase;
-    tabs?.querySelectorAll("[data-locale-edit]").forEach((button) => {
-      const active = button.dataset.localeEdit === activeLocale;
-      button.classList.toggle("is-active", active);
-      button.setAttribute("aria-pressed", String(active));
+    hints().forEach((hint) => {
+      hint.hidden = showingBase;
+    });
+    tabs().forEach((tabGroup) => {
+      tabGroup.querySelectorAll("[data-locale-edit]").forEach((button) => {
+        const active = button.dataset.localeEdit === activeLocale;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", String(active));
+      });
     });
   }
 
-  tabs?.querySelectorAll("[data-locale-edit]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const next = button.dataset.localeEdit;
-      if (next === activeLocale) return;
-      store();
-      activeLocale = next;
-      paint();
-      onChange?.(activeLocale);
+  tabs().forEach((tabGroup) => {
+    tabGroup.querySelectorAll("[data-locale-edit]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const next = button.dataset.localeEdit;
+        if (next === activeLocale) return;
+        store();
+        activeLocale = next;
+        paint();
+        onChange?.(activeLocale);
+      });
     });
   });
 
