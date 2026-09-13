@@ -1,0 +1,139 @@
+import { automationApiBaseUrl, automationApiToken, isAutomationApiConfigured } from "../config/env.js";
+import { DataError } from "./errors.js";
+
+// The Admin's only door to the Python automation service. Every call to it goes
+// through here so no page grows its own fetch() with its own error handling.
+//
+// Python is an additional capability, never a dependency: when
+// VITE_AUTOMATION_API_URL is unset, `isAutomationApiAvailable()` is false and
+// these functions throw a `not_configured` DataError that callers are expected
+// to treat as "feature unavailable", not as an outage. Nothing in the Admin
+// calls them yet.
+//
+// The division of labour is deliberate. Reading and writing a project stays on
+// Supabase directly -- routing CRUD through Python would add a hop that does
+// nothing. Only processing lives here: analysis, reports and automations.
+
+// Short on purpose. These calls sit in front of a page that already works
+// without them, so waiting is worse than reporting the service as unreachable.
+const DEFAULT_TIMEOUT_MS = 8000;
+
+export function isAutomationApiAvailable() {
+  return isAutomationApiConfigured();
+}
+
+export function automationApiUrl(path = "") {
+  const base = automationApiBaseUrl();
+  if (!base) return "";
+
+  const suffix = String(path ?? "").trim();
+  return suffix ? `${base}${suffix.startsWith("/") ? "" : "/"}${suffix}` : base;
+}
+
+function notConfigured() {
+  return new DataError(
+    "Automation API is not configured. Set VITE_AUTOMATION_API_URL to enable it.",
+    { code: "not_configured" },
+  );
+}
+
+// The service answers errors as { code, message }. The code is stable and is
+// what callers should branch on; the message is already safe to show.
+async function readError(response) {
+  try {
+    const body = await response.json();
+    if (body && typeof body.code === "string") {
+      return new DataError(String(body.message || "Automation request failed."), { code: body.code });
+    }
+  } catch {
+    // A non-JSON body means the failure came from somewhere other than the
+    // service itself -- a proxy, or the wrong URL entirely.
+  }
+
+  return new DataError(`Automation request failed (${response.status}).`, {
+    code: response.status === 404 ? "not_found" : "automation_error",
+  });
+}
+
+async function request(path, { method = "GET", body = null, timeout = DEFAULT_TIMEOUT_MS } = {}) {
+  if (!isAutomationApiConfigured()) throw notConfigured();
+
+  const headers = { Accept: "application/json" };
+  if (body) headers["Content-Type"] = "application/json";
+  // Only the shared secret is sent. No Supabase credential ever leaves the
+  // browser through this client.
+  const token = automationApiToken();
+  if (token) headers["X-API-Token"] = token;
+
+  // A processing call that hangs must not hang the page with it.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+
+  let response;
+  try {
+    response = await fetch(automationApiUrl(path), {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    throw new DataError("Automation API is unreachable.", {
+      code: error?.name === "AbortError" ? "timeout" : "network_error",
+      cause: error,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) throw await readError(response);
+
+  return response.json();
+}
+
+/** Liveness plus which dependencies the service has configured. */
+export async function getAutomationHealth() {
+  return request("/api/v1/health");
+}
+
+/**
+ * Operational analysis of one project.
+ *
+ * Server-side and deliberately distinct from the editor's `projectHealth`:
+ * that one answers "is this form ready to publish?", this one answers "is the
+ * stored row coherent?" -- publication consistency, demo coherence, staleness.
+ *
+ * @param projectId uuid or case number, the same identifiers the router uses
+ */
+export async function analyzeProject(projectId) {
+  const id = String(projectId ?? "").trim();
+  if (!id) throw new DataError("A project id is required.", { code: "bad_request" });
+
+  return request(`/api/v1/projects/${encodeURIComponent(id)}/analyze`, { method: "POST" });
+}
+
+/** Catalogue-wide operational metrics, counted from Supabase. */
+export async function getOperationsOverview() {
+  return request("/api/v1/reports/overview");
+}
+
+/** Automations registered on the service, with their handlers. */
+export async function getRegisteredAutomations() {
+  return request("/api/v1/automations");
+}
+
+/**
+ * Dispatches an automation event.
+ *
+ * Handlers in this phase only read and report; none of them writes back to
+ * Supabase.
+ */
+export async function dispatchAutomation(event, payload = {}) {
+  const name = String(event ?? "").trim();
+  if (!name) throw new DataError("An event name is required.", { code: "bad_request" });
+
+  return request("/api/v1/automations/dispatch", {
+    method: "POST",
+    body: { event: name, payload },
+  });
+}
