@@ -1,6 +1,6 @@
 import { getSupabaseClient } from "../../lib/supabase.js";
 import { toDataError } from "../errors.js";
-import { mapPlanFromDatabase, mapPlanToDatabase } from "../mappers/plan-mapper.js";
+import { mapPlanFromDatabase, mapPlanToDatabase, mergePlanTranslations } from "../mappers/plan-mapper.js";
 import { t } from "../../i18n/index.js";
 
 const TABLE = "plans";
@@ -55,12 +55,33 @@ export const supabasePlanRepository = {
     return unwrap(result, t("errors.data.loadPlans")).map(mapPlanFromDatabase);
   },
 
+  async getById(id) {
+    const result = await getSupabaseClient().from(TABLE).select(SELECT).or(`id.eq.${id},slug.eq.${id}`).maybeSingle();
+    const row = unwrap(result, t("errors.data.loadPlan"));
+    return row ? mapPlanFromDatabase(row) : null;
+  },
+
+  async create(data) {
+    const supabase = getSupabaseClient();
+    const features = Array.isArray(data.features) ? data.features : [];
+    const inserted = unwrap(
+      await supabase.from(TABLE).insert(mapPlanToDatabase(data)).select("id").single(),
+      t("errors.data.savePlan"),
+    );
+    if (features.length) await syncFeatures(inserted.id, features);
+    return mapPlanFromDatabase(unwrap(await supabase.from(TABLE).select(SELECT).eq("id", inserted.id).single(), t("errors.data.reloadPlan")));
+  },
+
   async update(id, patch) {
     const supabase = getSupabaseClient();
-    const existing = unwrap(await supabase.from(TABLE).select("id").eq("id", id).maybeSingle(), t("errors.data.loadPlan"));
+    const existing = unwrap(await supabase.from(TABLE).select("id,translations").or(`id.eq.${id},slug.eq.${id}`).maybeSingle(), t("errors.data.loadPlan"));
     if (!existing) return null;
 
-    unwrap(await supabase.from(TABLE).update(mapPlanToDatabase(patch)).eq("id", existing.id), t("errors.data.savePlan"));
+    const dbPatch = mapPlanToDatabase(patch);
+    if (patch.translations !== undefined) {
+      dbPatch.translations = mergePlanTranslations(existing.translations ?? {}, patch.translations?.en ?? {});
+    }
+    unwrap(await supabase.from(TABLE).update(dbPatch).eq("id", existing.id), t("errors.data.savePlan"));
     if (Array.isArray(patch.features)) await syncFeatures(existing.id, patch.features);
     return mapPlanFromDatabase(unwrap(await supabase.from(TABLE).select(SELECT).eq("id", existing.id).single(), t("errors.data.reloadPlan")));
   },

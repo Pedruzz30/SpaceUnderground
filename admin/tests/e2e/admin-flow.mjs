@@ -481,6 +481,158 @@ try {
   await waitForRows();
   await page.evaluate(() => window.__resetSpaceAdminMocks());
 
+  /* ------------------------------------------------ services v2 foundation */
+
+  const SERVICE_FIXTURE = [
+    {
+      id: "service-alpha", slug: "alpha", name: "Alpha", range: "R$ 800", timeline: "1 semana",
+      scope: "Landing page", scopeShort: "Landing", description: "Oferta alpha.", status: "AVAILABLE",
+      visible: true, position: 0, accent: "#c6ff00",
+      features: [{ id: "service-alpha-1", position: 0, text: "Design", translations: { en: { text: "Design" } } }],
+      translations: { en: { timeline: "1 week", scope: "Landing page", scopeShort: "Landing", description: "Alpha offer." } },
+      createdAt: null, updatedAt: new Date().toISOString(),
+    },
+    {
+      id: "service-beta", slug: "beta", name: "Beta", range: "R$ 2.500", timeline: "3 semanas",
+      scope: "Sistema", scopeShort: "Sistema", description: "Oferta beta.", status: "AVAILABLE",
+      visible: false, position: 1, accent: "#22c55e", features: [{ id: "service-beta-1", position: 0, text: "Portal", translations: {} }],
+      translations: {}, createdAt: null, updatedAt: new Date().toISOString(),
+    },
+    {
+      id: "service-gamma", slug: "gamma", name: "Gamma", range: "", timeline: "",
+      scope: "", scopeShort: "", description: "", status: "ARCHIVED",
+      visible: false, position: 2, accent: "#f59e0b", features: [], translations: {}, createdAt: null, updatedAt: new Date().toISOString(),
+    },
+  ];
+
+  await page.evaluate((fixture) => {
+    localStorage.setItem("space-admin:plans:v1", JSON.stringify(fixture));
+  }, SERVICE_FIXTURE);
+
+  await page.goto(`${BASE_URL}/#/services`);
+  await page.waitForSelector("[data-service-id]");
+  const serviceRows = () => page.locator("[data-service-id]");
+  assert.equal(await serviceRows().count(), 3, "seeded service rows");
+  assert.deepEqual(
+    await page.evaluate(() => [...document.querySelectorAll("[data-service-metrics] .project-metric strong")].map((node) => node.textContent.trim())),
+    ["3", "1", "2", "2", "1", "2"],
+    "service KPIs read total/visible/hidden/available/archived/attention",
+  );
+
+  await page.fill("[data-search-services]", "beta");
+  await settle();
+  assert.equal(await serviceRows().count(), 1, "service search narrows to beta");
+  await page.selectOption('[data-service-filter="visibility"]', "HIDDEN");
+  assert.equal(await serviceRows().count(), 1, "service visibility combines with search");
+  await page.selectOption('[data-service-filter="health"]', "INCOMPLETE");
+  assert.equal(await serviceRows().count(), 0, "beta is attention, not incomplete");
+  await page.fill("[data-search-services]", "");
+  await page.selectOption('[data-service-filter="visibility"]', "ALL");
+  await page.selectOption('[data-service-filter="health"]', "INCOMPLETE");
+  await settle();
+  assert.equal(await serviceRows().count(), 1, "incomplete filter keeps gamma");
+  await page.selectOption('[data-service-filter="status"]', "ALL");
+  await page.selectOption('[data-service-filter="visibility"]', "ALL");
+  await page.selectOption('[data-service-filter="health"]', "ALL");
+  await settle();
+
+  const serviceHref = await page.evaluate(() => document.querySelector('[data-service-id="service-alpha"] .row-menu__panel a')?.href ?? "");
+  assert.ok(serviceHref.startsWith("http"), `service public link is absolute — got ${serviceHref}`);
+  assert.ok(serviceHref.includes("#plans"), "service public link targets public plans section");
+
+  await page.click('[data-service-open="service-alpha"]');
+  await page.waitForSelector("[data-service-editor]");
+  await page.click("#tab-commercial");
+  await page.fill("#field-name", "Alpha Prime");
+  await page.click("#tab-content");
+  assert.equal(await page.inputValue("#field-description"), "Oferta alpha.", "service editor opens PT copy");
+  await page.click("#tab-features");
+  assert.equal(await page.locator("#panel-features [data-locale-edit].is-active").getAttribute("data-locale-edit"), "pt-BR", "features exposes the shared PT locale control");
+  assert.equal(await page.locator("[data-feature-text]").first().inputValue(), "Design", "feature editor starts in PT");
+  await page.locator("#panel-features [data-locale-edit='en']").click();
+  await settle();
+  assert.equal(await page.locator("#panel-features [data-locale-edit].is-active").getAttribute("data-locale-edit"), "en", "features switches directly to EN");
+  await page.locator("[data-feature-text]").first().fill("Custom design");
+  await page.click("[data-feature-duplicate]");
+  await settle();
+  assert.equal(await page.locator("[data-feature-text]").nth(1).inputValue(), "Custom design", "duplicated feature copies EN text");
+  await page.click("#tab-content");
+  assert.equal(await page.locator("#panel-content [data-locale-edit].is-active").getAttribute("data-locale-edit"), "en", "content shares the locale selected in features");
+  assert.equal(await page.inputValue("#field-description"), "Alpha offer.", "content fields follow the feature locale switch");
+  await page.locator("#panel-content [data-locale-edit='pt-BR']").click();
+  await settle();
+  await page.click("#tab-features");
+  assert.equal(await page.locator("#panel-features [data-locale-edit].is-active").getAttribute("data-locale-edit"), "pt-BR", "features follows the locale selected in content");
+  assert.equal(await page.locator("[data-feature-text]").first().inputValue(), "Design", "switching back restores PT feature text");
+  await page.locator("[data-feature-text]").first().fill("Design sob medida");
+  assert.equal(await page.locator("[data-feature-text]").nth(1).inputValue(), "Design", "duplicated feature also kept PT text");
+  await page.click("[data-feature-add]");
+  await page.locator("[data-feature-text]").last().fill("Entrega A");
+  await page.click("[data-feature-add]");
+  await page.locator("[data-feature-text]").last().fill("Entrega B");
+  await page.locator("[data-feature-remove]").nth(2).click();
+  await page.click("[data-feature-add]");
+  await page.locator("[data-feature-text]").last().fill("Entrega C");
+  await settle();
+  assert.deepEqual(
+    await page.locator("[data-feature-text]").evaluateAll((inputs) => inputs.map((input) => input.value)),
+    ["Design sob medida", "Design", "Entrega B", "Entrega C"],
+    "feature add/remove/add keeps stable ordering",
+  );
+  await page.click("#tab-content");
+  await page.fill("#field-description", "Oferta alpha prime.");
+  await page.fill("#field-timeline", "2 semanas");
+  await settle();
+  assert.match(await page.locator("[data-service-preview]").innerText(), /Alpha Prime/, "service preview follows unsaved name");
+  assert.match(await page.locator("[data-service-preview]").innerText(), /Oferta alpha prime/, "service preview follows unsaved description");
+  assert.match(await page.locator("[data-service-preview]").innerText(), /2 semanas/i, "service preview follows unsaved timeline");
+  await page.click("#tab-features");
+  await page.locator("[data-feature-text]").last().fill("Nova entrega");
+  await settle();
+  assert.match(await page.locator("[data-service-preview]").innerText(), /Nova entrega/, "service preview follows unsaved feature");
+  await page.click("[data-action-save]");
+  await page.waitForSelector("[data-save-state].is-saved");
+  await page.reload();
+  await page.waitForSelector("[data-service-editor]");
+  await page.click("#tab-commercial");
+  assert.equal(await page.inputValue("#field-name"), "Alpha Prime", "service edit persisted");
+  await page.click("#tab-features");
+  assert.equal(await page.locator("[data-feature-text]").first().inputValue(), "Design sob medida", "PT feature text persisted");
+  await page.click("#tab-content");
+  await page.click('[data-locale-edit="en"]');
+  await settle();
+  await page.click("#tab-features");
+  assert.equal(await page.locator("[data-feature-text]").first().inputValue(), "Custom design", "EN feature text persisted");
+
+  await page.goto(`${BASE_URL}/#/services/new`);
+  await page.waitForSelector("[data-service-editor]");
+  await page.click("#tab-commercial");
+  await page.fill("#field-name", "Delta Offer");
+  await settle();
+  assert.equal(await page.inputValue("#field-slug"), "delta-offer", "service auto slug");
+  await page.click("[data-action-save]");
+  await page.waitForSelector("[data-service-id]");
+  assert.equal(await hash(), "#/services/mock-plan-delta-offer", "created service opens route");
+
+  await page.goto(`${BASE_URL}/#/services`);
+  await page.waitForSelector("[data-service-id]");
+  await page.locator('[data-service-id="service-alpha"] [data-row-menu-toggle]').click();
+  await page.click('[data-service-duplicate="service-alpha"]');
+  await settle();
+  await page.selectOption('[data-service-filter="status"]', "UNAVAILABLE");
+  await page.selectOption('[data-service-filter="health"]', "ALL");
+  await settle();
+  assert.ok(await page.locator('[data-service-id^="mock-plan-alpha-prime-copy"]').count(), "duplicate is hidden and unavailable");
+  await page.selectOption('[data-service-filter="status"]', "ALL");
+  await settle();
+
+  await page.locator('[data-service-id="service-beta"] [data-row-menu-toggle]').click();
+  await page.click('[data-service-archive="service-beta"]');
+  await settle();
+  await page.selectOption('[data-service-filter="status"]', "ARCHIVED");
+  await settle();
+  assert.ok(await page.locator('[data-service-id="service-beta"]').count(), "archived service appears in archived filter");
+
   assert.deepEqual(errors, [], "no console or page errors");
   console.log("admin flow: all checks passed");
 } finally {

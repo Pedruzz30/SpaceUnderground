@@ -21,7 +21,7 @@ const MAX_ROW = {
       category: "PLAN / CUSTOM SOFTWARE",
       scope: "SYSTEMS · AUTOMATION · AI · INTEGRATIONS",
       scope_short: "SYSTEMS · AUTOMATION · AI",
-      status: "ON REQUEST",
+      status: "LEGACY TRANSLATION IGNORED",
       description: "For operations that need custom software.",
       timeline: "6–12 weeks",
     },
@@ -80,11 +80,13 @@ describe("plan editorial fields", () => {
     const pt = localizePlanRow(MAX_ROW, {}, "pt-BR");
     const en = localizePlanRow(MAX_ROW, {}, "en");
 
-    for (const field of ["category", "scope", "scopeShort", "status", "description", "timeline"]) {
+    for (const field of ["category", "scope", "scopeShort", "description", "timeline"]) {
       assert.notEqual(en[field], pt[field], `${field} should differ between locales`);
     }
     assert.equal(en.scopeShort, "SYSTEMS · AUTOMATION · AI");
-    assert.equal(en.status, "ON REQUEST");
+    assert.equal(en.status, "ON_REQUEST");
+    assert.equal(en.statusLabel, "ON REQUEST");
+    assert.equal(pt.statusLabel, "SOB CONSULTA");
   });
 
   it("falls back to the bundled plan when the row has nothing", () => {

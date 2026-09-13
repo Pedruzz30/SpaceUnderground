@@ -1,9 +1,13 @@
-import { plans, commercialPlan } from "./plans-registry.js";
 import { fetchVisiblePlans, isConfigured } from "./supabase-public.js";
 import { getLocale, subscribeLocaleChange, t } from "./i18n/index.js";
+import { listPublicPlans, planRowToViewModel, refreshPublicPlansForLocale, resetPublicPlansToFallback, setPublicPlanRows } from "./public-plan-store.js";
+import { observeReveal } from "./reveal.js";
+
+export function localizePlanRow(row, basePlan = {}, locale = "pt-BR") {
+  return planRowToViewModel({ ...basePlan, ...row }, 0, locale);
+}
 
 let localeSubscribed = false;
-let loadedPlanRows = [];
 
 const PRODUCT_OPTIONS = {
   "pt-BR": [
@@ -40,99 +44,48 @@ function productOptions() {
   }));
 }
 
-// Editorial copy only, resolved for a given locale. Blank translations fall
-// through to the base value.
-function localizedFor(row, field, locale) {
-  const translated = row?.translations?.[locale]?.[field];
-  return String(translated ?? "").trim() !== "" ? translated : row?.[field];
-}
-
-function localized(row, field) {
-  return localizedFor(row, field, getLocale());
-}
-
-// Structural values, read straight from the record.
-function base(value) {
-  return typeof value === "string" ? value.trim() : value || "";
-}
-
-// Which plan fields follow the locale and which do not. Names ("Plus", "Pro",
-// "Max"), slug, monogram, price range, year, accent and position identify or
-// price the product and read identically in both languages; category, scope,
-// status, description and timeline are editorial copy.
-const LOCALIZED_PLAN_FIELDS = {
-  category: "category",
-  scope: "scope",
-  scopeShort: "scope_short",
-  status: "status",
-  description: "description",
-  timeline: "timeline",
-};
-
-/**
- * Pure resolution of one plan row for a locale. Exported for tests so the
- * structural/editorial split is pinned down rather than implied.
- */
-export function localizePlanRow(row, basePlan = {}, locale = "pt-BR") {
-  const resolved = {
-    name: base(row?.name) || basePlan.name,
-    monogram: row?.monogram || basePlan.monogram,
-    range: base(row?.range) || basePlan.range,
-    year: row?.year ? String(row.year) : basePlan.year,
-    accent: row?.accent || basePlan.accent,
-  };
-
-  for (const [field, column] of Object.entries(LOCALIZED_PLAN_FIELDS)) {
-    resolved[field] = localizedFor(row, column, locale) || basePlan[field];
-  }
-
-  return resolved;
-}
-
 const scopeLines = (plan) => [
   t("commercial.scope", { value: plan.scope }),
   t("commercial.investment", { value: plan.range }),
-  t("commercial.status", { value: plan.status }),
+  t("commercial.status", { value: plan.statusLabel }),
 ];
 
-function hydratePlanCard(planKey, basePlan) {
-  const plan = commercialPlan(basePlan);
-  const opener = document.querySelector(`[data-project="${basePlan.key}"]`);
-  const article = opener?.closest("article.project");
-  if (!opener || !article) return;
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
-  if (plan.accent) article.style.setProperty("--accent", plan.accent);
-  article.classList.toggle("project--plan-max", planKey === "max");
-
-  const write = (selector, value, root = article) => {
-    const target = root.querySelector(selector);
-    if (target) target.textContent = value;
-  };
-
-  opener.setAttribute("aria-label", t("commercial.selectedPlan", { name: plan.name }));
-  write(".visual-index", t("commercial.planIndex", { id: plan.id }), opener);
-  write(".plan-card__top span", t("commercial.commercialPlan"), opener);
-  write(".plan-card__eyebrow", t("commercial.plan"), opener);
-  write(".plan-card__name", plan.name, opener);
-  write(".plan-card__range", plan.range, opener);
-  const footer = opener.querySelectorAll(".plan-card__footer span");
-  if (footer[0]) footer[0].textContent = plan.scopeShort;
-  if (footer[1]) footer[1].textContent = plan.status;
-  write(".project__hover-mark", t("commercial.view"), opener);
-
-  const details = article.querySelector(".project__details");
-  if (details) {
-    const meta = details.querySelector(".project__meta");
-    if (meta) meta.innerHTML = `${t("commercial.commercialPlan")} <span>${t("commercial.year", { year: plan.year })}</span>`;
-    write("h3", plan.name, details);
-    const scope = details.querySelector(":scope > p");
-    if (scope) scope.innerHTML = scopeLines(plan).join("<br>");
-    const link = details.querySelector(".text-link");
-    if (link) {
-      link.setAttribute("aria-label", t("commercial.selectedPlan", { name: plan.name }));
-      write("span", t("commercial.viewPlan"), link);
-    }
-  }
+function renderPlanCard(plan) {
+  const label = t("commercial.selectedPlan", { name: plan.name });
+  const scope = scopeLines(plan).map(escapeHtml).join("<br>");
+  return `
+    <article class="project project--compact reveal${plan.slug === "plan-max" ? " project--plan-max" : ""}" data-reveal style="--accent:${escapeHtml(plan.accent || "#c6ff00")}">
+      <a class="project__visual project__visual--plan" href="#project-preview" data-project="${escapeHtml(plan.key)}" aria-label="${escapeHtml(label)}">
+        <div class="visual-index">${escapeHtml(t("commercial.planIndex", { id: plan.id }))}</div>
+        <div class="plan-card" aria-hidden="true">
+          <div class="plan-card__top"><span>${escapeHtml(t("commercial.commercialPlan"))}</span><strong>${escapeHtml(plan.monogram)}</strong></div>
+          <div class="plan-card__body">
+            <span class="plan-card__eyebrow">${escapeHtml(t("commercial.plan"))}</span>
+            <strong class="plan-card__name">${escapeHtml(plan.name)}</strong>
+            <span class="plan-card__range">${escapeHtml(plan.range)}</span>
+          </div>
+          <div class="plan-card__footer"><span>${escapeHtml(plan.scopeShort)}</span><span>${escapeHtml(plan.statusLabel)}</span></div>
+        </div>
+        <span class="project__hover-mark" aria-hidden="true">${escapeHtml(t("commercial.view"))}</span>
+      </a>
+      <div class="project__details project__details--stacked">
+        <div>
+          <p class="project__meta">${escapeHtml(t("commercial.commercialPlan"))} <span>${escapeHtml(t("commercial.year", { year: plan.year }))}</span></p>
+          <h3>${escapeHtml(plan.name)}</h3>
+        </div>
+        <p>${scope}</p>
+        <a class="text-link" href="#project-preview" data-project="${escapeHtml(plan.key)}" aria-label="${escapeHtml(label)}"><span>${escapeHtml(t("commercial.viewPlan"))}</span><i aria-hidden="true"></i></a>
+      </div>
+    </article>
+  `;
 }
 
 function hydratePlansSection() {
@@ -147,8 +100,8 @@ function hydratePlansSection() {
   const intro = section.querySelector(".section-intro");
   if (intro) intro.textContent = t("commercial.plansIntro");
 
-  loadedPlanRows.forEach(applyPlanRow);
-  Object.entries(plans).forEach(([key, plan]) => hydratePlanCard(key, plan));
+  grid.innerHTML = listPublicPlans().map(renderPlanCard).join("");
+  observeReveal(grid);
 
   if (!section.querySelector(".plans__commercial-note")) {
     const note = document.createElement("div");
@@ -163,6 +116,7 @@ function hydratePlansSection() {
       <a class="text-link" href="#project-request"><span></span><i aria-hidden="true"></i></a>
     `;
     grid.after(note);
+    observeReveal(note);
   }
 
   const note = section.querySelector(".plans__commercial-note");
@@ -176,41 +130,11 @@ function hydratePlansSection() {
   if (noteLink) noteLink.textContent = t("commercial.requestProposal");
 }
 
-// Plan names ("Plus", "Pro", "Max"), the numeric range, position, accent and
-// year are structural and identical in both locales. Only editorial copy --
-// scope, description, timeline wording, feature text -- comes from translations.
-function applyPlanRow(row) {
-  const key = String(row.slug || "").replace(/^plan-/, "");
-  const plan = plans[key];
-  if (!plan) return;
-
-  const included = Array.isArray(row.plan_features)
-    ? [...row.plan_features]
-        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-        .map((feature) => localized(feature, "text"))
-        .filter(Boolean)
-    : plan.included;
-
-  const resolved = localizePlanRow(row, plan, getLocale());
-  const commercial = plan.commercial || {};
-
-  Object.assign(plan, {
-    ...resolved,
-    included,
-    commercial: {
-      ...commercial,
-      ...localizePlanRow(row, { ...commercial, name: commercial.name ?? plan.name }, getLocale()),
-      included,
-    },
-  });
-}
-
 async function hydratePlansFromSupabase() {
   if (!isConfigured()) return;
   try {
     const rows = await fetchVisiblePlans();
-    loadedPlanRows = rows;
-    loadedPlanRows.forEach(applyPlanRow);
+    setPublicPlanRows(rows, getLocale());
     hydratePlansSection();
   } catch (error) {
     console.warn("[plans] Supabase unavailable, keeping bundled plan copy.", error);
@@ -298,10 +222,12 @@ export function initCommercialPositioning() {
   if (!localeSubscribed) {
     localeSubscribed = true;
     subscribeLocaleChange(() => {
+      refreshPublicPlansForLocale(getLocale());
       hydratePlansSection();
       hydrateProjectForm();
     });
   }
+  resetPublicPlansToFallback(getLocale());
   hydratePlansSection();
   hydratePlansFromSupabase();
   hydrateProjectForm();

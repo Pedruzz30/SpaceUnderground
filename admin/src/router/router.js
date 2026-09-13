@@ -11,6 +11,7 @@ import { commercialPage } from "../pages/commercial.js";
 import { financialPage } from "../pages/financial.js";
 import { mediaPage } from "../pages/media.js";
 import { servicesPage } from "../pages/services.js";
+import { serviceEditorPage } from "../pages/service-editor.js";
 import { contentPage } from "../pages/content.js";
 import { cmsPage } from "../pages/cms.js";
 import { logsPage } from "../pages/logs.js";
@@ -32,6 +33,7 @@ const pages = [
   { test: (route) => route === "/financial", page: financialPage },
   { test: (route) => route === "/media", page: mediaPage },
   { test: (route) => route === "/services", page: servicesPage },
+  { test: (route) => /^\/services\/[^/]+$/.test(route), page: serviceEditorPage },
   { test: (route) => route === "/content", page: contentPage },
   { test: (route) => route === "/cms", page: cmsPage },
   // #/activity is the pre-Lab name for this screen; keep the old link working.

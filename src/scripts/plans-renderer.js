@@ -9,6 +9,7 @@
 // O markup abaixo e o mesmo que estava escrito a mao no index.html.
 
 import { commercialPlan, plans, planScopeLines } from "./plans-registry.js";
+import { serviceStatusLabel } from "./service-status.js";
 
 const escapeHtml = (value) =>
   String(value)
@@ -19,8 +20,9 @@ const escapeHtml = (value) =>
 
 function renderPlanCard(plan) {
   const localizedPlan = commercialPlan(plan);
+  const status = serviceStatusLabel(localizedPlan.status, "pt-BR");
   const label = `Ver plano: ${localizedPlan.name}`;
-  const scope = planScopeLines(localizedPlan)
+  const scope = planScopeLines({ ...localizedPlan, status })
     .map((line) => line.replace("SCOPE —", "ESCOPO —").replace("RANGE —", "INVESTIMENTO —"))
     .map(escapeHtml)
     .join("<br>");
@@ -35,7 +37,7 @@ function renderPlanCard(plan) {
                     <strong class="plan-card__name">${escapeHtml(localizedPlan.name)}</strong>
                     <span class="plan-card__range">${escapeHtml(localizedPlan.range)}</span>
                   </div>
-                  <div class="plan-card__footer"><span>${escapeHtml(localizedPlan.scopeShort)}</span><span>${escapeHtml(localizedPlan.status)}</span></div>
+                  <div class="plan-card__footer"><span>${escapeHtml(localizedPlan.scopeShort)}</span><span>${escapeHtml(status)}</span></div>
                 </div>
                 <span class="project__hover-mark" aria-hidden="true">VER</span>
               </a>

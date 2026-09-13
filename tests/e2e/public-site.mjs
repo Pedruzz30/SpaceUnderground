@@ -49,6 +49,123 @@ if (!RUN_SUPABASE_PUBLIC_E2E || !SUPABASE_URL || !ANON_KEY || !EMAIL || !PASSWOR
 
     await page.reload({ waitUntil: "domcontentloaded" });
     check((await page.locator("html").getAttribute("lang")) === "en", "reload preserves EN preference");
+    await page.click('[data-locale-switch="pt-BR"]');
+
+    const visiblePlans = () => page.$$eval("#plans .plans__grid .project__visual[data-project]", (nodes) => nodes.map((node) => node.dataset.project));
+    const planLabels = () => page.$$eval("#plans .project__visual[data-project]", (nodes) =>
+      nodes.map((node) => ({
+        key: node.dataset.project,
+        status: node.querySelector(".plan-card__footer span:last-child")?.textContent.trim(),
+      })),
+    );
+    const planCardsVisuallyReady = () => page.$$eval("#plans .project[data-reveal]", (cards) =>
+      cards.every((card) => {
+        const styles = getComputedStyle(card);
+        return card.classList.contains("is-visible") && styles.opacity !== "0" && styles.visibility !== "hidden" && styles.display !== "none";
+      }),
+    );
+    const planRows = {
+      plus: {
+        slug: "plan-plus",
+        name: "Plus",
+        range: "R$ 800",
+        scope: "Landing",
+        scope_short: "Landing",
+        status: "DISPONÍVEL",
+        description: "Plus PT",
+        timeline: "1 semana",
+        position: 0,
+        plan_features: [{ text: "Design", position: 0 }],
+      },
+      pro: {
+        slug: "plan-pro",
+        name: "Pro",
+        range: "R$ 2.500",
+        scope: "Site",
+        scope_short: "Site",
+        status: "AVAILABLE",
+        description: "Pro PT",
+        timeline: "3 semanas",
+        position: 1,
+        plan_features: [{ text: "SEO", position: 0 }],
+      },
+      beta: {
+        slug: "beta",
+        name: "Beta",
+        range: "R$ 9.000",
+        scope: "Sistema",
+        scope_short: "Sistema",
+        status: "ON_REQUEST",
+        description: "Beta PT",
+        timeline: "8 semanas",
+        position: 2,
+        translations: { en: { scope: "System", scope_short: "System", description: "Beta EN", timeline: "8 weeks" } },
+        plan_features: [{ text: "Portal", position: 0, translations: { en: { text: "Portal" } } }],
+      },
+    };
+    const loadWithPlans = async (rows) => {
+      await page.unroute("**/rest/v1/plans*").catch(() => {});
+      await page.route("**/rest/v1/plans*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(rows) }));
+      await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(
+        (count) => document.querySelectorAll("#plans .plans__grid .project__visual[data-project]").length === count,
+        rows.length,
+      );
+      await page.locator("#plans").scrollIntoViewIfNeeded();
+      await page.waitForFunction(() =>
+        [...document.querySelectorAll("#plans .project[data-reveal]")].every((card) => {
+          const styles = getComputedStyle(card);
+          return card.classList.contains("is-visible") && styles.opacity !== "0" && styles.visibility !== "hidden" && styles.display !== "none";
+        }),
+      );
+    };
+
+    await loadWithPlans([planRows.plus, planRows.pro]);
+    check(JSON.stringify(await visiblePlans()) === JSON.stringify(["plan-plus", "plan-pro"]), "plans success removes missing static plans");
+    check(await planCardsVisuallyReady(), "plans success cards are visually visible");
+
+    await loadWithPlans([planRows.plus, planRows.pro, planRows.beta]);
+    check((await visiblePlans()).includes("beta"), "plans success creates cards for new Supabase slugs");
+    check(await planCardsVisuallyReady(), "dynamic beta card is visually visible");
+    await page.click('[data-project="beta"]');
+    await page.waitForFunction(() => document.querySelector("[data-project-dialog]")?.open === true);
+    check((await page.locator("[data-dialog-title]").innerText()) === "Beta", "dynamic plan opens the public dialog");
+    const dialogScope = await page.locator("[data-dialog-scope]").evaluateAll((nodes) => nodes.map((node) => node.textContent));
+    check(dialogScope.some((line) => line.includes("SOB CONSULTA")), "dialog status comes from structural status");
+    await page.keyboard.press("Escape");
+
+    await page.click('[data-locale-switch="en"]');
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll("#plans .project[data-reveal]")].every((card) => {
+        const styles = getComputedStyle(card);
+        return card.classList.contains("is-visible") && styles.opacity !== "0" && styles.visibility !== "hidden" && styles.display !== "none";
+      }),
+    );
+    check(await planCardsVisuallyReady(), "locale rerender keeps plan cards visible");
+    check((await planLabels()).find((item) => item.key === "beta")?.status === "ON REQUEST", "canonical ON_REQUEST localizes in EN");
+    await page.click('[data-locale-switch="pt-BR"]');
+
+    await loadWithPlans([]);
+    check((await visiblePlans()).length === 0, "successful empty plans response renders zero cards");
+
+    await page.unroute("**/rest/v1/plans*").catch(() => {});
+    await page.route("**/rest/v1/plans*", (route) => route.abort());
+    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => document.querySelectorAll("#plans .plans__grid .project__visual[data-project]").length === 3);
+    await page.locator("#plans").scrollIntoViewIfNeeded();
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll("#plans .project[data-reveal]")].every((card) => {
+        const styles = getComputedStyle(card);
+        return card.classList.contains("is-visible") && styles.opacity !== "0" && styles.visibility !== "hidden" && styles.display !== "none";
+      }),
+    );
+    check(JSON.stringify(await visiblePlans()) === JSON.stringify(["plan-plus", "plan-pro", "plan-max"]), "plans fetch failure keeps bundled fallback");
+    check(await planCardsVisuallyReady(), "plans fetch failure keeps fallback cards visible");
+    check(JSON.stringify(await planLabels()) === JSON.stringify([
+      { key: "plan-plus", status: "DISPONÍVEL" },
+      { key: "plan-pro", status: "DISPONÍVEL" },
+      { key: "plan-max", status: "SOB CONSULTA" },
+    ]), "offline fallback renders localized status labels");
   } finally {
     await context.close();
     await browser.close();
