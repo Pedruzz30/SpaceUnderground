@@ -22,6 +22,7 @@ import {
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
 import { applyStaticTranslations, subscribeLocaleChange, t, statusLabel } from "../i18n/index.js";
 import { BASE_LOCALE, TRANSLATION_LOCALE, localeHint, localeTabs } from "../components/locale-fields.js";
+import { publicSiteUrl } from "../config/public-site.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 import { isLivePreviewUrl, liveDemoState, projectHealth, publishReadiness } from "../utils/project-health.js";
 
@@ -232,11 +233,30 @@ function healthChecksMarkup(health) {
   `;
 }
 
+function healthCardMarkup(health) {
+  return `
+    <strong>${escapeHtml(t("projectHealth.score", { score: health.score, total: health.total }))}</strong>
+    ${statusBadge(t(HEALTH_LABEL_KEYS[health.status]), health.status)}
+    ${healthChecksMarkup(health)}
+  `;
+}
+
+function overviewBadgesMarkup(values, health) {
+  const completeness = health.completeness;
+  return `
+    ${badge(values.editorialStatus, badgeType(values.editorialStatus))}
+    ${statusBadge(values.visible ? t("common.visible") : t("common.hidden"), values.visible ? "healthy" : "none")}
+    ${statusBadge(t(DEMO_LABEL_KEYS[health.demo]), health.demo)}
+    ${statusBadge(t("projectHealth.content.pt", { percent: completeness.pt.percent }), completeness.pt.percent === 100 ? "healthy" : "attention")}
+    ${statusBadge(t("projectHealth.content.en", { percent: completeness.en.percent }), completeness.en.percent === 100 ? "healthy" : "attention")}
+  `;
+}
+
 function overviewMarkup(project) {
   const health = projectHealth(project);
   const completeness = health.completeness;
   const demo = health.demo;
-  const publicUrl = project.slug ? `../#work` : "";
+  const publicUrl = project.slug ? publicSiteUrl("#work") : "";
 
   return `
     <div class="project-overview">
@@ -245,21 +265,13 @@ function overviewMarkup(project) {
           <span>${escapeHtml(t("projectEditor.caseLabel", { caseNumber: project.caseNumber }))}</span>
           <h3>${escapeHtml(project.name || t("projects.untitled"))}</h3>
         </div>
-        <div class="overview-badges">
-          ${badge(project.editorialStatus, badgeType(project.editorialStatus))}
-          ${statusBadge(project.visible ? t("common.visible") : t("common.hidden"), project.visible ? "healthy" : "none")}
-          ${statusBadge(t(DEMO_LABEL_KEYS[demo]), demo)}
-          ${statusBadge(t("projectHealth.content.pt", { percent: completeness.pt.percent }), completeness.pt.percent === 100 ? "healthy" : "attention")}
-          ${statusBadge(t("projectHealth.content.en", { percent: completeness.en.percent }), completeness.en.percent === 100 ? "healthy" : "attention")}
-        </div>
+        <div class="overview-badges" data-overview-badges>${overviewBadgesMarkup(project, health)}</div>
       </section>
 
       <section class="overview-grid">
         <article class="overview-card">
           <span>${escapeHtml(t("projectHealth.title"))}</span>
-          <strong>${escapeHtml(t("projectHealth.score", { score: health.score, total: health.total }))}</strong>
-          ${statusBadge(t(HEALTH_LABEL_KEYS[health.status]), health.status)}
-          ${healthChecksMarkup(health)}
+          <div data-overview-health>${healthCardMarkup(health)}</div>
         </article>
         <article class="overview-card">
           <span>${escapeHtml(t("projectEditor.quickActions"))}</span>
@@ -267,7 +279,7 @@ function overviewMarkup(project) {
             <button type="submit" class="button" data-editor-action data-action-overview-save>${t("common.save")}</button>
             <button type="button" class="button button--primary" data-editor-action data-action-overview-publish>${t("projectEditor.publishChanges")}</button>
             <a class="button" href="${escapeAttribute(publicUrl || "#/projects")}" target="_blank" rel="noreferrer" ${publicUrl ? "" : "aria-disabled=\"true\""}>${t("projectEditor.viewPublic")}</a>
-            <a class="button" href="${escapeAttribute(project.projectUrl || "#")}" target="_blank" rel="noreferrer" ${project.projectUrl ? "" : "aria-disabled=\"true\""}>${t("projectEditor.openProject")}</a>
+            <a class="button" data-action-open-project href="${escapeAttribute(project.projectUrl || "#")}" target="_blank" rel="noreferrer" ${project.projectUrl ? "" : "aria-disabled=\"true\""}>${t("projectEditor.openProject")}</a>
             <button type="button" class="button" data-editor-action data-action-demo ${demo === "live" ? "" : "disabled"}>${t("projectEditor.openDemo")}</button>
           </div>
         </article>
@@ -282,7 +294,7 @@ function liveDemoMarkup(project) {
     <div class="live-demo-panel">
       <div class="live-demo-status">
         <span>${escapeHtml(t("projectEditor.liveDemoStatus"))}</span>
-        ${statusBadge(t(DEMO_LABEL_KEYS[demo]), demo)}
+        <span data-demo-status>${statusBadge(t(DEMO_LABEL_KEYS[demo]), demo)}</span>
       </div>
       <fieldset class="field field--wide">
         <legend data-i18n="projectEditor.liveDemo">${t("projectEditor.liveDemo")}</legend>
@@ -336,7 +348,7 @@ function renderEditor(project, isCreate) {
       </div>
 
       <div class="tabs" role="tablist" aria-label="${t("projectEditor.sections")}" data-i18n-aria-label="projectEditor.sections">
-        <button type="button" role="tab" id="tab-overview" aria-selected="${activeTab === "overview"}" aria-controls="panel-overview" data-tab="overview" tabindex="${activeTab === "overview" ? "0" : "-1"}" data-i18n="projectEditor.overview">${t("projectEditor.overview")}</button>
+        ${isCreate ? "" : `<button type="button" role="tab" id="tab-overview" aria-selected="${activeTab === "overview"}" aria-controls="panel-overview" data-tab="overview" tabindex="${activeTab === "overview" ? "0" : "-1"}" data-i18n="projectEditor.overview">${t("projectEditor.overview")}</button>`}
         <button type="button" role="tab" id="tab-general" aria-selected="${activeTab === "general"}" aria-controls="panel-general" data-tab="general" tabindex="${activeTab === "general" ? "0" : "-1"}" data-i18n="projectEditor.general">${t("projectEditor.general")}</button>
         <button type="button" role="tab" id="tab-presentation" aria-selected="false" aria-controls="panel-presentation" data-tab="presentation" tabindex="-1" data-i18n="projectEditor.presentation">${t("projectEditor.presentation")}</button>
         <button type="button" role="tab" id="tab-media" aria-selected="false" aria-controls="panel-media" data-tab="media" tabindex="-1" data-i18n="projectEditor.media">${t("projectEditor.media")}</button>
@@ -344,9 +356,10 @@ function renderEditor(project, isCreate) {
         <button type="button" role="tab" id="tab-publishing" aria-selected="false" aria-controls="panel-publishing" data-tab="publishing" tabindex="-1" data-i18n="projectEditor.publishing">${t("projectEditor.publishing")}</button>
       </div>
 
+      ${isCreate ? "" : `
       <div class="tab-panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" ${activeTab === "overview" ? "" : "hidden"}>
         ${overviewMarkup(project)}
-      </div>
+      </div>`}
 
       <div class="tab-panel" id="panel-general" role="tabpanel" aria-labelledby="tab-general" ${activeTab === "general" ? "" : "hidden"}>
         <div class="form-grid">
@@ -581,6 +594,7 @@ function mount(project, isCreate) {
     description: "description",
     presentationSystem: "presentation_system",
     presentationLabel: "presentation_label",
+    presentationAddress: "presentation_address",
     presentationType: "presentation_type",
   };
   const translationDraft = { ...(project.translations?.[TRANSLATION_LOCALE] ?? {}) };
@@ -684,7 +698,7 @@ function mount(project, isCreate) {
       presentation: {
         system: base("presentationSystem").trim(),
         label: base("presentationLabel").trim(),
-        address: (data.presentationAddress || "").trim(),
+        address: base("presentationAddress").trim(),
         type: base("presentationType").trim(),
         origin: (data.presentationOrigin || "").trim(),
         coordinates: [data.presentationLatitude, data.presentationLongitude].map((value) => String(value || "").trim()).filter(Boolean),
@@ -782,6 +796,49 @@ function mount(project, isCreate) {
     showToast(dataError.message);
   }
 
+  // Overview and Live Demo show values derived from the form, not from the
+  // record loaded at mount. Without this they went stale the moment anything
+  // was edited: enabling a demo left TEST DEMO disabled until a save+reload.
+  //
+  // Only the derived nodes are repainted, so focus, dirty state, translations,
+  // modules and pending uploads are untouched.
+  function refreshProjectSignals() {
+    if (!form.isConnected) return;
+
+    const values = collectFormValues();
+    const health = projectHealth(values);
+    const demo = health.demo;
+
+    const badges = form.querySelector("[data-overview-badges]");
+    if (badges) badges.innerHTML = overviewBadgesMarkup(values, health);
+
+    const healthCard = form.querySelector("[data-overview-health]");
+    if (healthCard) healthCard.innerHTML = healthCardMarkup(health);
+
+    const demoStatus = form.querySelector("[data-demo-status]");
+    if (demoStatus) demoStatus.innerHTML = statusBadge(t(DEMO_LABEL_KEYS[demo]), demo);
+
+    // Toggled rather than re-rendered, so a focused button keeps its focus.
+    form.querySelectorAll("[data-action-test-demo], [data-action-demo]").forEach((button) => {
+      button.disabled = demo !== "live";
+    });
+
+    const openProject = form.querySelector("[data-action-open-project]");
+    if (openProject) {
+      const href = values.projectUrl || "";
+      openProject.href = href || "#";
+      openProject.toggleAttribute("aria-disabled", !href);
+    }
+
+    applyStaticTranslations(form);
+  }
+
+  let signalsTimer = 0;
+  function scheduleProjectSignals() {
+    window.clearTimeout(signalsTimer);
+    signalsTimer = window.setTimeout(refreshProjectSignals, 150);
+  }
+
   function demoModal(values = collectFormValues()) {
     const demo = liveDemoState(values);
     if (demo !== "live") {
@@ -824,9 +881,25 @@ function mount(project, isCreate) {
   function markDirty() {
     isDirty = JSON.stringify(collectFormValues()) !== baselineSnapshot;
     updateSaveState();
+    // Debounced: the derived panels follow the form without repainting on
+    // every keystroke.
+    scheduleProjectSignals();
   }
 
   bindTabs(form);
+
+  // Entering a tab that shows derived values repaints it immediately, so it is
+  // never a debounce behind.
+  form.querySelectorAll('[role="tab"][data-tab="overview"], [role="tab"][data-tab="live-demo"]').forEach((tab) => {
+    tab.addEventListener("click", refreshProjectSignals);
+  });
+
+  // The checkbox and the preview URL drive the demo state directly, so they
+  // refresh without waiting for the debounce.
+  form.elements.livePreviewEnabled?.addEventListener("change", refreshProjectSignals);
+  form.elements.previewUrl?.addEventListener("input", scheduleProjectSignals);
+
+  refreshProjectSignals();
 
   // Slug auto-generation from the project name until manually edited.
   form.elements.slug.addEventListener("input", () => {

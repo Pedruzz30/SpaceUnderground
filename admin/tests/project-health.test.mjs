@@ -128,3 +128,76 @@ describe("poster: warning for health, blocking for publish", () => {
     assert.ok(publishReadiness(noName).blocking.some((item) => item.key === "name"));
   });
 });
+
+describe("project URL is optional", () => {
+  // CASE 003 to 005 are published cases with no external link. Requiring one
+  // would mark working projects incomplete.
+  const noUrl = () => completeProject({ projectUrl: "" });
+
+  it("does not mark a published project incomplete for having no external URL", () => {
+    assert.notEqual(projectHealth(noUrl()).status, "incomplete");
+  });
+
+  it("can be fully healthy with no external URL and no demo", () => {
+    const bare = completeProject({ projectUrl: "", livePreviewEnabled: false, previewUrl: "" });
+    assert.equal(projectHealth(bare).status, "healthy");
+  });
+
+  it("does not block publishing", () => {
+    const readiness = publishReadiness(noUrl());
+
+    assert.equal(readiness.canPublish, true);
+    assert.ok(!readiness.blocking.some((item) => item.key === "projectUrl"));
+  });
+
+  it("still flags a URL that was entered but is not a valid link", () => {
+    const health = projectHealth(completeProject({ projectUrl: "javascript:alert(1)" }));
+
+    assert.equal(health.status, "attention");
+    assert.ok(health.checks.some((item) => item.key === "projectUrl" && !item.ok));
+  });
+
+  it("accepts a valid external URL", () => {
+    assert.equal(projectHealth(completeProject({ projectUrl: "https://example.com" })).status, "healthy");
+  });
+});
+
+describe("English completeness covers every field the editor can translate", () => {
+  // The helper used to count presentation_address while the editor offered no
+  // way to translate it, so English could never reach 100%.
+  const TRANSLATABLE = [
+    "description",
+    "presentation_system",
+    "presentation_label",
+    "presentation_address",
+    "presentation_type",
+  ];
+
+  const withTranslations = (translations) =>
+    completeProject({
+      presentation: { system: "s", label: "l", address: "a", type: "t" },
+      modules: [{ title: "t", description: "d", translations: { en: { title: "T", description: "D" } } }],
+      translations: { en: translations },
+    });
+
+  it("reaches 100% once every translatable field is filled", () => {
+    const full = Object.fromEntries(TRANSLATABLE.map((field) => [field, "value"]));
+    assert.equal(contentCompleteness(withTranslations(full)).en.percent, 100);
+  });
+
+  it("drops below 100% when the address translation is missing", () => {
+    const missing = Object.fromEntries(
+      TRANSLATABLE.filter((field) => field !== "presentation_address").map((field) => [field, "value"]),
+    );
+    const percent = contentCompleteness(withTranslations(missing)).en.percent;
+
+    assert.ok(percent < 100, `expected under 100%, got ${percent}%`);
+  });
+
+  it("counts the address translation when it is provided", () => {
+    const without = contentCompleteness(withTranslations({ description: "d" })).en.done;
+    const with_ = contentCompleteness(withTranslations({ description: "d", presentation_address: "a" })).en.done;
+
+    assert.equal(with_, without + 1);
+  });
+});

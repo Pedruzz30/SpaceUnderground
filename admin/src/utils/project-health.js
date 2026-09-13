@@ -73,7 +73,10 @@ export function projectHealth(project = {}) {
     // is not "incomplete" for lacking one -- it reads as attention instead.
     check("poster", text(project.poster), "publish"),
     check("modules", Array.isArray(project.modules) && project.modules.length > 0),
-    check("projectUrl", text(project.projectUrl)),
+    // An external link is optional: JARVIS, Despensa Digital and Termo Digital
+    // are published cases with no public URL. Only a URL that was actually
+    // entered has to be valid.
+    check("projectUrl", !text(project.projectUrl) || isLivePreviewUrl(project.projectUrl), "warning"),
   ];
 
   const publicationConsistent =

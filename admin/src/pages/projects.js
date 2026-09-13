@@ -1,5 +1,6 @@
 import { badge, badgeType } from "../components/badge.js";
 import { CATEGORIES, EDITORIAL_STATUSES } from "../data/projects.js";
+import { publicSiteUrl } from "../config/public-site.js";
 import { getProjects } from "../services/project-service.js";
 import { describeError } from "../services/errors.js";
 import { onLocaleChange, statusLabel, t } from "../i18n/index.js";
@@ -73,7 +74,9 @@ function projectCard(project) {
   const health = projectHealth(project);
   const demo = liveDemoState(project);
   const completeness = contentCompleteness(project);
-  const publicHref = project.slug ? "../#work" : "";
+  // Absolute: the Admin runs on its own host, so a relative link would resolve
+  // against the Admin domain instead of the public site.
+  const publicHref = project.slug ? publicSiteUrl("#work") : "";
   const projectHref = project.projectUrl || "";
   const demoHref = demo === "live" ? project.previewUrl : "";
 
