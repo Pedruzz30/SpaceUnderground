@@ -325,7 +325,7 @@ function mount(plan, isCreate) {
     captureFeatureDrafts();
     const data = Object.fromEntries(new FormData(form).entries());
     const base = controller?.baseValues() ?? {};
-    const translated = controller?.translationValues() ?? {};
+    const translated = controller?.translationDraftValues?.() ?? controller?.translationValues() ?? {};
     const featureValues = features.map((feature, index) => {
       const text = String(feature.text ?? "").trim();
       const enText = String(feature.translations?.[TRANSLATION_LOCALE]?.text ?? "").trim();
@@ -337,7 +337,12 @@ function mount(plan, isCreate) {
       };
     });
     const planTranslation = Object.fromEntries(
-      ["timeline", "scope", "scopeShort", "description"].map((field) => [field, String(translated[field] ?? "").trim()]).filter(([, value]) => value),
+      ["timeline", "scope", "scopeShort", "description"]
+        .map((field) => [field, String(translated[field] ?? "").trim()])
+        .filter(([field, value]) => {
+          const dbField = field === "scopeShort" ? "scope_short" : field;
+          return value || initialTranslations[field] !== undefined || initialTranslations[dbField] !== undefined;
+        }),
     );
     return {
       name: String(data.name || "").trim(),
@@ -418,10 +423,10 @@ function mount(plan, isCreate) {
     scheduleRefresh();
   }
 
-  function renderFeatures() {
+  function renderFeatures({ capture = true } = {}) {
     controller?.baseValues();
     controller?.translationValues();
-    captureFeatureDrafts();
+    if (capture) captureFeatureDrafts();
     const list = form.querySelector("[data-feature-list]");
     if (!list) return;
     list.innerHTML = features.length
@@ -559,8 +564,9 @@ function mount(plan, isCreate) {
     scope: SCOPE,
     initial: initialTranslations,
     onChange: (locale) => {
+      captureFeatureDrafts();
       featureLocale = locale;
-      renderFeatures();
+      renderFeatures({ capture: false });
       refreshSignals();
     },
   });

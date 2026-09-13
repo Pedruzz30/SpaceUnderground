@@ -1,25 +1,17 @@
 import { seedPlans } from "../../data/plans.js";
+import { mapPlanTranslationsFromDatabase, mergePlanTranslations, normalizePlanTranslationsForDatabase } from "../mappers/plan-mapper.js";
+import { normalizeServiceStatus } from "../../utils/service-health.js";
 
 const PLANS_KEY = "space-admin:plans:v1";
 const clone = (value) => JSON.parse(JSON.stringify(value));
-const LEGACY_STATUSES = new Map([
-  ["DISPONÍVEL", "AVAILABLE"],
-  ["DISPONIVEL", "AVAILABLE"],
-  ["SOB CONSULTA", "LIMITED"],
-  ["ON REQUEST", "LIMITED"],
-]);
-
-function normalizeStatus(value) {
-  const raw = String(value || "").trim();
-  return LEGACY_STATUSES.get(raw.toUpperCase()) || raw || "UNAVAILABLE";
-}
 
 function normalizePlan(plan, index = 0) {
   return {
     ...plan,
-    status: normalizeStatus(plan.status),
+    status: normalizeServiceStatus(plan.status),
     visible: Boolean(plan.visible),
     position: Number.isFinite(Number(plan.position)) ? Number(plan.position) : index,
+    translations: mapPlanTranslationsFromDatabase(normalizePlanTranslationsForDatabase(plan.translations ?? {})),
     features: Array.isArray(plan.features)
       ? plan.features.map((feature, featureIndex) => ({
           ...feature,
@@ -86,6 +78,10 @@ export const mockPlanRepository = {
       ...plans[index],
       ...patch,
       id: plans[index].id,
+      status: patch.status === undefined ? plans[index].status : normalizeServiceStatus(patch.status),
+      translations: patch.translations === undefined
+        ? plans[index].translations
+        : mapPlanTranslationsFromDatabase(mergePlanTranslations(plans[index].translations ?? {}, patch.translations?.en ?? {})),
       features: Array.isArray(patch.features)
         ? patch.features.map((feature, featureIndex) => ({
           ...feature,

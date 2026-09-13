@@ -36,6 +36,14 @@ Run everything from the repo root unless noted.
 
 Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
 
+- [ ] For data normalization migrations after compatible code, follow this
+      order:
+      [ ] new code reads legacy values
+      [ ] new code reads canonical values
+      [ ] public site deployed
+      [ ] smoke test passed
+      [ ] only then migration applied
+      [ ] canonical DB verified
 - [ ] Every migration in `supabase/migrations/` is applied to the real project,
       in order. Check the highest number, not just the newest file you wrote.
 - [ ] The exact public query returns `200`, run against production with the

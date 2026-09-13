@@ -89,6 +89,7 @@ export default {
     automation: "Automation",
     ai: "AI",
     other: "Other",
+    on_request: "ON REQUEST",
   },
   nav: {
     dashboard: "Dashboard",

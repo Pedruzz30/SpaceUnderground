@@ -5,7 +5,7 @@ import { onLocaleChange, plural, statusLabel, t } from "../i18n/index.js";
 import { logActivity } from "../services/activity-service.js";
 import { describeError } from "../services/errors.js";
 import { archivePlan, duplicatePlan, getPlans, SERVICE_STATUSES, unarchivePlan } from "../services/plan-service.js";
-import { contentCompleteness, serviceHealth } from "../utils/service-health.js";
+import { contentCompleteness, normalizeServiceStatus, serviceHealth } from "../utils/service-health.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
 function formatUpdated(iso) {
@@ -40,8 +40,8 @@ function metricsMarkup(plans) {
     ["services.metricTotal", plans.length],
     ["services.metricVisible", plans.filter((plan) => plan.visible).length],
     ["services.metricHidden", plans.filter((plan) => !plan.visible).length],
-    ["services.metricAvailable", plans.filter((plan) => plan.status === "AVAILABLE").length],
-    ["services.metricArchived", plans.filter((plan) => plan.status === "ARCHIVED").length],
+    ["services.metricAvailable", plans.filter((plan) => normalizeServiceStatus(plan.status) === "AVAILABLE").length],
+    ["services.metricArchived", plans.filter((plan) => normalizeServiceStatus(plan.status) === "ARCHIVED").length],
     ["services.metricAttention", enriched.filter((item) => item.health.status !== "healthy").length],
   ];
 
@@ -60,8 +60,9 @@ function metricsMarkup(plans) {
 function serviceRow(plan) {
   const health = serviceHealth(plan);
   const completeness = contentCompleteness(plan);
-  const archiveLabel = plan.status === "ARCHIVED" ? t("services.actionUnarchive") : t("services.actionArchive");
-  const archiveAction = plan.status === "ARCHIVED" ? "unarchive" : "archive";
+  const status = normalizeServiceStatus(plan.status);
+  const archiveLabel = status === "ARCHIVED" ? t("services.actionUnarchive") : t("services.actionArchive");
+  const archiveAction = status === "ARCHIVED" ? "unarchive" : "archive";
   const publicHref = publicSiteUrl("#plans");
 
   return `
@@ -72,7 +73,7 @@ function serviceRow(plan) {
       </span>
       <span data-label="${escapeAttribute(t("services.range"))}">${escapeHtml(plan.range || "-")}</span>
       <span data-label="${escapeAttribute(t("services.timeline"))}">${escapeHtml(plan.timeline || "-")}</span>
-      <span data-label="${escapeAttribute(t("services.status"))}">${badge(plan.status, plan.status === "AVAILABLE" ? "success" : plan.status === "ARCHIVED" ? "muted" : "warning")}</span>
+      <span data-label="${escapeAttribute(t("services.status"))}">${badge(status, status === "AVAILABLE" ? "success" : status === "ARCHIVED" ? "muted" : "warning")}</span>
       <span data-label="${escapeAttribute(t("services.visibility"))}">${escapeHtml(plan.visible ? t("common.visible") : t("common.hidden"))}</span>
       <span data-label="${escapeAttribute(t("services.content"))}">${escapeHtml(t("serviceHealth.content.compact", { pt: completeness.pt.percent, en: completeness.en.percent }))}</span>
       <span data-label="${escapeAttribute(t("services.features"))}">${escapeHtml(plural("services.featureCount", (plan.features || []).length))}</span>
@@ -165,7 +166,8 @@ export const servicesPage = {
         const matchesQuery = [plan.name, plan.slug, plan.scope, plan.scopeShort, plan.description].some((value) =>
           String(value || "").toLowerCase().includes(query),
         );
-        const matchesStatus = filterState.status === "ALL" || plan.status === filterState.status;
+        const status = normalizeServiceStatus(plan.status);
+        const matchesStatus = filterState.status === "ALL" || status === filterState.status;
         const matchesVisibility = filterState.visibility === "ALL" || (filterState.visibility === "VISIBLE" ? plan.visible : !plan.visible);
         const matchesHealth = filterState.health === "ALL" || health === filterState.health;
         return matchesQuery && matchesStatus && matchesVisibility && matchesHealth;

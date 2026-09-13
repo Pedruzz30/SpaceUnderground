@@ -84,7 +84,7 @@ export const seedPlans = [
     range: "A PARTIR DE R$ 5.000",
     scope: "SISTEMAS · AUTOMAÇÃO · IA · INTEGRAÇÕES",
     scopeShort: "SISTEMAS · AUTOMAÇÃO · IA",
-    status: "LIMITED",
+    status: "ON_REQUEST",
     description: "Para operações que precisam de software sob medida: sistemas, automações, integrações e inteligência artificial aplicada ao negócio.",
     timeline: "6–12+ semanas",
     year: "2026",

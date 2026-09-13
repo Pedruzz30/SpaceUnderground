@@ -130,6 +130,11 @@ export function bindLocaleFields({ root, scope, initial = {}, onChange } = {}) {
       store();
       return Object.fromEntries([...translated].filter(([, value]) => String(value).trim() !== ""));
     },
+    /** Raw translated draft, including blanks that may mean "clear this field". */
+    translationDraftValues() {
+      store();
+      return Object.fromEntries(translated);
+    },
     /** Picks up fields added to the group after binding. */
     rescan() {
       store();

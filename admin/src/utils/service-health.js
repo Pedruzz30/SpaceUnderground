@@ -1,7 +1,30 @@
-export const SERVICE_STATUSES = ["AVAILABLE", "LIMITED", "WAITLIST", "UNAVAILABLE", "ARCHIVED"];
+export const SERVICE_STATUSES = ["AVAILABLE", "LIMITED", "ON_REQUEST", "WAITLIST", "UNAVAILABLE", "ARCHIVED"];
+
+const STATUS_ALIASES = new Map([
+  ["AVAILABLE", "AVAILABLE"],
+  ["DISPONÍVEL", "AVAILABLE"],
+  ["DISPONIVEL", "AVAILABLE"],
+  ["LIMITED", "LIMITED"],
+  ["LIMITADO", "LIMITED"],
+  ["ON_REQUEST", "ON_REQUEST"],
+  ["ON REQUEST", "ON_REQUEST"],
+  ["SOB CONSULTA", "ON_REQUEST"],
+  ["WAITLIST", "WAITLIST"],
+  ["LISTA DE ESPERA", "WAITLIST"],
+  ["UNAVAILABLE", "UNAVAILABLE"],
+  ["INDISPONÍVEL", "UNAVAILABLE"],
+  ["INDISPONIVEL", "UNAVAILABLE"],
+  ["ARCHIVED", "ARCHIVED"],
+  ["ARQUIVADO", "ARCHIVED"],
+]);
+
+export function normalizeServiceStatus(value) {
+  const key = String(value || "").trim().toUpperCase();
+  return STATUS_ALIASES.get(key) || key;
+}
 
 export function isServiceStatus(value) {
-  return SERVICE_STATUSES.includes(String(value || ""));
+  return SERVICE_STATUSES.includes(normalizeServiceStatus(value));
 }
 
 function text(value) {
@@ -26,7 +49,8 @@ export function contentCompleteness(plan = {}) {
   const total = fields.length + features.length;
   const en = english(plan);
   const baseDone = fields.filter((field) => text(plan[field])).length + features.filter((feature) => text(feature.text)).length;
-  const enDone = fields.filter((field) => text(en[field])).length + features.filter((feature) => text(englishFeature(feature).text)).length;
+  const enValue = (field) => en[field] ?? (field === "scopeShort" ? en.scope_short : undefined);
+  const enDone = fields.filter((field) => text(enValue(field))).length + features.filter((feature) => text(englishFeature(feature).text)).length;
 
   return {
     pt: { done: baseDone, total, percent: percent(baseDone, total) },
@@ -36,6 +60,7 @@ export function contentCompleteness(plan = {}) {
 
 export function serviceHealth(plan = {}) {
   const features = Array.isArray(plan.features) ? plan.features : [];
+  const status = normalizeServiceStatus(plan.status);
   const completeness = contentCompleteness(plan);
   const checks = [
     { key: "name", ok: Boolean(text(plan.name)), severity: "incomplete" },
@@ -43,10 +68,10 @@ export function serviceHealth(plan = {}) {
     { key: "timeline", ok: Boolean(text(plan.timeline)), severity: "incomplete" },
     { key: "descriptionPt", ok: Boolean(text(plan.description)), severity: "incomplete" },
     { key: "features", ok: features.some((feature) => text(feature.text)), severity: "incomplete" },
-    { key: "publicationState", ok: isServiceStatus(plan.status), severity: "incomplete" },
+    { key: "publicationState", ok: isServiceStatus(status), severity: "incomplete" },
     { key: "englishCompleteness", ok: completeness.en.percent === 100, severity: "attention" },
-    { key: "availableHidden", ok: !(plan.status === "AVAILABLE" && plan.visible === false), severity: "attention" },
-    { key: "archivedVisible", ok: !(plan.status === "ARCHIVED" && plan.visible === true), severity: "attention" },
+    { key: "availableHidden", ok: !(status === "AVAILABLE" && plan.visible === false), severity: "attention" },
+    { key: "archivedVisible", ok: !(status === "ARCHIVED" && plan.visible === true), severity: "attention" },
   ];
   const essentialFailures = checks.filter((check) => !check.ok && check.severity === "incomplete");
   const warnings = checks.filter((check) => !check.ok && check.severity === "attention");

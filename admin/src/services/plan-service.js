@@ -1,5 +1,5 @@
 import { t } from "../i18n/index.js";
-import { SERVICE_STATUSES, isServiceStatus, serviceReadiness } from "../utils/service-health.js";
+import { SERVICE_STATUSES, isServiceStatus, normalizeServiceStatus, serviceReadiness } from "../utils/service-health.js";
 import { DataError } from "./errors.js";
 import { getPlanRepository } from "./repositories/index.js";
 
@@ -38,7 +38,8 @@ function validateStatus(status) {
 }
 
 function assertReadyToPublish(plan) {
-  if (!plan.visible && plan.status !== "AVAILABLE") return;
+  const status = normalizeServiceStatus(plan.status);
+  if (!plan.visible && status !== "AVAILABLE") return;
   const readiness = serviceReadiness(plan);
   if (readiness.ok) return;
   throw new DataError(t("services.readinessBlocked"), { code: "readiness", field: "visible", cause: readiness });
@@ -82,7 +83,7 @@ export async function createPlan(data = {}) {
   if (!repository.create) throw new Error("Plan repository cannot create plans.");
   const plans = await repository.list();
   const payload = { ...defaultPlan(nextPosition(plans)), ...data };
-  payload.status = payload.status || "UNAVAILABLE";
+  payload.status = normalizeServiceStatus(payload.status || "UNAVAILABLE");
   payload.slug = payload.slug || uniqueSlug(payload.name || "service", plans);
   payload.position = Number.isFinite(Number(payload.position)) ? Number(payload.position) : nextPosition(plans);
   payload.features = Array.isArray(payload.features) ? payload.features : [];
@@ -96,9 +97,11 @@ export async function updatePlan(id, patch) {
   const existing = await getPlan(id);
   if (!existing) throw new Error("Plan not found.");
   const payload = { ...existing, ...patch };
+  if (payload.status !== undefined) payload.status = normalizeServiceStatus(payload.status);
   if (payload.status !== undefined) validateStatus(payload.status);
   assertReadyToPublish(payload);
-  const updated = await repository.update(id, patch);
+  const normalizedPatch = patch.status === undefined ? patch : { ...patch, status: normalizeServiceStatus(patch.status) };
+  const updated = await repository.update(id, normalizedPatch);
   if (!updated) throw new Error("Plan not found.");
   return updated;
 }

@@ -89,6 +89,7 @@ export default {
     automation: "Automação",
     ai: "IA",
     other: "Outro",
+    on_request: "SOB CONSULTA",
   },
   nav: {
     dashboard: "Dashboard",
