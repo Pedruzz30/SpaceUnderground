@@ -1,0 +1,35 @@
+[project]
+name = "space-underground-automation-api"
+version = "0.1.0"
+description = "Processing layer for the Space Underground Admin: analysis, reporting and automations."
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error::DeprecationWarning:app.*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+  "E",    # pycodestyle
+  "F",    # pyflakes
+  "I",    # import order
+  "B",    # bugbear
+  "UP",   # pyupgrade
+  "SIM",  # simplify
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI declares dependencies as argument defaults by design; B008 reads that
+# idiom as a mutable-default bug, which it is not.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header", "fastapi.Path", "fastapi.Query"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests rebind settings and assert on internals; both are fine there.
+"tests/*" = ["S101"]
