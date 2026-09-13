@@ -66,7 +66,17 @@ export function isConfigured() {
 }
 
 function headers(extra = {}) {
-  return { apikey: PUBLISHABLE_KEY, Authorization: `Bearer ${PUBLISHABLE_KEY}`, ...extra };
+  const result = { apikey: PUBLISHABLE_KEY, ...extra };
+
+  // Legacy anon keys are JWTs and are valid bearer tokens. Modern
+  // `sb_publishable_...` keys belong only in the `apikey` header; sending one
+  // as `Authorization: Bearer ...` makes the public request fail before RLS is
+  // even evaluated.
+  if (/^eyJ[A-Za-z0-9_-]*\./.test(PUBLISHABLE_KEY)) {
+    result.Authorization = `Bearer ${PUBLISHABLE_KEY}`;
+  }
+
+  return result;
 }
 
 // A slow or unreachable backend must never hold the page hostage.
