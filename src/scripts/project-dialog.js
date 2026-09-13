@@ -1,25 +1,16 @@
-// Modal unico da pagina. Quem abre sao os cards da secao 06 / Plans; os cases
-// reais nao passam por aqui, eles ficam no PROJECT VIEWER (signal-frame.js).
-//
-// Os dados moram em plans-registry.js. A camada `commercial` sobrepoe a
-// apresentacao comercial sem quebrar o HTML estatico gerado em build time.
+import { t } from "./i18n/index.js";
+import { getPublicPlan } from "./public-plan-store.js";
 
-import { plans, commercialPlan, planScopeLines } from "./plans-registry.js";
-
-const PLAN_PRESET = {
-  namespace: "PLANO",
-  kind: "Plano comercial",
-  note: "A faixa exibida serve como referência inicial. A proposta final é definida depois que entendemos escopo, integrações e complexidade do projeto.",
-  cta: "Solicitar uma Proposta",
-};
-
-const previewsByKey = new Map(Object.values(plans).map((plan) => [plan.key, plan]));
+const scopeLines = (plan) => [
+  t("commercial.scope", { value: plan.scope }),
+  t("commercial.investment", { value: plan.range }),
+  t("commercial.status", { value: plan.statusLabel }),
+];
 
 export function initProjectDialog() {
   const projectDialog = document.querySelector("[data-project-dialog]");
-  const projectOpeners = document.querySelectorAll("[data-project]");
-
-  if (!projectDialog) return;
+  if (!projectDialog || projectDialog.dataset.bound === "true") return;
+  projectDialog.dataset.bound = "true";
 
   const dialogFields = {
     index: projectDialog.querySelector("[data-dialog-index]"),
@@ -59,16 +50,14 @@ export function initProjectDialog() {
     if (node) node.textContent = value;
   };
 
-  const fillDialog = (basePlan) => {
-    const plan = commercialPlan(basePlan);
-    const scope = planScopeLines(plan)
-      .map((line) => line.replace("SCOPE —", "ESCOPO —").replace("RANGE —", "INVESTIMENTO —").replace("STATUS —", "STATUS —"));
+  const fillDialog = (plan) => {
+    const scope = scopeLines(plan);
 
     write(dialogFields.index, plan.id);
-    write(dialogFields.namespace, PLAN_PRESET.namespace);
-    write(dialogFields.kind, PLAN_PRESET.kind);
-    write(dialogFields.note, PLAN_PRESET.note);
-    write(dialogFields.cta, PLAN_PRESET.cta);
+    write(dialogFields.namespace, t("dialog.namespace"));
+    write(dialogFields.kind, t("dialog.kind"));
+    write(dialogFields.note, t("dialog.note"));
+    write(dialogFields.cta, t("dialog.cta"));
     write(dialogFields.category, plan.category);
     write(dialogFields.year, plan.year);
     write(dialogFields.title, plan.name);
@@ -82,34 +71,35 @@ export function initProjectDialog() {
     if (dialogFields.included) {
       dialogFields.included.hidden = !plan.included?.length;
       const label = dialogFields.included.querySelector(".project-dialog__included-label");
-      if (label) label.textContent = "O que está incluído";
+      if (label) label.textContent = t("dialog.included");
       dialogFields.includedItems.forEach((item, index) => {
         item.textContent = plan.included?.[index] || "";
+        item.hidden = !plan.included?.[index];
       });
       const timelineLabel = dialogFields.included.querySelector(".project-dialog__timeline");
       if (timelineLabel) {
-        timelineLabel.childNodes[0].textContent = "Prazo típico — ";
+        timelineLabel.childNodes[0].textContent = `${t("dialog.timeline")} `;
       }
       write(dialogFields.timeline, plan.timeline || "");
     }
   };
 
-  projectOpeners.forEach((opener) => {
-    opener.addEventListener("click", (event) => {
-      const plan = previewsByKey.get(opener.dataset.project);
-      if (!plan) return;
+  document.addEventListener("click", (event) => {
+    const opener = event.target.closest("[data-project]");
+    if (!opener) return;
+    const plan = getPublicPlan(opener.dataset.project);
+    if (!plan) return;
 
-      event.preventDefault();
-      fillDialog(plan);
+    event.preventDefault();
+    fillDialog(plan);
 
-      previousBodyOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
+    previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
-      if (typeof projectDialog.showModal === "function") projectDialog.showModal();
-      else projectDialog.setAttribute("open", "");
+    if (typeof projectDialog.showModal === "function") projectDialog.showModal();
+    else projectDialog.setAttribute("open", "");
 
-      dialogClose?.focus({ preventScroll: true });
-    });
+    dialogClose?.focus({ preventScroll: true });
   });
 
   dialogClose?.addEventListener("click", closeProjectDialog);

@@ -24,7 +24,7 @@ export const plans = {
       range: "R$ 800 – R$ 2.500",
       scope: "LANDING PAGES · PORTFÓLIOS",
       scopeShort: "LANDING PAGES · PORTFÓLIOS",
-      status: "DISPONÍVEL",
+      status: "AVAILABLE",
       description: "Para colocar sua presença digital no ar com clareza, identidade e foco em conversão.",
       included: [
         "Design responsivo sob medida",
@@ -45,7 +45,7 @@ export const plans = {
     range: "R$ 2.500 – R$ 4.500",
     scope: "MULTI-PAGE INSTITUTIONAL SITES",
     scopeShort: "INSTITUTIONAL WEBSITES",
-    status: "AVAILABLE",
+    status: "ON_REQUEST",
     description: "For businesses ready to show up as more than a page.",
     included: ["Multi-page structure", "Custom design, no templates", "Basic SEO & performance", "2 revision rounds"],
     timeline: "3–6 weeks",
@@ -93,7 +93,7 @@ export const plans = {
       range: "A PARTIR DE R$ 5.000",
       scope: "SISTEMAS · AUTOMAÇÃO · IA · INTEGRAÇÕES",
       scopeShort: "SISTEMAS · AUTOMAÇÃO · IA",
-      status: "SOB CONSULTA",
+      status: "ON_REQUEST",
       description: "Para operações que precisam de software sob medida: sistemas, automações, integrações e inteligência artificial aplicada ao negócio.",
       included: [
         "Arquitetura e desenvolvimento sob medida",
