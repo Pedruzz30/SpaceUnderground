@@ -13,7 +13,7 @@
 
 import fs from "node:fs";
 
-import { PLANS_END, PLANS_START, readPlansBlock } from "./plans-block.mjs";
+import { PLANS_END, PLANS_START, plansBlockMatches, readPlansBlock } from "./plans-block.mjs";
 import { renderPlanCards } from "../src/scripts/plans-renderer.js";
 
 const FILE = "index.html";
@@ -21,7 +21,7 @@ const html = fs.readFileSync(FILE, "utf8");
 const { before, current, after } = readPlansBlock(html, FILE);
 const next = renderPlanCards();
 
-if (current === next) {
+if (plansBlockMatches(current, next)) {
   console.log("Plans: ja estava em dia, nada reescrito.");
   process.exit(0);
 }

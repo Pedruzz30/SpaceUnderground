@@ -18,6 +18,11 @@ const SCANNABLE_EXTENSIONS = new Set([".js", ".html"]);
 // covered by the dynamic-family assertions below instead of a fragile regex.
 const LITERAL_CALL = /\bt\(\s*"([^"]*)"|\bt\(\s*'([^']*)'/g;
 const ATTRIBUTE = /data-i18n(?:-html|-aria-label|-placeholder)?\s*=\s*"([^"]*)"/g;
+// Keys held in data structures rather than passed to t() directly, such as the
+// sidebar's navGroups. These reach the UI through t(item.labelKey) or
+// data-i18n="${item.labelKey}", both invisible to the scanners above -- which is
+// how a missing nav.dashboard shipped and rendered as a raw key.
+const KEY_PROPERTY = /\b(?:labelKey|detailKey|hintKey|ariaKey|titleKey|placeholderKey|optionKeyPrefix)\s*:\s*"([^"]*)"/g;
 // plural("key", count) resolves to key.one / key.other at call time.
 const PLURAL_CALL = /\bplural\(\s*"([^"]*)"/g;
 
@@ -39,6 +44,11 @@ function scan() {
 
     for (const match of contents.matchAll(LITERAL_CALL)) {
       usages.push({ key: match[1] ?? match[2], file: label });
+    }
+    for (const match of contents.matchAll(KEY_PROPERTY)) {
+      // optionKeyPrefix names a family, not a leaf, so only its children exist.
+      if (match[0].startsWith("optionKeyPrefix")) continue;
+      usages.push({ key: match[1], file: label });
     }
     for (const match of contents.matchAll(PLURAL_CALL)) {
       usages.push({ key: `${match[1]}.one`, file: label });

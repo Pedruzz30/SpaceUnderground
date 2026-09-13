@@ -154,6 +154,7 @@ try {
   assert.equal(await page.getAttribute("#tab-media", "aria-selected"), "true", "media tab via keyboard");
 
   // Invalid URL blocks creation, valid URL lets it through.
+  await page.click("#tab-general");
   await page.fill("#field-projectUrl", "not-a-url");
   await page.click("[data-action-create]");
   await settle();
@@ -163,6 +164,8 @@ try {
   await page.click("[data-action-create]");
   await page.waitForSelector("[data-action-save]");
   assert.equal(await hash(), "#/projects/003", "created project opens");
+  assert.equal(await page.getAttribute("#tab-overview", "aria-selected"), "true", "existing project opens on overview");
+  await page.click("#tab-general");
 
   // Editing marks the editor dirty.
   await page.fill("#field-name", "Nebula Client Portal v2");
@@ -184,10 +187,17 @@ try {
 
   await page.click("[data-action-publish]");
   await settle();
-  assert.equal(await page.locator(".editor-identity .badge").getAttribute("data-status-label"), "PUBLISHED", "published badge");
+  await page.waitForSelector(".modal");
+  assert.match(await page.locator(".modal").innerText(), /Poster/, "readiness blocks publishing without a poster");
+  await page.click("[data-modal-action='0']");
+  await settle();
+  assert.equal(await page.locator(".editor-identity .badge").getAttribute("data-status-label"), "DRAFT", "publish stays draft when readiness blocks");
 
   // Changes survive a reload.
   await page.reload();
+  await page.waitForSelector("#tab-general");
+  assert.equal(await page.getAttribute("#tab-overview", "aria-selected"), "true", "reload opens overview");
+  await page.click("#tab-general");
   await page.waitForSelector("#field-name");
   assert.equal(await page.inputValue("#field-name"), "Nebula Client Portal v2", "persisted after reload");
 
@@ -200,6 +210,7 @@ try {
   await page.click("[data-action-save]");
   await page.waitForSelector("[data-save-state].is-saved");
   await page.reload();
+  await page.waitForSelector("#tab-presentation");
   await page.click("#tab-presentation");
   assert.equal(await page.locator(".module-card").count(), 2, "module removal persisted");
   assert.equal(await page.inputValue("#field-module-title-1"), "ORQUESTRAÇÃO", "module reorder/edit persisted");
@@ -213,12 +224,12 @@ try {
 
   await page.click('a[href="#/projects"]');
   await waitForRows();
-  await page.click('[data-editorial-filter="ARCHIVED"]');
+  await page.selectOption('[data-project-filter="editorial"]', "ARCHIVED");
   await settle();
   assert.equal(await rows().count(), 1, "archived filter");
 
   // Delete returns to the list.
-  await page.click(`${ROW}[data-project-id="003"]`);
+  await page.click('[data-project-open="003"]');
   await page.waitForSelector("[data-action-delete]");
   await page.click("[data-action-delete]");
   await page.waitForSelector(".modal");
@@ -234,6 +245,241 @@ try {
   assert.equal(await page.locator('[data-health-metric="published"]').innerText(), "2", "final published cases");
   assert.equal(await page.locator('[data-health-metric="drafts"]').innerText(), "0", "final draft cases");
   assert.ok((await page.locator(".activity-list > div").count()) > 0, "activity log populated");
+
+
+  /* ------------------------------------------------ projects hub: metrics */
+
+  // A fixture with genuinely different states, so the KPIs and the combined
+  // filters are counting something rather than agreeing with a uniform seed.
+  const HUB_FIXTURE = [
+    {
+      id: "101", caseNumber: "101", name: "Alpha Site", slug: "alpha-site", client: "Alpha",
+      category: "Website", description: "Descrição alpha.", status: "Live",
+      editorialStatus: "PUBLISHED", visible: true, featured: false, year: "2026", accent: "#c6ff00",
+      techStack: [], presentation: { system: "s", label: "l", address: "a", type: "t", coordinates: [] },
+      modules: [
+        { id: null, position: 0, code: "01", title: "t", description: "d", translations: { en: { title: "T", description: "D" } } },
+      ],
+      poster: "posters/alpha.png", gallery: [], projectUrl: "https://alpha.example.com",
+      previewUrl: "https://alpha.example.com/embed", livePreviewEnabled: true,
+      // Fully translated, so this one is genuinely healthy and the attention
+      // count is measuring the other two rather than a missing translation.
+      translations: {
+        en: {
+          description: "Alpha description.",
+          presentation_system: "s",
+          presentation_label: "l",
+          presentation_address: "a",
+          presentation_type: "t",
+        },
+      },
+      createdAt: null, updatedAt: new Date().toISOString(), publishedAt: null,
+    },
+    {
+      id: "102", caseNumber: "102", name: "Beta System", slug: "beta-system", client: "Beta",
+      category: "System", description: "Descrição beta.", status: "MVP",
+      editorialStatus: "PUBLISHED", visible: false, featured: false, year: "2026", accent: "#c6ff00",
+      techStack: [], presentation: { system: "s", label: "l", address: "a", type: "t", coordinates: [] },
+      modules: [{ id: null, position: 0, code: "01", title: "t", description: "d", translations: {} }],
+      poster: "posters/beta.png", gallery: [], projectUrl: "", previewUrl: "",
+      livePreviewEnabled: false, translations: {},
+      createdAt: null, updatedAt: new Date().toISOString(), publishedAt: null,
+    },
+    {
+      id: "103", caseNumber: "103", name: "Gamma Draft", slug: "gamma-draft", client: "Gamma",
+      category: "Website", description: "", status: "In Development",
+      editorialStatus: "DRAFT", visible: false, featured: false, year: "2026", accent: "#c6ff00",
+      techStack: [], presentation: { system: "", label: "", address: "", type: "", coordinates: [] },
+      modules: [], poster: "", gallery: [], projectUrl: "", previewUrl: "",
+      livePreviewEnabled: false, translations: {},
+      createdAt: null, updatedAt: new Date().toISOString(), publishedAt: null,
+    },
+  ];
+
+  await page.evaluate((fixture) => {
+    localStorage.setItem("space-admin:projects:v2", JSON.stringify(fixture));
+  }, HUB_FIXTURE);
+  await page.goto(`${BASE_URL}/#/projects`);
+  await waitForRows();
+
+  const metricValues = await page.evaluate(() =>
+    [...document.querySelectorAll("[data-project-metrics] .project-metric")].map((card) => ({
+      value: card.querySelector("strong")?.textContent.trim(),
+      label: card.querySelector("span")?.textContent.trim(),
+    })),
+  );
+
+  assert.equal(metricValues.length, 6, "six KPI cards");
+  // total / published / draft / hidden / with demo / attention.
+  // Alpha is healthy; Beta is published-but-hidden and Gamma is an empty draft.
+  assert.deepEqual(
+    metricValues.map((entry) => entry.value),
+    ["3", "2", "1", "2", "1", "2"],
+    `KPIs read total/published/draft/hidden/withDemo/attention — got ${JSON.stringify(metricValues)}`,
+  );
+
+  /* ----------------------------------------------- projects hub: filters */
+
+  const setFilter = async (name, value) => {
+    await page.selectOption(`[data-project-filter="${name}"]`, value);
+    await settle();
+  };
+  const resetFilters = async () => {
+    for (const name of ["category", "editorial", "visibility", "demo", "health"]) {
+      await setFilter(name, "ALL");
+    }
+    await page.fill("[data-search-projects]", "");
+    await settle();
+  };
+
+  // Editorial + visibility: only Alpha is published and visible.
+  await setFilter("editorial", "PUBLISHED");
+  await setFilter("visibility", "VISIBLE");
+  assert.equal(await rows().count(), 1, "published + visible narrows to one row");
+  assert.ok(await page.locator('[data-project-id="101"]').count(), "published + visible keeps Alpha");
+
+  // Demo + health: Alpha is the only one with a live demo.
+  await resetFilters();
+  await setFilter("demo", "LIVE");
+  assert.equal(await rows().count(), 1, "demo=live narrows to one row");
+  await setFilter("health", "INCOMPLETE");
+  assert.equal(await rows().count(), 0, "a live demo project is not incomplete");
+
+  // Search + category.
+  await resetFilters();
+  await page.fill("[data-search-projects]", "a");
+  await setFilter("category", "System");
+  assert.equal(await rows().count(), 1, "search + category narrows to Beta");
+  assert.ok(await page.locator('[data-project-id="102"]').count(), "search + category keeps Beta");
+
+  // Draft with nothing filled reads as incomplete, not as an error state.
+  await resetFilters();
+  await setFilter("health", "INCOMPLETE");
+  assert.equal(await rows().count(), 1, "the empty draft is the only incomplete row");
+  await resetFilters();
+
+  /* ------------------------------------------- view public leaves the admin */
+
+  const publicHref = await page.evaluate(() => {
+    const row = document.querySelector('[data-project-id="101"]');
+    return [...row.querySelectorAll(".row-menu__panel a")][0]?.href ?? "";
+  });
+  assert.ok(publicHref.startsWith("http"), `view public is absolute — got ${publicHref}`);
+  assert.notEqual(
+    new URL(publicHref).host,
+    new URL(BASE_URL).host,
+    `view public must not point at the admin host — got ${publicHref}`,
+  );
+  assert.ok(publicHref.includes("#work"), "view public deep-links to the work section");
+
+  /* ------------------------------------------------- live demo reactivity */
+
+  await page.click('[data-project-open="103"]');
+  await page.waitForSelector("[data-action-save]");
+  await page.click('[role="tab"][data-tab="live-demo"]');
+  await settle();
+
+  const demoStatus = () => page.locator("[data-demo-status]").innerText();
+  const testDisabled = () => page.locator("[data-action-test-demo]").isDisabled();
+
+  assert.match(await demoStatus(), /NENHUM|NONE/i, "starts with no demo");
+  assert.equal(await testDisabled(), true, "test demo starts disabled");
+
+  // Enabling with no URL is still no demo.
+  await page.check('[name="livePreviewEnabled"]');
+  await settle();
+  assert.match(await demoStatus(), /NENHUM|NONE/i, "enabled with no URL is still none");
+  assert.equal(await testDisabled(), true, "test demo stays disabled without a URL");
+
+  // An entered URL that cannot be framed is flagged.
+  await page.fill("#field-previewUrl", "javascript:alert(1)");
+  await settle();
+  assert.match(await demoStatus(), /INVÁLID|INVALID/i, "an unusable URL reads as invalid");
+  assert.equal(await testDisabled(), true, "test demo stays disabled for an invalid URL");
+
+  // A valid URL flips it live, with no save in between.
+  await page.fill("#field-previewUrl", "https://example.com/embed");
+  await settle();
+  assert.match(await demoStatus(), /LIVE/i, "a valid URL reads as live without saving");
+  assert.equal(await testDisabled(), false, "test demo is enabled without saving");
+
+  await page.click("[data-action-test-demo]");
+  await page.waitForSelector(".modal iframe");
+  assert.equal(
+    await page.locator(".modal iframe").getAttribute("src"),
+    "https://example.com/embed",
+    "test demo frames the preview URL",
+  );
+  await page.click("[data-modal-action]");
+  await settle();
+
+  // Unchecking takes it straight back.
+  await page.uncheck('[name="livePreviewEnabled"]');
+  await settle();
+  assert.match(await demoStatus(), /NENHUM|NONE/i, "unchecking returns to none immediately");
+  assert.equal(await testDisabled(), true, "test demo disables again immediately");
+
+  /* --------------------------------------------------- live demo persists */
+
+  await page.check('[name="livePreviewEnabled"]');
+  await page.fill("#field-previewUrl", "https://example.com/embed");
+  await settle();
+  await page.click("[data-action-save]");
+  await page.waitForSelector("[data-save-state].is-saved");
+  await page.reload();
+  await page.waitForSelector("[data-action-save]");
+  await page.click('[role="tab"][data-tab="live-demo"]');
+  await settle();
+
+  assert.equal(await page.isChecked('[name="livePreviewEnabled"]'), true, "the demo flag survived the save");
+  assert.equal(
+    await page.inputValue("#field-previewUrl"),
+    "https://example.com/embed",
+    "the preview URL survived the save",
+  );
+  assert.match(await demoStatus(), /LIVE/i, "status is live after reload");
+  assert.equal(await testDisabled(), false, "test demo is enabled after reload");
+
+  // And disabling persists too.
+  await page.uncheck('[name="livePreviewEnabled"]');
+  await settle();
+  await page.click("[data-action-save]");
+  await page.waitForSelector("[data-save-state].is-saved");
+  await page.reload();
+  await page.waitForSelector("[data-action-save]");
+  await page.click('[role="tab"][data-tab="live-demo"]');
+  await settle();
+  assert.equal(await page.isChecked('[name="livePreviewEnabled"]'), false, "disabling the demo persisted");
+
+  /* --------------------------------------------- overview follows the form */
+
+  await page.click('[role="tab"][data-tab="overview"]');
+  await settle();
+  const overviewText = () => page.locator("[data-overview-badges]").innerText();
+  const before = await overviewText();
+
+  // This project is a hidden draft, so making it visible is the change that
+  // actually moves the badge.
+  assert.match(before, /OCULTO|HIDDEN/i, "starts hidden");
+
+  await page.click('[role="tab"][data-tab="publishing"]');
+  await page.check('[name="visible"]');
+  await settle();
+  await page.click('[role="tab"][data-tab="overview"]');
+  await settle();
+
+  const after = await overviewText();
+  assert.notEqual(after, before, "overview reflects an unsaved visibility change");
+  assert.match(after, /VISÍVEL|VISIBLE/i, "overview shows the new visibility without a save");
+
+  await page.evaluate(() => {
+    window.onbeforeunload = null;
+  });
+  await page.goto(`${BASE_URL}/#/projects`);
+  const leaving = page.locator("[data-modal-confirm]");
+  if (await leaving.count()) await leaving.click();
+  await waitForRows();
+  await page.evaluate(() => window.__resetSpaceAdminMocks());
 
   assert.deepEqual(errors, [], "no console or page errors");
   console.log("admin flow: all checks passed");

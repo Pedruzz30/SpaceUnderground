@@ -358,7 +358,9 @@ textarea {
 
 .project-table__head,
 .project-row {
-  grid-template-columns: 4.5rem minmax(13rem, 1.2fr) 7.5rem 8rem 8rem 7rem 6.5rem 1.5rem;
+  gap: 0.6rem;
+  grid-template-columns:
+    3.2rem minmax(8rem, 1.2fr) minmax(5.2rem, 0.8fr) 5.4rem 6.4rem 5.2rem 5.6rem 5.8rem 4rem 6.4rem;
 }
 
 .project-table__head {
@@ -374,14 +376,67 @@ textarea {
 .project-row {
   margin-top: 0.35rem;
   box-shadow: none;
-  cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease;
+}
+
+.project-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-bottom: var(--space-3);
+}
+
+.project-metric {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.018);
+  padding: 0.65rem 0.75rem;
+}
+
+.project-metric strong {
+  display: block;
+  color: var(--accent);
+  font: 700 1.05rem/1 var(--mono);
+}
+
+.project-metric span,
+.project-row__stack small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font: 600 0.56rem/1.2 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .project-row__project {
   display: grid;
   gap: 0.18rem;
   min-width: 0;
+}
+
+.project-row__stack {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.project-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.button--compact {
+  min-height: 1.9rem;
+  padding: 0 0.55rem;
+  font-size: 0.55rem;
+  letter-spacing: 0.05em;
+}
+
+.button[aria-disabled="true"] {
+  opacity: 0.42;
+  pointer-events: none;
 }
 
 .project-row__project small {
@@ -854,8 +909,27 @@ textarea {
 @media (max-width: 760px) {
   .asset-row,
   .asset-row--orphan,
-  .activity-row {
+  .activity-row,
+  .project-table__head {
+    display: none;
+  }
+
+  .project-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-row {
     grid-template-columns: 1fr;
+  }
+
+  .project-row > span:not(.project-row__case):not(.project-row__project):not(.project-row__actions)::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.3rem;
+    color: var(--text-muted);
+    font: 700 0.54rem/1 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .asset-thumb {
@@ -938,4 +1012,117 @@ textarea {
 .editor-locale-row .locale-hint {
   flex-basis: 100%;
   margin: 0;
+}
+
+/* The hub is wide by nature. A scroll container keeps it inside the panel on a
+   narrower desktop instead of letting the actions column spill out. */
+.projects-table-scroll {
+  overflow-x: auto;
+}
+
+/* The minmax() columns already set a readable floor; an explicit min-width on
+   top of that only forced the table a few pixels past the panel. */
+.projects-table-scroll .project-table {
+  min-width: 0;
+}
+
+/* Per-row overflow menu, so secondary actions do not widen every row. */
+.row-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.row-menu__toggle {
+  min-width: 1.9rem;
+  padding: 0 0.4rem;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.row-menu__panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.3rem);
+  right: 0;
+  display: grid;
+  min-width: 11rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface, #0c0d0b);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 45%);
+  padding: 0.25rem;
+}
+
+.row-menu__panel a {
+  border-radius: 0.35rem;
+  padding: 0.45rem 0.55rem;
+  color: var(--text);
+  font: 600 0.6rem/1 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.row-menu__panel a:hover,
+.row-menu__panel a:focus-visible {
+  background: rgb(255 255 255 / 6%);
+  color: var(--accent);
+}
+
+.row-menu__panel a[aria-disabled="true"] {
+  opacity: 0.38;
+  pointer-events: none;
+}
+
+.project-row__stack small {
+  color: var(--text-muted);
+  font: 500 0.6rem/1.2 var(--mono);
+  text-transform: uppercase;
+}
+
+/* Seven controls do not belong in a space-between row: they wrap into ragged
+   lines. One auto-fitting grid keeps the filter bar dense and predictable. */
+.toolbar--filters {
+  display: grid;
+  align-items: end;
+  gap: 0.6rem var(--space-2);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.toolbar--filters .search-field {
+  grid-column: 1 / -1;
+  max-width: 22rem;
+}
+
+.toolbar--filters .toolbar__controls {
+  display: contents;
+}
+
+@media (max-width: 900px) {
+  .toolbar--filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .toolbar--filters .search-field {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Grid children default to min-width:auto, so a long cell pushes the whole
+   table wider than its columns. Letting them shrink keeps the ten columns
+   inside the panel, with long values truncating instead. */
+.project-row > span {
+  min-width: 0;
+}
+
+.project-row > span:not(.project-row__project):not(.project-row__stack):not(.project-row__actions) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Edit plus the overflow toggle sit on one line: stacking them made every row
+   taller than the content needed. */
+.project-row__actions {
+  flex-wrap: nowrap;
+  align-items: start;
 }

@@ -62,6 +62,9 @@ function normalizeGallery(project) {
             code: item.code ?? "",
             title: item.title ?? "",
             description: item.description ?? "",
+            // Rebuilding the module field by field used to drop this, so every
+            // read silently discarded the English copy of a module.
+            translations: item.translations ?? {},
           }))
           .sort((a, b) => a.position - b.position)
       : [],

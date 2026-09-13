@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 
-import { readPlansBlock } from "./scripts/plans-block.mjs";
+import { plansBlockMatches, readPlansBlock } from "./scripts/plans-block.mjs";
 import { renderPlanCards } from "./src/scripts/plans-renderer.js";
 import {
   OG_IMAGE,
@@ -186,7 +186,7 @@ function spaceUndergroundBuild() {
         if (!html.includes("<!--@seo-->")) throw new Error("index.html perdeu o marcador <!--@seo-->.");
 
         const { current } = readPlansBlock(html, context.filename || "index.html");
-        if (current !== renderPlanCards()) {
+        if (!plansBlockMatches(current, renderPlanCards())) {
           throw new Error(
             "Os cards de Plans no index.html nao batem com src/scripts/plans-registry.js. " +
               "Rode `npm run plans` para regerar o bloco (e nunca edite os cards a mao).",

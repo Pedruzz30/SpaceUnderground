@@ -267,6 +267,7 @@ const PROJECT_FIXTURE = [
     poster_url: "",
     project_url: "https://pedruzz30.github.io/TattooSite/",
     preview_url: "https://pedruzz30.github.io/TattooSite/?embed=spaceunderground",
+    live_preview_enabled: true,
     translations: {
       en: { description: "A dark editorial experience.", presentation_type: "PORTFOLIO WEBSITE" },
     },
@@ -302,6 +303,7 @@ const PROJECT_FIXTURE = [
     poster_url: "",
     project_url: "https://pedruzz30.github.io/LucasNutri/",
     preview_url: "https://pedruzz30.github.io/LucasNutri/?embed=spaceunderground",
+    live_preview_enabled: true,
     translations: { en: { description: "A strategic digital presence." } },
     project_gallery: [],
     project_modules: [],

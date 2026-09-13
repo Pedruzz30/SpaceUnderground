@@ -36,6 +36,7 @@ const PROJECT_COLUMNS = [
   "poster_url",
   "project_url",
   "preview_url",
+  "live_preview_enabled",
   "translations",
   "project_gallery(url,alt,caption,position,translations)",
   "project_modules(code,title,description,position,translations)",

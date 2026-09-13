@@ -32,6 +32,7 @@ const fixture = [
     poster_url: "",
     project_url: "https://pedruzz30.github.io/TattooSite/",
     preview_url: INK_PREVIEW,
+    live_preview_enabled: true,
     translations: { en: { description: "Editorial tattoo website.", presentation_type: "PORTFOLIO WEBSITE" } },
     project_gallery: [],
     project_modules: [
@@ -59,6 +60,7 @@ const fixture = [
     poster_url: "",
     project_url: "https://pedruzz30.github.io/LucasNutri/",
     preview_url: LUCAS_PREVIEW,
+    live_preview_enabled: true,
     translations: { en: { description: "Sports nutrition digital presence.", presentation_type: "SPORTS NUTRITION WEBSITE" } },
     project_gallery: [],
     project_modules: [],
@@ -83,6 +85,7 @@ const fixture = [
     poster_url: "",
     project_url: "https://example.com/jarvis",
     preview_url: null,
+    live_preview_enabled: false,
     translations: { en: { description: "Intelligent assistant prototype.", presentation_type: "INTELLIGENT ASSISTANT" } },
     project_gallery: [],
     project_modules: [],

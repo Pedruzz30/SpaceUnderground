@@ -25,3 +25,13 @@ export function readPlansBlock(html, file = "index.html") {
     after: html.slice(end),
   };
 }
+
+// Um checkout no Windows com core.autocrlf=true entrega o index.html em CRLF,
+// enquanto renderPlanCards() sempre gera LF. Comparar cru fazia o guard acusar
+// divergencia em toda maquina Windows, com o build quebrado e nenhum card fora
+// de lugar. A diferenca que importa e conteudo, nao fim de linha.
+const normalizeEol = (value) => String(value).replace(/\r\n/g, "\n");
+
+export function plansBlockMatches(current, expected) {
+  return normalizeEol(current) === normalizeEol(expected);
+}
