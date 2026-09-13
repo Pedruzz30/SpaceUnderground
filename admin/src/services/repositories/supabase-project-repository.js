@@ -145,8 +145,13 @@ async function syncModules(projectDbId, modules) {
 export const supabaseProjectRepository = {
   async list() {
     const supabase = getSupabaseClient();
-    // The list view never renders images, so the gallery is left out here.
-    const result = await supabase.from(TABLE).select("*").order("case_number", { ascending: true });
+    // The list view never renders images, so the gallery is left out. Modules
+    // are not optional though: the hub derives health and content completeness
+    // from them, and without them every project reads as incomplete.
+    const result = await supabase
+      .from(TABLE)
+      .select("*, project_modules(code,title,description,position,translations)")
+      .order("case_number", { ascending: true });
     return unwrap(result, t("errors.data.loadProjects")).map(mapProjectFromDatabase);
   },
 

@@ -20,6 +20,13 @@ function visibilityLabel(project) {
   return project.visible ? t("common.visible").toUpperCase() : t("common.hidden").toUpperCase();
 }
 
+// These labels are already localized, so they must not go through badge(),
+// which runs its text through statusLabel(): that maps "LIVE" to the project
+// status "No ar" and would mislabel the whole column.
+function plainBadge(label, type = "neutral") {
+  return `<span class="badge badge--${type}">${escapeHtml(label)}</span>`;
+}
+
 function demoLabel(state) {
   return t(`projectHealth.demo.${state}`).toUpperCase();
 }
@@ -75,24 +82,37 @@ function projectCard(project) {
       <span class="project-row__case">${escapeHtml(project.caseNumber)}</span>
       <span class="project-row__project">
         <strong>${escapeHtml(project.name || t("projects.untitled"))}</strong>
-        <small>${escapeHtml(project.client || project.slug || t("projects.noClient"))}</small>
+        <small>${escapeHtml(project.slug || "—")}</small>
       </span>
-      <span data-label="${t("dashboard.project")}">${escapeHtml(statusLabel(project.status))}</span>
       <span data-label="${t("common.client")}">${escapeHtml(project.client || t("projects.noClient"))}</span>
-      <span data-label="${t("common.category")}">${escapeHtml(statusLabel(project.category || t("projects.uncategorised")))}</span>
+      <span class="project-row__stack" data-label="${t("common.category")}">${escapeHtml(statusLabel(project.category || t("projects.uncategorised")))}<small>${escapeHtml(statusLabel(project.status))}</small></span>
       <span class="project-row__stack" data-label="${t("projects.publication")}">${badge(project.editorialStatus, badgeType(project.editorialStatus))}<small>${escapeHtml(visibilityLabel(project))}</small></span>
-      <span data-label="${t("projectEditor.liveDemo")}">${badge(demoLabel(demo), demo === "live" ? "success" : demo === "invalid" ? "warning" : "muted")}</span>
+      <span data-label="${t("projectEditor.liveDemo")}">${plainBadge(demoLabel(demo), demo === "live" ? "success" : demo === "invalid" ? "warning" : "muted")}</span>
       <span data-label="${t("projects.content")}">${escapeHtml(t("projectHealth.content.compact", { pt: completeness.pt.percent, en: completeness.en.percent }))}</span>
-      <span data-label="${t("projectHealth.title")}">${badge(healthLabel(health.status), health.status === "healthy" ? "success" : health.status === "attention" ? "warning" : "muted")}</span>
+      <span data-label="${t("projectHealth.title")}">${plainBadge(healthLabel(health.status), health.status === "healthy" ? "success" : health.status === "attention" ? "warning" : "muted")}</span>
       <span data-label="${t("common.updated")}">${escapeHtml(formatUpdated(project.updatedAt))}</span>
       <span class="project-row__actions">
         <button class="button button--compact" type="button" data-project-open="${escapeAttribute(project.id)}">${t("projects.actionEdit")}</button>
-        <a class="button button--compact" href="${escapeAttribute(publicHref || "#/projects")}" target="_blank" rel="noreferrer" ${publicHref ? "" : "aria-disabled=\"true\""}>${t("projects.actionViewPublic")}</a>
-        <a class="button button--compact" href="${escapeAttribute(projectHref || "#")}" target="_blank" rel="noreferrer" ${projectHref ? "" : "aria-disabled=\"true\""}>${t("projects.actionOpenProject")}</a>
-        <a class="button button--compact" href="${escapeAttribute(demoHref || "#")}" target="_blank" rel="noreferrer" ${demoHref ? "" : "aria-disabled=\"true\""}>${t("projects.actionOpenDemo")}</a>
+        <span class="row-menu" data-row-menu>
+          <button class="button button--compact row-menu__toggle" type="button" data-row-menu-toggle aria-expanded="false" aria-haspopup="true" aria-label="${escapeAttribute(t("projects.actions"))}">⋯</button>
+          <span class="row-menu__panel" role="menu" hidden>
+            <a role="menuitem" href="${escapeAttribute(publicHref || "#/projects")}" target="_blank" rel="noreferrer" ${publicHref ? "" : 'aria-disabled="true"'}>${t("projects.actionViewPublic")}</a>
+            <a role="menuitem" href="${escapeAttribute(projectHref || "#")}" target="_blank" rel="noreferrer" ${projectHref ? "" : 'aria-disabled="true"'}>${t("projects.actionOpenProject")}</a>
+            <a role="menuitem" href="${escapeAttribute(demoHref || "#")}" target="_blank" rel="noreferrer" ${demoHref ? "" : 'aria-disabled="true"'}>${t("projects.actionOpenDemo")}</a>
+          </span>
+        </span>
       </span>
     </article>
   `;
+}
+
+function closeRowMenus(root = document) {
+  root.querySelectorAll("[data-row-menu] .row-menu__panel").forEach((panel) => {
+    panel.hidden = true;
+  });
+  root.querySelectorAll("[data-row-menu-toggle]").forEach((toggle) => {
+    toggle.setAttribute("aria-expanded", "false");
+  });
 }
 
 export const projectsPage = {
@@ -112,7 +132,7 @@ export const projectsPage = {
 
     <section class="panel projects-panel">
       <div class="project-metrics" data-project-metrics aria-live="polite"></div>
-      <div class="toolbar">
+      <div class="toolbar toolbar--filters">
         <label class="search-field">
           <span data-i18n="projects.searchProjects">${t("projects.searchProjects")}</span>
           <input data-search-projects type="search" placeholder="${t("projects.searchPlaceholder")}" disabled>
@@ -134,16 +154,25 @@ export const projectsPage = {
         </div>
       </div>
 
-      <div class="project-table" data-project-list aria-live="polite" aria-busy="true">
-        <div class="project-row project-row--skeleton"></div>
-        <div class="project-row project-row--skeleton"></div>
-        <div class="project-row project-row--skeleton"></div>
+      <div class="projects-table-scroll">
+        <div class="project-table" data-project-list aria-live="polite" aria-busy="true">
+          <div class="project-row project-row--skeleton"></div>
+          <div class="project-row project-row--skeleton"></div>
+          <div class="project-row project-row--skeleton"></div>
+        </div>
       </div>
     </section>
   `,
   afterRender: async () => {
     document.querySelector("[data-new-project]")?.addEventListener("click", () => {
       window.location.hash = "#/projects/new";
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest("[data-row-menu]")) closeRowMenus();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeRowMenus();
     });
 
     const search = document.querySelector("[data-search-projects]");
@@ -182,7 +211,7 @@ export const projectsPage = {
 
       list.innerHTML = `
         <div class="project-table__head" aria-hidden="true">
-          <span>CASE</span><span>${t("dashboard.project").toUpperCase()}</span><span>${t("common.status").toUpperCase()}</span><span>${t("common.client").toUpperCase()}</span><span>${t("common.category").toUpperCase()}</span><span>${t("projects.publication").toUpperCase()}</span><span>${t("projectEditor.liveDemo").toUpperCase()}</span><span>${t("projects.content").toUpperCase()}</span><span>${t("projectHealth.title").toUpperCase()}</span><span>${t("common.updated").toUpperCase()}</span><span>${t("projects.actions").toUpperCase()}</span>
+          <span>CASE</span><span>${t("dashboard.project").toUpperCase()}</span><span>${t("common.client").toUpperCase()}</span><span>${t("common.category").toUpperCase()}</span><span>${t("projects.publication").toUpperCase()}</span><span>${t("projectEditor.liveDemo").toUpperCase()}</span><span>${t("projects.content").toUpperCase()}</span><span>${t("projectHealth.title").toUpperCase()}</span><span>${t("common.updated").toUpperCase()}</span><span>${t("projects.actions").toUpperCase()}</span>
         </div>
         ${visible.length ? visible.map(projectCard).join("") : `<p class="empty-inline">${emptyMessage}</p>`}
       `;
@@ -190,6 +219,21 @@ export const projectsPage = {
       list.querySelectorAll("[data-project-open]").forEach((button) => {
         button.addEventListener("click", () => {
           window.location.hash = `#/projects/${button.dataset.projectOpen}`;
+        });
+      });
+
+      // Secondary actions live behind a per-row overflow menu, so the table
+      // keeps one button per row instead of four.
+      list.querySelectorAll("[data-row-menu-toggle]").forEach((toggle) => {
+        toggle.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const panel = toggle.nextElementSibling;
+          const willOpen = panel?.hidden;
+          closeRowMenus();
+          if (panel && willOpen) {
+            panel.hidden = false;
+            toggle.setAttribute("aria-expanded", "true");
+          }
         });
       });
     };

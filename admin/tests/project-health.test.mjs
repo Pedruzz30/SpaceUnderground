@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 
-import { contentCompleteness, isLivePreviewUrl, liveDemoState, projectHealth } from "../src/utils/project-health.js";
+import { contentCompleteness, isLivePreviewUrl, liveDemoState, projectHealth, publishReadiness } from "../src/utils/project-health.js";
 
 const completeProject = (overrides = {}) => ({
   name: "INK Tattoo",
@@ -97,5 +97,34 @@ describe("live demo validation", () => {
     assert.equal(isLivePreviewUrl("http://example.com"), true);
     assert.equal(isLivePreviewUrl("data:text/html,test"), false);
     assert.equal(isLivePreviewUrl("file:///tmp/demo.html"), false);
+  });
+});
+
+describe("poster: warning for health, blocking for publish", () => {
+  // The live cases predate the poster requirement and have none stored. Marking
+  // them "incomplete" would invalidate working projects, so health warns while
+  // the publish action still refuses to ship something new without one.
+  const posterless = () => completeProject({ poster: "" });
+
+  it("does not mark an existing published case incomplete for a missing poster", () => {
+    assert.equal(projectHealth(posterless()).status, "attention");
+  });
+
+  it("still blocks publishing without a poster, and says why", () => {
+    const readiness = publishReadiness(posterless());
+
+    assert.equal(readiness.canPublish, false);
+    assert.deepEqual(readiness.blocking.map((item) => item.key), ["poster"]);
+  });
+
+  it("allows publishing once the poster is there", () => {
+    assert.equal(publishReadiness(completeProject()).canPublish, true);
+  });
+
+  it("keeps a genuinely missing essential field blocking and incomplete", () => {
+    const noName = completeProject({ name: "" });
+
+    assert.equal(projectHealth(noName).status, "incomplete");
+    assert.ok(publishReadiness(noName).blocking.some((item) => item.key === "name"));
   });
 });

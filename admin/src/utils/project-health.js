@@ -69,7 +69,9 @@ export function projectHealth(project = {}) {
     check("client", text(project.client)),
     check("category", text(project.category)),
     check("descriptionPt", text(project.description)),
-    check("poster", text(project.poster)),
+    // A poster blocks publishing, but a live case that predates the requirement
+    // is not "incomplete" for lacking one -- it reads as attention instead.
+    check("poster", text(project.poster), "publish"),
     check("modules", Array.isArray(project.modules) && project.modules.length > 0),
     check("projectUrl", text(project.projectUrl)),
   ];
@@ -87,7 +89,8 @@ export function projectHealth(project = {}) {
 
   const required = checks.filter((item) => item.severity === "required");
   const requiredOk = required.every((item) => item.ok);
-  const warnings = checks.filter((item) => item.severity === "warning" && !item.ok);
+  // "publish" checks gate the publish action but only warn in the hub.
+  const warnings = checks.filter((item) => item.severity !== "required" && !item.ok);
   const status = requiredOk ? (warnings.length ? "attention" : "healthy") : "incomplete";
 
   return {
@@ -100,11 +103,15 @@ export function projectHealth(project = {}) {
   };
 }
 
+// Publishing is stricter than health: a case already on the site may be missing
+// a poster, but nothing new should go out without one.
 export function publishReadiness(project = {}) {
   const health = projectHealth({ ...project, editorialStatus: "PUBLISHED" });
+  const blocks = (item) => item.severity === "required" || item.severity === "publish";
+
   return {
-    canPublish: health.checks.filter((item) => item.severity === "required").every((item) => item.ok),
-    blocking: health.checks.filter((item) => item.severity === "required" && !item.ok),
+    canPublish: health.checks.filter(blocks).every((item) => item.ok),
+    blocking: health.checks.filter((item) => blocks(item) && !item.ok),
     warnings: health.checks.filter((item) => item.severity === "warning" && !item.ok),
     health,
   };

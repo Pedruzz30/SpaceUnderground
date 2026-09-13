@@ -87,6 +87,7 @@ export default {
     other: "Outro",
   },
   nav: {
+    dashboard: "Dashboard",
     overview: "Visão geral",
     operations: "Operações",
     content: "Conteúdo",
