@@ -25,6 +25,15 @@ import { BASE_LOCALE, TRANSLATION_LOCALE, localeHint, localeTabs } from "../comp
 import { publicSiteUrl } from "../config/public-site.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 import { isLivePreviewUrl, liveDemoState, projectHealth, publishReadiness } from "../utils/project-health.js";
+import { analyzeProject, dispatchAutomation, isAutomationApiAvailable } from "../services/automation-api.js";
+import { isSupabaseMode } from "../config/env.js";
+import {
+  ERROR,
+  IDLE,
+  LOADING,
+  NOT_CONFIGURED,
+  SUCCESS,
+} from "../utils/automation-state.js";
 
 const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/avif,image/gif";
 
@@ -241,6 +250,77 @@ function healthCardMarkup(health) {
   `;
 }
 
+// The analysis comes from the Python service, so the row it describes is the
+// one already stored -- not the unsaved form. The two are deliberately shown
+// side by side: the health card answers "is this form ready to publish?", this
+// one answers "is what is in the database coherent?".
+//
+// Check severities map onto the classes the health card already uses, so both
+// read the same way: ok, warning, and required for a hard failure.
+const ANALYSIS_CHECK_CLASS = { ok: "ok", warn: "warning", fail: "required" };
+
+function analysisMarkup(state) {
+  if (state.status === NOT_CONFIGURED) {
+    return `<p class="empty-inline" data-i18n="projectAnalysis.notConfigured">${escapeHtml(t("projectAnalysis.notConfigured"))}</p>`;
+  }
+
+  if (state.status === LOADING) {
+    return `<p class="empty-inline" data-i18n="projectAnalysis.loading">${escapeHtml(t("projectAnalysis.loading"))}</p>`;
+  }
+
+  if (state.status === ERROR) {
+    // An unreachable service and a failed analysis are different facts, and the
+    // operator needs to know which one happened before deciding to retry.
+    const key = state.error?.code === "network_error" || state.error?.code === "timeout"
+      ? "projectAnalysis.offline"
+      : "projectAnalysis.unavailable";
+    return `<p class="empty-inline" data-i18n="${key}">${escapeHtml(t(key))}</p>`;
+  }
+
+  if (state.status !== SUCCESS || !state.data) {
+    return `<p class="empty-inline" data-i18n="projectAnalysis.notSaved">${escapeHtml(t("projectAnalysis.notSaved"))}</p>`;
+  }
+
+  const analysis = state.data;
+  const checks = Array.isArray(analysis.checks) ? analysis.checks : [];
+  const recommendations = Array.isArray(analysis.recommendations) ? analysis.recommendations : [];
+
+  return `
+    <div class="analysis-summary">
+      <div>
+        <span data-i18n="projectAnalysis.score">${escapeHtml(t("projectAnalysis.score"))}</span>
+        <strong>${escapeHtml(t("projectAnalysis.scoreValue", { score: analysis.score }))}</strong>
+      </div>
+      <div>
+        <span data-i18n="projectAnalysis.status">${escapeHtml(t("projectAnalysis.status"))}</span>
+        ${statusBadge(t(HEALTH_LABEL_KEYS[analysis.status] ?? "projectHealth.status.attention"), analysis.status)}
+      </div>
+    </div>
+
+    <div class="health-checks">
+      ${checks
+        .map(
+          (check) => `
+        <div class="health-check health-check--${escapeAttribute(ANALYSIS_CHECK_CLASS[check.status] ?? "warning")}">
+          <span aria-hidden="true">${check.status === "ok" ? "OK" : "!"}</span>
+          <strong>${escapeHtml(check.message)}</strong>
+        </div>
+      `,
+        )
+        .join("")}
+    </div>
+
+    ${
+      recommendations.length
+        ? `<div class="analysis-recommendations">
+             <span data-i18n="projectAnalysis.recommendations">${escapeHtml(t("projectAnalysis.recommendations"))}</span>
+             <ul>${recommendations.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+           </div>`
+        : `<p class="empty-inline" data-i18n="projectAnalysis.allClear">${escapeHtml(t("projectAnalysis.allClear"))}</p>`
+    }
+  `;
+}
+
 function overviewBadgesMarkup(values, health) {
   const completeness = health.completeness;
   return `
@@ -283,6 +363,17 @@ function overviewMarkup(project) {
             <button type="button" class="button" data-editor-action data-action-demo ${demo === "live" ? "" : "disabled"}>${t("projectEditor.openDemo")}</button>
           </div>
         </article>
+      </section>
+
+      <section class="overview-analysis panel" aria-labelledby="project-analysis-title">
+        <header class="panel__head">
+          <div>
+            <span data-i18n="projectAnalysis.title">${escapeHtml(t("projectAnalysis.title"))}</span>
+            <h3 id="project-analysis-title" data-i18n="projectAnalysis.intro">${escapeHtml(t("projectAnalysis.intro"))}</h3>
+          </div>
+          <button type="button" class="button" data-action-analyze data-i18n="projectAnalysis.retry">${escapeHtml(t("projectAnalysis.retry"))}</button>
+        </header>
+        <div data-project-analysis aria-live="polite">${analysisMarkup({ status: IDLE, data: null, error: null })}</div>
       </section>
     </div>
   `;
@@ -901,6 +992,97 @@ function mount(project, isCreate) {
 
   refreshProjectSignals();
 
+  /* ------------------------------------------------ operational analysis */
+
+  // The analysis describes the stored row, so it is only meaningful once the
+  // project exists. In create mode there is nothing to analyse and the Overview
+  // tab is not rendered at all.
+  //
+  // The API accepts a uuid or a case number. `dbId` is the real primary key and
+  // is preferred; in mock mode it is null, and the padded case number ("001")
+  // is what the service resolves instead.
+  //
+  // Mock mode is excluded on purpose. The service always reads the real
+  // Supabase project, while the Admin is reading localStorage, so an analysis
+  // shown here would describe a different row than the one on screen -- a
+  // report that looks right and is about something else.
+  const analysisId = isCreate || !isSupabaseMode() ? "" : String(project.dbId || project.id || "");
+  let analysisState = { status: IDLE, data: null, error: null };
+  let analysisRequest = null;
+
+  function paintAnalysis() {
+    const target = form.querySelector("[data-project-analysis]");
+    if (!target?.isConnected) return;
+
+    target.innerHTML = analysisMarkup(analysisState);
+    // Nothing to retry while a request is running, when there is no row to
+    // analyse, or when the service was never configured.
+    const retry = form.querySelector("[data-action-analyze]");
+    if (retry) {
+      retry.disabled =
+        analysisState.status === LOADING
+        || analysisState.status === NOT_CONFIGURED
+        || !analysisId;
+    }
+    applyStaticTranslations(target);
+  }
+
+  async function runAnalysis({ force = false } = {}) {
+    if (!analysisId) return;
+
+    // Not configured is not a failure: no request is made and the section says
+    // so. This is what keeps the editor working with Python switched off.
+    if (!isAutomationApiAvailable()) {
+      analysisState = { status: NOT_CONFIGURED, data: null, error: null };
+      paintAnalysis();
+      return;
+    }
+
+    // Opening the tab twice, or opening it while a request is in flight, must
+    // not produce a second call.
+    if (analysisRequest && !force) return;
+    if (!force && analysisState.status === SUCCESS) return;
+
+    analysisState = { status: LOADING, data: null, error: null };
+    paintAnalysis();
+
+    analysisRequest = analyzeProject(analysisId)
+      .then((data) => {
+        analysisState = { status: SUCCESS, data, error: null };
+      })
+      .catch((error) => {
+        // A failed analysis never touches the form: the editor stays usable and
+        // the section offers a retry.
+        analysisState = {
+          status: error?.code === "not_configured" ? NOT_CONFIGURED : ERROR,
+          data: null,
+          error,
+        };
+      })
+      .finally(() => {
+        analysisRequest = null;
+        if (form.isConnected) paintAnalysis();
+      });
+  }
+
+  form.querySelector("[data-action-analyze]")?.addEventListener("click", () => {
+    runAnalysis({ force: true });
+  });
+
+  // Entering the Overview tab is what triggers the first analysis; it is never
+  // driven by typing.
+  form.querySelector('[role="tab"][data-tab="overview"]')?.addEventListener("click", () => {
+    runAnalysis();
+  });
+
+  // Painted once up front so the retry button carries the right disabled state
+  // even when there is nothing to analyse.
+  paintAnalysis();
+
+  // Overview is the tab the editor opens on for an existing project, so the
+  // first analysis runs at mount without waiting for a click.
+  if (!isCreate) runAnalysis();
+
   // Slug auto-generation from the project name until manually edited.
   form.elements.slug.addEventListener("input", () => {
     slugTouched = true;
@@ -1269,10 +1451,35 @@ function mount(project, isCreate) {
       unsavedUploads.clear();
       await removeProjectImages(pendingDeletions.splice(0));
       showToast(t("projectEditor.projectPublished"));
+
+      // Publishing belongs to Supabase and is already done. The automation is a
+      // separate responsibility: it is fired after the fact, it is not awaited,
+      // and it can never turn a successful publication into a failure.
+      notifyPublished(updated);
+
       await loadEditor(updated.id);
     } catch (error) {
       reportFailure(error, t("projectEditor.publishError"));
     }
+  }
+
+  // Deliberately not async and deliberately not awaited by the caller. A
+  // rejected dispatch is reported as a light notice; there is no rollback,
+  // because the project really is published.
+  function notifyPublished(updated) {
+    if (!isAutomationApiAvailable() || !isSupabaseMode()) return;
+
+    const projectId = String(updated?.dbId || updated?.id || analysisId || "");
+    if (!projectId) return;
+
+    dispatchAutomation("project.published", { project_id: projectId })
+      .then(() => {
+        // The next analysis should describe the row as just published.
+        analysisState = { status: IDLE, data: null, error: null };
+      })
+      .catch(() => {
+        showToast(t("automation.dispatchFailed"));
+      });
   }
 
   async function handleArchive() {

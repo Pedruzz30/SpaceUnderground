@@ -433,3 +433,47 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Automation service: the processing layer surfaced inside the panel grid.
+   The dot is decorative -- every state is also written out next to it. */
+.dash-dot--ok {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.dash-dot--neutral {
+  background: var(--border-strong);
+}
+
+.automation-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.automation-head > span {
+  color: var(--text-muted);
+  font: 500 0.6rem/1.5 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.automation-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.automation-status strong {
+  font: 500 0.62rem/1.5 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Reserves the height the figures will take, so resolving the request does not
+   shove the panels below it down the page. */
+.dash-operations {
+  min-height: 7.5rem;
+}

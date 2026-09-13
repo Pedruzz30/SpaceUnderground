@@ -1,4 +1,13 @@
 import { getActivity } from "../services/activity-service.js";
+import { getRegisteredAutomations } from "../services/automation-api.js";
+import { serviceStatusMarkup } from "../components/automation-panel.js";
+import {
+  ERROR,
+  LOADING,
+  NOT_CONFIGURED,
+  SUCCESS,
+  createAutomationResource,
+} from "../utils/automation-state.js";
 import { onLocaleChange, plural, t } from "../i18n/index.js";
 import { escapeHtml } from "../utils/html.js";
 
@@ -87,6 +96,43 @@ function filterGroup({ labelKey, name, options, activeOption, ariaKey, optionKey
   `;
 }
 
+const automationsResource = createAutomationResource(() => getRegisteredAutomations());
+
+// Capability only. The service keeps no execution history, so this reports
+// which automations exist and nothing more -- inventing a run count here would
+// be a number with no source.
+function renderAutomationEngine(state) {
+  if (state.status === NOT_CONFIGURED) {
+    return `<p class="empty-inline" data-i18n="automation.notConfiguredHint">${t("automation.notConfiguredHint")}</p>`;
+  }
+  if (state.status === ERROR) {
+    return `<p class="empty-inline" data-i18n="automation.unavailable">${t("automation.unavailable")}</p>`;
+  }
+  if (state.status !== SUCCESS) {
+    return `<p class="empty-inline" data-i18n="common.loading">${t("common.loading")}...</p>`;
+  }
+
+  const items = Array.isArray(state.data) ? state.data : [];
+  if (!items.length) {
+    return `<p class="empty-inline" data-i18n="automation.noAutomations">${t("automation.noAutomations")}</p>`;
+  }
+
+  return `
+    <div class="ops-figures">
+      ${items
+        .map(
+          (item) => `
+        <div>
+          <span>${escapeHtml(String(item.event ?? ""))}</span>
+          <strong data-i18n="automation.ready">${escapeHtml(t("automation.ready"))}</strong>
+        </div>
+      `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 export const logsPage = {
   title: () => t("logs.title"),
   breadcrumb: () => t("logs.breadcrumb"),
@@ -95,6 +141,19 @@ export const logsPage = {
       <span data-i18n="logs.eyebrow">${t("logs.eyebrow")}</span>
       <h2 data-i18n="logs.heading">${t("logs.heading")}</h2>
       <p data-i18n="logs.intro">${t("logs.intro")}</p>
+    </section>
+
+    <section class="panel">
+      <header class="panel__head">
+        <div>
+          <span data-i18n="automation.engine">${t("automation.engine")}</span>
+          <h3 data-i18n="automation.engineIntro">${t("automation.engineIntro")}</h3>
+        </div>
+        ${serviceStatusMarkup(LOADING)}
+      </header>
+      <div data-automation-engine aria-live="polite">
+        ${renderAutomationEngine({ status: LOADING, data: null, error: null })}
+      </div>
     </section>
 
     <section class="panel">
@@ -125,6 +184,22 @@ export const logsPage = {
     </section>
   `,
   afterRender: async () => {
+    // Resolved on its own: the activity log below must render whether or not
+    // the processing service answers.
+    const engineEl = document.querySelector("[data-automation-engine]");
+    const engineStatusEl = engineEl?.parentElement?.querySelector(".automation-status");
+
+    function paintEngine(state) {
+      if (!engineEl?.isConnected) return;
+      engineEl.innerHTML = renderAutomationEngine(state);
+      if (engineStatusEl) engineStatusEl.outerHTML = serviceStatusMarkup(state.status);
+    }
+
+    automationsResource
+      .read()
+      .then(paintEngine)
+      .catch(() => paintEngine({ status: ERROR, data: null, error: null }));
+
     const table = document.querySelector("[data-log-table]");
     const count = document.querySelector("[data-log-count]");
     const channelButtons = [...document.querySelectorAll("[data-log-channel-filter]")];

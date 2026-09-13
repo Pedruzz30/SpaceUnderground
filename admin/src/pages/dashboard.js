@@ -8,6 +8,15 @@ import {
   demoPipelineStages,
   demoTransactions,
 } from "../data/operations-demo.js";
+import { getOperationsOverview } from "../services/automation-api.js";
+import { overviewFiguresMarkup, overviewTimestamp, serviceStatusMarkup } from "../components/automation-panel.js";
+import {
+  ERROR,
+  LOADING,
+  NOT_CONFIGURED,
+  SUCCESS,
+  createAutomationResource,
+} from "../utils/automation-state.js";
 import { getActivityWithStatus } from "../services/activity-service.js";
 import { getProjects } from "../services/project-service.js";
 import { describeError } from "../services/errors.js";
@@ -287,6 +296,38 @@ function renderHealth({ projects, projectsOk, activityOk }) {
   `;
 }
 
+/* --------------------------------------------------- operations intelligence */
+
+// Kept at module scope so returning to the Dashboard within the TTL reuses the
+// last answer instead of re-querying on every navigation.
+const overviewResource = createAutomationResource(() => getOperationsOverview());
+
+function renderOperations(state) {
+  const body = () => {
+    if (state.status === NOT_CONFIGURED) {
+      return `<p class="empty-inline" data-i18n="automation.notConfiguredHint">${t("automation.notConfiguredHint")}</p>`;
+    }
+    if (state.status === ERROR) {
+      return `<p class="empty-inline" data-i18n="operations.loadError">${t("operations.loadError")}</p>`;
+    }
+    if (state.status !== SUCCESS) {
+      return `<div class="dash-skeleton"></div><div class="dash-skeleton"></div>`;
+    }
+    return overviewFiguresMarkup(state.data);
+  };
+
+  const time = state.status === SUCCESS ? overviewTimestamp(state.data) : "";
+
+  return `
+    <div class="automation-head">
+      <span data-i18n="automation.service">${t("automation.service")}</span>
+      ${serviceStatusMarkup(state.status)}
+    </div>
+    ${body()}
+    ${time ? `<p class="dash-inline-note">${escapeHtml(t("operations.updatedAt", { time }))}</p>` : ""}
+  `;
+}
+
 /* ------------------------------------------------------------------- page */
 
 export const dashboardPage = {
@@ -365,6 +406,13 @@ export const dashboardPage = {
         ${panelHead(t("dashboard.recentActivity"), t("dashboard.administrativeLog"), "dash-activity-title", textLink("#/logs", t("dashboard.viewAllLogs")))}
         <div class="activity-list" data-activity aria-busy="true">
           <p class="empty-inline">${t("common.loading")}...</p>
+        </div>
+      </article>
+
+      <article class="panel dash-panel--operations" aria-labelledby="dash-operations-title">
+        ${panelHead(t("operations.title"), t("operations.intro"), "dash-operations-title")}
+        <div class="dash-operations" data-operations aria-live="polite" aria-busy="true">
+          ${renderOperations({ status: LOADING, data: null, error: null })}
         </div>
       </article>
 
@@ -450,6 +498,31 @@ export const dashboardPage = {
       paintData();
       financeEl.innerHTML = renderFinancial(periodEl.value);
     });
+
+    // The automation API is optional and slower than the local reads, so it is
+    // resolved on its own. Nothing above waits for it and a failure here cannot
+    // reach the rest of the Dashboard.
+    const operationsEl = document.querySelector("[data-operations]");
+    let operationsState = { status: LOADING, data: null, error: null };
+
+    function paintOperations() {
+      if (!operationsEl?.isConnected) return;
+      operationsEl.innerHTML = renderOperations(operationsState);
+      operationsEl.toggleAttribute("aria-busy", operationsState.status === LOADING);
+    }
+
+    overviewResource
+      .read()
+      .then((state) => {
+        operationsState = state;
+        paintOperations();
+      })
+      .catch(() => {
+        operationsState = { status: ERROR, data: null, error: null };
+        paintOperations();
+      });
+
+    if (operationsEl) onLocaleChange(operationsEl, paintOperations);
 
     attentionEl?.removeAttribute("aria-busy");
     pulseEl.removeAttribute("aria-busy");

@@ -1,5 +1,8 @@
 import { showToast } from "../components/toast.js";
-import { DATA_SOURCE, isSupabaseConfigured } from "../config/env.js";
+import { DATA_SOURCE, automationApiToken, isSupabaseConfigured } from "../config/env.js";
+import { getAutomationHealth, isAutomationApiAvailable } from "../services/automation-api.js";
+import { serviceStatusMarkup } from "../components/automation-panel.js";
+import { ERROR, LOADING, NOT_CONFIGURED, SUCCESS } from "../utils/automation-state.js";
 import { onLocaleChange, t } from "../i18n/index.js";
 import { BASE_LOCALE, TRANSLATION_LOCALE, localeHint, localeTabs } from "../components/locale-fields.js";
 import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
@@ -198,6 +201,10 @@ export const settingsPage = {
               <div><span data-i18n="settings.database">${t("settings.database")}</span><strong>${isSupabaseConfigured() ? t("common.configured") : t("common.notConfigured")}</strong></div>
               <div><span data-i18n="settings.storage">${t("settings.storage")}</span><strong>${isSupabaseConfigured() ? t("common.projectMedia") : t("common.mockMode")}</strong></div>
               <div><span data-i18n="settings.publicSite">${t("settings.publicSite")}</span><strong data-i18n="settings.readOnlyAnonKey">${t("settings.readOnlyAnonKey")}</strong></div>
+              <div><span data-i18n="automation.service">${t("automation.service")}</span><strong data-automation-service>${t("automation.checking")}</strong></div>
+              <div><span data-i18n="automation.endpoint">${t("automation.endpoint")}</span><strong>${isAutomationApiAvailable() ? t("automation.endpointConfigured") : t("common.notConfigured")}</strong></div>
+              <div><span data-i18n="automation.auth">${t("automation.auth")}</span><strong>${automationApiToken() ? t("automation.authEnabled") : t("automation.authDisabled")}</strong></div>
+              <div><span data-i18n="automation.version">${t("automation.version")}</span><strong data-automation-version>&mdash;</strong></div>
             </div>
             <p data-i18n="settings.noSecrets">${t("settings.noSecrets")}</p>
           </section>
@@ -205,6 +212,25 @@ export const settingsPage = {
         </aside>
       `;
       form.removeAttribute("aria-busy");
+
+      // Diagnostic only, and never the token: the value is read from the
+      // service itself so the row reports what is actually answering.
+      const serviceEl = form.querySelector("[data-automation-service]");
+      const versionEl = form.querySelector("[data-automation-version]");
+
+      function paintAutomation(status, version) {
+        if (serviceEl?.isConnected) serviceEl.innerHTML = serviceStatusMarkup(status);
+        if (versionEl?.isConnected && version) versionEl.textContent = version;
+      }
+
+      if (!isAutomationApiAvailable()) {
+        paintAutomation(NOT_CONFIGURED);
+      } else {
+        paintAutomation(LOADING);
+        getAutomationHealth()
+          .then((health) => paintAutomation(SUCCESS, health?.version))
+          .catch(() => paintAutomation(ERROR));
+      }
       seoBase = { seoTitle: settings.seoTitle ?? "", seoDescription: settings.seoDescription ?? "" };
       seoTranslation = { ...(settings.translations?.[TRANSLATION_LOCALE] ?? {}) };
       settingsTranslations = settings.translations ?? {};
