@@ -154,6 +154,7 @@ try {
   assert.equal(await page.getAttribute("#tab-media", "aria-selected"), "true", "media tab via keyboard");
 
   // Invalid URL blocks creation, valid URL lets it through.
+  await page.click("#tab-general");
   await page.fill("#field-projectUrl", "not-a-url");
   await page.click("[data-action-create]");
   await settle();
@@ -163,6 +164,8 @@ try {
   await page.click("[data-action-create]");
   await page.waitForSelector("[data-action-save]");
   assert.equal(await hash(), "#/projects/003", "created project opens");
+  assert.equal(await page.getAttribute("#tab-overview", "aria-selected"), "true", "existing project opens on overview");
+  await page.click("#tab-general");
 
   // Editing marks the editor dirty.
   await page.fill("#field-name", "Nebula Client Portal v2");
@@ -184,10 +187,17 @@ try {
 
   await page.click("[data-action-publish]");
   await settle();
-  assert.equal(await page.locator(".editor-identity .badge").getAttribute("data-status-label"), "PUBLISHED", "published badge");
+  await page.waitForSelector(".modal");
+  assert.match(await page.locator(".modal").innerText(), /Poster/, "readiness blocks publishing without a poster");
+  await page.click("[data-modal-action='0']");
+  await settle();
+  assert.equal(await page.locator(".editor-identity .badge").getAttribute("data-status-label"), "DRAFT", "publish stays draft when readiness blocks");
 
   // Changes survive a reload.
   await page.reload();
+  await page.waitForSelector("#tab-general");
+  assert.equal(await page.getAttribute("#tab-overview", "aria-selected"), "true", "reload opens overview");
+  await page.click("#tab-general");
   await page.waitForSelector("#field-name");
   assert.equal(await page.inputValue("#field-name"), "Nebula Client Portal v2", "persisted after reload");
 
@@ -200,6 +210,7 @@ try {
   await page.click("[data-action-save]");
   await page.waitForSelector("[data-save-state].is-saved");
   await page.reload();
+  await page.waitForSelector("#tab-presentation");
   await page.click("#tab-presentation");
   assert.equal(await page.locator(".module-card").count(), 2, "module removal persisted");
   assert.equal(await page.inputValue("#field-module-title-1"), "ORQUESTRAÇÃO", "module reorder/edit persisted");
@@ -213,12 +224,12 @@ try {
 
   await page.click('a[href="#/projects"]');
   await waitForRows();
-  await page.click('[data-editorial-filter="ARCHIVED"]');
+  await page.selectOption('[data-project-filter="editorial"]', "ARCHIVED");
   await settle();
   assert.equal(await rows().count(), 1, "archived filter");
 
   // Delete returns to the list.
-  await page.click(`${ROW}[data-project-id="003"]`);
+  await page.click('[data-project-open="003"]');
   await page.waitForSelector("[data-action-delete]");
   await page.click("[data-action-delete]");
   await page.waitForSelector(".modal");

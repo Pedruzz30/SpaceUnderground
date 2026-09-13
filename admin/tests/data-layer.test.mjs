@@ -118,7 +118,7 @@ describe("project service (mock repository)", () => {
   });
 
   it("rejects updates to a project that does not exist", async () => {
-    await assert.rejects(() => updateProject("999", { name: "Nope" }), /not found/i);
+    await assert.rejects(() => updateProject("999", { name: "Nope" }), /not found|não encontrado/i);
   });
 
   it("records activity for create, archive and delete", async () => {
@@ -153,6 +153,7 @@ describe("project mapper", () => {
       poster_url: "poster.png",
       project_url: "https://example.com",
       preview_url: null,
+      live_preview_enabled: true,
     });
 
     assert.equal(model.id, "003");
@@ -162,6 +163,7 @@ describe("project mapper", () => {
     assert.equal(model.year, "2026");
     assert.equal(model.poster, "poster.png");
     assert.equal(model.previewUrl, "");
+    assert.equal(model.livePreviewEnabled, true);
     assert.deepEqual(model.techStack, ["Node"]);
   });
 
@@ -174,6 +176,7 @@ describe("project mapper", () => {
       year: "2026",
       poster: "poster.png",
       previewUrl: "",
+      livePreviewEnabled: false,
     });
 
     assert.equal(row.case_number, 3);
@@ -181,6 +184,7 @@ describe("project mapper", () => {
     assert.equal(row.year, 2026);
     assert.equal(row.poster_url, "poster.png");
     assert.equal(row.preview_url, null);
+    assert.equal(row.live_preview_enabled, false);
     assert.deepEqual(row.tech_stack, ["Node"]);
     // Fields that were not provided must not appear in the patch.
     assert.equal("slug" in row, false);

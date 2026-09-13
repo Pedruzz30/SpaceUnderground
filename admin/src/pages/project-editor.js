@@ -23,6 +23,7 @@ import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
 import { applyStaticTranslations, subscribeLocaleChange, t, statusLabel } from "../i18n/index.js";
 import { BASE_LOCALE, TRANSLATION_LOCALE, localeHint, localeTabs } from "../components/locale-fields.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
+import { isLivePreviewUrl, liveDemoState, projectHealth, publishReadiness } from "../utils/project-health.js";
 
 const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/avif,image/gif";
 
@@ -46,6 +47,10 @@ function isValidUrl(value) {
   } catch {
     return false;
   }
+}
+
+function isRequiredLivePreviewUrl(value) {
+  return isLivePreviewUrl(value);
 }
 
 function isValidHex(value) {
@@ -76,7 +81,8 @@ function validate(values) {
   if (!PROJECT_STATUSES.includes(values.status)) errors.status = t("projectEditor.validation.statusValid");
   if (!EDITORIAL_STATUSES.includes(values.editorialStatus)) errors.editorialStatus = t("projectEditor.validation.editorialStatusValid");
   if (!isValidUrl(values.projectUrl)) errors.projectUrl = t("projectEditor.validation.urlValid");
-  if (!isValidUrl(values.previewUrl)) errors.previewUrl = t("projectEditor.validation.urlValid");
+  if (values.previewUrl && !isRequiredLivePreviewUrl(values.previewUrl)) errors.previewUrl = t("projectEditor.validation.previewUrlValid");
+  if (values.livePreviewEnabled && !isRequiredLivePreviewUrl(values.previewUrl)) errors.previewUrl = t("projectEditor.validation.previewUrlValid");
   if (values.accent && !isValidHex(values.accent)) errors.accent = t("projectEditor.validation.hexValid");
   const untitledModule = (values.modules || []).findIndex((module) => !module.title.trim());
   if (untitledModule >= 0) errors[`module-title-${untitledModule}`] = t("projectEditor.validation.moduleTitleRequired");
@@ -143,6 +149,7 @@ function blankProject(caseNumber) {
     gallery: [],
     projectUrl: "",
     previewUrl: "",
+    livePreviewEnabled: false,
     createdAt: null,
     updatedAt: null,
     publishedAt: null,
@@ -182,10 +189,122 @@ function moduleMarkup(module, index, total, editLocale = BASE_LOCALE) {
   `;
 }
 
+const HEALTH_LABEL_KEYS = {
+  healthy: "projectHealth.status.healthy",
+  attention: "projectHealth.status.attention",
+  incomplete: "projectHealth.status.incomplete",
+};
+
+const DEMO_LABEL_KEYS = {
+  live: "projectHealth.demo.live",
+  none: "projectHealth.demo.none",
+  invalid: "projectHealth.demo.invalid",
+};
+
+const CHECK_LABEL_KEYS = {
+  name: "projectHealth.checks.name",
+  client: "projectHealth.checks.client",
+  category: "projectHealth.checks.category",
+  descriptionPt: "projectHealth.checks.descriptionPt",
+  poster: "projectHealth.checks.poster",
+  modules: "projectHealth.checks.modules",
+  projectUrl: "projectHealth.checks.projectUrl",
+  publicationConsistency: "projectHealth.checks.publicationConsistency",
+  liveDemoUrl: "projectHealth.checks.liveDemoUrl",
+  englishCompleteness: "projectHealth.checks.englishCompleteness",
+};
+
+function statusBadge(label, state) {
+  const type = state === "healthy" || state === "live" ? "success" : state === "none" ? "muted" : "warning";
+  return `<span class="badge badge--${type}">${escapeHtml(label)}</span>`;
+}
+
+function healthChecksMarkup(health) {
+  return `
+    <div class="health-checks">
+      ${health.checks.map((item) => `
+        <div class="health-check health-check--${item.ok ? "ok" : item.severity}">
+          <span aria-hidden="true">${item.ok ? "OK" : "!"}</span>
+          <strong>${escapeHtml(t(CHECK_LABEL_KEYS[item.key]))}</strong>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function overviewMarkup(project) {
+  const health = projectHealth(project);
+  const completeness = health.completeness;
+  const demo = health.demo;
+  const publicUrl = project.slug ? `../#work` : "";
+
+  return `
+    <div class="project-overview">
+      <section class="overview-hero">
+        <div>
+          <span>${escapeHtml(t("projectEditor.caseLabel", { caseNumber: project.caseNumber }))}</span>
+          <h3>${escapeHtml(project.name || t("projects.untitled"))}</h3>
+        </div>
+        <div class="overview-badges">
+          ${badge(project.editorialStatus, badgeType(project.editorialStatus))}
+          ${statusBadge(project.visible ? t("common.visible") : t("common.hidden"), project.visible ? "healthy" : "none")}
+          ${statusBadge(t(DEMO_LABEL_KEYS[demo]), demo)}
+          ${statusBadge(t("projectHealth.content.pt", { percent: completeness.pt.percent }), completeness.pt.percent === 100 ? "healthy" : "attention")}
+          ${statusBadge(t("projectHealth.content.en", { percent: completeness.en.percent }), completeness.en.percent === 100 ? "healthy" : "attention")}
+        </div>
+      </section>
+
+      <section class="overview-grid">
+        <article class="overview-card">
+          <span>${escapeHtml(t("projectHealth.title"))}</span>
+          <strong>${escapeHtml(t("projectHealth.score", { score: health.score, total: health.total }))}</strong>
+          ${statusBadge(t(HEALTH_LABEL_KEYS[health.status]), health.status)}
+          ${healthChecksMarkup(health)}
+        </article>
+        <article class="overview-card">
+          <span>${escapeHtml(t("projectEditor.quickActions"))}</span>
+          <div class="overview-actions">
+            <button type="submit" class="button" data-editor-action data-action-overview-save>${t("common.save")}</button>
+            <button type="button" class="button button--primary" data-editor-action data-action-overview-publish>${t("projectEditor.publishChanges")}</button>
+            <a class="button" href="${escapeAttribute(publicUrl || "#/projects")}" target="_blank" rel="noreferrer" ${publicUrl ? "" : "aria-disabled=\"true\""}>${t("projectEditor.viewPublic")}</a>
+            <a class="button" href="${escapeAttribute(project.projectUrl || "#")}" target="_blank" rel="noreferrer" ${project.projectUrl ? "" : "aria-disabled=\"true\""}>${t("projectEditor.openProject")}</a>
+            <button type="button" class="button" data-editor-action data-action-demo ${demo === "live" ? "" : "disabled"}>${t("projectEditor.openDemo")}</button>
+          </div>
+        </article>
+      </section>
+    </div>
+  `;
+}
+
+function liveDemoMarkup(project) {
+  const demo = liveDemoState(project);
+  return `
+    <div class="live-demo-panel">
+      <div class="live-demo-status">
+        <span>${escapeHtml(t("projectEditor.liveDemoStatus"))}</span>
+        ${statusBadge(t(DEMO_LABEL_KEYS[demo]), demo)}
+      </div>
+      <fieldset class="field field--wide">
+        <legend data-i18n="projectEditor.liveDemo">${t("projectEditor.liveDemo")}</legend>
+        <div class="checks">
+          <label><input type="checkbox" name="livePreviewEnabled" ${project.livePreviewEnabled ? "checked" : ""}> <span data-i18n="projectEditor.enableLiveDemo">${t("projectEditor.enableLiveDemo")}</span></label>
+        </div>
+      </fieldset>
+      <div class="form-grid">
+        ${fieldMarkup({ labelKey: "projectEditor.previewUrl", name: "previewUrl", value: project.previewUrl, type: "url", hintKey: "projectEditor.previewUrlHint" })}
+      </div>
+      <div class="media-actions">
+        <button type="button" class="button" data-editor-action data-action-test-demo ${demo === "live" ? "" : "disabled"} data-i18n="projectEditor.testDemo">${t("projectEditor.testDemo")}</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderEditor(project, isCreate) {
   const accentValue = project.accent || "#c6ff00";
   const presentation = project.presentation || {};
   const coordinates = Array.isArray(presentation.coordinates) ? presentation.coordinates : [];
+  const activeTab = isCreate ? "general" : "overview";
 
   return `
     <section class="page-heading page-heading--split">
@@ -217,13 +336,19 @@ function renderEditor(project, isCreate) {
       </div>
 
       <div class="tabs" role="tablist" aria-label="${t("projectEditor.sections")}" data-i18n-aria-label="projectEditor.sections">
-        <button type="button" role="tab" id="tab-general" aria-selected="true" aria-controls="panel-general" data-tab="general" tabindex="0" data-i18n="projectEditor.general">${t("projectEditor.general")}</button>
+        <button type="button" role="tab" id="tab-overview" aria-selected="${activeTab === "overview"}" aria-controls="panel-overview" data-tab="overview" tabindex="${activeTab === "overview" ? "0" : "-1"}" data-i18n="projectEditor.overview">${t("projectEditor.overview")}</button>
+        <button type="button" role="tab" id="tab-general" aria-selected="${activeTab === "general"}" aria-controls="panel-general" data-tab="general" tabindex="${activeTab === "general" ? "0" : "-1"}" data-i18n="projectEditor.general">${t("projectEditor.general")}</button>
         <button type="button" role="tab" id="tab-presentation" aria-selected="false" aria-controls="panel-presentation" data-tab="presentation" tabindex="-1" data-i18n="projectEditor.presentation">${t("projectEditor.presentation")}</button>
         <button type="button" role="tab" id="tab-media" aria-selected="false" aria-controls="panel-media" data-tab="media" tabindex="-1" data-i18n="projectEditor.media">${t("projectEditor.media")}</button>
+        <button type="button" role="tab" id="tab-live-demo" aria-selected="false" aria-controls="panel-live-demo" data-tab="live-demo" tabindex="-1" data-i18n="projectEditor.liveDemo">${t("projectEditor.liveDemo")}</button>
         <button type="button" role="tab" id="tab-publishing" aria-selected="false" aria-controls="panel-publishing" data-tab="publishing" tabindex="-1" data-i18n="projectEditor.publishing">${t("projectEditor.publishing")}</button>
       </div>
 
-      <div class="tab-panel" id="panel-general" role="tabpanel" aria-labelledby="tab-general">
+      <div class="tab-panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" ${activeTab === "overview" ? "" : "hidden"}>
+        ${overviewMarkup(project)}
+      </div>
+
+      <div class="tab-panel" id="panel-general" role="tabpanel" aria-labelledby="tab-general" ${activeTab === "general" ? "" : "hidden"}>
         <div class="form-grid">
           ${fieldMarkup({ labelKey: "projectEditor.caseNumber", name: "caseNumber", value: project.caseNumber, attrs: 'readonly aria-readonly="true"', hintKey: "projectEditor.caseNumberHint" })}
           ${fieldMarkup({ labelKey: "projectEditor.projectName", name: "name", value: project.name, attrs: "required" })}
@@ -232,6 +357,7 @@ function renderEditor(project, isCreate) {
           ${selectMarkup({ labelKey: "common.category", name: "category", value: project.category, options: CATEGORIES })}
           ${selectMarkup({ labelKey: "projectEditor.projectStatus", name: "status", value: project.status, options: PROJECT_STATUSES })}
           ${fieldMarkup({ labelKey: "projectEditor.year", name: "year", value: project.year, type: "number", attrs: 'min="1990" max="2100"' })}
+          ${fieldMarkup({ labelKey: "projectEditor.projectUrl", name: "projectUrl", value: project.projectUrl, type: "url", hintKey: "projectEditor.projectUrlHint" })}
           <div class="field" data-field="accent">
             <label for="field-accent" data-i18n="projectEditor.accent">${t("projectEditor.accent")}</label>
             <div class="accent-field">
@@ -306,17 +432,16 @@ function renderEditor(project, isCreate) {
           ${isCreate ? `<p class="field-hint" data-i18n="projectEditor.saveBeforeUpload">${t("projectEditor.saveBeforeUpload")}</p>` : ""}
         </div>
 
-        <div class="form-grid">
-          ${fieldMarkup({ labelKey: "projectEditor.projectUrl", name: "projectUrl", value: project.projectUrl, type: "url" })}
-          ${fieldMarkup({ labelKey: "projectEditor.previewUrl", name: "previewUrl", value: project.previewUrl, type: "url" })}
-        </div>
-
         <div class="media-block">
           <span class="field-label" data-i18n="projectEditor.gallery">${t("projectEditor.gallery")}</span>
           <div class="gallery-grid" data-gallery></div>
           <button type="button" class="button" data-editor-action data-gallery-add ${isCreate ? "disabled" : ""} data-i18n="projectEditor.addImage">${t("projectEditor.addImage")}</button>
           <input type="file" accept="${IMAGE_ACCEPT}" data-gallery-file hidden>
         </div>
+      </div>
+
+      <div class="tab-panel" id="panel-live-demo" role="tabpanel" aria-labelledby="tab-live-demo" hidden>
+        ${liveDemoMarkup(project)}
       </div>
 
       <div class="tab-panel" id="panel-publishing" role="tabpanel" aria-labelledby="tab-publishing" hidden>
@@ -551,6 +676,7 @@ function mount(project, isCreate) {
       accent: (data.accent || "").trim(),
       projectUrl: (data.projectUrl || "").trim(),
       previewUrl: (data.previewUrl || "").trim(),
+      livePreviewEnabled: Boolean(form.elements.livePreviewEnabled?.checked),
       editorialStatus: data.editorialStatus,
       visible: form.elements.visible.checked,
       featured: form.elements.featured.checked,
@@ -654,6 +780,43 @@ function mount(project, isCreate) {
       return;
     }
     showToast(dataError.message);
+  }
+
+  function demoModal(values = collectFormValues()) {
+    const demo = liveDemoState(values);
+    if (demo !== "live") {
+      showToast(t("projectEditor.demoUnavailable"));
+      return;
+    }
+
+    openModal({
+      title: t("projectEditor.demoPreviewTitle", { name: values.name || t("projects.untitled") }),
+      body: `
+        <div class="demo-preview">
+          <p>${escapeHtml(values.previewUrl)}</p>
+          <iframe src="${escapeAttribute(values.previewUrl)}" title="${escapeAttribute(t("projectEditor.demoIframeTitle", { name: values.name || t("projects.untitled") }))}" loading="lazy"></iframe>
+        </div>
+      `,
+      actions: [
+        { label: t("projectEditor.openExternally"), onSelect: () => window.open(values.previewUrl, "_blank", "noopener,noreferrer") },
+        { label: t("common.close") },
+      ],
+    });
+  }
+
+  function showReadinessModal(readiness) {
+    const row = (item) => `<li>${escapeHtml(t(CHECK_LABEL_KEYS[item.key]))}</li>`;
+    openModal({
+      title: t("projectEditor.cannotPublishTitle"),
+      body: `
+        <div class="readiness-modal">
+          <p>${escapeHtml(t("projectEditor.cannotPublishBody"))}</p>
+          <ul>${readiness.blocking.map(row).join("")}</ul>
+          ${readiness.warnings.length ? `<p>${escapeHtml(t("projectEditor.nonBlockingWarnings"))}</p><ul>${readiness.warnings.map(row).join("")}</ul>` : ""}
+        </div>
+      `,
+      actions: [{ label: t("common.close") }],
+    });
   }
 
   const baselineSnapshot = JSON.stringify(collectFormValues());
@@ -1022,6 +1185,12 @@ function mount(project, isCreate) {
     }
     clearErrors();
 
+    const readiness = publishReadiness(values);
+    if (!readiness.canPublish) {
+      showReadinessModal(readiness);
+      return;
+    }
+
     try {
       const updated = await updateProject(id, values);
       unsavedUploads.clear();
@@ -1101,8 +1270,14 @@ function mount(project, isCreate) {
 
   const publishBtn = form.querySelector("[data-action-publish]");
   publishBtn?.addEventListener("click", () => run(publishBtn, t("projectEditor.publishingProgress"), handlePublish));
+  form.querySelector("[data-action-overview-publish]")?.addEventListener("click", (event) => {
+    const button = event.currentTarget;
+    run(button, t("projectEditor.publishingProgress"), handlePublish);
+  });
 
   form.querySelector("[data-action-preview]")?.addEventListener("click", handlePreview);
+  form.querySelector("[data-action-demo]")?.addEventListener("click", () => demoModal());
+  form.querySelector("[data-action-test-demo]")?.addEventListener("click", () => demoModal());
 
   const archiveBtn = document.querySelector("[data-action-archive]");
   archiveBtn?.addEventListener("click", () => run(archiveBtn, t("projectEditor.archiving"), handleArchive));

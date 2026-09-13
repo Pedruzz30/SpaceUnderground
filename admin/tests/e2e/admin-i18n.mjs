@@ -80,7 +80,7 @@ try {
   // Each entry: route, a selector to wait for, and the heading in each locale.
   const SCREENS = [
     ["#/dashboard", ".page-heading > div > span", "CENTRAL DE CONTROLE", "COMMAND CENTER"],
-    ["#/projects", ".page-heading h2", "Controle do portfólio.", "Portfolio control."],
+    ["#/projects", ".page-heading h2", "PROJETOS", "PROJECTS"],
     ["#/clients", ".page-heading h2", "Diretório de clientes.", "Client directory."],
     ["#/commercial", ".page-heading h2", "Pipeline de vendas.", "Sales pipeline."],
     ["#/financial", ".page-heading h2", "Controle financeiro.", "Financial control."],
@@ -169,8 +169,9 @@ try {
   await setLocale("pt-BR");
   await page.goto(`${BASE_URL}/#/projects`);
   await page.waitForSelector("[data-project-list] [data-project-id]");
-  await page.locator("[data-project-list] [data-project-id]").first().click();
+  await page.locator("[data-project-open]").first().click();
   await page.waitForSelector("[data-project-editor]");
+  await page.click("#tab-general");
   const editorRoute = await hash();
 
   await page.fill("#field-name", "Nome de teste alterado");

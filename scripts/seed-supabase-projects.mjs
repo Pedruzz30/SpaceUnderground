@@ -83,6 +83,7 @@ const rows = projectPresentationSeed
     tech_stack: project.techStack,
     project_url: project.projectUrl || null,
     preview_url: project.previewUrl || null,
+    live_preview_enabled: Boolean(project.livePreviewEnabled),
     presentation_system: project.presentation.system,
     presentation_label: project.presentation.label,
     presentation_address: project.presentation.address,

@@ -81,6 +81,7 @@ export function mapProjectFromDatabase(row) {
     gallery: mapGalleryFromDatabase(row.project_gallery),
     projectUrl: row.project_url ?? "",
     previewUrl: row.preview_url ?? "",
+    livePreviewEnabled: Boolean(row.live_preview_enabled),
     createdAt: row.created_at ?? null,
     updatedAt: row.updated_at ?? null,
     publishedAt: row.published_at ?? null,
@@ -117,6 +118,7 @@ export function mapProjectToDatabase(model) {
   if (model.poster !== undefined) row.poster_url = model.poster || null;
   if (model.projectUrl !== undefined) row.project_url = model.projectUrl || null;
   if (model.previewUrl !== undefined) row.preview_url = model.previewUrl || null;
+  if (model.livePreviewEnabled !== undefined) row.live_preview_enabled = Boolean(model.livePreviewEnabled);
   if (model.translations !== undefined) row.translations = model.translations ?? {};
 
   return row;
