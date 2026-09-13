@@ -1,6 +1,7 @@
 import { fetchVisiblePlans, isConfigured } from "./supabase-public.js";
 import { getLocale, subscribeLocaleChange, t } from "./i18n/index.js";
 import { listPublicPlans, planRowToViewModel, refreshPublicPlansForLocale, resetPublicPlansToFallback, setPublicPlanRows } from "./public-plan-store.js";
+import { observeReveal } from "./reveal.js";
 
 export function localizePlanRow(row, basePlan = {}, locale = "pt-BR") {
   return planRowToViewModel({ ...basePlan, ...row }, 0, locale);
@@ -100,6 +101,7 @@ function hydratePlansSection() {
   if (intro) intro.textContent = t("commercial.plansIntro");
 
   grid.innerHTML = listPublicPlans().map(renderPlanCard).join("");
+  observeReveal(grid);
 
   if (!section.querySelector(".plans__commercial-note")) {
     const note = document.createElement("div");
@@ -114,6 +116,7 @@ function hydratePlansSection() {
       <a class="text-link" href="#project-request"><span></span><i aria-hidden="true"></i></a>
     `;
     grid.after(note);
+    observeReveal(note);
   }
 
   const note = section.querySelector(".plans__commercial-note");

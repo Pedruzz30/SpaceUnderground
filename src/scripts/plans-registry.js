@@ -45,7 +45,7 @@ export const plans = {
     range: "R$ 2.500 – R$ 4.500",
     scope: "MULTI-PAGE INSTITUTIONAL SITES",
     scopeShort: "INSTITUTIONAL WEBSITES",
-    status: "ON_REQUEST",
+    status: "AVAILABLE",
     description: "For businesses ready to show up as more than a page.",
     included: ["Multi-page structure", "Custom design, no templates", "Basic SEO & performance", "2 revision rounds"],
     timeline: "3–6 weeks",
@@ -56,7 +56,7 @@ export const plans = {
       range: "R$ 2.500 – R$ 4.500",
       scope: "SITES INSTITUCIONAIS · EXPERIÊNCIAS MULTIPÁGINA",
       scopeShort: "SITES INSTITUCIONAIS",
-      status: "DISPONÍVEL",
+      status: "AVAILABLE",
       description: "Para empresas que precisam de uma presença digital completa, profissional e preparada para crescer.",
       included: [
         "Estrutura com múltiplas páginas",
@@ -77,7 +77,7 @@ export const plans = {
     range: "FROM R$ 5.000",
     scope: "E-COMMERCE · WEB SYSTEMS · CUSTOM BUILDS",
     scopeShort: "E-COMMERCE · SYSTEMS",
-    status: "AVAILABLE",
+    status: "ON_REQUEST",
     description: "For the ones who need the full system behind the front.",
     included: [
       "Custom e-commerce or web system",

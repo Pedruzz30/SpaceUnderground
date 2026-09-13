@@ -8,6 +8,7 @@ import {
   resetPublicPlansToFallback,
   setPublicPlanRows,
 } from "../src/scripts/public-plan-store.js";
+import { plans } from "../src/scripts/plans-registry.js";
 import { normalizeServiceStatus, serviceStatusLabel } from "../src/scripts/service-status.js";
 
 const plus = { slug: "plan-plus", name: "Plus", range: "R$ 800", scope: "Landing", scope_short: "Landing", status: "DISPONÍVEL", description: "Plus PT", timeline: "1 semana", position: 0, plan_features: [{ text: "Design", position: 0 }] };
@@ -25,6 +26,29 @@ describe("public plan status normalization", () => {
 });
 
 describe("public plan runtime store", () => {
+  it("keeps fallback statuses canonical and localizes their labels", () => {
+    assert.equal(plans.plus.status, "AVAILABLE");
+    assert.equal(plans.plus.commercial.status, "AVAILABLE");
+    assert.equal(plans.pro.status, "AVAILABLE");
+    assert.equal(plans.pro.commercial.status, "AVAILABLE");
+    assert.equal(plans.max.status, "ON_REQUEST");
+    assert.equal(plans.max.commercial.status, "ON_REQUEST");
+
+    resetPublicPlansToFallback("pt-BR");
+    assert.deepEqual(listPublicPlans().map((plan) => [plan.slug, plan.status, plan.statusLabel]), [
+      ["plan-plus", "AVAILABLE", "DISPONÍVEL"],
+      ["plan-pro", "AVAILABLE", "DISPONÍVEL"],
+      ["plan-max", "ON_REQUEST", "SOB CONSULTA"],
+    ]);
+
+    refreshPublicPlansForLocale("en");
+    assert.deepEqual(listPublicPlans().map((plan) => [plan.slug, plan.status, plan.statusLabel]), [
+      ["plan-plus", "AVAILABLE", "AVAILABLE"],
+      ["plan-pro", "AVAILABLE", "AVAILABLE"],
+      ["plan-max", "ON_REQUEST", "ON REQUEST"],
+    ]);
+  });
+
   it("treats successful Supabase rows as authoritative", () => {
     setPublicPlanRows([plus, pro], "pt-BR");
     assert.deepEqual(listPublicPlans().map((plan) => plan.slug), ["plan-plus", "plan-pro"]);
