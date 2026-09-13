@@ -84,8 +84,12 @@ describe("live demo validation", () => {
     assert.equal(liveDemoState(completeProject({ previewUrl: "javascript:alert(1)" })), "invalid");
   });
 
-  it("does not use project_url when preview_url is missing", () => {
-    assert.equal(liveDemoState(completeProject({ previewUrl: "", projectUrl: "https://example.com" })), "invalid");
+  it("reports no demo when preview_url is missing, and never falls back to project_url", () => {
+    assert.equal(liveDemoState(completeProject({ previewUrl: "", projectUrl: "https://example.com" })), "none");
+  });
+
+  it("keeps invalid for a URL that was entered but cannot be framed", () => {
+    assert.equal(liveDemoState(completeProject({ previewUrl: "file:///etc/passwd" })), "invalid");
   });
 
   it("accepts only http and https iframe URLs", () => {

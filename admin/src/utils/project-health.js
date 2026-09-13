@@ -15,9 +15,15 @@ export function isLivePreviewUrl(value) {
   }
 }
 
+// "none" means there is simply no demo configured, which is a valid state for a
+// project: a missing preview URL is not a misconfiguration. "invalid" is
+// reserved for a URL that was actually entered but cannot be framed, which is
+// the case worth flagging. project_url never stands in for preview_url.
 export function liveDemoState(project = {}) {
+  const previewUrl = text(project.previewUrl);
+  if (!previewUrl) return "none";
   if (!project.livePreviewEnabled) return "none";
-  return isLivePreviewUrl(project.previewUrl) ? "live" : "invalid";
+  return isLivePreviewUrl(previewUrl) ? "live" : "invalid";
 }
 
 function moduleCount(modules = [], field, locale = "base") {
