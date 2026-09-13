@@ -1387,6 +1387,10 @@ function mount(project, isCreate) {
     paintEditorialLocale();
     renderGallery();
     updateSaveState();
+    // Overview badges, the health checks and the demo state are rendered from
+    // dictionary values, so they have to be rebuilt too. Without this they kept
+    // the previous language until something was edited or a tab was reopened.
+    refreshProjectSignals();
     applyStaticTranslations(document);
   });
 }

@@ -163,6 +163,88 @@ try {
   check(/of \d+ clients/.test(enCount), "EN client count agrees with the total", enCount);
   check((await hash()) === "#/clients", "locale switch keeps the route", await hash());
 
+  /* -------------------------------------- PROJECT EDITOR: derived signals */
+
+  // The Overview badges, the health card and the demo badge are built from
+  // dictionary lookups instead of data-i18n attributes, so a locale switch has
+  // to repaint them. They used to keep the previous language until something
+  // was edited or a tab was reopened, so this runs on a freshly opened editor
+  // with nothing typed.
+  await setLocale("pt-BR");
+  await gotoRoute("#/projects", "[data-project-list] [data-project-id]");
+  await page.locator("[data-project-open]").first().click();
+  await page.waitForSelector("[data-project-editor]");
+  await page.click('[role="tab"][data-tab="overview"]');
+  await settle();
+
+  const badgesText = () => textOf("[data-overview-badges]");
+  const healthText = () => textOf("[data-overview-health]");
+
+  const badgesPt = await badgesText();
+  const healthPt = await healthText();
+  check(/Oculto|Visível/.test(badgesPt), "overview: PT badges read in Portuguese", badgesPt);
+  check(/pronto/.test(healthPt), "overview: PT health score reads in Portuguese", healthPt);
+  check(/Incompleto|Atenção|Saudável/.test(healthPt), "overview: PT health status reads in Portuguese");
+  check(/Categoria/.test(healthPt), "overview: PT health check labels read in Portuguese");
+
+  await setLocale("en");
+  const badgesEn = await badgesText();
+  const healthEn = await healthText();
+
+  check(/Hidden|Visible/.test(badgesEn), "overview: badges follow the locale switch with no edit", badgesEn);
+  check(!/Oculto|Visível/.test(badgesEn), "overview: badges keep no Portuguese copy", badgesEn);
+  check(/ready/.test(healthEn) && !/pronto/.test(healthEn), "overview: health score follows the switch", healthEn);
+  check(
+    /Incomplete|Attention|Healthy/.test(healthEn) && !/Incompleto|Atenção|Saudável/.test(healthEn),
+    "overview: health status follows the switch",
+  );
+  check(
+    /Category/.test(healthEn) && !/Categoria/.test(healthEn),
+    "overview: health check labels follow the switch",
+  );
+
+  // The demo badge sits on its own tab and is painted the same way.
+  const DEMO_LABELS = { Nenhum: "None", Live: "Live", "URL inválida": "Invalid URL" };
+  await setLocale("pt-BR");
+  await page.click('[role="tab"][data-tab="live-demo"]');
+  await settle();
+  const demoPt = await textOf("[data-demo-status]");
+  await setLocale("en");
+  const demoEn = await textOf("[data-demo-status]");
+  check(
+    DEMO_LABELS[demoPt] === demoEn,
+    "live demo: the status badge follows the locale switch",
+    `${demoPt} -> ${demoEn}`,
+  );
+
+  // And back, still with nothing edited.
+  await setLocale("pt-BR");
+  check((await textOf("[data-demo-status]")) === demoPt, "live demo: PT round-trip restores the status badge");
+  await page.click('[role="tab"][data-tab="overview"]');
+  await settle();
+  check((await badgesText()) === badgesPt, "overview: PT round-trip restores the badges", await badgesText());
+  check((await healthText()) === healthPt, "overview: PT round-trip restores the health card");
+
+  // "Live" is spelled the same in both dictionaries, so the round trip above
+  // cannot prove the demo badge was repainted. Forcing the state to "none",
+  // whose labels do differ, does.
+  await page.click('[role="tab"][data-tab="live-demo"]');
+  await settle();
+  const demoEnabled = await page.isChecked('[name="livePreviewEnabled"]');
+  if (demoEnabled) await page.uncheck('[name="livePreviewEnabled"]');
+  else await page.fill("#field-previewUrl", "");
+  await settle();
+
+  const offPt = await textOf("[data-demo-status]");
+  await setLocale("en");
+  const offEn = await textOf("[data-demo-status]");
+  check(offPt === "Nenhum", "live demo: an unpublished demo reads NENHUM in PT", offPt);
+  check(offEn === "None", "live demo: the demo badge repaints on the locale switch", `${offPt} -> ${offEn}`);
+  await setLocale("pt-BR");
+
+  // Nothing here was saved; the guard is discarded so the next section starts clean.
+  await gotoRoute("#/projects", "[data-project-list] [data-project-id]");
+
   /* ------------------------------------------------ PROJECT EDITOR: state */
 
   // The main test: an unsaved edit must survive a PT <-> EN switch.
