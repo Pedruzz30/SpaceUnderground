@@ -178,3 +178,18 @@ describe("modern publishable keys", () => {
     assert.ok(guardIndex !== -1 && publicSource.indexOf(bearerLine[0]) > guardIndex, "bearer must be conditional");
   });
 });
+
+describe("plan status normalization migration", () => {
+  it("ships migration 010 for every canonical plan status", () => {
+    const file = migrationFiles.find((name) => name === "010_normalize_plan_status.sql");
+    assert.ok(file, "migration 010_normalize_plan_status.sql is missing");
+
+    const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf8");
+    assert.match(sql, /update\s+public\.plans/i, "migration must be limited to public.plans data");
+    for (const status of ["AVAILABLE", "LIMITED", "ON_REQUEST", "WAITLIST", "UNAVAILABLE", "ARCHIVED"]) {
+      assert.match(sql, new RegExp(`'${status}'`, "i"), `migration must normalize ${status}`);
+    }
+    assert.doesNotMatch(sql, /create\s+type/i, "status stays text in this phase");
+    assert.doesNotMatch(sql, /alter\s+table\s+(?!public\.plans)/i, "migration must not alter unrelated tables");
+  });
+});

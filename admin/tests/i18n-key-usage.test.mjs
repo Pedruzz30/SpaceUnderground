@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 
 import { CATEGORIES, EDITORIAL_STATUSES, PROJECT_STATUSES } from "../src/data/projects.js";
+import { SERVICE_STATUSES } from "../src/utils/service-health.js";
 import { SUPPORTED_LOCALES, hasKey, setLocale, statusLabel } from "../src/i18n/index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -86,6 +87,7 @@ const DYNAMIC_STATUS_VALUES = [
   ...CATEGORIES,
   ...PROJECT_STATUSES,
   ...EDITORIAL_STATUSES,
+  ...SERVICE_STATUSES,
   "ACTIVE",
   "INACTIVE",
   "ARCHIVED",

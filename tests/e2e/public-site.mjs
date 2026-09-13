@@ -49,6 +49,78 @@ if (!RUN_SUPABASE_PUBLIC_E2E || !SUPABASE_URL || !ANON_KEY || !EMAIL || !PASSWOR
 
     await page.reload({ waitUntil: "domcontentloaded" });
     check((await page.locator("html").getAttribute("lang")) === "en", "reload preserves EN preference");
+    await page.click('[data-locale-switch="pt-BR"]');
+
+    const visiblePlans = () => page.$$eval("#plans .plans__grid .project__visual[data-project]", (nodes) => nodes.map((node) => node.dataset.project));
+    const planRows = {
+      plus: {
+        slug: "plan-plus",
+        name: "Plus",
+        range: "R$ 800",
+        scope: "Landing",
+        scope_short: "Landing",
+        status: "DISPONÍVEL",
+        description: "Plus PT",
+        timeline: "1 semana",
+        position: 0,
+        plan_features: [{ text: "Design", position: 0 }],
+      },
+      pro: {
+        slug: "plan-pro",
+        name: "Pro",
+        range: "R$ 2.500",
+        scope: "Site",
+        scope_short: "Site",
+        status: "AVAILABLE",
+        description: "Pro PT",
+        timeline: "3 semanas",
+        position: 1,
+        plan_features: [{ text: "SEO", position: 0 }],
+      },
+      beta: {
+        slug: "beta",
+        name: "Beta",
+        range: "R$ 9.000",
+        scope: "Sistema",
+        scope_short: "Sistema",
+        status: "ON_REQUEST",
+        description: "Beta PT",
+        timeline: "8 semanas",
+        position: 2,
+        translations: { en: { scope: "System", scope_short: "System", description: "Beta EN", timeline: "8 weeks" } },
+        plan_features: [{ text: "Portal", position: 0, translations: { en: { text: "Portal" } } }],
+      },
+    };
+    const loadWithPlans = async (rows) => {
+      await page.unroute("**/rest/v1/plans*").catch(() => {});
+      await page.route("**/rest/v1/plans*", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(rows) }));
+      await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(
+        (count) => document.querySelectorAll("#plans .plans__grid .project__visual[data-project]").length === count,
+        rows.length,
+      );
+    };
+
+    await loadWithPlans([planRows.plus, planRows.pro]);
+    check(JSON.stringify(await visiblePlans()) === JSON.stringify(["plan-plus", "plan-pro"]), "plans success removes missing static plans");
+
+    await loadWithPlans([planRows.plus, planRows.pro, planRows.beta]);
+    check((await visiblePlans()).includes("beta"), "plans success creates cards for new Supabase slugs");
+    await page.click('[data-project="beta"]');
+    await page.waitForFunction(() => document.querySelector("[data-project-dialog]")?.open === true);
+    check((await page.locator("[data-dialog-title]").innerText()) === "Beta", "dynamic plan opens the public dialog");
+    const dialogScope = await page.locator("[data-dialog-scope]").evaluateAll((nodes) => nodes.map((node) => node.textContent));
+    check(dialogScope.some((line) => line.includes("SOB CONSULTA")), "dialog status comes from structural status");
+    await page.keyboard.press("Escape");
+
+    await loadWithPlans([]);
+    check((await visiblePlans()).length === 0, "successful empty plans response renders zero cards");
+
+    await page.unroute("**/rest/v1/plans*").catch(() => {});
+    await page.route("**/rest/v1/plans*", (route) => route.abort());
+    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => document.querySelectorAll("#plans .plans__grid .project__visual[data-project]").length === 3);
+    check(JSON.stringify(await visiblePlans()) === JSON.stringify(["plan-plus", "plan-pro", "plan-max"]), "plans fetch failure keeps bundled fallback");
   } finally {
     await context.close();
     await browser.close();

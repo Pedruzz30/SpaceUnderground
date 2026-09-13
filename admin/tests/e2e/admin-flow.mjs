@@ -545,6 +545,37 @@ try {
   await page.click("#tab-commercial");
   await page.fill("#field-name", "Alpha Prime");
   await page.click("#tab-content");
+  assert.equal(await page.inputValue("#field-description"), "Oferta alpha.", "service editor opens PT copy");
+  await page.click('[data-locale-edit="en"]');
+  await settle();
+  assert.equal(await page.inputValue("#field-description"), "Alpha offer.", "service editor opens EN copy");
+  await page.click("#tab-features");
+  assert.equal(await page.locator("[data-feature-text]").first().inputValue(), "Design", "feature editor follows EN locale");
+  await page.locator("[data-feature-text]").first().fill("Custom design");
+  await page.click("[data-feature-duplicate]");
+  await settle();
+  assert.equal(await page.locator("[data-feature-text]").nth(1).inputValue(), "Custom design", "duplicated feature copies EN text");
+  await page.click("#tab-content");
+  await page.click('[data-locale-edit="pt-BR"]');
+  await settle();
+  await page.click("#tab-features");
+  assert.equal(await page.locator("[data-feature-text]").first().inputValue(), "Design", "switching back restores PT feature text");
+  await page.locator("[data-feature-text]").first().fill("Design sob medida");
+  assert.equal(await page.locator("[data-feature-text]").nth(1).inputValue(), "Design", "duplicated feature also kept PT text");
+  await page.click("[data-feature-add]");
+  await page.locator("[data-feature-text]").last().fill("Entrega A");
+  await page.click("[data-feature-add]");
+  await page.locator("[data-feature-text]").last().fill("Entrega B");
+  await page.locator("[data-feature-remove]").nth(2).click();
+  await page.click("[data-feature-add]");
+  await page.locator("[data-feature-text]").last().fill("Entrega C");
+  await settle();
+  assert.deepEqual(
+    await page.locator("[data-feature-text]").evaluateAll((inputs) => inputs.map((input) => input.value)),
+    ["Design sob medida", "Design", "Entrega B", "Entrega C"],
+    "feature add/remove/add keeps stable ordering",
+  );
+  await page.click("#tab-content");
   await page.fill("#field-description", "Oferta alpha prime.");
   await page.fill("#field-timeline", "2 semanas");
   await settle();
@@ -552,7 +583,6 @@ try {
   assert.match(await page.locator("[data-service-preview]").innerText(), /Oferta alpha prime/, "service preview follows unsaved description");
   assert.match(await page.locator("[data-service-preview]").innerText(), /2 semanas/i, "service preview follows unsaved timeline");
   await page.click("#tab-features");
-  await page.click("[data-feature-add]");
   await page.locator("[data-feature-text]").last().fill("Nova entrega");
   await settle();
   assert.match(await page.locator("[data-service-preview]").innerText(), /Nova entrega/, "service preview follows unsaved feature");
@@ -562,6 +592,13 @@ try {
   await page.waitForSelector("[data-service-editor]");
   await page.click("#tab-commercial");
   assert.equal(await page.inputValue("#field-name"), "Alpha Prime", "service edit persisted");
+  await page.click("#tab-features");
+  assert.equal(await page.locator("[data-feature-text]").first().inputValue(), "Design sob medida", "PT feature text persisted");
+  await page.click("#tab-content");
+  await page.click('[data-locale-edit="en"]');
+  await settle();
+  await page.click("#tab-features");
+  assert.equal(await page.locator("[data-feature-text]").first().inputValue(), "Custom design", "EN feature text persisted");
 
   await page.goto(`${BASE_URL}/#/services/new`);
   await page.waitForSelector("[data-service-editor]");

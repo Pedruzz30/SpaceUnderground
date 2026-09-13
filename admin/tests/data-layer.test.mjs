@@ -34,10 +34,11 @@ const {
   nextAvailableCaseNumber,
   updateProject,
 } = await import("../src/services/project-service.js");
-const { archivePlan, createPlan, duplicatePlan, getPlan, getPlans, unarchivePlan } = await import("../src/services/plan-service.js");
+const { archivePlan, createPlan, duplicatePlan, getPlan, getPlans, unarchivePlan, updatePlan } = await import("../src/services/plan-service.js");
 const { mapProjectFromDatabase, mapProjectToDatabase, formatCaseNumber } = await import(
   "../src/services/mappers/project-mapper.js"
 );
+const { mapPlanFromDatabase, mapPlanToDatabase, mergePlanTranslations } = await import("../src/services/mappers/plan-mapper.js");
 
 const draft = {
   name: "Orbital Ops",
@@ -243,6 +244,108 @@ describe("plan service (mock repository)", () => {
     assert.equal(restored.status, "UNAVAILABLE");
     assert.equal(restored.visible, false);
     assert.ok(await getPlan("plan-plus"));
+  });
+
+  it("loads real legacy statuses as canonical admin values", async () => {
+    localStorage.setItem("space-admin:plans:v1", JSON.stringify([
+      { id: "plus", slug: "plan-plus", name: "Plus", status: "DISPONÍVEL", visible: true, features: [{ text: "Design" }] },
+      { id: "pro", slug: "plan-pro", name: "Pro", status: "DISPONÍVEL", visible: true, features: [{ text: "SEO" }] },
+      { id: "max", slug: "plan-max", name: "Max", status: "SOB CONSULTA", visible: true, features: [{ text: "Sistema" }] },
+    ]));
+
+    const plans = await getPlans();
+    assert.deepEqual(plans.map((plan) => [plan.slug, plan.status]), [
+      ["plan-plus", "AVAILABLE"],
+      ["plan-pro", "AVAILABLE"],
+      ["plan-max", "ON_REQUEST"],
+    ]);
+  });
+
+  it("preserves unknown translation fields when editing PT copy only", async () => {
+    localStorage.setItem("space-admin:plans:v1", JSON.stringify([
+      {
+        id: "pro",
+        slug: "plan-pro",
+        name: "Pro",
+        range: "R$ 2.500",
+        timeline: "3 semanas",
+        description: "Descrição PT",
+        status: "DISPONÍVEL",
+        visible: true,
+        features: [{ id: "pro-1", position: 0, text: "SEO" }],
+        translations: {
+          en: {
+            category: "PLAN / FULL WEBSITE",
+            status: "AVAILABLE",
+            scope_short: "WEBSITE",
+            scope: "FULL WEBSITE",
+            description: "Original EN",
+            timeline: "3 weeks",
+          },
+        },
+      },
+    ]));
+
+    await updatePlan("pro", { description: "Descrição PT editada", translations: { en: { description: "Original EN" } } });
+    const saved = await getPlan("pro");
+    assert.equal(saved.description, "Descrição PT editada");
+    assert.equal(saved.translations.en.category, "PLAN / FULL WEBSITE");
+    assert.equal(saved.translations.en.status, "AVAILABLE");
+    assert.equal(saved.translations.en.scope_short, "WEBSITE");
+    assert.equal(saved.translations.en.scope, "FULL WEBSITE");
+    assert.equal(saved.translations.en.description, "Original EN");
+    assert.equal(saved.translations.en.timeline, "3 weeks");
+  });
+
+  it("changes and clears only editable English fields", async () => {
+    const existing = {
+      en: {
+        category: "PLAN / FULL WEBSITE",
+        status: "AVAILABLE",
+        scope_short: "WEBSITE",
+        scope: "FULL WEBSITE",
+        description: "Original EN",
+        timeline: "3 weeks",
+      },
+      es: { description: "ES" },
+    };
+
+    const edited = mergePlanTranslations(existing, { description: "Edited EN" });
+    assert.equal(edited.en.description, "Edited EN");
+    assert.equal(edited.en.category, "PLAN / FULL WEBSITE");
+    assert.equal(edited.es.description, "ES");
+
+    const cleared = mergePlanTranslations(edited, { description: "" });
+    assert.equal("description" in cleared.en, false);
+    assert.equal(cleared.en.category, "PLAN / FULL WEBSITE");
+    assert.equal(cleared.en.scope_short, "WEBSITE");
+    assert.equal(cleared.en.status, "AVAILABLE");
+  });
+});
+
+describe("plan mapper", () => {
+  it("maps DB scope_short to Admin scopeShort and normalizes legacy status", () => {
+    const plan = mapPlanFromDatabase({
+      id: "plan",
+      slug: "plan-max",
+      status: "SOB CONSULTA",
+      translations: { en: { scope_short: "SYSTEMS", description: "EN" } },
+      plan_features: [],
+    });
+
+    assert.equal(plan.status, "ON_REQUEST");
+    assert.equal(plan.translations.en.scope_short, "SYSTEMS");
+    assert.equal(plan.translations.en.scopeShort, "SYSTEMS");
+  });
+
+  it("writes scope_short, never scopeShort, inside translations JSON", () => {
+    const row = mapPlanToDatabase({
+      translations: { en: { scopeShort: "SYSTEMS", description: "EN", status: "AVAILABLE" } },
+    });
+
+    assert.equal(row.translations.en.scope_short, "SYSTEMS");
+    assert.equal("scopeShort" in row.translations.en, false);
+    assert.equal(row.translations.en.status, "AVAILABLE");
   });
 });
 

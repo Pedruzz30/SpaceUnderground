@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 
-const { contentCompleteness, serviceHealth } = await import("../src/utils/service-health.js");
+const { contentCompleteness, normalizeServiceStatus, serviceHealth } = await import("../src/utils/service-health.js");
 
 function plan(overrides = {}) {
   return {
@@ -50,6 +50,13 @@ describe("service health", () => {
 
   it("keeps archived hidden plans valid when the essentials are complete", () => {
     assert.equal(serviceHealth(plan({ status: "ARCHIVED", visible: false })).status, "healthy");
+  });
+
+  it("normalizes production legacy statuses before health checks", () => {
+    assert.equal(normalizeServiceStatus("DISPONÍVEL"), "AVAILABLE");
+    assert.equal(normalizeServiceStatus("SOB CONSULTA"), "ON_REQUEST");
+    assert.equal(serviceHealth(plan({ status: "DISPONÍVEL" })).status, "healthy");
+    assert.equal(serviceHealth(plan({ status: "SOB CONSULTA" })).status, "healthy");
   });
 });
 
