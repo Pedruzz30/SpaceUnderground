@@ -31,6 +31,14 @@ does not pretend to rebuild sitemap/canonical output.
 
 `migrations/007_activity_log.sql` adds the admin-only activity log.
 
+`migrations/008_editorial_i18n.sql` adds the optional `translations` JSONB
+columns. pt-BR text stays in the existing columns as the primary source.
+
+`migrations/009_project_live_preview.sql` adds
+`projects.live_preview_enabled`. The public viewer only frames `preview_url`
+when this flag is true, so a URL alone never puts a project on the site. The
+column defaults to false and the migration enables CASE 001 and 002.
+
 Plus:
 
 - `is_admin()` — `security definer` helper used by the policies.
