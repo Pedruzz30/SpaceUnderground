@@ -1,281 +1,249 @@
+import { badge } from "../components/badge.js";
 import { showToast } from "../components/toast.js";
-import { bindLocaleFields, localeFieldAttrs, localeHint, localeTabs } from "../components/locale-fields.js";
-import { describeError } from "../services/errors.js";
-import { getPlans, updatePlan } from "../services/plan-service.js";
+import { publicSiteUrl } from "../config/public-site.js";
+import { onLocaleChange, plural, statusLabel, t } from "../i18n/index.js";
 import { logActivity } from "../services/activity-service.js";
-import { onLocaleChange, plural, t } from "../i18n/index.js";
+import { describeError } from "../services/errors.js";
+import { archivePlan, duplicatePlan, getPlans, SERVICE_STATUSES, unarchivePlan } from "../services/plan-service.js";
+import { contentCompleteness, serviceHealth } from "../utils/service-health.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
-function field(labelKey, name, value = "", attrs = "") {
-  return `
-    <div class="field">
-      <label for="plan-${name}" data-i18n="${labelKey}">${escapeHtml(t(labelKey))}</label>
-      <input id="plan-${name}" name="${name}" value="${escapeAttribute(value)}" ${attrs}>
-    </div>
-  `;
+function formatUpdated(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString(document.documentElement.lang || undefined, { month: "short", day: "2-digit" });
 }
 
-// Editorial fields are bilingual; structural ones are not. A plan's name
-// ("Plus", "Pro", "Max"), slug, numeric range, position, accent, status and
-// visibility describe the product itself and read the same in both locales.
-function editorialField(scope, labelKey, name, value = "") {
-  return `
-    <div class="field">
-      <label for="plan-${name}-${scope}" data-i18n="${labelKey}">${escapeHtml(t(labelKey))}</label>
-      <input id="plan-${name}-${scope}" value="${escapeAttribute(value)}" ${localeFieldAttrs(scope, name)}>
-    </div>
-  `;
+function optionMarkup(value, label = value) {
+  return `<option value="${escapeAttribute(value)}">${escapeHtml(label)}</option>`;
 }
 
-function featureRow(feature, index, total, scope) {
-  const key = feature.id ? `feature:${feature.id}` : `feature:new:${index}`;
+function filterMarkup({ labelKey, name, options }) {
   return `
-    <label class="feature-row">
-      <span>${String(index + 1).padStart(2, "0")}</span>
-      <input value="${escapeAttribute(feature.text)}" data-feature-id="${escapeAttribute(feature.id || "")}" data-feature-key="${escapeAttribute(key)}" ${localeFieldAttrs(scope, key)}>
-      <button type="button" class="button" data-move-feature-up="${index}" ${index === 0 ? "disabled" : ""} data-i18n="services.moveUp">${escapeHtml(t("services.moveUp"))}</button>
-      <button type="button" class="button" data-move-feature-down="${index}" ${index === total - 1 ? "disabled" : ""} data-i18n="services.moveDown">${escapeHtml(t("services.moveDown"))}</button>
-      <button type="button" class="button button--danger" data-remove-feature="${index}" data-i18n="services.remove">${escapeHtml(t("services.remove"))}</button>
+    <label class="sort-field">
+      <span>${escapeHtml(t(labelKey))}</span>
+      <select data-service-filter="${escapeAttribute(name)}" disabled>
+        ${options.map(([value, label]) => optionMarkup(value, label)).join("")}
+      </select>
     </label>
   `;
 }
 
-function renderPlan(plan) {
-  const featureCount = plan.features?.length || 0;
-  const scope = `plan-${plan.id}`;
+function healthBadge(status) {
+  const type = status === "healthy" ? "success" : status === "attention" ? "warning" : "muted";
+  return `<span class="badge badge--${type}">${escapeHtml(t(`serviceHealth.status.${status}`)).toUpperCase()}</span>`;
+}
+
+function metricsMarkup(plans) {
+  const enriched = plans.map((plan) => ({ plan, health: serviceHealth(plan) }));
+  const metrics = [
+    ["services.metricTotal", plans.length],
+    ["services.metricVisible", plans.filter((plan) => plan.visible).length],
+    ["services.metricHidden", plans.filter((plan) => !plan.visible).length],
+    ["services.metricAvailable", plans.filter((plan) => plan.status === "AVAILABLE").length],
+    ["services.metricArchived", plans.filter((plan) => plan.status === "ARCHIVED").length],
+    ["services.metricAttention", enriched.filter((item) => item.health.status !== "healthy").length],
+  ];
+
+  return metrics
+    .map(
+      ([key, value]) => `
+        <div class="project-metric service-metric">
+          <strong>${escapeHtml(value)}</strong>
+          <span>${escapeHtml(t(key))}</span>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+function serviceRow(plan) {
+  const health = serviceHealth(plan);
+  const completeness = contentCompleteness(plan);
+  const archiveLabel = plan.status === "ARCHIVED" ? t("services.actionUnarchive") : t("services.actionArchive");
+  const archiveAction = plan.status === "ARCHIVED" ? "unarchive" : "archive";
+  const publicHref = publicSiteUrl("#plans");
 
   return `
-    <article class="plan-editor" data-plan-id="${escapeAttribute(plan.id)}">
-      <header class="panel__head">
-        <div>
-          <span>${escapeHtml(plan.monogram || plan.slug)}</span>
-          <h3>${escapeHtml(plan.name)}</h3>
-        </div>
-        <div class="plan-editor__badges">
-          <strong class="badge ${plan.visible ? "badge--success" : "badge--muted"}" data-i18n="${plan.visible ? "common.visible" : "common.hidden"}">${escapeHtml(plan.visible ? t("common.visible") : t("common.hidden"))}</strong>
-          <strong class="badge" data-feature-count>${escapeHtml(plural("services.featureCount", featureCount))}</strong>
-        </div>
-      </header>
-      <form data-plan-form="${escapeAttribute(plan.id)}" data-locale-scope-root="${escapeAttribute(scope)}">
-        <div class="form-grid">
-          ${field("services.name", "name", plan.name, "required")}
-          ${field("services.range", "range", plan.range)}
-          ${field("services.status", "status", plan.status)}
-          ${field("services.accent", "accent", plan.accent)}
-          ${field("services.position", "position", plan.position, 'type="number" min="0"')}
-
-          <div class="field field--wide plan-editor__locale">
-            <span class="field-label" data-i18n="services.editorialCopy">${escapeHtml(t("services.editorialCopy"))}</span>
-            ${localeTabs(scope)}
-            ${localeHint(scope)}
-          </div>
-
-          ${editorialField(scope, "services.timeline", "timeline", plan.timeline)}
-          ${editorialField(scope, "services.scope", "scope", plan.scope)}
-          ${editorialField(scope, "services.scopeShort", "scopeShort", plan.scopeShort)}
-
-          <div class="field field--wide">
-            <label for="plan-description-${escapeAttribute(plan.id)}" data-i18n="services.description">${escapeHtml(t("services.description"))}</label>
-            <textarea id="plan-description-${escapeAttribute(plan.id)}" rows="4" ${localeFieldAttrs(scope, "description")}>${escapeHtml(plan.description)}</textarea>
-          </div>
-
-          <fieldset class="field field--wide">
-            <legend data-i18n="services.visibility">${escapeHtml(t("services.visibility"))}</legend>
-            <div class="checks">
-              <label><input type="checkbox" name="visible" ${plan.visible ? "checked" : ""}> <span data-i18n="services.showOnPublicSite">${escapeHtml(t("services.showOnPublicSite"))}</span></label>
-            </div>
-          </fieldset>
-
-          <div class="field field--wide">
-            <span class="field-label" data-i18n="services.features">${escapeHtml(t("services.features"))}</span>
-            <div class="feature-list" data-feature-list>
-              ${(plan.features || []).map((feature, index) => featureRow(feature, index, featureCount, scope)).join("")
-                || `<p class="empty-inline" data-i18n="services.noFeatures">${escapeHtml(t("services.noFeatures"))}</p>`}
-            </div>
-            <button class="button" type="button" data-add-feature data-i18n="services.addFeature">${escapeHtml(t("services.addFeature"))}</button>
-          </div>
-        </div>
-        <aside class="plan-preview">
-          <span>${escapeHtml(plan.scopeShort || plan.scope || t("services.plan"))}</span>
-          <strong>${escapeHtml(plan.name || t("services.untitledPlan"))}</strong>
-          <p>${escapeHtml(plan.description || t("services.noPublicDescription"))}</p>
-          <small>${escapeHtml(plan.range || t("services.rangePending"))} · ${escapeHtml(plan.timeline || t("services.timelinePending"))}</small>
-        </aside>
-        <div class="form-actions">
-          <button class="button button--primary" type="submit" data-action-save data-i18n="services.savePlan">${escapeHtml(t("services.savePlan"))}</button>
-        </div>
-      </form>
+    <article class="project-row service-row" data-service-id="${escapeAttribute(plan.id)}">
+      <span class="project-row__project">
+        <strong>${escapeHtml(plan.name || t("services.untitledPlan"))}</strong>
+        <small>${escapeHtml(plan.slug || "-")}</small>
+      </span>
+      <span data-label="${escapeAttribute(t("services.range"))}">${escapeHtml(plan.range || "-")}</span>
+      <span data-label="${escapeAttribute(t("services.timeline"))}">${escapeHtml(plan.timeline || "-")}</span>
+      <span data-label="${escapeAttribute(t("services.status"))}">${badge(plan.status, plan.status === "AVAILABLE" ? "success" : plan.status === "ARCHIVED" ? "muted" : "warning")}</span>
+      <span data-label="${escapeAttribute(t("services.visibility"))}">${escapeHtml(plan.visible ? t("common.visible") : t("common.hidden"))}</span>
+      <span data-label="${escapeAttribute(t("services.content"))}">${escapeHtml(t("serviceHealth.content.compact", { pt: completeness.pt.percent, en: completeness.en.percent }))}</span>
+      <span data-label="${escapeAttribute(t("services.features"))}">${escapeHtml(plural("services.featureCount", (plan.features || []).length))}</span>
+      <span data-label="${escapeAttribute(t("serviceHealth.title"))}">${healthBadge(health.status)}</span>
+      <span data-label="${escapeAttribute(t("common.updated"))}">${escapeHtml(formatUpdated(plan.updatedAt))}</span>
+      <span class="project-row__actions">
+        <button class="button button--compact" type="button" data-service-open="${escapeAttribute(plan.id)}">${escapeHtml(t("services.actionEdit"))}</button>
+        <span class="row-menu" data-row-menu>
+          <button class="button button--compact row-menu__toggle" type="button" data-row-menu-toggle aria-expanded="false" aria-haspopup="true" aria-label="${escapeAttribute(t("services.actions"))}">...</button>
+          <span class="row-menu__panel" role="menu" hidden>
+            <a role="menuitem" href="${escapeAttribute(publicHref)}" target="_blank" rel="noreferrer">${escapeHtml(t("services.actionViewPublic"))}</a>
+            <button type="button" role="menuitem" data-service-duplicate="${escapeAttribute(plan.id)}">${escapeHtml(t("services.actionDuplicate"))}</button>
+            <button type="button" role="menuitem" data-service-archive="${escapeAttribute(plan.id)}" data-archive-action="${archiveAction}">${escapeHtml(archiveLabel)}</button>
+          </span>
+        </span>
+      </span>
     </article>
   `;
+}
+
+function closeRowMenus(root = document) {
+  root.querySelectorAll("[data-row-menu] .row-menu__panel").forEach((panel) => {
+    panel.hidden = true;
+  });
+  root.querySelectorAll("[data-row-menu-toggle]").forEach((toggle) => {
+    toggle.setAttribute("aria-expanded", "false");
+  });
 }
 
 export const servicesPage = {
   title: () => t("services.title"),
   breadcrumb: () => t("services.breadcrumb"),
   render: () => `
-    <section class="page-heading">
-      <span data-i18n="services.eyebrow">${t("services.eyebrow")}</span>
-      <h2 data-i18n="services.heading">${t("services.heading")}</h2>
-      <p data-i18n="services.intro">${t("services.intro")}</p>
+    <section class="page-heading page-heading--split">
+      <div>
+        <span data-i18n="services.eyebrow">${escapeHtml(t("services.eyebrow"))}</span>
+        <h2 data-i18n="services.heading">${escapeHtml(t("services.heading"))}</h2>
+        <p data-i18n="services.intro">${escapeHtml(t("services.intro"))}</p>
+      </div>
+      <div class="heading-actions">
+        <button class="button button--primary" type="button" data-new-service data-i18n="services.newService">${escapeHtml(t("services.newService"))}</button>
+      </div>
     </section>
-    <section class="plans-editor-grid" data-plans-list aria-busy="true">
-      <article class="panel"><p class="empty-inline" data-i18n="services.loading">${t("services.loading")}</p></article>
+
+    <section class="panel projects-panel services-panel">
+      <div class="project-metrics service-metrics" data-service-metrics aria-live="polite"></div>
+      <div class="toolbar toolbar--filters service-filters">
+        <label class="search-field">
+          <span data-i18n="services.searchServices">${escapeHtml(t("services.searchServices"))}</span>
+          <input data-search-services type="search" placeholder="${escapeAttribute(t("services.searchPlaceholder"))}" disabled>
+        </label>
+        <div class="toolbar__controls">
+          ${filterMarkup({ labelKey: "services.status", name: "status", options: [["ALL", t("common.all")], ...SERVICE_STATUSES.map((item) => [item, statusLabel(item)])] })}
+          ${filterMarkup({ labelKey: "services.visibility", name: "visibility", options: [["ALL", t("common.all")], ["VISIBLE", t("common.visible")], ["HIDDEN", t("common.hidden")]] })}
+          ${filterMarkup({ labelKey: "serviceHealth.title", name: "health", options: [["ALL", t("common.all")], ["HEALTHY", t("serviceHealth.status.healthy")], ["ATTENTION", t("serviceHealth.status.attention")], ["INCOMPLETE", t("serviceHealth.status.incomplete")]] })}
+        </div>
+      </div>
+      <div class="projects-table-scroll services-table-scroll">
+        <div class="project-table service-table" data-service-list aria-live="polite" aria-busy="true">
+          <div class="project-row project-row--skeleton"></div>
+          <div class="project-row project-row--skeleton"></div>
+          <div class="project-row project-row--skeleton"></div>
+        </div>
+      </div>
     </section>
   `,
   afterRender: async () => {
-    const root = document.querySelector("[data-plans-list]");
+    document.querySelector("[data-new-service]")?.addEventListener("click", () => {
+      window.location.hash = "#/services/new";
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest("[data-row-menu]")) closeRowMenus();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeRowMenus();
+    });
+
+    const search = document.querySelector("[data-search-services]");
+    const list = document.querySelector("[data-service-list]");
+    const metricRoot = document.querySelector("[data-service-metrics]");
+    const filters = [...document.querySelectorAll("[data-service-filter]")];
     let plans = [];
 
-    function bindPlanForms() {
-      root.querySelectorAll("[data-plan-form]").forEach((form) => {
-        const planId = form.dataset.planForm;
-        const plan = plans.find((item) => String(item.id) === String(planId));
-        const scope = form.dataset.localeScopeRoot;
+    const renderList = () => {
+      const query = search.value.trim().toLowerCase();
+      const filterState = Object.fromEntries(filters.map((filter) => [filter.dataset.serviceFilter, filter.value]));
+      const visible = plans.filter((plan) => {
+        const health = serviceHealth(plan).status.toUpperCase();
+        const matchesQuery = [plan.name, plan.slug, plan.scope, plan.scopeShort, plan.description].some((value) =>
+          String(value || "").toLowerCase().includes(query),
+        );
+        const matchesStatus = filterState.status === "ALL" || plan.status === filterState.status;
+        const matchesVisibility = filterState.visibility === "ALL" || (filterState.visibility === "VISIBLE" ? plan.visible : !plan.visible);
+        const matchesHealth = filterState.health === "ALL" || health === filterState.health;
+        return matchesQuery && matchesStatus && matchesVisibility && matchesHealth;
+      });
 
-        // Feature translations live on each feature row, not on the plan, so
-        // they are folded into the group under the same key the row carries.
-        const initialTranslations = { ...(plan?.translations?.en ?? {}) };
-        (plan?.features ?? []).forEach((feature) => {
-          const text = feature.translations?.en?.text;
-          if (feature.id && text) initialTranslations[`feature:${feature.id}`] = text;
+      if (metricRoot) metricRoot.innerHTML = metricsMarkup(plans);
+      list.innerHTML = `
+        <div class="project-table__head service-table__head" aria-hidden="true">
+          <span>${t("services.plan").toUpperCase()}</span><span>${t("services.range").toUpperCase()}</span><span>${t("services.timeline").toUpperCase()}</span><span>${t("services.status").toUpperCase()}</span><span>${t("services.visibility").toUpperCase()}</span><span>${t("services.content").toUpperCase()}</span><span>${t("services.features").toUpperCase()}</span><span>${t("serviceHealth.title").toUpperCase()}</span><span>${t("common.updated").toUpperCase()}</span><span>${t("services.actions").toUpperCase()}</span>
+        </div>
+        ${visible.length ? visible.map(serviceRow).join("") : `<p class="empty-inline">${escapeHtml(plans.length ? t("services.noMatch") : t("services.noPlans"))}</p>`}
+      `;
+
+      list.querySelectorAll("[data-service-open]").forEach((button) => {
+        button.addEventListener("click", () => {
+          window.location.hash = `#/services/${button.dataset.serviceOpen}`;
         });
-
-        const locale = bindLocaleFields({
-          root: form,
-          scope,
-          initial: initialTranslations,
-        });
-
-        const renumberFeatures = () => {
-          const rows = [...form.querySelectorAll(".feature-row")];
-          rows.forEach((row, index) => {
-            row.querySelector("span").textContent = String(index + 1).padStart(2, "0");
-            const up = row.querySelector("[data-move-feature-up]");
-            const down = row.querySelector("[data-move-feature-down]");
-            const remove = row.querySelector("[data-remove-feature]");
-            if (up) {
-              up.dataset.moveFeatureUp = String(index);
-              up.disabled = index === 0;
-            }
-            if (down) {
-              down.dataset.moveFeatureDown = String(index);
-              down.disabled = index === rows.length - 1;
-            }
-            if (remove) remove.dataset.removeFeature = String(index);
-          });
-          const counter = form.querySelector("[data-feature-count]");
-          if (counter) counter.textContent = plural("services.featureCount", rows.length);
-        };
-
-        form.querySelector("[data-add-feature]")?.addEventListener("click", () => {
-          const list = form.querySelector("[data-feature-list]");
-          const count = list.querySelectorAll("input[data-feature-id]").length;
-          if (list.querySelector(".empty-inline")) list.innerHTML = "";
-          list.insertAdjacentHTML("beforeend", featureRow({ id: "", text: "" }, count, count + 1, scope));
-          renumberFeatures();
-          // A row added while the English tab is open joins the group as an
-          // English draft; the pt-BR side stays empty until it is filled in.
-          locale?.rescan();
-        });
-
-        form.addEventListener("click", (event) => {
-          const remove = event.target.closest("[data-remove-feature]");
-          if (remove) {
-            const input = remove.closest(".feature-row")?.querySelector("[data-feature-key]");
-            if (input) locale?.forget(input.dataset.featureKey);
-            remove.closest(".feature-row")?.remove();
-            renumberFeatures();
-            return;
+      });
+      list.querySelectorAll("[data-row-menu-toggle]").forEach((toggle) => {
+        toggle.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const panel = toggle.nextElementSibling;
+          const willOpen = panel?.hidden;
+          closeRowMenus();
+          if (panel && willOpen) {
+            panel.hidden = false;
+            toggle.setAttribute("aria-expanded", "true");
           }
-          const up = event.target.closest("[data-move-feature-up]");
-          const down = event.target.closest("[data-move-feature-down]");
-          if (!up && !down) return;
-          const row = (up || down).closest(".feature-row");
-          if (up) row?.previousElementSibling?.before(row);
-          if (down) row?.nextElementSibling?.after(row);
-          renumberFeatures();
         });
-
-        form.addEventListener("submit", async (event) => {
-          event.preventDefault();
-          const data = Object.fromEntries(new FormData(form).entries());
-          const baseValues = locale?.baseValues() ?? {};
-          const translationValues = locale?.translationValues() ?? {};
-
-          const featureInputs = [...form.querySelectorAll("input[data-feature-id]")];
-          const features = featureInputs
-            .map((input, index) => {
-              const key = input.dataset.featureKey;
-              return {
-                id: input.dataset.featureId || null,
-                position: index,
-                text: String(baseValues[key] ?? "").trim(),
-                translations: translationValues[key] ? { en: { text: translationValues[key] } } : {},
-              };
-            })
-            .filter((feature) => feature.text);
-
-          // Feature copy is carried per row, so it is not duplicated into the
-          // plan's own translations object.
-          const planTranslations = Object.fromEntries(
-            Object.entries(translationValues).filter(([key]) => !key.startsWith("feature:")),
-          );
-
-          const patch = {
-            name: data.name.trim(),
-            range: data.range.trim(),
-            status: data.status.trim(),
-            accent: data.accent.trim(),
-            position: data.position,
-            timeline: String(baseValues.timeline ?? "").trim(),
-            scope: String(baseValues.scope ?? "").trim(),
-            scopeShort: String(baseValues.scopeShort ?? "").trim(),
-            description: baseValues.description ?? "",
-            visible: form.elements.visible.checked,
-            features,
-            // Merging keeps any locale the Admin does not edit yet intact.
-            translations: {
-              ...(plan?.translations ?? {}),
-              ...(Object.keys(planTranslations).length ? { en: planTranslations } : {}),
-            },
-          };
-          if (!Object.keys(planTranslations).length) delete patch.translations.en;
-
-          const button = form.querySelector('button[type="submit"]');
-          button.disabled = true;
+      });
+      list.querySelectorAll("[data-service-duplicate]").forEach((button) => {
+        button.addEventListener("click", async () => {
           try {
-            await updatePlan(planId, patch);
-            await logActivity("Plan updated", `${patch.name} updated`, { action: "plan.updated", entityType: "plan", entityId: planId });
-            showToast(t("services.planSaved"));
+            const copy = await duplicatePlan(button.dataset.serviceDuplicate);
+            await logActivity("Plan duplicated", `${copy.name} created from an existing plan.`, { action: "plan.duplicated", entityType: "plan", entityId: copy.id });
+            plans = await getPlans();
+            renderList();
+            showToast(t("services.planDuplicated"));
           } catch (error) {
-            showToast(describeError(error, t("services.saveError")));
-          } finally {
-            button.disabled = false;
+            showToast(describeError(error, t("services.duplicateError")));
           }
         });
       });
-    }
-
-    // Plans are rendered once. A locale change re-labels the chrome through
-    // applyStaticTranslations() and only refreshes the feature counters, so
-    // in-progress edits in either language are left alone.
-    onLocaleChange(root, () => {
-      root.querySelectorAll("[data-plan-form]").forEach((form) => {
-        const counter = form.querySelector("[data-feature-count]");
-        if (counter) counter.textContent = plural("services.featureCount", form.querySelectorAll(".feature-row").length);
+      list.querySelectorAll("[data-service-archive]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          try {
+            const action = button.dataset.archiveAction;
+            const changed = action === "unarchive" ? await unarchivePlan(button.dataset.serviceArchive) : await archivePlan(button.dataset.serviceArchive);
+            await logActivity(action === "unarchive" ? "Plan unarchived" : "Plan archived", `${changed.name} lifecycle updated.`, {
+              action: action === "unarchive" ? "plan.unarchived" : "plan.archived",
+              entityType: "plan",
+              entityId: changed.id,
+            });
+            plans = await getPlans();
+            renderList();
+            showToast(action === "unarchive" ? t("services.planUnarchived") : t("services.planArchived"));
+          } catch (error) {
+            showToast(describeError(error, t("services.archiveError")));
+          }
+        });
       });
-    });
+    };
+
+    filters.forEach((filter) => filter.addEventListener("change", renderList));
+    search.addEventListener("input", renderList);
+    onLocaleChange(list, () => renderList());
 
     try {
       plans = await getPlans();
-      root.innerHTML = plans.length
-        ? plans.map(renderPlan).join("")
-        : `<article class="panel"><p class="empty-inline" data-i18n="services.noPlans">${t("services.noPlans")}</p></article>`;
-      bindPlanForms();
+      if (!list.isConnected) return;
+      list.removeAttribute("aria-busy");
+      search.disabled = false;
+      filters.forEach((filter) => {
+        filter.disabled = false;
+      });
+      renderList();
     } catch (error) {
-      root.innerHTML = `<article class="panel"><p class="empty-inline">${escapeHtml(describeError(error, t("services.loadError")))}</p></article>`;
-    } finally {
-      root.removeAttribute("aria-busy");
+      list.innerHTML = `<p class="empty-inline">${escapeHtml(describeError(error, t("services.loadError")))}</p>`;
     }
   },
 };

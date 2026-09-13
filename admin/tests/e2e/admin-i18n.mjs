@@ -84,7 +84,7 @@ try {
     ["#/clients", ".page-heading h2", "Diretório de clientes.", "Client directory."],
     ["#/commercial", ".page-heading h2", "Pipeline de vendas.", "Sales pipeline."],
     ["#/financial", ".page-heading h2", "Controle financeiro.", "Financial control."],
-    ["#/services", ".page-heading h2", "Planos comerciais.", "Commercial plans."],
+    ["#/services", ".page-heading h2", "SERVICES", "SERVICES"],
     ["#/cms", ".page-heading h2", "Controle de conteúdo.", "Content control."],
     ["#/content", ".page-heading h2", "Área editorial.", "Editorial workspace."],
     ["#/media", ".page-heading h2", "Arquivos dos projetos.", "Project assets."],

@@ -55,9 +55,26 @@ export const supabasePlanRepository = {
     return unwrap(result, t("errors.data.loadPlans")).map(mapPlanFromDatabase);
   },
 
+  async getById(id) {
+    const result = await getSupabaseClient().from(TABLE).select(SELECT).or(`id.eq.${id},slug.eq.${id}`).maybeSingle();
+    const row = unwrap(result, t("errors.data.loadPlan"));
+    return row ? mapPlanFromDatabase(row) : null;
+  },
+
+  async create(data) {
+    const supabase = getSupabaseClient();
+    const features = Array.isArray(data.features) ? data.features : [];
+    const inserted = unwrap(
+      await supabase.from(TABLE).insert(mapPlanToDatabase(data)).select("id").single(),
+      t("errors.data.savePlan"),
+    );
+    if (features.length) await syncFeatures(inserted.id, features);
+    return mapPlanFromDatabase(unwrap(await supabase.from(TABLE).select(SELECT).eq("id", inserted.id).single(), t("errors.data.reloadPlan")));
+  },
+
   async update(id, patch) {
     const supabase = getSupabaseClient();
-    const existing = unwrap(await supabase.from(TABLE).select("id").eq("id", id).maybeSingle(), t("errors.data.loadPlan"));
+    const existing = unwrap(await supabase.from(TABLE).select("id").or(`id.eq.${id},slug.eq.${id}`).maybeSingle(), t("errors.data.loadPlan"));
     if (!existing) return null;
 
     unwrap(await supabase.from(TABLE).update(mapPlanToDatabase(patch)).eq("id", existing.id), t("errors.data.savePlan"));

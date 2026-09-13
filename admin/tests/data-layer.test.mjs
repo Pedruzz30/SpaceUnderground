@@ -22,6 +22,7 @@ function createStorageStub() {
 globalThis.localStorage = createStorageStub();
 
 const { resetMockProjects } = await import("../src/services/repositories/mock-project-repository.js");
+const { resetMockPlans } = await import("../src/services/repositories/mock-plan-repository.js");
 const { resetMockActivity } = await import("../src/services/repositories/mock-activity-repository.js");
 const { getActivity, getActivityWithStatus } = await import("../src/services/activity-service.js");
 const {
@@ -33,6 +34,7 @@ const {
   nextAvailableCaseNumber,
   updateProject,
 } = await import("../src/services/project-service.js");
+const { archivePlan, createPlan, duplicatePlan, getPlan, getPlans, unarchivePlan } = await import("../src/services/plan-service.js");
 const { mapProjectFromDatabase, mapProjectToDatabase, formatCaseNumber } = await import(
   "../src/services/mappers/project-mapper.js"
 );
@@ -188,6 +190,59 @@ describe("project mapper", () => {
     assert.deepEqual(row.tech_stack, ["Node"]);
     // Fields that were not provided must not appear in the patch.
     assert.equal("slug" in row, false);
+  });
+});
+
+describe("plan service (mock repository)", () => {
+  beforeEach(() => {
+    resetMockPlans();
+  });
+
+  it("creates a hidden unavailable plan with features", async () => {
+    const created = await createPlan({
+      name: "Orbit",
+      slug: "orbit",
+      range: "R$ 1.000",
+      status: "UNAVAILABLE",
+      visible: false,
+      timeline: "2 semanas",
+      description: "Plano sob medida.",
+      features: [{ text: "Diagnóstico", translations: { en: { text: "Discovery" } } }],
+    });
+
+    assert.equal(created.status, "UNAVAILABLE");
+    assert.equal(created.visible, false);
+    assert.equal(created.features.length, 1);
+    assert.equal((await getPlans()).length, 4);
+  });
+
+  it("duplicates a plan as hidden and unavailable with copied features", async () => {
+    const duplicated = await duplicatePlan("plan-pro");
+
+    assert.equal(duplicated.name, "Pro Copy");
+    assert.equal(duplicated.slug, "pro-copy");
+    assert.equal(duplicated.status, "UNAVAILABLE");
+    assert.equal(duplicated.visible, false);
+    assert.equal(duplicated.features.length, (await getPlan("plan-pro")).features.length);
+    assert.ok(duplicated.features.every((feature) => feature.id));
+  });
+
+  it("uses incremented slugs for repeated duplicates", async () => {
+    await duplicatePlan("plan-pro");
+    const second = await duplicatePlan("plan-pro");
+
+    assert.equal(second.slug, "pro-copy-2");
+  });
+
+  it("archives and unarchives without physical deletion", async () => {
+    const archived = await archivePlan("plan-plus");
+    assert.equal(archived.status, "ARCHIVED");
+    assert.equal(archived.visible, false);
+
+    const restored = await unarchivePlan("plan-plus");
+    assert.equal(restored.status, "UNAVAILABLE");
+    assert.equal(restored.visible, false);
+    assert.ok(await getPlan("plan-plus"));
   });
 });
 

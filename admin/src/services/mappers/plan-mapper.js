@@ -44,7 +44,7 @@ export function mapPlanToDatabase(plan) {
   if (plan.range !== undefined) row.range = plan.range || null;
   if (plan.scope !== undefined) row.scope = plan.scope || null;
   if (plan.scopeShort !== undefined) row.scope_short = plan.scopeShort || null;
-  if (plan.status !== undefined) row.status = plan.status || "AVAILABLE";
+  if (plan.status !== undefined) row.status = plan.status || "UNAVAILABLE";
   if (plan.description !== undefined) row.description = plan.description || null;
   if (plan.timeline !== undefined) row.timeline = plan.timeline || null;
   if (plan.year !== undefined) row.year = plan.year === "" ? null : Number(plan.year);
