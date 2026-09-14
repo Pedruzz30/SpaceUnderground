@@ -23,7 +23,7 @@ services:
 
     # Deploys follow the branch. There is no separate pipeline: CI validates
     # the change, Render builds the same Dockerfile a developer builds locally.
-    branch: main
+    branch: feat/automation-production-runtime
     autoDeploy: true
 
     envVars:
