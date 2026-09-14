@@ -329,6 +329,7 @@ describe("automation client transport", () => {
       // Omitted by the caller here, so it must be explicitly null rather than
       // absent: the service distinguishes "no key" from "missing field".
       assert.equal(body.operation_id, null);
+      assert.equal(body.dry_run, false);
     } finally {
       fetchStub.restore();
     }

@@ -260,12 +260,15 @@ describe("automation run storage contract", () => {
     }
   });
 
-  it("writes to no table other than its own history", () => {
+  it("writes only to the explicit automation and handoff tables", () => {
     const supabase = readFileSync(
       join(root, "services", "automation-api", "app", "services", "supabase_service.py"),
       "utf8",
     );
 
-    assert.match(supabase, /WRITABLE_TABLES = \{"automation_runs"\}/);
+    assert.match(
+      supabase,
+      /WRITABLE_TABLES = \{"automation_runs", "projects", "commercial_project_handoffs"\}/,
+    );
   });
 });

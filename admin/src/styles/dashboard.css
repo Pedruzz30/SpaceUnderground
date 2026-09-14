@@ -538,13 +538,40 @@
   line-height: 1.6;
 }
 
-.automation-steps .health-check small {
+/* The business half of a run detail: one heading per block, reusing
+   .ops-figures for the summary and .health-checks for the actions so the
+   modal reads as one list rather than three different widgets. */
+.automation-detail__section {
+  margin-bottom: var(--space-4);
+}
+
+.automation-detail__heading {
+  margin: 0;
+  color: var(--text-muted);
+  font: 600 0.6rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.automation-detail__business {
+  margin: var(--space-2) 0 0;
+}
+
+/* Overrides the header grid's own spacing: inside a section the heading
+   already provides the gap above. */
+.automation-detail__section .ops-figures {
+  margin: var(--space-2) 0 0;
+}
+
+.automation-steps .health-check small,
+.automation-actions .health-check small {
   margin-left: auto;
   color: var(--text-muted);
   font: 500 0.6rem/1.5 var(--mono);
 }
 
-.automation-steps .health-check em {
+.automation-steps .health-check em,
+.automation-actions .health-check em {
   flex-basis: 100%;
   color: var(--danger);
   font-size: 0.72rem;

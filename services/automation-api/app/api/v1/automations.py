@@ -39,6 +39,21 @@ def get_store(supabase: SupabaseService = Depends(get_supabase_service)) -> RunS
     return get_run_store(supabase)
 
 
+def _default_entity_type(event: AutomationEvent) -> str | None:
+    if event.entity_type:
+        return event.entity_type
+    if event.event.startswith("commercial."):
+        return "commercial_proposal"
+    if event.event.startswith("project."):
+        return "project"
+    return None
+
+
+def _default_entity_id(event: AutomationEvent) -> str | None:
+    value = event.entity_id or event.payload.get("project_id") or event.payload.get("proposal_id")
+    return str(value) if value else None
+
+
 def _to_run(raw: dict[str, Any]) -> AutomationRun:
     """Normalises a run from either the engine or a stored row.
 
@@ -95,11 +110,12 @@ async def dispatch_event(
             workflow,
             supabase=supabase,
             store=store,
-            entity_type=event.entity_type or "project",
-            entity_id=event.entity_id or str(event.payload.get("project_id") or "") or None,
+            entity_type=_default_entity_type(event),
+            entity_id=_default_entity_id(event),
             payload=event.payload,
-            source="admin",
+            source="dry_run" if event.dry_run else "admin",
             idempotency_key=event.idempotency_key(),
+            dry_run=event.dry_run,
         )
     except SupabaseNotConfigured as error:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error

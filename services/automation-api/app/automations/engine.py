@@ -88,6 +88,7 @@ class StepContext:
     entity_id: str | None
     payload: dict[str, Any]
     supabase: SupabaseService
+    dry_run: bool = False
     # Results of the steps that already ran, by name, so a later step can build
     # on an earlier one without the handler passing state around by hand.
     results: dict[str, Any] = field(default_factory=dict)
@@ -183,6 +184,7 @@ async def run_workflow(
     source: str = "api",
     idempotency_key: str | None = None,
     retry_of: str | None = None,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
     """Executes a workflow end to end and records it.
 
@@ -245,6 +247,7 @@ async def run_workflow(
         entity_id=entity_id,
         payload=payload,
         supabase=supabase,
+        dry_run=dry_run,
     )
 
     steps: list[dict[str, Any]] = []
@@ -274,6 +277,10 @@ async def run_workflow(
         "steps_run": len(steps),
         "steps_succeeded": sum(1 for item in steps if item["status"] == SUCCESS),
         "summary": context.results.get("summary"),
+        "business_status": context.results.get("business_status"),
+        "actions": context.results.get("actions") or [],
+        "entities": context.results.get("entities") or {},
+        "dry_run": dry_run,
     }
 
     run = {

@@ -278,3 +278,232 @@ describe("automation run presentation", () => {
     assert.match(markup, /disabled/);
   });
 });
+
+// The business half of a run detail. Phase 3 runs carry an empty result and
+// must keep rendering exactly as they did; Phase 4 runs add a business status,
+// a summary and a list of actions. Everything here is asserted on markup
+// because the guarantee being protected is what reaches the DOM.
+
+const COMMERCIAL_RUN = {
+  run_id: "abcdef12-3456-4789-abcd-000000000003",
+  event: "commercial.proposal.accepted",
+  status: "SUCCESS",
+  source: "admin",
+  entity_type: "proposal",
+  entity_id: "20d77737-448e-4c36-b4e4-cf8e324fda88",
+  duration_ms: 2080,
+  steps: [
+    { name: "validate_proposal", status: "SUCCESS", duration_ms: 413 },
+    { name: "register_handoff", status: "SUCCESS", duration_ms: 12 },
+  ],
+  result: {
+    business_status: "SUCCESS",
+    summary: {
+      proposal_id: "20d77737-448e-4c36-b4e4-cf8e324fda88",
+      client_id: "668a1d7e-b100-4085-9bc6-fb7463aaea71",
+      plan_id: "d077da8e-5205-4ac5-aeec-743712e9da66",
+      project_id: "d9683452-5407-415e-88a6-fbbf182f482c",
+      case_number: 7,
+    },
+    actions: [
+      {
+        action: "project.create",
+        status: "executed",
+        target: "projects",
+        entity_id: "d9683452-5407-415e-88a6-fbbf182f482c",
+        dry_run: false,
+      },
+    ],
+  },
+  error: null,
+};
+
+const withResult = (result) => ({ ...COMMERCIAL_RUN, result });
+
+describe("automation run business detail", () => {
+  it("leaves a Phase 3 run exactly as it was, with no business blocks", async () => {
+    const { runs } = await loadModules();
+    const markup = runs.runDetailMarkup(RUN);
+
+    assert.doesNotMatch(markup, /automation-detail__section/);
+    assert.doesNotMatch(markup, /automation-actions/);
+    // What the run always showed is still there.
+    assert.match(markup, /load_project/);
+    assert.match(markup, /project\.published/);
+  });
+
+  it("survives a run whose result is missing or malformed", async () => {
+    const { runs } = await loadModules();
+
+    for (const result of [undefined, null, {}, [], "corrupted", { summary: null }, { actions: null }]) {
+      const markup = runs.runDetailMarkup(withResult(result));
+      assert.match(markup, /automation-detail/);
+      assert.doesNotMatch(markup, /undefined|\[object Object\]/);
+    }
+  });
+
+  it("shows the business entities a commercial run resolved", async () => {
+    const { runs } = await loadModules();
+    const markup = runs.runDetailMarkup(COMMERCIAL_RUN);
+
+    assert.match(markup, /automationRuns\.summaryFields\.proposalId/);
+    assert.match(markup, /20d77737-448e-4c36-b4e4-cf8e324fda88/);
+    assert.match(markup, /668a1d7e-b100-4085-9bc6-fb7463aaea71/);
+    assert.match(markup, /d077da8e-5205-4ac5-aeec-743712e9da66/);
+    assert.match(markup, /d9683452-5407-415e-88a6-fbbf182f482c/);
+    assert.match(markup, />7</);
+  });
+
+  it("renders only the summary fields that are present", async () => {
+    const { runs } = await loadModules();
+    const markup = runs.runDetailMarkup(withResult({ summary: { project_id: "only-this-one" } }));
+
+    assert.match(markup, /only-this-one/);
+    assert.doesNotMatch(markup, /summaryFields\.proposalId/);
+    assert.doesNotMatch(markup, /summaryFields\.clientId/);
+  });
+
+  it("writes the business status as text, not only as a colour", async () => {
+    const { runs } = await loadModules();
+    const markup = runs.runDetailMarkup(withResult({ business_status: "ATTENTION" }));
+
+    assert.match(markup, /badge--warning/);
+    assert.match(markup, /automationRuns\.businessStatus"/);
+    const badgeText = markup.match(/<span class="badge badge--warning">([^<]+)</);
+    assert.ok(badgeText && badgeText[1].trim().length > 0, "the status must carry a label");
+  });
+
+  it("does not render an unknown business status as a raw translation key", async () => {
+    const { runs } = await loadModules();
+    const markup = runs.runDetailMarkup(withResult({ business_status: "WARP_SPEED" }));
+
+    assert.match(markup, /WARP_SPEED/);
+    assert.doesNotMatch(markup, /businessStatusValue\.WARP_SPEED/);
+  });
+
+  it("distinguishes a planned action from an executed one", async () => {
+    const { runs } = await loadModules();
+
+    const planned = runs.runDetailMarkup(
+      withResult({ actions: [{ action: "project.create", status: "planned", entity_id: null }] }),
+    );
+    assert.match(planned, /health-check--warning/);
+    assert.match(planned, /PROJECT\.CREATE/);
+    assert.doesNotMatch(planned, /actionStatus\.PLANNED/);
+
+    const executed = runs.runDetailMarkup(COMMERCIAL_RUN);
+    assert.match(executed, /health-check--ok/);
+    // Shortened for the row, since the full id is already in the summary.
+    assert.match(executed, /d9683452…/);
+  });
+
+  it("explains why an action was skipped", async () => {
+    const { runs } = await loadModules();
+    const markup = runs.runDetailMarkup(
+      withResult({
+        actions: [
+          {
+            action: "project.create",
+            status: "skipped",
+            reason: "A project already exists for this proposal.",
+            entity_id: "d9683452-5407-415e-88a6-fbbf182f482c",
+          },
+        ],
+      }),
+    );
+
+    assert.match(markup, /A project already exists for this proposal\./);
+    assert.match(markup, /health-check--warning/);
+  });
+
+  it("marks a failed action as failed", async () => {
+    const { runs } = await loadModules();
+    const markup = runs.runDetailMarkup(
+      withResult({ actions: [{ action: "project.create", status: "failed", message: "Category is missing." }] }),
+    );
+
+    assert.match(markup, /health-check--required/);
+    assert.match(markup, /Category is missing\./);
+  });
+
+  it("omits the actions block when the run took none", async () => {
+    const { runs } = await loadModules();
+
+    for (const actions of [[], undefined]) {
+      const markup = runs.runDetailMarkup(withResult({ business_status: "ATTENTION", actions }));
+      assert.doesNotMatch(markup, /automation-actions/);
+      assert.doesNotMatch(markup, /automationRuns\.actions"/);
+    }
+  });
+
+  it("never lets a secret in the result reach the markup", async () => {
+    const { runs } = await loadModules();
+    const markup = runs.runDetailMarkup(
+      withResult({
+        business_status: "SUCCESS",
+        // Each of these sits outside the whitelist, at a different depth.
+        token: "sb_secret_top_level",
+        authorization: "Bearer eyJhbGciOiJIUzI1NiSHOULDNEVERRENDER",
+        summary: {
+          project_id: "d9683452-5407-415e-88a6-fbbf182f482c",
+          service_role_key: "sb_secret_in_summary",
+          apikey: "sb_secret_apikey",
+          // A whitelisted key holding a structure is dropped, not flattened.
+          client_id: { value: "sb_secret_nested_under_whitelist" },
+        },
+        actions: [
+          {
+            action: "project.create",
+            status: "executed",
+            entity_id: "d9683452-5407-415e-88a6-fbbf182f482c",
+            fields: { apikey: "sb_secret_in_action_fields" },
+            headers: { authorization: "sb_secret_in_action_headers" },
+          },
+        ],
+      }),
+    );
+
+    for (const secret of [
+      "sb_secret_top_level",
+      "SHOULDNEVERRENDER",
+      "sb_secret_in_summary",
+      "sb_secret_apikey",
+      "sb_secret_nested_under_whitelist",
+      "sb_secret_in_action_fields",
+      "sb_secret_in_action_headers",
+    ]) {
+      assert.doesNotMatch(markup, new RegExp(secret), secret + " must never render");
+    }
+
+    // The whitelisted value standing beside them still renders.
+    assert.match(markup, /d9683452-5407-415e-88a6-fbbf182f482c/);
+    assert.doesNotMatch(markup, /\[object Object\]/);
+  });
+
+  it("escapes a hostile business value instead of rendering it", async () => {
+    const { runs } = await loadModules();
+    const markup = runs.runDetailMarkup(
+      withResult({
+        summary: { project_id: '<img src=x onerror="alert(1)">' },
+        actions: [{ action: "<script>alert(1)</script>", status: "executed", reason: "<b>no</b>" }],
+      }),
+    );
+
+    assert.doesNotMatch(markup, /<img|<script|<b>/);
+    assert.match(markup, /&lt;img/);
+  });
+
+  it("keeps the retry lineage and the error next to the business blocks", async () => {
+    const { runs } = await loadModules();
+    const markup = runs.runDetailMarkup({
+      ...FAILED_RUN,
+      retry_of: "abcdef12-3456-4789-abcd-000000000001",
+      result: { business_status: "ATTENTION" },
+    });
+
+    assert.match(markup, /abcdef12/);
+    assert.match(markup, /Preview URL is not reachable \(timeout\)\./);
+    assert.match(markup, /automation-detail__section/);
+    assert.equal(typeof runs.openRunDetail, "function");
+  });
+});

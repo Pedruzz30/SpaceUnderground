@@ -24,6 +24,7 @@ class AutomationEvent(BaseModel):
     operation_id: str | None = Field(default=None, max_length=100)
 
     payload: dict[str, Any] = Field(default_factory=dict)
+    dry_run: bool = False
 
     def idempotency_key(self) -> str | None:
         """event + entity + operation, or None when there is nothing to key on.
@@ -34,7 +35,8 @@ class AutomationEvent(BaseModel):
         """
         if not self.operation_id:
             return None
-        return f"{self.event}:{self.entity_id or '-'}:{self.operation_id}"
+        entity = self.entity_id or self.payload.get("project_id") or self.payload.get("proposal_id") or "-"
+        return f"{self.event}:{entity}:{self.operation_id}"
 
 
 class AutomationStep(BaseModel):

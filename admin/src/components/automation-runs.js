@@ -17,6 +17,39 @@ const STATUS_BADGE = {
   PENDING: "neutral",
 };
 
+const BUSINESS_BADGE = {
+  SUCCESS: "success",
+  OK: "success",
+  READY: "success",
+  ATTENTION: "warning",
+  FAILED: "warning",
+  SKIPPED: "muted",
+  NOT_ELIGIBLE: "muted",
+};
+
+// What an action did, in the vocabulary the engine uses. The glyph is
+// decorative: every row also spells its status out, so a colour is never the
+// only thing carrying the difference between planned and executed.
+const ACTION_PRESENTATION = {
+  EXECUTED: { tone: "ok", glyph: "OK" },
+  PLANNED: { tone: "warning", glyph: "»" },
+  SKIPPED: { tone: "warning", glyph: "–" },
+  FAILED: { tone: "required", glyph: "!" },
+};
+
+// The only summary fields this screen is allowed to show. The engine's result
+// is a free-form object from a service that may add fields at any time, so the
+// modal renders from this list rather than from whatever arrived -- a new
+// field has to be added here deliberately before it can reach the DOM.
+const SUMMARY_FIELDS = [
+  ["proposal_id", "automationRuns.summaryFields.proposalId"],
+  ["client_id", "automationRuns.summaryFields.clientId"],
+  ["service_id", "automationRuns.summaryFields.serviceId"],
+  ["plan_id", "automationRuns.summaryFields.planId"],
+  ["project_id", "automationRuns.summaryFields.projectId"],
+  ["case_number", "automationRuns.summaryFields.caseNumber"],
+];
+
 export function runStatusLabel(status) {
   const key = `automationRuns.status.${String(status || "PENDING").toUpperCase()}`;
   const label = t(key);
@@ -27,6 +60,22 @@ export function runStatusLabel(status) {
 export function runStatusBadge(status) {
   const type = STATUS_BADGE[String(status || "").toUpperCase()] ?? "neutral";
   return `<span class="badge badge--${type}">${escapeHtml(runStatusLabel(status))}</span>`;
+}
+
+/** Translated when the value is known, echoed verbatim when it is not. */
+function vocabularyLabel(namespace, value) {
+  const raw = String(value || "").toUpperCase();
+  const key = `${namespace}.${raw}`;
+  const label = t(key);
+  return label === key ? raw : label;
+}
+
+export function businessStatusBadge(status) {
+  const raw = String(status || "").toUpperCase();
+  if (!raw) return "";
+
+  const type = BUSINESS_BADGE[raw] ?? "neutral";
+  return `<span class="badge badge--${type}">${escapeHtml(vocabularyLabel("automationRuns.businessStatusValue", raw))}</span>`;
 }
 
 export function formatDuration(ms) {
@@ -119,16 +168,99 @@ function field(labelKey, value) {
 }
 
 /**
- * Detail view for one run.
+ * A value this screen is willing to print.
+ *
+ * Strings and finite numbers only: an object or an array coming back under a
+ * whitelisted key is dropped rather than stringified, so a nested structure
+ * can never be flattened onto the page by accident.
+ */
+function safeScalar(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
+  if (typeof value === "string") return value.trim();
+  return "";
+}
+
+function truncateId(value) {
+  const id = safeScalar(value);
+  return id.length > 8 ? `${id.slice(0, 8)}…` : id;
+}
+
+function sectionMarkup(labelKey, content) {
+  if (!content.trim()) return "";
+  return `
+    <section class="automation-detail__section">
+      <h4 class="automation-detail__heading" data-i18n="${escapeAttribute(labelKey)}">${escapeHtml(t(labelKey))}</h4>
+      ${content}
+    </section>
+  `;
+}
+
+function summaryMarkup(summary) {
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) return "";
+
+  const rows = SUMMARY_FIELDS.map(([key, labelKey]) => field(labelKey, safeScalar(summary[key]))).join("");
+  return sectionMarkup("automationRuns.summary", rows.trim() ? `<div class="ops-figures">${rows}</div>` : "");
+}
+
+function actionsMarkup(actions) {
+  if (!Array.isArray(actions) || !actions.length) return "";
+
+  const rows = actions
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return "";
+
+      const name = safeScalar(entry.action) || safeScalar(entry.type);
+      const status = String(safeScalar(entry.status)).toUpperCase();
+      const { tone, glyph } = ACTION_PRESENTATION[status] ?? { tone: "warning", glyph: "»" };
+      const statusLabel = status ? vocabularyLabel("automationRuns.actionStatus", status) : "";
+      const entityId = truncateId(entry.entity_id);
+      const reason = safeScalar(entry.reason) || safeScalar(entry.message);
+      if (!name && !statusLabel) return "";
+
+      return `
+        <div class="health-check health-check--${escapeAttribute(tone)}">
+          <span aria-hidden="true">${escapeHtml(glyph)}</span>
+          <strong>${escapeHtml(name.toUpperCase())}</strong>
+          <small>${escapeHtml([statusLabel, entityId].filter(Boolean).join(" · "))}</small>
+          ${reason ? `<em>${escapeHtml(reason)}</em>` : ""}
+        </div>
+      `;
+    })
+    .join("");
+
+  return sectionMarkup(
+    "automationRuns.actions",
+    rows.trim() ? `<div class="health-checks automation-actions">${rows}</div>` : "",
+  );
+}
+
+/**
+ * The business half of a run, when the engine reported one.
+ *
+ * Phase 3 runs carry an empty result and simply render nothing extra, which is
+ * why every block here is built from what is present rather than assumed.
+ */
+function businessMarkup(result) {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return "";
+
+  const badge = businessStatusBadge(result.business_status);
+  return `
+    ${badge ? sectionMarkup("automationRuns.businessStatus", `<p class="automation-detail__business">${badge}</p>`) : ""}
+    ${summaryMarkup(result.summary)}
+    ${actionsMarkup(result.actions)}
+  `;
+}
+
+/**
+ * Detail view for one run, as markup.
  *
  * Shows what the engine reported and nothing else: no payload dump, no
- * headers, no tokens. The engine already sanitises step errors, and this keeps
- * the surface narrow rather than trusting that.
+ * headers, no tokens, and never the result object as it arrived. Business
+ * fields come from an explicit whitelist, so a service that starts returning
+ * something new cannot put it on screen without a change here first.
  */
-export function openRunDetail(run, { onRetry } = {}) {
-  const canRetry = String(run.status || "").toUpperCase() === "FAILED" && Boolean(run.run_id) && onRetry;
-
-  const body = `
+export function runDetailMarkup(run) {
+  return `
     <div class="automation-detail">
       <div class="ops-figures">
         ${field("automationRuns.run", shortRunId(run.run_id))}
@@ -144,11 +276,18 @@ export function openRunDetail(run, { onRetry } = {}) {
 
       ${run.retry_of ? `<p class="ops-note">${escapeHtml(t("automationRuns.retryOf", { runId: shortRunId(run.retry_of) }))}</p>` : ""}
 
+      ${businessMarkup(run.result)}
+
       ${stepsMarkup(run.steps)}
 
       ${run.error ? `<p class="automation-detail__error"><span data-i18n="automationRuns.error">${escapeHtml(t("automationRuns.error"))}</span> ${escapeHtml(run.error)}</p>` : ""}
     </div>
   `;
+}
+
+export function openRunDetail(run, { onRetry } = {}) {
+  const canRetry = String(run.status || "").toUpperCase() === "FAILED" && Boolean(run.run_id) && onRetry;
+  const body = runDetailMarkup(run);
 
   const actions = [];
   if (canRetry) {

@@ -18,6 +18,7 @@ from app.core.config import get_settings
 from app.main import create_app
 from app.services.supabase_service import (
     ProjectNotFound,
+    SupabaseConflict,
     SupabaseNotConfigured,
     SupabaseService,
     get_supabase_service,
@@ -51,8 +52,21 @@ def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 class FakeSupabaseService:
     """Stands in for SupabaseService with rows held in memory."""
 
-    def __init__(self, rows: list[dict[str, Any]] | None = None, *, configured: bool = True) -> None:
+    def __init__(
+        self,
+        rows: list[dict[str, Any]] | None = None,
+        *,
+        configured: bool = True,
+        proposals: list[dict[str, Any]] | None = None,
+        clients: list[dict[str, Any]] | None = None,
+        plans: list[dict[str, Any]] | None = None,
+        handoffs: list[dict[str, Any]] | None = None,
+    ) -> None:
         self.rows = rows or []
+        self.proposals = proposals or []
+        self.clients = clients or []
+        self.plans = plans or []
+        self.handoffs = handoffs or []
         self._configured = configured
         self.calls: list[str] = []
 
@@ -78,6 +92,61 @@ class FakeSupabaseService:
         self.calls.append("list_projects")
         self._require()
         return list(self.rows)
+
+    async def get_commercial_proposal(self, proposal_id: str) -> dict[str, Any]:
+        self.calls.append("get_commercial_proposal:" + proposal_id)
+        self._require()
+        for row in self.proposals:
+            if str(row.get("id")) == proposal_id:
+                return row
+        raise ProjectNotFound("No commercial proposal for identifier: " + proposal_id)
+
+    async def get_client(self, client_id: str) -> dict[str, Any]:
+        self.calls.append("get_client:" + client_id)
+        self._require()
+        for row in self.clients:
+            if str(row.get("id")) == client_id:
+                return row
+        raise ProjectNotFound("No client for identifier: " + client_id)
+
+    async def get_plan(self, plan_id: str) -> dict[str, Any]:
+        self.calls.append("get_plan:" + plan_id)
+        self._require()
+        for row in self.plans:
+            if str(row.get("id")) == plan_id:
+                return row
+        raise ProjectNotFound("No service plan for identifier: " + plan_id)
+
+    async def get_project_by_proposal(self, proposal_id: str) -> dict[str, Any] | None:
+        self.calls.append("get_project_by_proposal:" + proposal_id)
+        self._require()
+        for row in self.handoffs:
+            if str(row.get("proposal_id")) == proposal_id:
+                project_id = str(row.get("project_id"))
+                return next((project for project in self.rows if str(project.get("id")) == project_id), None)
+        return None
+
+    async def get_project_by_slug(self, slug: str) -> dict[str, Any] | None:
+        self.calls.append("get_project_by_slug:" + slug)
+        self._require()
+        return next((row for row in self.rows if row.get("slug") == slug), None)
+
+    async def next_project_case_number(self) -> int:
+        self.calls.append("next_project_case_number")
+        self._require()
+        numbers = [row.get("case_number") for row in self.rows if isinstance(row.get("case_number"), int)]
+        return (max(numbers) if numbers else 0) + 1
+
+    async def create_project_from_proposal(self, project: dict[str, Any]) -> dict[str, Any]:
+        self.calls.append("create_project_from_proposal")
+        self._require()
+        if any(row.get("slug") == project.get("slug") for row in self.rows):
+            raise SupabaseConflict("Conflicting row.")
+
+        created = {**project, "id": f"22222222-2222-4222-8222-{len(self.rows) + 1:012d}"}
+        self.rows.append(created)
+        self.handoffs.append({"proposal_id": project.get("_proposal_id"), "project_id": created["id"]})
+        return created
 
 
 class FakeRunStore:
@@ -190,9 +259,20 @@ def make_client():
         *,
         configured: bool = True,
         storage: bool = True,
+        proposals: list[dict[str, Any]] | None = None,
+        clients: list[dict[str, Any]] | None = None,
+        plans: list[dict[str, Any]] | None = None,
+        handoffs: list[dict[str, Any]] | None = None,
     ) -> tuple[TestClient, FakeSupabaseService]:
         app = create_app()
-        fake = FakeSupabaseService(rows, configured=configured)
+        fake = FakeSupabaseService(
+            rows,
+            configured=configured,
+            proposals=proposals,
+            clients=clients,
+            plans=plans,
+            handoffs=handoffs,
+        )
         store = FakeRunStore(available=configured and storage, configured=configured)
         app.dependency_overrides[get_supabase_service] = lambda: fake
         app.dependency_overrides[get_store] = lambda: store
@@ -262,4 +342,57 @@ def project_row(**overrides: Any) -> dict[str, Any]:
     return row
 
 
-__all__ = ["FakeRunStore", "FakeSupabaseService", "make_client", "project_row", "SupabaseService"]
+def client_row(**overrides: Any) -> dict[str, Any]:
+    row = {
+        "id": "aaaaaaaa-1111-4111-8111-000000000001",
+        "code": "CL-001",
+        "name": "Aurora Labs",
+        "company": "Aurora Labs Ltda",
+        "email": "ops@example.com",
+        "phone": None,
+        "status": "ACTIVE",
+    }
+    row.update(overrides)
+    return row
+
+
+def plan_row(**overrides: Any) -> dict[str, Any]:
+    row = {
+        "id": "bbbbbbbb-2222-4222-8222-000000000001",
+        "slug": "business-system",
+        "name": "Business System",
+        "status": "AVAILABLE",
+        "visible": True,
+    }
+    row.update(overrides)
+    return row
+
+
+def proposal_row(**overrides: Any) -> dict[str, Any]:
+    row = {
+        "id": "cccccccc-3333-4333-8333-000000000001",
+        "proposal_number": "PROP-001",
+        "title": "Aurora Operations Portal",
+        "status": "ACCEPTED",
+        "amount": 12000,
+        "currency": "BRL",
+        "payment_terms": "50/50",
+        "project_category": "System",
+        "client_id": "aaaaaaaa-1111-4111-8111-000000000001",
+        "plan_id": "bbbbbbbb-2222-4222-8222-000000000001",
+        "accepted_at": "2026-09-13T10:00:00+00:00",
+    }
+    row.update(overrides)
+    return row
+
+
+__all__ = [
+    "FakeRunStore",
+    "FakeSupabaseService",
+    "SupabaseService",
+    "client_row",
+    "make_client",
+    "plan_row",
+    "project_row",
+    "proposal_row",
+]

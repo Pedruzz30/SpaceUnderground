@@ -6,9 +6,8 @@ dictionaries instead of a database.
 
 PostgREST is called directly with httpx rather than through the Supabase Python
 SDK. The SDK would add a dependency and a client lifecycle to manage in
-exchange for a thin wrapper over the same REST calls; this service only reads,
-so the wrapper earns nothing. If it later needs Realtime or Storage signed
-URLs, that is the point to reconsider.
+exchange for a thin wrapper over the same REST calls. Writes stay behind named
+methods and a hard allowlist; no endpoint accepts a table name or SQL.
 """
 
 from __future__ import annotations
@@ -58,6 +57,40 @@ PROJECT_COLUMNS = ",".join(
     ]
 )
 
+CLIENT_COLUMNS = ",".join(["id", "code", "name", "company", "email", "phone", "status"])
+
+PLAN_COLUMNS = ",".join(
+    [
+        "id",
+        "slug",
+        "name",
+        "category",
+        "range",
+        "scope",
+        "scope_short",
+        "status",
+        "description",
+        "timeline",
+        "visible",
+    ]
+)
+
+PROPOSAL_COLUMNS = ",".join(
+    [
+        "id",
+        "proposal_number",
+        "title",
+        "status",
+        "amount",
+        "currency",
+        "payment_terms",
+        "project_category",
+        "accepted_at",
+        "client_id",
+        "plan_id",
+    ]
+)
+
 
 class SupabaseError(Exception):
     """Base class for every failure raised by this layer."""
@@ -101,19 +134,17 @@ def _looks_like_uuid(value: str) -> bool:
     return all(part and all(char in "0123456789abcdefABCDEF" for char in part) for part in parts)
 
 
-# The only table this service is allowed to write. Project, plan and content
-# rows belong to the Admin and to Supabase; the automation service reads them
-# and never edits them. Run history is its own, so it writes that and nothing
-# else -- enforced here rather than left to each caller to remember.
-WRITABLE_TABLES = {"automation_runs"}
+# Tables this service is allowed to write. `automation_runs` is its own history.
+# `projects` is the only business write path in Phase 4, and only through the
+# proposal handoff method below. No caller can choose an arbitrary table.
+WRITABLE_TABLES = {"automation_runs", "projects", "commercial_project_handoffs"}
 
 
 class SupabaseService:
-    """PostgREST client: reads the catalogue, writes only its own run history.
+    """PostgREST client for named catalogue and handoff operations.
 
     No endpoint accepts SQL -- callers choose a named method, never a query --
-    and `_write` refuses any table outside WRITABLE_TABLES, so a future handler
-    cannot quietly start editing projects.
+    and `_write` refuses any table outside WRITABLE_TABLES.
     """
 
     def __init__(self, settings: Settings | None = None) -> None:
@@ -238,6 +269,93 @@ class SupabaseService:
             "projects",
             {"select": PROJECT_COLUMNS, "order": "case_number.asc"},
         )
+
+    async def get_commercial_proposal(self, proposal_id: str) -> dict[str, Any]:
+        identifier = proposal_id.strip()
+        if not _looks_like_uuid(identifier):
+            raise SupabaseError("Invalid proposal identifier.")
+
+        rows = await self._get(
+            "commercial_proposals",
+            {"select": PROPOSAL_COLUMNS, "id": f"eq.{identifier}", "limit": "1"},
+        )
+        if not rows:
+            raise ProjectNotFound("No commercial proposal for identifier: " + identifier)
+        return rows[0]
+
+    async def get_client(self, client_id: str) -> dict[str, Any]:
+        identifier = client_id.strip()
+        if not _looks_like_uuid(identifier):
+            raise SupabaseError("Invalid client identifier.")
+
+        rows = await self._get("clients", {"select": CLIENT_COLUMNS, "id": f"eq.{identifier}", "limit": "1"})
+        if not rows:
+            raise ProjectNotFound("No client for identifier: " + identifier)
+        return rows[0]
+
+    async def get_plan(self, plan_id: str) -> dict[str, Any]:
+        identifier = plan_id.strip()
+        if not _looks_like_uuid(identifier):
+            raise SupabaseError("Invalid plan identifier.")
+
+        rows = await self._get("plans", {"select": PLAN_COLUMNS, "id": f"eq.{identifier}", "limit": "1"})
+        if not rows:
+            raise ProjectNotFound("No service plan for identifier: " + identifier)
+        return rows[0]
+
+    async def get_project_by_proposal(self, proposal_id: str) -> dict[str, Any] | None:
+        identifier = proposal_id.strip()
+        if not _looks_like_uuid(identifier):
+            raise SupabaseError("Invalid proposal identifier.")
+
+        rows = await self._get(
+            "commercial_project_handoffs",
+            {
+                "select": "project_id,projects(" + PROJECT_COLUMNS + ")",
+                "proposal_id": f"eq.{identifier}",
+                "limit": "1",
+            },
+        )
+        if rows and isinstance(rows[0].get("projects"), dict):
+            return rows[0]["projects"]
+        return None
+
+    async def get_project_by_slug(self, slug: str) -> dict[str, Any] | None:
+        identifier = slug.strip()
+        if not identifier:
+            raise SupabaseError("Invalid project slug.")
+
+        rows = await self._get(
+            "projects",
+            {"select": PROJECT_COLUMNS, "slug": f"eq.{identifier}", "limit": "1"},
+        )
+        return rows[0] if rows else None
+
+    async def next_project_case_number(self) -> int:
+        rows = await self._get(
+            "projects",
+            {"select": "case_number", "order": "case_number.desc", "limit": "1"},
+        )
+        if not rows:
+            return 1
+
+        value = rows[0].get("case_number")
+        return int(value) + 1 if isinstance(value, int) else 1
+
+    async def create_project_from_proposal(self, project: dict[str, Any]) -> dict[str, Any]:
+        payload = dict(project)
+        proposal_id = str(payload.pop("_proposal_id"))
+        rows = await self._write("projects", "POST", json=payload)
+        if not rows:
+            raise SupabaseUnavailable("Project creation returned no row.")
+        created = rows[0]
+
+        await self._write(
+            "commercial_project_handoffs",
+            "POST",
+            json={"proposal_id": proposal_id, "project_id": created.get("id"), "action": "project.create"},
+        )
+        return created
 
 
 def get_supabase_service() -> SupabaseService:

@@ -24,7 +24,7 @@ import { applyStaticTranslations, subscribeLocaleChange, t, statusLabel } from "
 import { BASE_LOCALE, TRANSLATION_LOCALE, localeHint, localeTabs } from "../components/locale-fields.js";
 import { publicSiteUrl } from "../config/public-site.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
-import { isLivePreviewUrl, liveDemoState, projectHealth, publishReadiness } from "../utils/project-health.js";
+import { isLivePreviewUrl, liveDemoState, projectHealth, publishReadiness, yearError } from "../utils/project-health.js";
 import { analyzeProject, dispatchAutomation, isAutomationApiAvailable } from "../services/automation-api.js";
 import { isSupabaseMode } from "../config/env.js";
 import { runStatusBadge, shortRunId } from "../components/automation-runs.js";
@@ -87,8 +87,12 @@ function validate(values) {
   if (!values.slug.trim()) errors.slug = t("projectEditor.validation.slugRequired");
   if (!CATEGORIES.includes(values.category)) errors.category = t("projectEditor.validation.categoryRequired");
 
-  const year = Number(values.year);
-  if (!values.year || Number.isNaN(year) || year < 1990 || year > 2100) errors.year = t("projectEditor.validation.yearValid");
+  // The year rule lives with the other editorial rules, so the form and the
+  // publish gate cannot drift apart. Publishing reaches it through
+  // `handlePublish`, which validates against a forced PUBLISHED status.
+  const yearProblem = yearError(values);
+  if (yearProblem === "required") errors.year = t("projectEditor.validation.yearRequiredToPublish");
+  else if (yearProblem === "invalid") errors.year = t("projectEditor.validation.yearValid");
   if (!PROJECT_STATUSES.includes(values.status)) errors.status = t("projectEditor.validation.statusValid");
   if (!EDITORIAL_STATUSES.includes(values.editorialStatus)) errors.editorialStatus = t("projectEditor.validation.editorialStatusValid");
   if (!isValidUrl(values.projectUrl)) errors.projectUrl = t("projectEditor.validation.urlValid");

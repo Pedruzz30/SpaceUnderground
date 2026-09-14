@@ -18,7 +18,7 @@ from app.automations.engine import (
     run_workflow,
 )
 from app.automations.registry import get_workflow, known_events
-from tests.conftest import FakeRunStore, FakeSupabaseService, project_row
+from tests.conftest import FakeRunStore, FakeSupabaseService, client_row, plan_row, project_row, proposal_row
 
 # --- registry --------------------------------------------------------------
 
@@ -26,13 +26,39 @@ from tests.conftest import FakeRunStore, FakeSupabaseService, project_row
 def test_only_this_phase_events_are_registered():
     # Registering an event with no workflow would make a typo look like a
     # working no-op, so the registry stays deliberately small.
-    assert known_events() == ("project.completed", "project.published")
+    assert known_events() == ("commercial.proposal.accepted", "project.completed", "project.published")
 
 
 def test_each_workflow_declares_ordered_steps():
     steps = [step.name for step in get_workflow("project.published").steps]
 
     assert steps == ["load_project", "analyze_project", "check_live_preview", "register_result"]
+
+
+def test_project_completed_declares_business_readiness_steps():
+    steps = [step.name for step in get_workflow("project.completed").steps]
+
+    assert steps == [
+        "load_project",
+        "analyze_project",
+        "build_checklist",
+        "finance_review",
+        "cms_candidate",
+        "register_result",
+    ]
+
+
+def test_commercial_handoff_declares_ordered_steps():
+    steps = [step.name for step in get_workflow("commercial.proposal.accepted").steps]
+
+    assert steps == [
+        "validate_proposal",
+        "resolve_client",
+        "resolve_service",
+        "prepare_project",
+        "prepare_financial_context",
+        "register_handoff",
+    ]
 
 
 def test_an_unregistered_event_has_no_workflow():
@@ -378,6 +404,108 @@ def test_project_completed_reports_outstanding_work_without_failing(make_client)
     checklist = body["steps"][2]["result"]
     assert checklist["ready_to_close"] is False
     assert any(item["key"] == "poster" for item in checklist["outstanding"])
+
+
+def test_project_completed_reports_finance_and_cms_readiness(make_client):
+    client, _ = make_client([project_row(live_preview_enabled=False, preview_url=None)])
+
+    body = client.post(
+        "/api/v1/automations/dispatch",
+        json={"event": "project.completed", "entity_id": "1"},
+    ).json()
+
+    assert body["result"]["business_status"] == "SUCCESS"
+    assert body["steps"][3]["result"]["status"] == "SKIPPED"
+    assert body["steps"][4]["result"]["status"] == "READY"
+    assert body["result"]["summary"]["cms_status"] == "READY"
+
+
+def test_commercial_proposal_accepted_creates_a_project_draft(make_client):
+    client, fake = make_client(
+        [],
+        proposals=[proposal_row()],
+        clients=[client_row()],
+        plans=[plan_row()],
+    )
+
+    body = client.post(
+        "/api/v1/automations/dispatch",
+        json={"event": "commercial.proposal.accepted", "entity_id": proposal_row()["id"]},
+    ).json()
+
+    assert body["status"] == "SUCCESS"
+    assert body["entity_type"] == "commercial_proposal"
+    assert body["result"]["business_status"] == "SUCCESS"
+    assert body["result"]["actions"][0]["status"] == "executed"
+    assert fake.rows[0]["editorial_status"] == "DRAFT"
+    assert fake.rows[0]["visible"] is False
+    assert fake.handoffs[0]["proposal_id"] == proposal_row()["id"]
+
+
+def test_commercial_handoff_dry_run_plans_without_writing(make_client):
+    client, fake = make_client(
+        [],
+        proposals=[proposal_row()],
+        clients=[client_row()],
+        plans=[plan_row()],
+    )
+
+    body = client.post(
+        "/api/v1/automations/dispatch",
+        json={
+            "event": "commercial.proposal.accepted",
+            "payload": {"proposal_id": proposal_row()["id"]},
+            "dry_run": True,
+        },
+    ).json()
+
+    assert body["status"] == "SUCCESS"
+    assert body["source"] == "dry_run"
+    assert body["result"]["dry_run"] is True
+    assert body["result"]["actions"][0]["status"] == "planned"
+    assert fake.rows == []
+
+
+def test_commercial_handoff_second_run_detects_existing_project(make_client):
+    proposal = proposal_row()
+    client, fake = make_client(
+        [],
+        proposals=[proposal],
+        clients=[client_row()],
+        plans=[plan_row()],
+    )
+
+    first = client.post(
+        "/api/v1/automations/dispatch",
+        json={"event": "commercial.proposal.accepted", "entity_id": proposal["id"]},
+    ).json()
+    second = client.post(
+        "/api/v1/automations/dispatch",
+        json={"event": "commercial.proposal.accepted", "entity_id": proposal["id"]},
+    ).json()
+
+    assert first["result"]["actions"][0]["status"] == "executed"
+    assert second["result"]["actions"][0]["status"] == "skipped"
+    assert len(fake.rows) == 1
+
+
+def test_commercial_handoff_fails_without_required_data(make_client):
+    proposal = proposal_row(project_category=None)
+    client, _ = make_client(
+        [],
+        proposals=[proposal],
+        clients=[client_row()],
+        plans=[plan_row()],
+    )
+
+    body = client.post(
+        "/api/v1/automations/dispatch",
+        json={"event": "commercial.proposal.accepted", "entity_id": proposal["id"]},
+    ).json()
+
+    assert body["status"] == "FAILED"
+    assert body["result"]["business_status"] == "ATTENTION"
+    assert "project_category" in body["error"]
 
 
 def test_the_run_list_is_newest_first_and_filterable(make_client):

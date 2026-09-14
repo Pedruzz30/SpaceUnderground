@@ -26,6 +26,36 @@ export function liveDemoState(project = {}) {
   return isLivePreviewUrl(previewUrl) ? "live" : "invalid";
 }
 
+/**
+ * Whether this project is on its way to the public site.
+ *
+ * The editor's publish action validates against a forced PUBLISHED status, so
+ * asking the same question here keeps "public" defined in one place rather
+ * than re-derived per screen.
+ */
+export function goesPublic(project = {}) {
+  return project.editorialStatus === "PUBLISHED" || Boolean(project.visible);
+}
+
+/**
+ * The one year rule, shared by every caller.
+ *
+ * A year is editorial, not structural: the commercial handoff creates hidden
+ * drafts with no year, and those have to stay editable. So an absent year only
+ * blocks a project from going public -- while a year that was actually typed
+ * has to be a real one either way.
+ *
+ * Returns "" when the year is acceptable, "required" when it is missing on a
+ * project that is going public, and "invalid" when it cannot be a year.
+ */
+export function yearError(project = {}) {
+  const raw = text(project.year == null ? "" : String(project.year));
+  if (!raw) return goesPublic(project) ? "required" : "";
+
+  const year = Number(raw);
+  return !Number.isFinite(year) || year < 1990 || year > 2100 ? "invalid" : "";
+}
+
 function moduleCount(modules = [], field, locale = "base") {
   return modules.reduce((count, module) => {
     const value = locale === "en" ? module.translations?.en?.[field] : module[field];

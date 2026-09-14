@@ -1,12 +1,12 @@
 """Workflow for `project.completed`.
 
 Produces the closing checklist for a project: what is done, what is still
-outstanding. It is strictly read-only in this phase.
+outstanding. It is still read-only; Phase 4 adds finance/CMS readiness records
+without creating invoices, CMS content or public changes.
 
-What it explicitly does not do, because these were asked for later and doing
-any of them early would make the workflow unsafe to run twice: no invoice, no
-PDF, no financial movement, no email. A checklist is information; acting on it
-is a decision a person still makes.
+What it explicitly does not do: no invoice, no PDF, no financial movement, no
+email and no publication. Readiness is information; acting on it is still a
+human decision.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.automations.engine import Step, StepFailed, Workflow
+from app.business.projects import cms_candidate, completion_business_status, finance_readiness_for_project
 from app.services.project_analysis_service import analyze_project
 from app.services.supabase_service import ProjectNotFound, SupabaseError
 
@@ -100,10 +101,33 @@ async def summarise(context) -> dict[str, Any]:
         "score": analysis.score if analysis else None,
         "ready_to_close": checklist.get("ready_to_close"),
         "outstanding": len(checklist.get("outstanding", [])),
+        "finance_status": (context.results.get("finance_review") or {}).get("status"),
+        "cms_status": (context.results.get("cms_candidate") or {}).get("status"),
     }
 
     context.results["summary"] = summary
+    context.results["business_status"] = completion_business_status(checklist)
+    context.results["entities"] = {"project_id": row.get("id")}
     return summary
+
+
+async def finance_review(context) -> dict[str, Any]:
+    readiness = finance_readiness_for_project()
+    context.results["finance_review"] = readiness
+    return readiness
+
+
+async def build_cms_candidate(context) -> dict[str, Any]:
+    row = context.results.get("project") or {}
+    analysis = context.results.get("analysis")
+    if not analysis:
+        raise StepFailed("The analysis did not run.")
+
+    readiness = cms_candidate(row, analysis)
+    context.results["cms_candidate"] = readiness
+    if readiness["status"] == "ATTENTION":
+        context.results["business_status"] = "ATTENTION"
+    return readiness
 
 
 WORKFLOW = Workflow(
@@ -112,6 +136,8 @@ WORKFLOW = Workflow(
         Step(name="load_project", run=load_project),
         Step(name="analyze_project", run=analyze),
         Step(name="build_checklist", run=build_checklist),
+        Step(name="finance_review", run=finance_review),
+        Step(name="cms_candidate", run=build_cms_candidate),
         Step(name="register_result", run=summarise),
     ],
 )

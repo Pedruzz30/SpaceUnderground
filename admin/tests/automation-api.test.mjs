@@ -181,7 +181,25 @@ describe("automation api client", () => {
         entity_id: "1",
         operation_id: "op-1",
         payload: { project_id: "1" },
+        dry_run: false,
       });
+    } finally {
+      fetchStub.restore();
+    }
+  });
+
+  it("can dispatch a dry-run workflow", async () => {
+    const client = await loadClient({ url: "http://127.0.0.1:8000" });
+    const fetchStub = stubFetch(() => jsonResponse({ event: "commercial.proposal.accepted" }));
+
+    try {
+      await client.dispatchAutomation("commercial.proposal.accepted", {
+        entityType: "commercial_proposal",
+        entityId: "proposal-1",
+        dryRun: true,
+      });
+
+      assert.equal(JSON.parse(fetchStub.calls[0].init.body).dry_run, true);
     } finally {
       fetchStub.restore();
     }

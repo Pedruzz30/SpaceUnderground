@@ -167,10 +167,12 @@ export async function retryAutomationRun(runId) {
 /**
  * Dispatches an automation event.
  *
- * Handlers in this phase only read and report; none of them writes back to
- * Supabase.
+ * `dryRun` asks write-capable workflows to record planned actions only.
  */
-export async function dispatchAutomation(event, { entityType, entityId, operationId, payload = {} } = {}) {
+export async function dispatchAutomation(
+  event,
+  { entityType, entityId, operationId, payload = {}, dryRun = false } = {},
+) {
   const name = String(event ?? "").trim();
   if (!name) throw new DataError("An event name is required.", { code: "bad_request" });
 
@@ -184,6 +186,7 @@ export async function dispatchAutomation(event, { entityType, entityId, operatio
       // deliberate later run of the same event supplies a new id.
       operation_id: operationId || null,
       payload,
+      dry_run: Boolean(dryRun),
     },
   });
 }

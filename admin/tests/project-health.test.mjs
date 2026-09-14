@@ -1,7 +1,15 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 
-import { contentCompleteness, isLivePreviewUrl, liveDemoState, projectHealth, publishReadiness } from "../src/utils/project-health.js";
+import {
+  contentCompleteness,
+  goesPublic,
+  isLivePreviewUrl,
+  liveDemoState,
+  projectHealth,
+  publishReadiness,
+  yearError,
+} from "../src/utils/project-health.js";
 
 const completeProject = (overrides = {}) => ({
   name: "INK Tattoo",
@@ -199,5 +207,78 @@ describe("English completeness covers every field the editor can translate", () 
     const with_ = contentCompleteness(withTranslations({ description: "d", presentation_address: "a" })).en.done;
 
     assert.equal(with_, without + 1);
+  });
+});
+
+// The year rule, which the commercial handoff forced into the open: a project
+// created by an automation arrives as a hidden draft with no year, and had to
+// become editable without loosening what publishing requires.
+
+describe("year requirement", () => {
+  const draft = { editorialStatus: "DRAFT", visible: false };
+  const published = { editorialStatus: "PUBLISHED", visible: true };
+
+  it("lets a hidden draft carry no year at all", () => {
+    // Exactly the shape the commercial handoff writes.
+    assert.equal(yearError({ ...draft, name: "phase4-project", year: "" }), "");
+    assert.equal(yearError({ ...draft, year: null }), "");
+    assert.equal(yearError({ ...draft, year: undefined }), "");
+  });
+
+  it("still refuses a year that could not be one, draft or not", () => {
+    for (const year of ["1889", "3000", "not-a-year", "0"]) {
+      assert.equal(yearError({ ...draft, year }), "invalid", `draft ${year}`);
+      assert.equal(yearError({ ...published, year }), "invalid", `published ${year}`);
+    }
+  });
+
+  it("accepts a real year on a draft", () => {
+    assert.equal(yearError({ ...draft, year: "2026" }), "");
+    assert.equal(yearError({ ...draft, year: 2026 }), "");
+    assert.equal(yearError({ ...draft, year: " 2026 " }), "");
+  });
+
+  it("requires a year before a project can be published", () => {
+    assert.equal(yearError({ editorialStatus: "PUBLISHED", visible: true, year: "" }), "required");
+    assert.equal(yearError({ editorialStatus: "PUBLISHED", visible: false, year: "" }), "required");
+  });
+
+  it("requires a year before a project can be made visible", () => {
+    // Visibility is the public surface even while the editorial status lags.
+    assert.equal(yearError({ editorialStatus: "DRAFT", visible: true, year: "" }), "required");
+  });
+
+  it("leaves a published project that already has a year alone", () => {
+    assert.equal(yearError({ ...published, year: "2024" }), "");
+    assert.equal(yearError({ ...published, year: 1990 }), "");
+    assert.equal(yearError({ ...published, year: 2100 }), "");
+  });
+
+  it("treats going public the same way the publish action does", () => {
+    assert.equal(goesPublic({ editorialStatus: "PUBLISHED", visible: false }), true);
+    assert.equal(goesPublic({ editorialStatus: "DRAFT", visible: true }), true);
+    assert.equal(goesPublic({ editorialStatus: "DRAFT", visible: false }), false);
+    assert.equal(goesPublic({}), false);
+  });
+
+  it("does not change how a legacy published project is scored", () => {
+    // publishReadiness is untouched by the year rule: a live case keeps the
+    // exact blocking set it had before.
+    const legacy = {
+      name: "JARVIS",
+      client: "Space Underground",
+      category: "System",
+      description: "A published case.",
+      poster: "poster.png",
+      modules: [{ title: "Overview", description: "..." }],
+      editorialStatus: "PUBLISHED",
+      visible: true,
+      year: "2024",
+    };
+
+    const readiness = publishReadiness(legacy);
+    assert.equal(readiness.canPublish, true);
+    assert.equal(readiness.blocking.length, 0);
+    assert.ok(!readiness.health.checks.some((item) => item.key === "year"));
   });
 });
