@@ -1,5 +1,5 @@
 import { showToast } from "../components/toast.js";
-import { DATA_SOURCE, automationApiToken, isSupabaseConfigured } from "../config/env.js";
+import { DATA_SOURCE, isSupabaseConfigured } from "../config/env.js";
 import { getAutomationHealth, isAutomationApiAvailable } from "../services/automation-api.js";
 import { serviceStatusMarkup } from "../components/automation-panel.js";
 import { ERROR, LOADING, NOT_CONFIGURED, SUCCESS } from "../utils/automation-state.js";
@@ -203,7 +203,7 @@ export const settingsPage = {
               <div><span data-i18n="settings.publicSite">${t("settings.publicSite")}</span><strong data-i18n="settings.readOnlyAnonKey">${t("settings.readOnlyAnonKey")}</strong></div>
               <div><span data-i18n="automation.service">${t("automation.service")}</span><strong data-automation-service>${t("automation.checking")}</strong></div>
               <div><span data-i18n="automation.endpoint">${t("automation.endpoint")}</span><strong>${isAutomationApiAvailable() ? t("automation.endpointConfigured") : t("common.notConfigured")}</strong></div>
-              <div><span data-i18n="automation.auth">${t("automation.auth")}</span><strong>${automationApiToken() ? t("automation.authEnabled") : t("automation.authDisabled")}</strong></div>
+              <div><span data-i18n="automation.auth">${t("automation.auth")}</span><strong data-automation-auth>&mdash;</strong></div>
               <div><span data-i18n="automation.version">${t("automation.version")}</span><strong data-automation-version>&mdash;</strong></div>
             </div>
             <p data-i18n="settings.noSecrets">${t("settings.noSecrets")}</p>
@@ -217,10 +217,24 @@ export const settingsPage = {
       // service itself so the row reports what is actually answering.
       const serviceEl = form.querySelector("[data-automation-service]");
       const versionEl = form.querySelector("[data-automation-version]");
+      const authEl = form.querySelector("[data-automation-auth]");
 
-      function paintAutomation(status, version) {
+      function paintAutomation(status, health) {
         if (serviceEl?.isConnected) serviceEl.innerHTML = serviceStatusMarkup(status);
-        if (versionEl?.isConnected && version) versionEl.textContent = version;
+        if (versionEl?.isConnected && health?.version) versionEl.textContent = health.version;
+
+        if (!authEl?.isConnected) return;
+        // Reported by the service rather than inferred from this bundle. The
+        // Admin holds no automation credential of its own to report on, and
+        // what matters operationally is whether the service is enforcing one.
+        const authentication = (health?.dependencies ?? []).find((item) => item.name === "authentication");
+        if (status === SUCCESS && authentication) {
+          authEl.textContent = authentication.configured
+            ? t("automation.authEnabled")
+            : t("automation.authDisabled");
+        } else if (status !== LOADING) {
+          authEl.innerHTML = "&mdash;";
+        }
       }
 
       if (!isAutomationApiAvailable()) {
@@ -228,7 +242,7 @@ export const settingsPage = {
       } else {
         paintAutomation(LOADING);
         getAutomationHealth()
-          .then((health) => paintAutomation(SUCCESS, health?.version))
+          .then((health) => paintAutomation(SUCCESS, health))
           .catch(() => paintAutomation(ERROR));
       }
       seoBase = { seoTitle: settings.seoTitle ?? "", seoDescription: settings.seoDescription ?? "" };

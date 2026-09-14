@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 from app.api.v1.automations import get_store
 from app.core.config import get_settings
+from app.core.security import reset_identity_cache
 from app.main import create_app
 from app.services.supabase_service import (
     ProjectNotFound,
@@ -39,8 +40,13 @@ def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "SUPABASE_SERVICE_ROLE_KEY",
         "API_TOKEN",
         "ADMIN_ORIGIN",
+        "ADMIN_JWT_AUTH",
     ):
         monkeypatch.delenv(key, raising=False)
+
+    # Verified identities outlive a Settings reload, so a test that changes the
+    # auth configuration must not inherit an identity proven under the old one.
+    reset_identity_cache()
 
     # Settings reads a .env file when one exists; point it somewhere empty.
     monkeypatch.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + os.sep + "tests")
@@ -61,12 +67,20 @@ class FakeSupabaseService:
         clients: list[dict[str, Any]] | None = None,
         plans: list[dict[str, Any]] | None = None,
         handoffs: list[dict[str, Any]] | None = None,
+        tokens: dict[str, str] | None = None,
+        admins: set[str] | None = None,
+        identity_error: Exception | None = None,
     ) -> None:
         self.rows = rows or []
         self.proposals = proposals or []
         self.clients = clients or []
         self.plans = plans or []
         self.handoffs = handoffs or []
+        # Access token -> user id, as Supabase would resolve it. Anything not
+        # listed is an invalid token.
+        self.tokens = tokens or {}
+        self.admins = admins or set()
+        self.identity_error = identity_error
         self._configured = configured
         self.calls: list[str] = []
 
@@ -136,6 +150,23 @@ class FakeSupabaseService:
         self._require()
         numbers = [row.get("case_number") for row in self.rows if isinstance(row.get("case_number"), int)]
         return (max(numbers) if numbers else 0) + 1
+
+    async def get_token_user(self, access_token: str) -> dict[str, Any] | None:
+        self.calls.append("get_token_user")
+        self._require()
+        if self.identity_error:
+            raise self.identity_error
+
+        user_id = self.tokens.get(access_token)
+        return {"id": user_id, "email": f"{user_id}@example.test"} if user_id else None
+
+    async def user_is_admin(self, user_id: str) -> bool:
+        self.calls.append("user_is_admin:" + str(user_id))
+        self._require()
+        if self.identity_error:
+            raise self.identity_error
+
+        return user_id in self.admins
 
     async def create_project_from_proposal(self, project: dict[str, Any]) -> dict[str, Any]:
         self.calls.append("create_project_from_proposal")
@@ -263,6 +294,9 @@ def make_client():
         clients: list[dict[str, Any]] | None = None,
         plans: list[dict[str, Any]] | None = None,
         handoffs: list[dict[str, Any]] | None = None,
+        tokens: dict[str, str] | None = None,
+        admins: set[str] | None = None,
+        identity_error: Exception | None = None,
     ) -> tuple[TestClient, FakeSupabaseService]:
         app = create_app()
         fake = FakeSupabaseService(
@@ -272,6 +306,9 @@ def make_client():
             clients=clients,
             plans=plans,
             handoffs=handoffs,
+            tokens=tokens,
+            admins=admins,
+            identity_error=identity_error,
         )
         store = FakeRunStore(available=configured and storage, configured=configured)
         app.dependency_overrides[get_supabase_service] = lambda: fake

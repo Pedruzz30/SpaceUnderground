@@ -51,6 +51,19 @@ class DetailedHealthResponse(HealthResponse):
     dependencies: list[DependencyHealth]
 
 
+class ReadinessResponse(BaseModel):
+    """Whether the service can actually do its job right now.
+
+    Distinct from health: health says the process is answering, readiness says
+    it is configured and its dependencies are reachable. A load balancer wants
+    the first; a deploy wants the second.
+    """
+
+    ready: bool
+    environment: str
+    checks: list[DependencyHealth]
+
+
 class ErrorResponse(BaseModel):
     """The only error body this service returns.
 

@@ -50,9 +50,21 @@ class Settings(BaseSettings):
         "http://localhost:5173,http://127.0.0.1:5173"
     )
 
-    # Optional shared secret. When set, callers must send it as X-API-Token.
-    # Unset is allowed in development and refused in production.
+    # Optional shared secret, sent as X-API-Token. This is the service-to-service
+    # credential: CI, scripts, technical administration. It is deliberately NOT
+    # what the Admin uses -- a secret shipped in a browser bundle is not a
+    # secret, so the Admin authenticates as its signed-in user instead.
     api_token: str = ""
+
+    # When true, a caller may present a Supabase access token as
+    # `Authorization: Bearer`. The service verifies it against Supabase and
+    # requires the user to hold a row in public.admins.
+    admin_jwt_auth: bool = True
+
+    # How long a verified identity is trusted before it is checked again. The
+    # Dashboard polls, and re-verifying every poll would add two Supabase round
+    # trips per request for an answer that changes rarely.
+    admin_jwt_cache_seconds: float = 60.0
 
     log_level: str = "INFO"
 
@@ -108,6 +120,52 @@ class Settings(BaseSettings):
     def allowed_origins(self) -> list[str]:
         """CORS allowlist. Comma-separated so a staging host can be added."""
         return [origin.strip() for origin in self.admin_origin.split(",") if origin.strip()]
+
+    @property
+    def has_local_origin(self) -> bool:
+        """Whether the allowlist still contains a development origin."""
+        return any(
+            origin.startswith(("http://localhost", "http://127.0.0.1"))
+            for origin in self.allowed_origins
+        )
+
+    @property
+    def startup_problems(self) -> list[str]:
+        """Configuration that makes production meaningless, not merely degraded.
+
+        Only structural values are listed: things that cannot become correct on
+        their own. A database that happens to be down is not here, because
+        refusing to boot for that would turn a five-minute Supabase blip into an
+        outage that needs a human to end.
+
+        Read at startup in production, and reported by /ready everywhere.
+        """
+        problems: list[str] = []
+
+        if not self.supabase_url:
+            problems.append("SUPABASE_URL is not set.")
+        if not self.supabase_service_role_key:
+            problems.append("SUPABASE_SERVICE_ROLE_KEY is not set.")
+        elif self.service_role_key_is_public:
+            problems.append(
+                "SUPABASE_SERVICE_ROLE_KEY holds a public key; a secret/service role key is required."
+            )
+
+        if not self.allowed_origins:
+            problems.append("ADMIN_ORIGIN is empty; no browser origin may call this service.")
+        elif self.has_local_origin:
+            # A production deployment that kept the development default would
+            # accept requests from any developer's laptop.
+            problems.append(
+                "ADMIN_ORIGIN still allows a localhost origin; set it to the deployed Admin origin."
+            )
+
+        if not self.api_token and not self.admin_jwt_auth:
+            problems.append(
+                "No authentication is enabled; set API_TOKEN or leave ADMIN_JWT_AUTH on."
+            )
+
+        return problems
 
     @property
     def supabase_configured(self) -> bool:

@@ -1,0 +1,52 @@
+# Render blueprint for the automation API.
+#
+# Why Render, recorded here rather than in a chat log: it is the only candidate
+# that takes this repository from a GitHub branch with no CLI involved, which
+# matters because the Dockerfile is the deployment artefact and nothing else in
+# this project uses a vendor CLI. Netlify serves the Admin and GitHub Pages the
+# public site; neither can host a long-running ASGI process.
+#
+# Nothing secret is in this file. Every value marked `sync: false` must be set
+# in the Render dashboard, once, by a human -- see README section 14.
+
+services:
+  - type: web
+    name: space-underground-automation
+    runtime: docker
+    plan: starter
+    region: oregon
+    rootDir: services/automation-api
+    dockerfilePath: ./Dockerfile
+
+    # Render supplies $PORT; the Dockerfile already honours it.
+    healthCheckPath: /health
+
+    # Deploys follow the branch. There is no separate pipeline: CI validates
+    # the change, Render builds the same Dockerfile a developer builds locally.
+    branch: main
+    autoDeploy: true
+
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: APP_HOST
+        value: 0.0.0.0
+
+      # The Admin authenticates as its signed-in user, so this stays on.
+      - key: ADMIN_JWT_AUTH
+        value: "true"
+
+      # Set in the dashboard. SUPABASE_SERVICE_ROLE_KEY and API_TOKEN are
+      # secrets; ADMIN_ORIGIN is not, but it is deployment-specific and the
+      # service refuses to start in production while it still allows localhost.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ADMIN_ORIGIN
+        sync: false
+      # Optional: only needed for CI and server-to-server scripts.
+      - key: API_TOKEN
+        sync: false

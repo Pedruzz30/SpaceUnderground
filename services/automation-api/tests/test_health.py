@@ -147,9 +147,25 @@ def test_token_is_required_when_configured(make_client, monkeypatch):
     assert wrong_token.status_code == 401
 
 
-def test_production_without_a_token_fails_closed(make_client, monkeypatch):
+def test_production_without_credentials_fails_closed(make_client, monkeypatch):
     """Production must never serve data unauthenticated by accident."""
     monkeypatch.setenv("APP_ENV", "production")
+    get_settings.cache_clear()
+
+    client, _ = make_client([])
+
+    response = client.get("/api/v1/reports/overview")
+
+    # 401 rather than 503: the admin token path is available, the caller simply
+    # presented nothing. Either way the request is refused.
+    assert response.status_code == 401
+    assert response.json()["code"] == "unauthorized"
+
+
+def test_production_with_no_mechanism_at_all_refuses(make_client, monkeypatch):
+    """Turning every mechanism off must close the door, not open it."""
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("ADMIN_JWT_AUTH", "false")
     get_settings.cache_clear()
 
     client, _ = make_client([])

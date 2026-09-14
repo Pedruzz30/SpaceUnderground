@@ -27,18 +27,21 @@ export const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY ?? "";
 // else changes. It is deliberately absent from `configurationProblems` for
 // that reason -- a missing automation API is not a misconfigured Admin.
 //
-// Only the URL and an optional shared token live here. The service role key
-// belongs to the Python process alone and must never reach this bundle.
+// Only the URL lives here, and it is not a secret.
+//
+// There is deliberately no token. A value shipped to a browser is readable by
+// anyone who opens the bundle, so a shared secret here would be the appearance
+// of authentication rather than authentication: the Admin instead sends the
+// Supabase access token of whoever is signed in, and the service verifies it.
+// The service role key belongs to the Python process alone and never reaches
+// this bundle at all.
+//
 // Read on each call rather than frozen at module load. The data source below
 // is fixed for the life of the bundle, but this one is optional and the unit
 // tests need to cover both the configured and the unconfigured Admin in the
 // same process.
 export function automationApiBaseUrl() {
   return String(readEnv().VITE_AUTOMATION_API_URL ?? "").trim().replace(/\/+$/, "");
-}
-
-export function automationApiToken() {
-  return String(readEnv().VITE_AUTOMATION_API_TOKEN ?? "").trim();
 }
 
 const configurationProblems = [];

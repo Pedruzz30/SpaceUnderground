@@ -357,6 +357,56 @@ class SupabaseService:
         )
         return created
 
+    # -- identity ------------------------------------------------------------
+    #
+    # Who is calling, answered by Supabase rather than by this service. The
+    # token is never decoded here: a signature this process does not verify is
+    # not evidence, and Supabase is the only party that can say whether a token
+    # is still valid, still unexpired and not revoked.
+
+    async def get_token_user(self, access_token: str) -> dict[str, Any] | None:
+        """Resolves a Supabase access token to its user. None when invalid."""
+        self._require_configuration()
+
+        url = f"{self._settings.supabase_url}/auth/v1/user"
+        headers = {
+            "apikey": self._settings.supabase_service_role_key,
+            # The user's own token, not the service key: this asks Supabase
+            # "who is this?", it does not act on their behalf.
+            "Authorization": f"Bearer {access_token}",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=self._settings.supabase_timeout_seconds) as client:
+                response = await client.get(url, headers=headers)
+        except httpx.HTTPError as error:
+            log_event(logger, logging.ERROR, "supabase.auth.failed", error=type(error).__name__)
+            raise SupabaseUnavailable("Could not reach Supabase.") from error
+
+        # 401/403 mean the token is not good, which is an answer rather than an
+        # outage. Anything else is Supabase failing and must not read as "not
+        # an admin", which would lock every operator out during a blip.
+        if response.status_code in (401, 403):
+            return None
+        if response.status_code >= 400:
+            log_event(logger, logging.ERROR, "supabase.auth.error", status=response.status_code)
+            raise SupabaseUnavailable(f"Supabase returned {response.status_code}.")
+
+        payload = response.json()
+        return payload if isinstance(payload, dict) and payload.get("id") else None
+
+    async def user_is_admin(self, user_id: str) -> bool:
+        """Whether the user holds a row in public.admins.
+
+        The same table `public.is_admin()` consults, so the API and the
+        database agree on who an administrator is by construction.
+        """
+        if not user_id:
+            return False
+
+        rows = await self._get("admins", {"select": "user_id", "user_id": f"eq.{user_id}", "limit": "1"})
+        return bool(rows)
+
 
 def get_supabase_service() -> SupabaseService:
     """FastAPI dependency. Overridden in tests with a fake."""

@@ -1,4 +1,4 @@
-import { automationApiBaseUrl, automationApiToken, isAutomationApiConfigured } from "../config/env.js";
+import { automationApiBaseUrl, isAutomationApiConfigured, isSupabaseMode } from "../config/env.js";
 import { DataError } from "./errors.js";
 
 // The Admin's only door to the Python automation service. Every call to it goes
@@ -37,22 +37,55 @@ function notConfigured() {
   );
 }
 
+// Status codes the caller has to be able to tell apart, because each one asks
+// the operator for something different: sign in again, ask for access, or wait.
+const STATUS_CODES = {
+  401: "unauthorized",
+  403: "forbidden",
+  404: "not_found",
+  503: "unavailable",
+};
+
 // The service answers errors as { code, message }. The code is stable and is
 // what callers should branch on; the message is already safe to show.
 async function readError(response) {
+  const fallback = STATUS_CODES[response.status] ?? "automation_error";
+
   try {
     const body = await response.json();
     if (body && typeof body.code === "string") {
-      return new DataError(String(body.message || "Automation request failed."), { code: body.code });
+      // The status wins for the two cases the service reports with a generic
+      // envelope: `forbidden` is a distinct outcome the Admin must not show as
+      // "log in again", and the body alone does not carry it.
+      const code = STATUS_CODES[response.status] ?? body.code;
+      return new DataError(String(body.message || "Automation request failed."), { code });
     }
   } catch {
     // A non-JSON body means the failure came from somewhere other than the
     // service itself -- a proxy, or the wrong URL entirely.
   }
 
-  return new DataError(`Automation request failed (${response.status}).`, {
-    code: response.status === 404 ? "not_found" : "automation_error",
-  });
+  return new DataError(`Automation request failed (${response.status}).`, { code: fallback });
+}
+
+/**
+ * The signed-in operator's Supabase access token, when there is one.
+ *
+ * Imported lazily so mock mode never pulls the Supabase client in, and failure
+ * is silent on purpose: no session simply means no Authorization header, and
+ * the service decides whether that is acceptable. It is not this client's job
+ * to guess the server's auth policy.
+ */
+async function accessToken() {
+  if (!isSupabaseMode()) return "";
+
+  try {
+    const { getSupabaseClient } = await import("../lib/supabase.js");
+    const { data } = await getSupabaseClient().auth.getSession();
+    return data?.session?.access_token ?? "";
+  } catch {
+    return "";
+  }
 }
 
 async function request(path, { method = "GET", body = null, timeout = DEFAULT_TIMEOUT_MS } = {}) {
@@ -60,10 +93,13 @@ async function request(path, { method = "GET", body = null, timeout = DEFAULT_TI
 
   const headers = { Accept: "application/json" };
   if (body) headers["Content-Type"] = "application/json";
-  // Only the shared secret is sent. No Supabase credential ever leaves the
-  // browser through this client.
-  const token = automationApiToken();
-  if (token) headers["X-API-Token"] = token;
+
+  // The operator's own access token, which the service verifies against
+  // Supabase and checks against public.admins. This is the only credential the
+  // Admin has, and the only one it should have: it proves who is asking, it
+  // expires, and revoking their admin row revokes it.
+  const token = await accessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   // A processing call that hangs must not hang the page with it.
   const controller = new AbortController();

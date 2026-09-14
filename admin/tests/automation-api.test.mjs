@@ -105,25 +105,86 @@ describe("automation api client", () => {
     }
   });
 
-  it("sends the shared token only when one is configured", async () => {
-    const withToken = await loadClient({ url: "http://127.0.0.1:8000", token: "s3cret" });
+  it("never puts a shared secret in the browser's request", async () => {
+    // A VITE_ value is readable by anyone who opens the bundle, so the Admin
+    // holds no automation secret at all. Even when one is present in the
+    // environment it must not be sent as a credential.
+    const client = await loadClient({ url: "http://127.0.0.1:8000", token: "s3cret" });
     const stubbed = stubFetch(() => jsonResponse({ status: "ok" }));
 
     try {
-      await withToken.getAutomationHealth();
-      assert.equal(stubbed.calls[0].init.headers["X-API-Token"], "s3cret");
+      await client.getAutomationHealth();
+      const { headers } = stubbed.calls[0].init;
+
+      assert.equal("X-API-Token" in headers, false);
+      assert.doesNotMatch(JSON.stringify(headers), /s3cret/);
     } finally {
       stubbed.restore();
     }
+  });
 
-    const withoutToken = await loadClient({ url: "http://127.0.0.1:8000" });
-    const plain = stubFetch(() => jsonResponse({ status: "ok" }));
+  it("sends no Authorization header when there is no session to send", async () => {
+    // Mock mode has no Supabase session. The request still goes out: whether
+    // an anonymous caller is acceptable is the service's decision, not this
+    // client's guess.
+    const client = await loadClient({ url: "http://127.0.0.1:8000" });
+    const stubbed = stubFetch(() => jsonResponse({ status: "ok" }));
 
     try {
-      await withoutToken.getAutomationHealth();
-      assert.equal("X-API-Token" in plain.calls[0].init.headers, false);
+      await client.getAutomationHealth();
+      assert.equal("Authorization" in stubbed.calls[0].init.headers, false);
     } finally {
-      plain.restore();
+      stubbed.restore();
+    }
+  });
+
+  it("tells apart the outcomes an operator has to act on differently", async () => {
+    // "Sign in again", "ask for access" and "wait" are three different
+    // instructions, and a single automation_error cannot express them.
+    const cases = [
+      [401, "unauthorized"],
+      [403, "forbidden"],
+      [503, "unavailable"],
+      // Not one of those three: the service's own code is more specific than
+      // anything the status could tell us, so it is passed through untouched.
+      [500, "error"],
+    ];
+
+    for (const [status, code] of cases) {
+      const client = await loadClient({ url: "http://127.0.0.1:8000" });
+      const stubbed = stubFetch(() => jsonResponse({ code: "error", message: "Denied." }, status));
+
+      try {
+        await assert.rejects(client.getAutomationHealth(), (error) => {
+          assert.equal(error.code, code, `status ${status}`);
+          return true;
+        });
+      } finally {
+        stubbed.restore();
+      }
+    }
+  });
+
+  it("still classifies a failure that never reached the service", async () => {
+    // A proxy or a wrong URL answers with something that is not the envelope.
+    for (const [status, code] of [[401, "unauthorized"], [502, "automation_error"]]) {
+      const client = await loadClient({ url: "http://127.0.0.1:8000" });
+      const stubbed = stubFetch(() => ({
+        ok: false,
+        status,
+        json: async () => {
+          throw new Error("not json");
+        },
+      }));
+
+      try {
+        await assert.rejects(client.getAutomationHealth(), (error) => {
+          assert.equal(error.code, code, `status ${status}`);
+          return true;
+        });
+      } finally {
+        stubbed.restore();
+      }
     }
   });
 

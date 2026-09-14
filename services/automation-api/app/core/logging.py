@@ -14,9 +14,19 @@ from __future__ import annotations
 
 import logging
 import sys
+from contextvars import ContextVar
 from typing import Any
 
 _CONFIGURED = False
+
+# Set once per request by the middleware and read by every log line produced
+# while handling it, so a single run can be followed across the service without
+# threading an id through every call signature.
+request_id_var: ContextVar[str] = ContextVar("request_id", default="")
+
+
+def current_request_id() -> str:
+    return request_id_var.get()
 
 
 class ContextFormatter(logging.Formatter):
@@ -24,7 +34,14 @@ class ContextFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         base = super().format(record)
-        context = getattr(record, "context", None)
+
+        context = dict(getattr(record, "context", None) or {})
+        request_id = current_request_id()
+        # Never overwrites an explicit value: a caller logging about a
+        # different request means it, and the ambient one is only a default.
+        if request_id and "request_id" not in context:
+            context["request_id"] = request_id
+
         if not context:
             return base
 

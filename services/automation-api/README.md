@@ -91,8 +91,10 @@ cp .env.example .env
 | `SUPABASE_URL` | for data endpoints | project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | for data endpoints | secret, server-side only |
 | `SUPABASE_TIMEOUT_SECONDS` | no | default `10` |
-| `ADMIN_ORIGIN` | no | CORS allowlist, comma-separated. Never `*` |
-| `API_TOKEN` | no in dev, yes in production | shared secret, sent as `X-API-Token` |
+| `ADMIN_ORIGIN` | yes in production | CORS allowlist, comma-separated. Never `*`, and never localhost in production |
+| `ADMIN_JWT_AUTH` | no | default `true`. Accept a Supabase access token as `Authorization: Bearer` |
+| `ADMIN_JWT_CACHE_SECONDS` | no | default `60`. How long a verified identity is trusted |
+| `API_TOKEN` | no | service-to-service secret, sent as `X-API-Token`. Never given to the Admin |
 | `LOG_LEVEL` | no | default `INFO` |
 
 Without `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` the service still starts
@@ -228,14 +230,54 @@ unconfigured service, CORS, and the token guard.
 
 - The service role key lives only here and is never returned by any endpoint.
 - CORS is an explicit allowlist. `*` is never used.
-- `API_TOKEN` is optional in development and required in production.
+- Production requires a credential on every non-health endpoint. Development
+  requires one once `API_TOKEN` is set, and runs open before that -- demanding
+  a credential before there is anywhere to keep one only teaches people to
+  disable the check.
 - All input is validated by Pydantic; identifiers are length-bounded before
   they can reach a query string.
 - No endpoint accepts SQL. Callers choose a named operation, never a query.
 - Errors are returned as `{ "code", "message" }`. Tracebacks and PostgREST
   strings go to the log, never to the client.
 
-## 13. Admin Integration
+## 13. Authentication
+
+There are two kinds of caller and they are not given the same credential.
+
+**A person using the Admin.** The Admin is a browser bundle, so it has no
+secret to offer: every `VITE_` value is readable by anyone who opens the
+bundle. Shipping a shared token there would be the appearance of
+authentication, not authentication. So the Admin sends the Supabase access
+token of whoever is signed in:
+
+```http
+Authorization: Bearer <supabase access token>
+```
+
+The service asks Supabase who that token belongs to -- it never decodes the
+token itself, because a signature this process does not verify is not evidence
+-- and then requires the user to hold a row in `public.admins`. That is the
+same table `public.is_admin()` consults, so the API and row level security
+agree on who an administrator is by construction rather than by convention.
+
+Authentication and authorisation are answered separately: an unknown token is
+`401`, and a real user without an admin row is `403`. The Admin needs that
+difference to say "your account lacks access" instead of bouncing a correctly
+signed-in operator back to the login screen.
+
+**Another machine.** CI, scripts, technical administration. These can keep a
+secret, so they send `X-API-Token: <API_TOKEN>`. This credential must never
+reach the Admin bundle.
+
+A verified identity is cached for `ADMIN_JWT_CACHE_SECONDS` (default 60), keyed
+by a digest of the token rather than the token itself. Without it a polling
+Dashboard would cost two Supabase round trips per poll for an answer that
+changes rarely; with it, revoking an admin takes effect within the window.
+
+If Supabase cannot be reached, the caller gets `503`, never `403`. A blip must
+not look like a permissions problem.
+
+## 14. Admin Integration
 
 `admin/src/services/automation-api.js` is the Admin's only door to this service.
 It centralises health, analysis, reports, run history, retries and dispatch.
@@ -244,24 +286,97 @@ In `admin/.env`:
 
 ```env
 VITE_AUTOMATION_API_URL=http://127.0.0.1:8000
-VITE_AUTOMATION_API_TOKEN=
 ```
 
-Leaving `VITE_AUTOMATION_API_URL` empty is a supported state. The Admin then
-reports the automation API as unavailable and behaves exactly as it does today;
-the client fails locally with a `not_configured` error and never issues a
-request. Python is an additional capability, not a dependency.
+There is deliberately no token variable. Leaving the URL empty is a supported
+state: the Admin then reports the automation API as unavailable and behaves
+exactly as it does today; the client fails locally with a `not_configured`
+error and never issues a request. Python is an additional capability, not a
+dependency.
 
-## 14. Deploy
+## 15. Health And Readiness
+
+| Endpoint | Auth | Answers |
+| --- | --- | --- |
+| `GET /health` | none | the process is alive. No I/O at all |
+| `GET /api/v1/health` | none | which dependencies are configured, never how |
+| `GET /api/v1/ready` | none | whether the service can actually work right now |
+
+Health is unauthenticated on purpose: a probe that needs a secret stops working
+the moment the secret rotates. None of the three ever returns a URL, a key, a
+key fragment or a traceback.
+
+`/api/v1/ready` answers `503` when configuration is broken or `automation_runs`
+is unreachable, and `200` again once it is not -- by itself, with nobody
+intervening. It is the deploy's gate, while `/health` is the process's.
+
+### Startup
+
+In production the service refuses to start when structural configuration is
+missing or wrong: no `SUPABASE_URL`, no service role key, a public key in the
+service role slot, an empty origin allowlist, or an allowlist that still
+permits `localhost`. Those cannot become correct on their own, so booting would
+only serve broken requests until someone noticed.
+
+Reachability is deliberately *not* checked at startup. Refusing to boot because
+Supabase is briefly down would turn a five-minute blip into an outage that
+needs a human to end it. `/api/v1/ready` reports that instead.
+
+Outside production the same problems are logged as warnings and the service
+starts, because a half-configured local checkout still has to run.
+
+### Request correlation
+
+Every response carries `X-Request-ID`, and every log line emitted while
+handling that request carries the same value. A caller may supply one; it is
+accepted only in a safe shape (`[A-Za-z0-9._:-]`, up to 64 characters) and
+replaced with a generated id otherwise. It is a log label and never a
+credential.
+
+## 16. Deploy
 
 The service is deployed on its own, never inside the Vite build. The Dockerfile
-targets any FastAPI-compatible host (Render, Railway, Fly.io, a VPS); it runs
-as a non-root user and honours `PORT`.
+targets any FastAPI-compatible host; it runs as a non-root user and honours
+`PORT`.
 
 ```bash
 docker build -t space-underground-automation .
 docker run --rm -p 8000:8000 --env-file .env space-underground-automation
 ```
 
-In production, set `APP_ENV=production`, a real `API_TOKEN`, and an
-`ADMIN_ORIGIN` restricted to the Admin's actual host.
+### Platform
+
+**Render**, configured by `render.yaml` in this directory. The reason is
+recorded because it was a real comparison and not a preference: Render is the
+only candidate that deploys this repository from a GitHub branch with no vendor
+CLI involved, which matters because nothing else in this project uses one.
+Railway and Fly.io both host the container equally well but need their CLI for
+the first deploy and for secrets. Netlify serves the Admin and GitHub Pages the
+public site; neither can host a long-running ASGI process.
+
+Deploys follow the branch: CI validates the change, then Render builds the same
+Dockerfile a developer builds locally. There is no second pipeline, so there is
+no second source of truth for what is running.
+
+### Remote environment
+
+Set these in the Render dashboard. `render.yaml` marks every one of them
+`sync: false`, so none is ever committed:
+
+| Variable | Value |
+| --- | --- |
+| `APP_ENV` | `production` (already in `render.yaml`) |
+| `SUPABASE_URL` | the project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | the secret / service role key |
+| `ADMIN_ORIGIN` | the deployed Admin origin, over HTTPS. No localhost |
+| `API_TOKEN` | only if CI or a script needs server-to-server access |
+
+And in the Admin's deployment (Netlify):
+
+| Variable | Value |
+| --- | --- |
+| `VITE_AUTOMATION_API_URL` | the deployed service origin, over HTTPS |
+
+The service refuses to start in production if `ADMIN_ORIGIN` is missing or
+still allows localhost, so a deployment that forgot it fails loudly at boot
+rather than quietly accepting requests from anywhere.
