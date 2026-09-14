@@ -1,5 +1,7 @@
 import { getActivity } from "../services/activity-service.js";
-import { getRegisteredAutomations } from "../services/automation-api.js";
+import { getAutomationRuns, retryAutomationRun } from "../services/automation-api.js";
+import { openRunDetail, runRowsMarkup } from "../components/automation-runs.js";
+import { showToast } from "../components/toast.js";
 import { serviceStatusMarkup } from "../components/automation-panel.js";
 import {
   ERROR,
@@ -7,6 +9,7 @@ import {
   NOT_CONFIGURED,
   SUCCESS,
   createAutomationResource,
+  notConfiguredHintKey,
 } from "../utils/automation-state.js";
 import { onLocaleChange, plural, t } from "../i18n/index.js";
 import { escapeHtml } from "../utils/html.js";
@@ -96,41 +99,38 @@ function filterGroup({ labelKey, name, options, activeOption, ariaKey, optionKey
   `;
 }
 
-const automationsResource = createAutomationResource(() => getRegisteredAutomations());
+// Real execution history from the engine. Nothing here is invented: an empty
+// list says so, and an unreachable service says that instead.
+//
+// This is deliberately not merged into the activity log below. The two record
+// different things and answer to different people:
+//
+//   activity log      "Pedro published CASE 006"   -- a human action
+//   automation runs   "project.published SUCCESS"  -- what the engine did
+//
+// Folding one into the other would make both harder to read and neither
+// trustworthy as an audit trail.
+const runsResource = createAutomationResource(() => getAutomationRuns({ limit: 25 }));
 
-// Capability only. The service keeps no execution history, so this reports
-// which automations exist and nothing more -- inventing a run count here would
-// be a number with no source.
 function renderAutomationEngine(state) {
   if (state.status === NOT_CONFIGURED) {
-    return `<p class="empty-inline" data-i18n="automation.notConfiguredHint">${t("automation.notConfiguredHint")}</p>`;
+    const key = notConfiguredHintKey();
+    return `<p class="empty-inline" data-i18n="${key}">${t(key)}</p>`;
   }
   if (state.status === ERROR) {
-    return `<p class="empty-inline" data-i18n="automation.unavailable">${t("automation.unavailable")}</p>`;
+    return `<p class="empty-inline" data-i18n="automationRuns.unavailable">${t("automationRuns.unavailable")}</p>`;
   }
   if (state.status !== SUCCESS) {
     return `<p class="empty-inline" data-i18n="common.loading">${t("common.loading")}...</p>`;
   }
 
-  const items = Array.isArray(state.data) ? state.data : [];
-  if (!items.length) {
-    return `<p class="empty-inline" data-i18n="automation.noAutomations">${t("automation.noAutomations")}</p>`;
+  // "Nothing has run" and "the history could not be read" look identical in an
+  // empty list, so the service reports which one it is.
+  if (state.data?.storage_available === false) {
+    return `<p class="empty-inline" data-i18n="automationRuns.unavailable">${t("automationRuns.unavailable")}</p>`;
   }
 
-  return `
-    <div class="ops-figures">
-      ${items
-        .map(
-          (item) => `
-        <div>
-          <span>${escapeHtml(String(item.event ?? ""))}</span>
-          <strong data-i18n="automation.ready">${escapeHtml(t("automation.ready"))}</strong>
-        </div>
-      `,
-        )
-        .join("")}
-    </div>
-  `;
+  return runRowsMarkup(Array.isArray(state.data?.runs) ? state.data.runs : []);
 }
 
 export const logsPage = {
@@ -147,7 +147,7 @@ export const logsPage = {
       <header class="panel__head">
         <div>
           <span data-i18n="automation.engine">${t("automation.engine")}</span>
-          <h3 data-i18n="automation.engineIntro">${t("automation.engineIntro")}</h3>
+          <h3 data-i18n="automationRuns.intro">${t("automationRuns.intro")}</h3>
         </div>
         ${serviceStatusMarkup(LOADING)}
       </header>
@@ -187,18 +187,51 @@ export const logsPage = {
     // Resolved on its own: the activity log below must render whether or not
     // the processing service answers.
     const engineEl = document.querySelector("[data-automation-engine]");
-    const engineStatusEl = engineEl?.parentElement?.querySelector(".automation-status");
+
+    let latestRuns = [];
 
     function paintEngine(state) {
       if (!engineEl?.isConnected) return;
+      latestRuns = Array.isArray(state.data?.runs) ? state.data.runs : [];
       engineEl.innerHTML = renderAutomationEngine(state);
-      if (engineStatusEl) engineStatusEl.outerHTML = serviceStatusMarkup(state.status);
+      const statusEl = engineEl.parentElement?.querySelector(".automation-status");
+      if (statusEl) statusEl.outerHTML = serviceStatusMarkup(state.status);
     }
 
-    automationsResource
-      .read()
-      .then(paintEngine)
-      .catch(() => paintEngine({ status: ERROR, data: null, error: null }));
+    async function loadRuns({ force = false } = {}) {
+      paintEngine(await runsResource.read({ force }).catch(() => ({ status: ERROR, data: null, error: null })));
+    }
+
+    // One delegated listener, so rows replaced by a reload stay clickable.
+    engineEl?.addEventListener("click", async (clickEvent) => {
+      const trigger = clickEvent.target.closest("[data-run-open]");
+      const runId = trigger?.dataset.runOpen;
+      if (!runId) return;
+
+      const runs = Array.isArray(latestRuns) ? latestRuns : [];
+      const run = runs.find((item) => item.run_id === runId);
+      if (!run) return;
+
+      openRunDetail(run, {
+        onRetry: async (id) => {
+          try {
+            await retryAutomationRun(id);
+            showToast(t("automationRuns.retryStarted"));
+            // A retry creates a new run, so the list is genuinely stale.
+            runsResource.invalidate();
+            await loadRuns({ force: true });
+          } catch {
+            // A failed retry must not take the Logs screen down with it.
+            showToast(t("automationRuns.retryFailed"));
+          }
+        },
+      });
+    });
+
+    // Deliberately not awaited. Awaiting here yields before the activity log
+    // below has looked up its own nodes, and navigating away during that gap
+    // left them null -- the run history must never hold up the page it shares.
+    void loadRuns();
 
     const table = document.querySelector("[data-log-table]");
     const count = document.querySelector("[data-log-count]");

@@ -166,12 +166,20 @@ describe("automation api client", () => {
     const fetchStub = stubFetch(() => jsonResponse({ event: "project.published", handled: true, results: [] }));
 
     try {
-      await client.dispatchAutomation("project.published", { project_id: "1" });
+      await client.dispatchAutomation("project.published", {
+        entityType: "project",
+        entityId: "1",
+        operationId: "op-1",
+        payload: { project_id: "1" },
+      });
 
       const { url, init } = fetchStub.calls[0];
       assert.equal(url, "http://127.0.0.1:8000/api/v1/automations/dispatch");
       assert.deepEqual(JSON.parse(init.body), {
         event: "project.published",
+        entity_type: "project",
+        entity_id: "1",
+        operation_id: "op-1",
         payload: { project_id: "1" },
       });
     } finally {

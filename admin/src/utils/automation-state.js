@@ -66,7 +66,12 @@ export function createAutomationResource(loader, { ttl = DEFAULT_TTL_MS } = {}) 
         // A request that fails leaves no cache behind: showing stale numbers
         // beside an OFFLINE badge would contradict itself.
         cached = null;
-        return { status: ERROR, data: null, error };
+        // The service answering "I am not configured" is not an outage. It
+        // reaches here as a 503 with code not_configured, and reporting it as
+        // OFFLINE would send someone looking for a network fault that is
+        // really a missing key on the server.
+        const status = error?.code === "not_configured" ? NOT_CONFIGURED : ERROR;
+        return { status, data: null, error };
       } finally {
         inFlight = null;
       }
@@ -94,6 +99,19 @@ export function serviceStatusKey(status) {
   if (status === ERROR) return "automation.offline";
   if (status === NOT_CONFIGURED) return "automation.notConfigured";
   return "automation.checking";
+}
+
+/**
+ * Which "not configured" this is.
+ *
+ * Two different situations arrive at the same state and need different
+ * instructions: the Admin has no URL, or the Admin has a URL and the service
+ * behind it answered 503 because its own key is missing. Telling someone to
+ * set VITE_AUTOMATION_API_URL when it is already set sends them to the wrong
+ * file entirely.
+ */
+export function notConfiguredHintKey() {
+  return isAutomationApiAvailable() ? "automation.notConfiguredServer" : "automation.notConfiguredHint";
 }
 
 /** Tone for the status dot. Never the only carrier of meaning -- text is. */

@@ -177,6 +177,33 @@ There is no queue, broker or scheduler — only the seam: an event name, a
 registry and handlers. Adding a queue later means changing `dispatch()`, not
 every handler.
 
+## 8b. Run history
+
+Execution history lives in `automation_runs`, created by
+`supabase/migrations/010_automation_runs.sql`. **The service works without it**:
+workflows still run, and every run reports `persisted: false` so the Admin can
+say history is not being recorded rather than pretend it is.
+
+To make history durable, two things are needed and neither can be faked:
+
+1. Apply `010_automation_runs.sql` to the project (SQL editor, or
+   `supabase db push`). It is additive: one new table, five indexes, RLS on.
+2. Put the real **service_role / secret** key in `.env`. The table has RLS
+   enabled with no policy, so only `service_role`, which bypasses RLS, can read
+   or write it. A publishable key gets nothing -- by design:
+
+       Admin -> FastAPI -> service_role -> automation_runs
+
+Then verify against the real project:
+
+```bash
+.venv/Scripts/python -m scripts.verify_run_storage
+```
+
+It writes one controlled row, reads it back, proves the unique index collapses a
+duplicate dispatch, proves the anon key cannot see run history, and deletes the
+row. It touches no project and never prints the key.
+
 ## 9. Tests
 
 ```bash

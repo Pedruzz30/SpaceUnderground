@@ -156,6 +156,36 @@ describe("automation request state", () => {
     assert.equal(failed.data, null);
   });
 
+  it("treats a server-side not_configured as configuration, not an outage", async () => {
+    // The service answers 503 not_configured when its own key is missing or
+    // wrong. Reporting that as OFFLINE would send someone hunting a network
+    // fault that is really a missing key on the server.
+    const { state } = await loadModules({ url: "http://127.0.0.1:8000" });
+
+    const resource = state.createAutomationResource(async () => {
+      const error = new Error("Supabase is not configured.");
+      error.code = "not_configured";
+      throw error;
+    });
+
+    const result = await resource.read();
+
+    assert.equal(result.status, state.NOT_CONFIGURED);
+    assert.notEqual(result.status, state.ERROR);
+  });
+
+  it("still reports a genuine transport failure as an outage", async () => {
+    const { state } = await loadModules({ url: "http://127.0.0.1:8000" });
+
+    const resource = state.createAutomationResource(async () => {
+      const error = new Error("unreachable");
+      error.code = "network_error";
+      throw error;
+    });
+
+    assert.equal((await resource.read()).status, state.ERROR);
+  });
+
   it("lets a forced read retry after a failure", async () => {
     const { state } = await loadModules({ url: "http://127.0.0.1:8000" });
 
@@ -291,12 +321,14 @@ describe("automation client transport", () => {
     const fetchStub = stubFetch(() => jsonResponse({ event: "project.published", handled: true, results: [] }));
 
     try {
-      await client.dispatchAutomation("project.published", { project_id: "001" });
+      await client.dispatchAutomation("project.published", { entityId: "001" });
 
-      assert.deepEqual(JSON.parse(fetchStub.calls[0].init.body), {
-        event: "project.published",
-        payload: { project_id: "001" },
-      });
+      const body = JSON.parse(fetchStub.calls[0].init.body);
+      assert.equal(body.event, "project.published");
+      assert.equal(body.entity_id, "001");
+      // Omitted by the caller here, so it must be explicitly null rather than
+      // absent: the service distinguishes "no key" from "missing field".
+      assert.equal(body.operation_id, null);
     } finally {
       fetchStub.restore();
     }

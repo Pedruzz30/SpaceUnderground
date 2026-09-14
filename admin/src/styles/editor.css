@@ -697,3 +697,24 @@ fieldset.field legend {
   font-size: 0.78rem;
   line-height: 1.7;
 }
+
+/* The run produced by the last publish, shown beside the analysis header. */
+.analysis-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.automation-last-run {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.automation-last-run span,
+.automation-last-run small {
+  color: var(--text-muted);
+  font: 500 0.58rem/1.5 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}

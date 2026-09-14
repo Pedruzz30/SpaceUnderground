@@ -75,6 +75,10 @@ class ProjectNotFound(SupabaseError):
     """The identifier resolved to no row."""
 
 
+class SupabaseConflict(SupabaseError):
+    """A unique constraint refused the write. Not an outage."""
+
+
 def _auth_headers(key: str) -> dict[str, str]:
     """Builds the PostgREST auth headers for whichever key format is in use.
 
@@ -97,11 +101,19 @@ def _looks_like_uuid(value: str) -> bool:
     return all(part and all(char in "0123456789abcdefABCDEF" for char in part) for part in parts)
 
 
-class SupabaseService:
-    """Read-only PostgREST client.
+# The only table this service is allowed to write. Project, plan and content
+# rows belong to the Admin and to Supabase; the automation service reads them
+# and never edits them. Run history is its own, so it writes that and nothing
+# else -- enforced here rather than left to each caller to remember.
+WRITABLE_TABLES = {"automation_runs"}
 
-    This service never writes. Nothing here issues POST, PATCH or DELETE, and
-    no endpoint accepts SQL: callers choose a named method, not a query.
+
+class SupabaseService:
+    """PostgREST client: reads the catalogue, writes only its own run history.
+
+    No endpoint accepts SQL -- callers choose a named method, never a query --
+    and `_write` refuses any table outside WRITABLE_TABLES, so a future handler
+    cannot quietly start editing projects.
     """
 
     def __init__(self, settings: Settings | None = None) -> None:
@@ -142,6 +154,54 @@ class SupabaseService:
                 body=response.text[:300],
             )
             raise SupabaseUnavailable(f"Supabase returned {response.status_code}.")
+
+        payload = response.json()
+        return payload if isinstance(payload, list) else [payload]
+
+    async def _write(
+        self,
+        path: str,
+        method: str,
+        *,
+        json: Any = None,
+        params: dict[str, str] | None = None,
+        prefer: str = "return=representation",
+    ) -> list[dict[str, Any]]:
+        """POST/PATCH against an allowed table."""
+        table = path.split("?")[0].strip("/")
+        if table not in WRITABLE_TABLES:
+            raise SupabaseError(f"Refusing to write to {table}.")
+
+        self._require_configuration()
+
+        url = f"{self._settings.supabase_url}/rest/v1/{path}"
+        headers = {**_auth_headers(self._settings.supabase_service_role_key), "Prefer": prefer}
+
+        try:
+            async with httpx.AsyncClient(timeout=self._settings.supabase_timeout_seconds) as client:
+                response = await client.request(method, url, params=params, json=json, headers=headers)
+        except httpx.HTTPError as error:
+            log_event(logger, logging.ERROR, "supabase.write.failed", path=path, error=type(error).__name__)
+            raise SupabaseUnavailable("Could not reach Supabase.") from error
+
+        if response.status_code >= 400:
+            log_event(
+                logger,
+                logging.ERROR,
+                "supabase.write.error",
+                path=path,
+                status=response.status_code,
+                body=response.text[:300],
+            )
+            # 409 is a unique violation, which is how an idempotency key
+            # collapses a duplicate dispatch. The caller needs to tell that
+            # apart from an outage.
+            if response.status_code == 409:
+                raise SupabaseConflict("Conflicting row.")
+            raise SupabaseUnavailable(f"Supabase returned {response.status_code}.")
+
+        if not response.content:
+            return []
 
         payload = response.json()
         return payload if isinstance(payload, list) else [payload]

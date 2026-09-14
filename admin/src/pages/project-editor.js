@@ -27,6 +27,7 @@ import { escapeAttribute, escapeHtml } from "../utils/html.js";
 import { isLivePreviewUrl, liveDemoState, projectHealth, publishReadiness } from "../utils/project-health.js";
 import { analyzeProject, dispatchAutomation, isAutomationApiAvailable } from "../services/automation-api.js";
 import { isSupabaseMode } from "../config/env.js";
+import { runStatusBadge, shortRunId } from "../components/automation-runs.js";
 import {
   ERROR,
   IDLE,
@@ -259,6 +260,18 @@ function healthCardMarkup(health) {
 // read the same way: ok, warning, and required for a hard failure.
 const ANALYSIS_CHECK_CLASS = { ok: "ok", warn: "warning", fail: "required" };
 
+// Survives the re-mount that publishing triggers, and is scoped to one project
+// so opening a different case never shows the previous one's run.
+let lastPublishRun = { projectId: "", run: null };
+
+function setLastPublishRun(projectId, run) {
+  lastPublishRun = { projectId: String(projectId || ""), run };
+}
+
+function lastPublishRunFor(projectId) {
+  return lastPublishRun.projectId === String(projectId || "") ? lastPublishRun.run : null;
+}
+
 function analysisMarkup(state) {
   if (state.status === NOT_CONFIGURED) {
     return `<p class="empty-inline" data-i18n="projectAnalysis.notConfigured">${escapeHtml(t("projectAnalysis.notConfigured"))}</p>`;
@@ -278,7 +291,10 @@ function analysisMarkup(state) {
   }
 
   if (state.status !== SUCCESS || !state.data) {
-    return `<p class="empty-inline" data-i18n="projectAnalysis.notSaved">${escapeHtml(t("projectAnalysis.notSaved"))}</p>`;
+    // In mock mode the project is saved; it is simply not the row the engine
+    // reads. Saying "save the project" there would be plainly untrue.
+    const key = isSupabaseMode() ? "projectAnalysis.notSaved" : "projectAnalysis.mockMode";
+    return `<p class="empty-inline" data-i18n="${key}">${escapeHtml(t(key))}</p>`;
   }
 
   const analysis = state.data;
@@ -371,7 +387,10 @@ function overviewMarkup(project) {
             <span data-i18n="projectAnalysis.title">${escapeHtml(t("projectAnalysis.title"))}</span>
             <h3 id="project-analysis-title" data-i18n="projectAnalysis.intro">${escapeHtml(t("projectAnalysis.intro"))}</h3>
           </div>
-          <button type="button" class="button" data-action-analyze data-i18n="projectAnalysis.retry">${escapeHtml(t("projectAnalysis.retry"))}</button>
+          <div class="analysis-actions">
+            <span class="automation-last-run" data-last-run aria-live="polite"></span>
+            <button type="button" class="button" data-action-analyze data-i18n="projectAnalysis.retry">${escapeHtml(t("projectAnalysis.retry"))}</button>
+          </div>
         </header>
         <div data-project-analysis aria-live="polite">${analysisMarkup({ status: IDLE, data: null, error: null })}</div>
       </section>
@@ -1076,8 +1095,10 @@ function mount(project, isCreate) {
   });
 
   // Painted once up front so the retry button carries the right disabled state
-  // even when there is nothing to analyse.
+  // even when there is nothing to analyse, and so a run recorded just before
+  // the re-mount is shown again rather than lost.
   paintAnalysis();
+  paintRunState();
 
   // Overview is the tab the editor opens on for an existing project, so the
   // first analysis runs at mount without waiting for a click.
@@ -1472,14 +1493,62 @@ function mount(project, isCreate) {
     const projectId = String(updated?.dbId || updated?.id || analysisId || "");
     if (!projectId) return;
 
-    dispatchAutomation("project.published", { project_id: projectId })
-      .then(() => {
+    // One id per publish action. A double click or a network retry reaches the
+    // engine with the same key and is collapsed into a single run; a later,
+    // deliberate publish gets a new one and runs again.
+    const operationId = `publish-${projectId}-${Date.now()}`;
+
+    dispatchAutomation("project.published", {
+      entityType: "project",
+      entityId: projectId,
+      operationId,
+      payload: { project_id: projectId },
+    })
+      .then((run) => {
+        setLastPublishRun(analysisId, run);
+        paintRunState();
         // The next analysis should describe the row as just published.
         analysisState = { status: IDLE, data: null, error: null };
       })
       .catch(() => {
+        setLastPublishRun(analysisId, null);
+        paintRunState();
         showToast(t("automation.dispatchFailed"));
       });
+  }
+
+  // The run the last publish produced, shown discreetly beside the analysis.
+  // The dispatch is synchronous today, so this reads the returned run rather
+  // than polling. If execution ever becomes asynchronous, this is the single
+  // place that would gain a bounded poll.
+  //
+  // Held at module scope because publishing calls loadEditor(), which re-mounts
+  // the whole editor: a value kept in this closure would be discarded before
+  // the dispatch ever answered, and the badge would never appear.
+  function paintRunState() {
+    // Deliberately the document and not the closure's `form`: publishing
+    // re-mounts the editor, so by the time the dispatch answers, `form` is a
+    // detached node and writing into it would paint nothing.
+    const target = document.querySelector("[data-last-run]");
+    if (!target?.isConnected) return;
+
+    const lastRun = lastPublishRunFor(analysisId);
+    if (!lastRun) {
+      target.innerHTML = "";
+      return;
+    }
+
+    const notStored = lastRun.persisted === false
+      ? `<small data-i18n="automationRuns.notStored">${escapeHtml(t("automationRuns.notStored"))}</small>`
+      : "";
+
+    target.innerHTML = `
+      <span data-i18n="automation.engine">${escapeHtml(t("automation.engine"))}</span>
+      ${runStatusBadge(lastRun.status)}
+      <small>${escapeHtml(shortRunId(lastRun.run_id))}</small>
+      ${notStored}
+    `;
+    applyStaticTranslations(target);
   }
 
   async function handleArchive() {

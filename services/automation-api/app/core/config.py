@@ -66,13 +66,59 @@ class Settings(BaseSettings):
         return self.app_env == "production"
 
     @property
+    def service_role_key_is_public(self) -> bool:
+        """Whether a *public* key was put in the service role slot.
+
+        This is worth detecting because the symptom is otherwise baffling: the
+        service authenticates fine, reads published rows fine, and then fails
+        every write against a table whose RLS grants nothing -- which reads as
+        "the database is broken" rather than "the wrong key is configured".
+
+        Only provably public keys are rejected. An unrecognised shape is
+        allowed through, because refusing a key that turns out to be valid
+        would be a self-inflicted outage, while a wrong one fails loudly at the
+        first write anyway.
+        """
+        key = self.supabase_service_role_key
+
+        if key.startswith("sb_publishable_"):
+            return True
+
+        # Legacy keys are JWTs, and anon and service_role are indistinguishable
+        # by prefix -- the role lives in the payload. Read it without verifying
+        # the signature: this is a configuration check, not authentication.
+        if key.startswith("eyJ"):
+            import base64
+            import json
+
+            parts = key.split(".")
+            if len(parts) < 2:
+                return False
+            try:
+                padded = parts[1] + "=" * (-len(parts[1]) % 4)
+                claims = json.loads(base64.urlsafe_b64decode(padded))
+            except (ValueError, TypeError):
+                return False
+
+            return claims.get("role") in {"anon", "authenticated"}
+
+        return False
+
+    @property
     def allowed_origins(self) -> list[str]:
         """CORS allowlist. Comma-separated so a staging host can be added."""
         return [origin.strip() for origin in self.admin_origin.split(",") if origin.strip()]
 
     @property
     def supabase_configured(self) -> bool:
-        return bool(self.supabase_url and self.supabase_service_role_key)
+        # A public key in the service role slot counts as not configured: the
+        # service cannot do privileged work with it, and saying so is more
+        # useful than failing later at the first write.
+        return bool(
+            self.supabase_url
+            and self.supabase_service_role_key
+            and not self.service_role_key_is_public
+        )
 
 
 @lru_cache

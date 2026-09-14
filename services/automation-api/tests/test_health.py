@@ -49,6 +49,57 @@ def test_health_needs_no_token(make_client, monkeypatch):
     assert client.get("/api/v1/health").status_code == 200
 
 
+@pytest.mark.parametrize(
+    "key,public",
+    [
+        ("sb_publishable_abc123", True),
+        ("sb_secret_abc123", False),
+        # Legacy keys are all "eyJ...": only the payload's role tells them apart.
+        # {"role":"anon"} and {"role":"service_role"}, unsigned -- this is a
+        # configuration check, not authentication.
+        ("eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.sig", True),
+        ("eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.sig", False),
+        # Unrecognised shapes pass: refusing a key that turns out to be valid
+        # would be a self-inflicted outage.
+        ("something-else-entirely", False),
+        ("eyJ-not-a-jwt", False),
+        ("", False),
+    ],
+)
+def test_a_public_key_in_the_service_role_slot_is_detected(monkeypatch, key, public):
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", key)
+    get_settings.cache_clear()
+
+    assert get_settings().service_role_key_is_public is public
+
+
+def test_a_public_key_makes_supabase_count_as_unconfigured(monkeypatch, make_client):
+    """The symptom of a wrong key is otherwise baffling: reads work, writes do not."""
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "sb_publishable_abc123")
+    get_settings.cache_clear()
+
+    settings = get_settings()
+    assert settings.supabase_configured is False
+
+    client, _ = make_client()
+    body = client.get("/api/v1/health").json()
+    supabase = next(item for item in body["dependencies"] if item["name"] == "supabase")
+
+    assert supabase["configured"] is False
+    assert "public key" in supabase["detail"]
+    # The message names the variable, never the value.
+    assert "sb_publishable_abc123" not in supabase["detail"]
+
+
+def test_a_secret_key_counts_as_configured(monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "sb_secret_abc123")
+    get_settings.cache_clear()
+
+    assert get_settings().supabase_configured is True
+
+
 def test_data_endpoints_report_503_without_supabase(make_client):
     """No configuration must read as "not configured", never as an empty result."""
     client, _ = make_client(configured=False)

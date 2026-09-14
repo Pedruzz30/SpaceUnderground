@@ -117,9 +117,51 @@ export async function getOperationsOverview() {
   return request("/api/v1/reports/overview");
 }
 
-/** Automations registered on the service, with their handlers. */
+/** Automations registered on the service, with the steps each one runs. */
 export async function getRegisteredAutomations() {
   return request("/api/v1/automations");
+}
+
+/**
+ * Workflow run history, newest first.
+ *
+ * Always bounded: the service clamps the limit too, but asking for an
+ * unbounded list is not something this client should be able to express.
+ */
+export async function getAutomationRuns({ event, status, entityId, limit = 25 } = {}) {
+  const params = new URLSearchParams();
+  if (event) params.set("event", event);
+  if (status) params.set("status", status);
+  if (entityId) params.set("entity_id", entityId);
+  params.set("limit", String(Math.max(1, Math.min(Number(limit) || 25, 100))));
+
+  return request(`/api/v1/automations/runs?${params.toString()}`);
+}
+
+/** Counts over the recent runs, for the Dashboard. */
+export async function getAutomationRunStats() {
+  return request("/api/v1/automations/runs/stats");
+}
+
+/** One run, with its steps. */
+export async function getAutomationRun(runId) {
+  const id = String(runId ?? "").trim();
+  if (!id) throw new DataError("A run id is required.", { code: "bad_request" });
+
+  return request(`/api/v1/automations/runs/${encodeURIComponent(id)}`);
+}
+
+/**
+ * Retries a failed run.
+ *
+ * Creates a new run rather than replacing the old one: the failed attempt is
+ * the evidence of what went wrong and is never overwritten.
+ */
+export async function retryAutomationRun(runId) {
+  const id = String(runId ?? "").trim();
+  if (!id) throw new DataError("A run id is required.", { code: "bad_request" });
+
+  return request(`/api/v1/automations/runs/${encodeURIComponent(id)}/retry`, { method: "POST" });
 }
 
 /**
@@ -128,12 +170,20 @@ export async function getRegisteredAutomations() {
  * Handlers in this phase only read and report; none of them writes back to
  * Supabase.
  */
-export async function dispatchAutomation(event, payload = {}) {
+export async function dispatchAutomation(event, { entityType, entityId, operationId, payload = {} } = {}) {
   const name = String(event ?? "").trim();
   if (!name) throw new DataError("An event name is required.", { code: "bad_request" });
 
   return request("/api/v1/automations/dispatch", {
     method: "POST",
-    body: { event: name, payload },
+    body: {
+      event: name,
+      entity_type: entityType || null,
+      entity_id: entityId ? String(entityId) : null,
+      // Collapses a double click plus a network retry into one run. A
+      // deliberate later run of the same event supplies a new id.
+      operation_id: operationId || null,
+      payload,
+    },
   });
 }

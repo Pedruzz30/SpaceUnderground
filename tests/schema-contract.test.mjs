@@ -193,3 +193,79 @@ describe("plan status normalization migration", () => {
     assert.doesNotMatch(sql, /alter\s+table\s+(?!public\.plans)/i, "migration must not alter unrelated tables");
   });
 });
+
+// The same failure mode as the public query, one layer over: the automation
+// service selects and writes named columns of `automation_runs`, and a column
+// it names that no migration creates fails only in production, as PostgREST
+// 42703. This reads both sources as written and refuses the mismatch here.
+describe("automation run storage contract", () => {
+  const storePath = join(root, "services", "automation-api", "app", "services", "run_store.py");
+  const migrationFile = migrationFiles.find((name) => name.includes("automation_runs"));
+
+  it("ships a migration that creates the run history table", () => {
+    assert.ok(migrationFile, "no migration creates automation_runs");
+
+    const sql = readFileSync(join(MIGRATIONS_DIR, migrationFile), "utf8");
+    assert.match(sql, /create table if not exists public\.automation_runs/i);
+    // Enabled with no policy: history is reached through the API, never by the
+    // Admin querying Supabase directly.
+    assert.match(sql, /alter table public\.automation_runs enable row level security/i);
+    assert.doesNotMatch(sql, /create policy[\s\S]*automation_runs/i);
+    assert.doesNotMatch(
+      sql,
+      /grant\s+[a-z, ]*\s+on\s+public\.automation_runs\s+to\s+(anon|authenticated)/i,
+      "run history must not be granted to admin clients",
+    );
+  });
+
+  it("creates every column the run store reads", () => {
+    const source = readFileSync(storePath, "utf8");
+    const match = source.match(/RUN_COLUMNS = ",".join\(\s*\[([\s\S]*?)\]/);
+    assert.ok(match, "RUN_COLUMNS not found in run_store.py");
+
+    const columns = [...match[1].matchAll(/"([^"]+)"/g)].map((entry) => entry[1]);
+    assert.ok(columns.length > 5, "expected a real column list");
+
+    const missing = columns.filter((column) => !migrationsDefine(column));
+    assert.deepEqual(missing, [], `selected by the run store but created by no migration: ${missing.join(", ")}`);
+  });
+
+  it("creates every column the engine writes", () => {
+    const engine = readFileSync(
+      join(root, "services", "automation-api", "app", "automations", "engine.py"),
+      "utf8",
+    );
+
+    // The keys the engine puts into store.create()/store.update() payloads.
+    const written = [
+      "event",
+      "status",
+      "source",
+      "entity_type",
+      "entity_id",
+      "payload",
+      "steps",
+      "result",
+      "error",
+      "started_at",
+      "finished_at",
+      "duration_ms",
+      "idempotency_key",
+      "retry_of",
+    ];
+
+    for (const column of written) {
+      assert.ok(engine.includes(`"${column}"`), `engine no longer writes ${column}; update this list`);
+      assert.ok(migrationsDefine(column), `engine writes ${column} but no migration creates it`);
+    }
+  });
+
+  it("writes to no table other than its own history", () => {
+    const supabase = readFileSync(
+      join(root, "services", "automation-api", "app", "services", "supabase_service.py"),
+      "utf8",
+    );
+
+    assert.match(supabase, /WRITABLE_TABLES = \{"automation_runs"\}/);
+  });
+});

@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.v1.automations import get_store
 from app.core.config import get_settings
 from app.main import create_app
 from app.services.supabase_service import (
@@ -79,6 +80,103 @@ class FakeSupabaseService:
         return list(self.rows)
 
 
+class FakeRunStore:
+    """In-memory stand-in for RunStore.
+
+    Implements the same degradation contract as the real one: when storage is
+    unavailable every method returns nothing rather than raising, because the
+    engine must keep working when the history table does not exist.
+    """
+
+    def __init__(self, *, available: bool = True, configured: bool | None = None) -> None:
+        self.rows: list[dict[str, Any]] = []
+        self._available = available
+        # Two distinct facts the real store also keeps apart: whether Supabase
+        # is configured at all, and whether the history table can be read.
+        # "No key" and "table missing" need different answers.
+        self._configured = available if configured is None else configured
+        self._sequence = 0
+
+    @property
+    def configured(self) -> bool:
+        return self._configured
+
+    async def available(self) -> bool:
+        return self._available
+
+    async def create(self, run: dict[str, Any]) -> dict[str, Any] | None:
+        if not self._available:
+            return None
+
+        key = run.get("idempotency_key")
+        if key:
+            existing = await self.find_by_idempotency_key(key)
+            if existing:
+                return existing
+
+        self._sequence += 1
+        row = {**run, "id": f"00000000-0000-4000-8000-{self._sequence:012d}"}
+        self.rows.append(row)
+        return row
+
+    async def update(self, run_id: str, changes: dict[str, Any]) -> dict[str, Any] | None:
+        if not self._available:
+            return None
+
+        for row in self.rows:
+            if row["id"] == run_id:
+                row.update(changes)
+                return row
+        return None
+
+    async def find_by_idempotency_key(self, key: str) -> dict[str, Any] | None:
+        if not self._available or not key:
+            return None
+        return next((row for row in self.rows if row.get("idempotency_key") == key), None)
+
+    async def get(self, run_id: str) -> dict[str, Any] | None:
+        if not self._available:
+            return None
+        return next((row for row in self.rows if row["id"] == run_id), None)
+
+    async def list(self, *, event=None, status=None, entity_id=None, limit=25):
+        if not self._available:
+            return []
+
+        rows = list(reversed(self.rows))
+        if event:
+            rows = [row for row in rows if row.get("event") == event]
+        if status:
+            rows = [row for row in rows if row.get("status") == status]
+        if entity_id:
+            rows = [row for row in rows if row.get("entity_id") == entity_id]
+        return rows[:limit]
+
+    async def stats(self, *, limit: int = 100) -> dict[str, Any]:
+        runs = await self.list(limit=limit)
+        total = len(runs)
+        success = sum(1 for run in runs if run.get("status") == "SUCCESS")
+        failed = sum(1 for run in runs if run.get("status") == "FAILED")
+        last = runs[0] if runs else None
+
+        return {
+            "total": total,
+            "success": success,
+            "failed": failed,
+            "success_rate": round((success / total) * 100, 1) if total else None,
+            "last_run": (
+                {
+                    "run_id": last.get("id"),
+                    "event": last.get("event"),
+                    "status": last.get("status"),
+                    "created_at": last.get("created_at"),
+                }
+                if last
+                else None
+            ),
+        }
+
+
 @pytest.fixture
 def make_client():
     """Builds a TestClient wired to a fake Supabase.
@@ -91,10 +189,16 @@ def make_client():
         rows: list[dict[str, Any]] | None = None,
         *,
         configured: bool = True,
+        storage: bool = True,
     ) -> tuple[TestClient, FakeSupabaseService]:
         app = create_app()
         fake = FakeSupabaseService(rows, configured=configured)
+        store = FakeRunStore(available=configured and storage, configured=configured)
         app.dependency_overrides[get_supabase_service] = lambda: fake
+        app.dependency_overrides[get_store] = lambda: store
+        # Handed back on the service so a test can inspect what was recorded
+        # without the factory having to return a third value.
+        fake.runs = store
         return TestClient(app), fake
 
     return factory
@@ -158,4 +262,4 @@ def project_row(**overrides: Any) -> dict[str, Any]:
     return row
 
 
-__all__ = ["FakeSupabaseService", "make_client", "project_row", "SupabaseService"]
+__all__ = ["FakeRunStore", "FakeSupabaseService", "make_client", "project_row", "SupabaseService"]

@@ -1,14 +1,14 @@
 import { badge, badgeType } from "../components/badge.js";
 import { statCard } from "../components/stat-card.js";
 import { spaceStatus } from "../data/dashboard.js";
-import { DATA_SOURCE } from "../config/env.js";
+import { DATA_SOURCE, isSupabaseMode } from "../config/env.js";
 import {
   demoClients,
   demoOpportunities,
   demoPipelineStages,
   demoTransactions,
 } from "../data/operations-demo.js";
-import { getOperationsOverview } from "../services/automation-api.js";
+import { getAutomationRunStats, getOperationsOverview } from "../services/automation-api.js";
 import { overviewFiguresMarkup, overviewTimestamp, serviceStatusMarkup } from "../components/automation-panel.js";
 import {
   ERROR,
@@ -16,6 +16,7 @@ import {
   NOT_CONFIGURED,
   SUCCESS,
   createAutomationResource,
+  notConfiguredHintKey,
 } from "../utils/automation-state.js";
 import { getActivityWithStatus } from "../services/activity-service.js";
 import { getProjects } from "../services/project-service.js";
@@ -301,11 +302,48 @@ function renderHealth({ projects, projectsOk, activityOk }) {
 // Kept at module scope so returning to the Dashboard within the TTL reuses the
 // last answer instead of re-querying on every navigation.
 const overviewResource = createAutomationResource(() => getOperationsOverview());
+const runStatsResource = createAutomationResource(() => getAutomationRunStats());
+
+// Counted by the engine over its recent runs, never estimated. With no runs
+// yet the panel says so rather than printing a 0% nobody measured.
+function renderRunStats(state) {
+  if (state.status !== SUCCESS || !state.data) return "";
+
+  const stats = state.data;
+  if (!stats.storage_available) {
+    return `<p class="dash-inline-note" data-i18n="automationRuns.stats.storageOffline">${t("automationRuns.stats.storageOffline")}</p>`;
+  }
+  if (!stats.total) {
+    return `<p class="dash-inline-note" data-i18n="automationRuns.stats.none">${t("automationRuns.stats.none")}</p>`;
+  }
+
+  const figure = (labelKey, value) => `
+    <div>
+      <span data-i18n="${labelKey}">${t(labelKey)}</span>
+      <strong>${escapeHtml(String(value))}</strong>
+    </div>
+  `;
+
+  return `
+    <div class="ops-figures dash-run-stats">
+      ${figure("automationRuns.stats.total", stats.total)}
+      ${figure("automationRuns.stats.success", stats.success)}
+      ${figure("automationRuns.stats.failed", stats.failed)}
+      ${stats.success_rate === null ? "" : figure("automationRuns.stats.successRate", `${stats.success_rate}%`)}
+    </div>
+    ${
+      stats.last_run
+        ? `<p class="dash-inline-note">${escapeHtml(t("automationRuns.stats.lastRun"))}: ${escapeHtml(stats.last_run.event ?? "")}</p>`
+        : ""
+    }
+  `;
+}
 
 function renderOperations(state) {
   const body = () => {
     if (state.status === NOT_CONFIGURED) {
-      return `<p class="empty-inline" data-i18n="automation.notConfiguredHint">${t("automation.notConfiguredHint")}</p>`;
+      const key = notConfiguredHintKey();
+      return `<p class="empty-inline" data-i18n="${key}">${t(key)}</p>`;
     }
     if (state.status === ERROR) {
       return `<p class="empty-inline" data-i18n="operations.loadError">${t("operations.loadError")}</p>`;
@@ -324,7 +362,17 @@ function renderOperations(state) {
       ${serviceStatusMarkup(state.status)}
     </div>
     ${body()}
+    <div data-operations-runs></div>
     ${time ? `<p class="dash-inline-note">${escapeHtml(t("operations.updatedAt", { time }))}</p>` : ""}
+    ${
+      state.status === SUCCESS && !isSupabaseMode()
+        ? // The Admin is reading localStorage while these numbers come from the
+          // real catalogue. Saying so is cheaper and more honest than hiding a
+          // panel whose figures are correct, and it matches how this page
+          // already labels its REAL and DEMO origins.
+          `<p class="dash-inline-note" data-i18n="operations.realDataNote">${escapeHtml(t("operations.realDataNote"))}</p>`
+        : ""
+    }
   `;
 }
 
@@ -509,6 +557,7 @@ export const dashboardPage = {
       if (!operationsEl?.isConnected) return;
       operationsEl.innerHTML = renderOperations(operationsState);
       operationsEl.toggleAttribute("aria-busy", operationsState.status === LOADING);
+      paintRunStats(runStatsState);
     }
 
     overviewResource
@@ -522,7 +571,31 @@ export const dashboardPage = {
         paintOperations();
       });
 
-    if (operationsEl) onLocaleChange(operationsEl, paintOperations);
+    // Run statistics resolve separately: the catalogue overview must appear
+    // even when the history table is not reachable.
+    function paintRunStats(state) {
+      const target = document.querySelector("[data-operations-runs]");
+      if (target?.isConnected) target.innerHTML = renderRunStats(state);
+    }
+
+    let runStatsState = { status: LOADING, data: null, error: null };
+
+    runStatsResource
+      .read()
+      .then((state) => {
+        runStatsState = state;
+        paintRunStats(state);
+      })
+      .catch(() => {
+        runStatsState = { status: ERROR, data: null, error: null };
+      });
+
+    if (operationsEl) {
+      onLocaleChange(operationsEl, () => {
+        paintOperations();
+        paintRunStats(runStatsState);
+      });
+    }
 
     attentionEl?.removeAttribute("aria-busy");
     pulseEl.removeAttribute("aria-busy");
