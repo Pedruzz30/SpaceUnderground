@@ -39,6 +39,30 @@ columns. pt-BR text stays in the existing columns as the primary source.
 when this flag is true, so a URL alone never puts a project on the site. The
 column defaults to false and the migration enables CASE 001 and 002.
 
+`migrations/010_normalize_plan_status.sql` is a data-only normalization of
+`plans.status` to the canonical values (`AVAILABLE`, `ON_REQUEST`, ...). It is
+applied only after the compatible code is deployed and smoke tested (see
+`docs/release-checklist.md`).
+
+`migrations/011_automation_runs.sql` adds `automation_runs`, the workflow
+engine's run history. RLS is on with no policy: only the automation service
+(service role) reads or writes it.
+
+`migrations/012_business_workflows.sql` adds `clients`,
+`commercial_proposals` and `commercial_project_handoffs`, all admin-only.
+
+### 011 and 012 record schema production already has
+
+Both sets of tables were created in production from the automation branch, where
+the files were numbered `010_automation_runs.sql` and
+`011_business_workflows.sql`. That numbering collided with
+`010_normalize_plan_status.sql` (the Supabase CLI keys a migration by its
+numeric prefix), so they join the official chain as 011 and 012 with their
+content byte for byte unchanged. Both are idempotent: running them against
+production, where the objects exist, changes nothing. Check
+`supabase_migrations.schema_migrations` before any `supabase db push` so the
+CLI's history matches this numbering.
+
 Plus:
 
 - `is_admin()` — `security definer` helper used by the policies.
@@ -82,6 +106,8 @@ RLS is enabled on all CMS tables.
 | `site_content_public_read` | Public visitors may read structured site content. |
 | `site_settings_public_read` | Public visitors may read safe runtime settings. |
 | `activity_log_admin_read` | Only admins can read activity. No anonymous grant exists. |
+| `automation_runs` | RLS enabled with no policy: invisible to `anon` and `authenticated`; only the service role reaches it. |
+| `clients_admin_*`, `commercial_proposals_admin_*`, `commercial_project_handoffs_admin_*` | Admin-only select/insert/update/delete. `anon` has every grant revoked. |
 
 There is **no public write path**. Authorization lives here, not in the
 frontend: hiding a button or a route is not security.
