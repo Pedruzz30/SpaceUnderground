@@ -4,9 +4,46 @@ Database foundation for the admin panel and CMS. The public site now reads
 published project, media, plan, content and settings data through the anon key
 and RLS.
 
-## What the migrations create
+## Migration format
 
-`migrations/001_admin_foundation.sql`
+Migrations follow the Supabase CLI format `YYYYMMDDHHMMSS_<name>.sql`. The
+14 digit timestamp is the version the CLI records in
+`supabase_migrations.schema_migrations`; the rest of the name only describes
+the migration. Versions are unique and sort chronologically, which
+`admin/tests/migration-chain.test.mjs` enforces.
+
+The project used to number migrations `001_` to `012_`. That broke twice: two
+files shared `010`, and production recorded CLI timestamps while the repository
+kept ordinals. Every file now carries a timestamp; the historical ones keep
+their old ordinal inside the name (`20260909062014_001_admin_foundation.sql`)
+so older notes and commits stay easy to follow.
+
+### Known remote state (production `zvzfkfvxbuofgqrrogxh`)
+
+| Version | Migration | State |
+| --- | --- | --- |
+| `20260909062014` .. `20260910225035` | `001` .. `007` (admin foundation to activity log) | Schema present in production, **not recorded** in the CLI history |
+| `20260912202425` | `editorial_i18n` | APPLIED (recorded) |
+| `20260913031225` | `project_live_preview` | APPLIED (recorded) |
+| `20260913211045` | `automation_runs` | APPLIED (recorded) |
+| `20260914025524` | `011_business_workflows` | APPLIED (recorded) |
+| `20260927225426` | `normalize_plan_status` | **NOT APPLIED** |
+
+The four recorded versions and names match
+`select version, name from supabase_migrations.schema_migrations` exactly and
+must never be renamed. `011_business_workflows` keeps its old ordinal in the
+name because that is the name production recorded.
+
+The versions of `001`..`007` are reconciliation identifiers, not deploy
+times: each is the UTC time of the commit that first added the file.
+`003`..`007` were added in the same commit (`3ee8c2f`, 2026-09-10 22:50:31
+UTC), so they take consecutive seconds from `225031` to keep their order.
+Before any `supabase db push`, the CLI history must be repaired to mark these
+seven versions as applied; they are listed in `docs/release-checklist.md`.
+
+### What each migration creates
+
+`migrations/20260909062014_001_admin_foundation.sql`
 
 | Table | Purpose |
 | --- | --- |
@@ -14,54 +51,48 @@ and RLS.
 | `projects` | Portfolio cases. `id` is a uuid; `case_number` is the editorial identity (CASE 001). |
 | `project_gallery` | Gallery images per project. Not wired to uploads yet. |
 
-`migrations/002_project_media_storage.sql` creates the private `project-media`
-bucket and storage policies.
+`migrations/20260910011630_002_project_media_storage.sql` creates the private
+`project-media` bucket and storage policies.
 
-`migrations/003_project_presentation.sql` adds the project viewer presentation
-columns and the ordered `project_modules` table.
+`migrations/20260910225031_003_project_presentation.sql` adds the project
+viewer presentation columns and the ordered `project_modules` table.
 
-`migrations/004_plans_cms.sql` adds public commercial plans plus ordered
-`plan_features`.
+`migrations/20260910225032_004_plans_cms.sql` adds public commercial plans plus
+ordered `plan_features`.
 
-`migrations/005_site_content.sql` adds structured public content by key.
+`migrations/20260910225033_005_site_content.sql` adds structured public
+content by key.
 
-`migrations/006_site_settings.sql` adds safe public runtime settings. Build-time
-SEO generation still belongs to `site.config.js`; editing settings in the admin
-does not pretend to rebuild sitemap/canonical output.
+`migrations/20260910225034_006_site_settings.sql` adds safe public runtime
+settings. Build-time SEO generation still belongs to `site.config.js`; editing
+settings in the admin does not pretend to rebuild sitemap/canonical output.
 
-`migrations/007_activity_log.sql` adds the admin-only activity log.
+`migrations/20260910225035_007_activity_log.sql` adds the admin-only activity
+log.
 
-`migrations/008_editorial_i18n.sql` adds the optional `translations` JSONB
-columns. pt-BR text stays in the existing columns as the primary source.
+`migrations/20260912202425_editorial_i18n.sql` adds the optional
+`translations` JSONB columns. pt-BR text stays in the existing columns as the
+primary source.
 
-`migrations/009_project_live_preview.sql` adds
+`migrations/20260913031225_project_live_preview.sql` adds
 `projects.live_preview_enabled`. The public viewer only frames `preview_url`
 when this flag is true, so a URL alone never puts a project on the site. The
 column defaults to false and the migration enables CASE 001 and 002.
 
-`migrations/010_normalize_plan_status.sql` is a data-only normalization of
+`migrations/20260913211045_automation_runs.sql` adds `automation_runs`, the
+workflow engine's run history. RLS is on with no policy: only the automation
+service (service role) reads or writes it.
+
+`migrations/20260914025524_011_business_workflows.sql` adds `clients`,
+`commercial_proposals` and `commercial_project_handoffs`, all admin-only.
+Both this and `automation_runs` were created in production from the automation
+branch before they joined this repository's main line; their content is
+unchanged and idempotent.
+
+`migrations/20260927225426_normalize_plan_status.sql` is a data-only normalization of
 `plans.status` to the canonical values (`AVAILABLE`, `ON_REQUEST`, ...). It is
 applied only after the compatible code is deployed and smoke tested (see
-`docs/release-checklist.md`).
-
-`migrations/011_automation_runs.sql` adds `automation_runs`, the workflow
-engine's run history. RLS is on with no policy: only the automation service
-(service role) reads or writes it.
-
-`migrations/012_business_workflows.sql` adds `clients`,
-`commercial_proposals` and `commercial_project_handoffs`, all admin-only.
-
-### 011 and 012 record schema production already has
-
-Both sets of tables were created in production from the automation branch, where
-the files were numbered `010_automation_runs.sql` and
-`011_business_workflows.sql`. That numbering collided with
-`010_normalize_plan_status.sql` (the Supabase CLI keys a migration by its
-numeric prefix), so they join the official chain as 011 and 012 with their
-content byte for byte unchanged. Both are idempotent: running them against
-production, where the objects exist, changes nothing. Check
-`supabase_migrations.schema_migrations` before any `supabase db push` so the
-CLI's history matches this numbering.
+`docs/release-checklist.md`). Not applied yet.
 
 Plus:
 
@@ -120,8 +151,8 @@ With the Supabase CLI, apply migrations in order:
 supabase db push
 ```
 
-Or paste each migration into the SQL editor in order. Do not edit already
-applied migrations `001` and `002`; create incremental migrations instead.
+Or paste each migration into the SQL editor in order. Never edit or rename an
+applied migration; create a new timestamped migration instead.
 
 ### Verifying it before deploying
 

@@ -1,14 +1,14 @@
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
+import { migrationPath } from "./helpers/migration-files.mjs";
 
 // The migration is applied to a real Postgres engine rather than asserted as
 // text. A constraint that is merely spelled correctly is not a constraint.
 
-const FOUNDATION = fileURLToPath(new URL("../../supabase/migrations/001_admin_foundation.sql", import.meta.url));
-const AUTOMATION_RUNS = fileURLToPath(new URL("../../supabase/migrations/011_automation_runs.sql", import.meta.url));
+const FOUNDATION = migrationPath("admin_foundation");
+const AUTOMATION_RUNS = migrationPath("automation_runs");
 
 let db;
 

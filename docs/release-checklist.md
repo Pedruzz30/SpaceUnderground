@@ -45,7 +45,41 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       [ ] only then migration applied
       [ ] canonical DB verified
 - [ ] Every migration in `supabase/migrations/` is applied to the real project,
-      in order. Check the highest number, not just the newest file you wrote.
+      in order. Migrations are named `YYYYMMDDHHMMSS_<name>.sql` (Supabase CLI
+      format); the timestamp is the version. Check the newest version, not just
+      the newest file you wrote.
+- [ ] Read the CLI history before any `supabase db push` or
+      `supabase migration repair`:
+
+      select version, name from supabase_migrations.schema_migrations order by version;
+
+      Known remote state:
+
+      | Version | Name | State |
+      | --- | --- | --- |
+      | `20260912202425` | `editorial_i18n` | APPLIED |
+      | `20260913031225` | `project_live_preview` | APPLIED |
+      | `20260913211045` | `automation_runs` | APPLIED |
+      | `20260914025524` | `011_business_workflows` | APPLIED |
+      | `20260927225426` | `normalize_plan_status` | NOT APPLIED |
+
+      The four recorded versions must never be renamed or repaired.
+- [ ] Repair the history for the schema production has but the CLI never
+      recorded, before the first `supabase db push`. These seven versions have
+      to be marked `applied` (their schema is already there); nothing else:
+
+      20260909062014  001_admin_foundation
+      20260910011630  002_project_media_storage
+      20260910225031  003_project_presentation
+      20260910225032  004_plans_cms
+      20260910225033  005_site_content
+      20260910225034  006_site_settings
+      20260910225035  007_activity_log
+
+      They are reconciliation identifiers derived from the commit that first
+      added each file (`003`..`007` share one commit and take consecutive
+      seconds), not deploy times. Skipping this makes `db push` try to re-run
+      the foundation migrations.
 - [ ] The exact public query returns `200`, run against production with the
       publishable key:
 
@@ -58,8 +92,8 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       an additive `default` is not the same as a backfill.
 
 How to apply a migration: Supabase CLI `supabase db push`, or paste the file
-into the SQL editor in order. Never edit an already applied migration; add an
-incremental one.
+into the SQL editor in order. Never edit or rename an already applied migration;
+add a new timestamped one (`YYYYMMDDHHMMSS_<name>.sql`, UTC).
 
 ### 4. Env and deploy targets
 

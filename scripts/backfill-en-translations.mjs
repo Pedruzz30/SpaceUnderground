@@ -68,7 +68,7 @@ async function assertSchemaReady() {
   if (body?.code === "42703") {
     console.error(
       "This project does not have the editorial translations column yet." +
-        " Apply supabase/migrations/008_editorial_i18n.sql first, then re-run this script.",
+        " Apply supabase/migrations/20260912202425_editorial_i18n.sql first, then re-run this script.",
     );
     process.exit(3);
   }

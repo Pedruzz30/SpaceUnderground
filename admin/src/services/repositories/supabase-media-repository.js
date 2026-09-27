@@ -65,7 +65,7 @@ async function listFolder(prefix) {
 }
 
 export const supabaseMediaRepository = {
-  // Mirrors the bucket configuration in 002_project_media_storage.sql. The
+  // Mirrors the bucket configuration in 20260910011630_002_project_media_storage.sql. The
   // storage API enforces these too; checking here just fails faster and nicer.
   maxBytes: 5 * 1024 * 1024,
   acceptedTypes: Object.keys(EXTENSION_BY_TYPE),

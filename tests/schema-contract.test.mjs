@@ -180,9 +180,11 @@ describe("modern publishable keys", () => {
 });
 
 describe("plan status normalization migration", () => {
-  it("ships migration 010 for every canonical plan status", () => {
-    const file = migrationFiles.find((name) => name === "010_normalize_plan_status.sql");
-    assert.ok(file, "migration 010_normalize_plan_status.sql is missing");
+  it("ships the normalization for every canonical plan status", () => {
+    // Found by purpose, not version: the version is a Supabase timestamp.
+    const matches = migrationFiles.filter((name) => /^\d{14}_normalize_plan_status\.sql$/.test(name));
+    assert.equal(matches.length, 1, `expected one *_normalize_plan_status.sql migration, found ${matches.length}`);
+    const [file] = matches;
 
     const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf8");
     assert.match(sql, /update\s+public\.plans/i, "migration must be limited to public.plans data");

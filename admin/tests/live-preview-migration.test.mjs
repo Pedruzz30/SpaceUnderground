@@ -1,11 +1,11 @@
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
+import { migrationPath } from "./helpers/migration-files.mjs";
 
-const FOUNDATION = fileURLToPath(new URL("../../supabase/migrations/001_admin_foundation.sql", import.meta.url));
-const LIVE_PREVIEW = fileURLToPath(new URL("../../supabase/migrations/009_project_live_preview.sql", import.meta.url));
+const FOUNDATION = migrationPath("admin_foundation");
+const LIVE_PREVIEW = migrationPath("project_live_preview");
 
 let db;
 

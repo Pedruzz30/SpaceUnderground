@@ -1,4 +1,4 @@
-// Applies 003_project_presentation.sql to a real Postgres engine (PGlite) and
+// Applies the project presentation migration to a real Postgres engine (PGlite) and
 // verifies the presentation columns, the project_modules table, its
 // constraints and the row level security that governs it.
 //
@@ -8,12 +8,11 @@
 // before the migration is ever applied to a live database.
 
 import { strict as assert } from "node:assert";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
+import { readMigration } from "./helpers/migration-files.mjs";
 
-const migration = (name) => readFileSync(fileURLToPath(new URL(`../../supabase/migrations/${name}`, import.meta.url)), "utf8");
+const migration = readMigration;
 
 const ADMIN_ID = "11111111-1111-1111-1111-111111111111";
 const USER_ID = "22222222-2222-2222-2222-222222222222";
@@ -71,8 +70,8 @@ before(async () => {
     "someone@space.local",
   ]);
 
-  await db.exec(migration("001_admin_foundation.sql"));
-  await db.exec(migration("003_project_presentation.sql"));
+  await db.exec(migration("admin_foundation"));
+  await db.exec(migration("project_presentation"));
 
   await db.query("insert into public.admins (user_id, role) values ($1,'owner')", [ADMIN_ID]);
   await db.query(
@@ -89,7 +88,7 @@ after(async () => {
 
 describe("presentation migration", () => {
   it("is idempotent", async () => {
-    await db.exec(migration("003_project_presentation.sql"));
+    await db.exec(migration("project_presentation"));
   });
 
   it("adds the presentation columns with usable defaults", async () => {

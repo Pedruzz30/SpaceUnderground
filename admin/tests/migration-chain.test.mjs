@@ -1,23 +1,56 @@
-// The migration chain as a whole: numbering and a clean replay.
+// The migration chain as a whole: identity, order and a clean replay.
 //
-// Two files once shared the 010 prefix (010_normalize_plan_status and
-// 010_automation_runs). The Supabase CLI keys a migration by that prefix, so a
-// duplicate breaks `db push` and `db reset` on a fresh database, and nothing in
-// the per-migration tests noticed. This test fails on that, and proves every
-// file applies in order to an empty database shaped like Supabase.
+// Migrations follow the Supabase CLI format, YYYYMMDDHHMMSS_<name>.sql. The
+// timestamp is the version the CLI records in supabase_migrations.schema_migrations,
+// so it must be unique, and sorting the files must sort them chronologically.
+// Before this format two files shared the version 010 and nothing noticed.
+//
+// The versions production has already recorded are pinned below: renaming one
+// of them would make the CLI treat applied schema as pending.
 //
 //   npm test
 
 import { strict as assert } from "node:assert";
-import { readFileSync, readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
+import { MIGRATIONS_DIR, migrationFile, migrationFiles } from "./helpers/migration-files.mjs";
 
-const DIR = fileURLToPath(new URL("../../supabase/migrations/", import.meta.url));
-const FILES = readdirSync(DIR).filter((name) => name.endsWith(".sql")).sort();
-const read = (name) => readFileSync(`${DIR}${name}`, "utf8");
-const prefix = (name) => name.match(/^(\d+)_/)?.[1] ?? null;
+const FILES = migrationFiles();
+const version = (name) => name.slice(0, 14);
+const read = (name) => readFileSync(`${MIGRATIONS_DIR}${name}`, "utf8");
+
+// select version, name from supabase_migrations.schema_migrations (production,
+// zvzfkfvxbuofgqrrogxh). The file name is <version>_<name> exactly.
+const RECORDED_IN_PRODUCTION = [
+  "20260912202425_editorial_i18n.sql",
+  "20260913031225_project_live_preview.sql",
+  "20260913211045_automation_runs.sql",
+  "20260914025524_011_business_workflows.sql",
+];
+
+// Schema production has but the CLI history does not record. Their versions
+// come from the commit that first added each file.
+const HISTORICAL = [
+  "admin_foundation",
+  "project_media_storage",
+  "project_presentation",
+  "plans_cms",
+  "site_content",
+  "site_settings",
+  "activity_log",
+];
+
+// Written after the recorded history and not applied anywhere yet.
+const PENDING = ["normalize_plan_status"];
+
+function toDate(stamp) {
+  const [, y, mo, d, h, mi, s] = stamp.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
+  const date = new Date(Date.UTC(+y, +mo - 1, +d, +h, +mi, +s));
+  // Date.UTC rolls 20260231 over into March; a real timestamp survives a round trip.
+  const roundTrip = date.toISOString().replace(/\D/g, "").slice(0, 14);
+  return roundTrip === stamp ? date : null;
+}
 
 let db;
 
@@ -69,39 +102,69 @@ after(async () => {
   await db?.close();
 });
 
-describe("migration chain", () => {
-  it("numbers every file with a three digit prefix", () => {
+describe("migration identity", () => {
+  it("names every file <14 digit timestamp>_<name>.sql", () => {
     assert.ok(FILES.length > 0, "no migrations found");
-    const unnumbered = FILES.filter((name) => !/^\d{3}_[a-z0-9_]+\.sql$/.test(name));
-    assert.deepEqual(unnumbered, []);
+    const invalid = FILES.filter((name) => !/^\d{14}_[a-z0-9_]+\.sql$/.test(name));
+    assert.deepEqual(invalid, []);
+  });
+
+  it("uses no bare three digit versions any more", () => {
+    assert.deepEqual(FILES.filter((name) => /^\d{3}_/.test(name)), []);
+  });
+
+  it("uses real UTC timestamps as versions", () => {
+    assert.deepEqual(FILES.filter((name) => !toDate(version(name))), []);
   });
 
   it("never reuses a version", () => {
-    const seen = new Map();
-    const duplicates = [];
-    for (const name of FILES) {
-      const version = prefix(name);
-      if (seen.has(version)) duplicates.push(`${seen.get(version)} / ${name}`);
-      else seen.set(version, name);
-    }
+    const versions = FILES.map(version);
+    const duplicates = versions.filter((value, index) => versions.indexOf(value) !== index);
     assert.deepEqual(duplicates, []);
   });
 
-  it("has no gaps, so the order is unambiguous from 001 up", () => {
-    const versions = FILES.map((name) => Number(prefix(name)));
-    assert.deepEqual(versions, versions.map((_, index) => index + 1));
+  it("sorts chronologically when sorted by name", () => {
+    const times = FILES.map((name) => toDate(version(name)).getTime());
+    assert.deepEqual(times, [...times].sort((a, b) => a - b));
+  });
+});
+
+describe("production history", () => {
+  it("keeps every version production has recorded, under the recorded name", () => {
+    const missing = RECORDED_IN_PRODUCTION.filter((name) => !FILES.includes(name));
+    assert.deepEqual(missing, []);
   });
 
-  it("applies in order to an empty Supabase-shaped database", async () => {
+  it("places the historical migrations before the first recorded version", () => {
+    const first = version(RECORDED_IN_PRODUCTION[0]);
+    for (const purpose of HISTORICAL) {
+      assert.ok(version(migrationFile(purpose)) < first, `${purpose} must precede ${first}`);
+    }
+  });
+
+  it("keeps the historical order admin foundation -> activity log", () => {
+    const versions = HISTORICAL.map((purpose) => version(migrationFile(purpose)));
+    assert.deepEqual(versions, [...versions].sort());
+  });
+
+  it("gives pending migrations versions after everything production recorded", () => {
+    const last = version(RECORDED_IN_PRODUCTION.at(-1));
+    for (const purpose of PENDING) {
+      assert.ok(version(migrationFile(purpose)) > last, `${purpose} must come after ${last}`);
+    }
+  });
+});
+
+describe("fresh database", () => {
+  it("applies every migration in order to an empty Supabase-shaped database", async () => {
     for (const name of FILES) {
       await assert.doesNotReject(() => db.exec(read(name)), `${name} failed on a fresh chain`);
     }
   });
 
-  it("re-applies the schema production already has without changing anything", async () => {
-    // 011 and 012 were created in production before they joined this chain,
-    // so running them there again must be a no-op.
-    for (const name of FILES.filter((file) => /^01[12]_/.test(file))) {
+  it("re-applies the schema production created before it joined the chain", async () => {
+    for (const purpose of ["automation_runs", "business_workflows"]) {
+      const name = migrationFile(purpose);
       await assert.doesNotReject(() => db.exec(read(name)), `${name} is not idempotent`);
     }
   });

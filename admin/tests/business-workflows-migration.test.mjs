@@ -1,12 +1,12 @@
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
+import { migrationPath } from "./helpers/migration-files.mjs";
 
-const FOUNDATION = fileURLToPath(new URL("../../supabase/migrations/001_admin_foundation.sql", import.meta.url));
-const PLANS = fileURLToPath(new URL("../../supabase/migrations/004_plans_cms.sql", import.meta.url));
-const BUSINESS = fileURLToPath(new URL("../../supabase/migrations/012_business_workflows.sql", import.meta.url));
+const FOUNDATION = migrationPath("admin_foundation");
+const PLANS = migrationPath("plans_cms");
+const BUSINESS = migrationPath("business_workflows");
 
 let db;
 let sequence = 0;

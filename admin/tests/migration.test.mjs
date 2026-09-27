@@ -1,4 +1,4 @@
-// Applies supabase/migrations/001_admin_foundation.sql to a real Postgres
+// Applies the admin foundation migration (supabase/migrations/*_admin_foundation.sql) to a real Postgres
 // engine (PGlite, Postgres compiled to WASM) and exercises the constraints,
 // triggers and RLS policies.
 //
@@ -9,11 +9,11 @@
 
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
+import { migrationPath } from "./helpers/migration-files.mjs";
 
-const MIGRATION_PATH = fileURLToPath(new URL("../../supabase/migrations/001_admin_foundation.sql", import.meta.url));
+const MIGRATION_PATH = migrationPath("admin_foundation");
 
 const ADMIN_ID = "11111111-1111-1111-1111-111111111111";
 const USER_ID = "22222222-2222-2222-2222-222222222222";
