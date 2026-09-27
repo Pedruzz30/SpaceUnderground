@@ -88,6 +88,12 @@ before(async () => {
     create or replace function auth.uid() returns uuid language sql stable as $$
       select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
     $$;
+    -- Supabase grants every new table, sequence and function in public to the
+    -- API roles by default. Without this the test would pass on grants that
+    -- production never has, so a revoke that is missing would go unnoticed.
+    alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+    alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+    alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
   `);
   await db.query("insert into auth.users (id, email) values ($1, $2), ($3, $4)", [
     ADMIN_ID,
@@ -333,6 +339,13 @@ describe("clients row level security", () => {
   it("does not let anonymous visitors call the code generator", async () => {
     const error = await asRole("anon", null, () => failure("select public.next_client_code()"));
     assert.equal(error?.code, "42501");
+  });
+
+  it("does not let API roles draw from the code sequence directly", async () => {
+    for (const role of ["anon", "authenticated"]) {
+      const error = await asRole(role, null, () => failure("select nextval('public.clients_code_seq')"));
+      assert.equal(error?.code, "42501", role);
+    }
   });
 
   it("leaves the public project read policy untouched", async () => {

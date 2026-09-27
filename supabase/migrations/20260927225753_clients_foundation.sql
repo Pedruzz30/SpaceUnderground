@@ -92,8 +92,15 @@ begin
 end;
 $$;
 
-revoke all on function public.next_client_code() from public;
+-- Supabase's default privileges grant every new function and sequence in public
+-- to anon and authenticated explicitly, so revoking from PUBLIC alone is not
+-- enough. Visitors must not be able to draw numbers through /rpc; the column
+-- default only needs authenticated (admins inserting) and the service role.
+revoke all on function public.next_client_code() from public, anon;
 grant execute on function public.next_client_code() to authenticated, service_role;
+
+-- The generator is SECURITY DEFINER, so no API role needs the sequence itself.
+revoke all on sequence public.clients_code_seq from public, anon, authenticated;
 
 -- Rows created before this migration may have no code. Backfill them in
 -- creation order so the numbering reads chronologically.
