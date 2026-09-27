@@ -2,13 +2,9 @@ import { badge, badgeType } from "../components/badge.js";
 import { statCard } from "../components/stat-card.js";
 import { spaceStatus } from "../data/dashboard.js";
 import { DATA_SOURCE } from "../config/env.js";
-import {
-  demoClients,
-  demoOpportunities,
-  demoPipelineStages,
-  demoTransactions,
-} from "../data/operations-demo.js";
+import { demoOpportunities, demoPipelineStages, demoTransactions } from "../data/operations-demo.js";
 import { getActivityWithStatus } from "../services/activity-service.js";
+import { getClients } from "../services/client-service.js";
 import { getProjects } from "../services/project-service.js";
 import { describeError } from "../services/errors.js";
 import { onLocaleChange, statusLabel, t } from "../i18n/index.js";
@@ -33,8 +29,9 @@ import {
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
 // The Dashboard mixes two origins and says so on screen:
-//   REAL — projects and the activity log, through the configured repository.
-//   DEMO — clients, commercial and financial, from operations-demo.js.
+//   REAL — clients, projects and the activity log, through the configured
+//          repository.
+//   DEMO — commercial and financial, from operations-demo.js.
 // Nothing here queries Supabase for the demo domains, and no demo record is
 // ever written back into a repository.
 
@@ -68,17 +65,18 @@ function textLink(href, label) {
 
 /* ------------------------------------------------------------------- KPIs */
 
-// All four are presentation-only: the operational domains have no backend yet.
-function renderKpis() {
+// The first two come from real clients and projects and read "—" until those
+// resolve (or if they fail); the last two are presentation-only demo figures.
+function renderKpis({ engagements = "—", clients = "—" } = {}) {
   return `
     ${statCard({
       label: t("dashboard.activeProjects"),
-      value: activeEngagements(demoClients),
+      value: engagements,
       detail: t("dashboard.activeProjectsDetail"),
     })}
     ${statCard({
       label: t("dashboard.activeClients"),
-      value: activeClients(demoClients),
+      value: clients,
       detail: t("dashboard.activeClientsDetail"),
     })}
     ${statCard({
@@ -312,7 +310,7 @@ export const dashboardPage = {
       </div>
     </section>
 
-    <section class="stats-grid stats-grid--quad dash-kpis" aria-label="${t("dashboard.primaryIndicators")}">
+    <section class="stats-grid stats-grid--quad dash-kpis" aria-label="${t("dashboard.primaryIndicators")}" data-dash-kpis>
       ${renderKpis()}
     </section>
 
@@ -358,7 +356,9 @@ export const dashboardPage = {
 
       <article class="panel dash-panel--followups" aria-labelledby="dash-followups-title">
         ${panelHead(t("dashboard.followUps"), t("dashboard.peopleToContactNext"), "dash-followups-title")}
-        ${renderQueue(followUps({ clients: demoClients, opportunities: demoOpportunities }), t("dashboard.noFollowUps"))}
+        <div data-followups aria-busy="true">
+          <p class="empty-inline">${t("common.loading")}...</p>
+        </div>
       </article>
 
       <article class="panel dash-panel--activity" aria-labelledby="dash-activity-title">
@@ -387,19 +387,27 @@ export const dashboardPage = {
 
     // One failing query must never blank the Dashboard: the demo-backed panels
     // are already on screen, and each real block resolves independently.
-    const [projectsResult, activityResult] = await Promise.allSettled([
+    const [projectsResult, activityResult, clientsResult] = await Promise.allSettled([
       getProjects(),
       getActivityWithStatus({ limit: 6 }),
+      getClients(),
     ]);
 
     const attentionEl = document.querySelector("[data-attention]");
     const pulseEl = document.querySelector("[data-pulse]");
     const activityEl = document.querySelector("[data-activity]");
     const healthEl = document.querySelector("[data-health]");
+    const kpisEl = document.querySelector("[data-dash-kpis]");
+    const followUpsEl = document.querySelector("[data-followups]");
     if (!pulseEl?.isConnected) return;
 
     const projectsOk = projectsResult.status === "fulfilled";
     const projects = projectsOk ? projectsResult.value : [];
+
+    // Clients need migration 013. Until it is applied (or on any failure) the
+    // two client KPIs read "—" and follow ups list only the demo pipeline.
+    const clientsOk = clientsResult.status === "fulfilled";
+    const clients = clientsOk ? clientsResult.value : [];
 
     // An outage and an empty log are different facts: getActivityWithStatus()
     // reports the read failure that getActivity() deliberately swallows.
@@ -411,6 +419,12 @@ export const dashboardPage = {
     // change replays this, so the Dashboard re-reads in the other language
     // without issuing a single new query.
     function paintData() {
+      kpisEl.innerHTML = renderKpis({
+        engagements: projectsOk ? activeEngagements(projects) : "—",
+        clients: clientsOk ? activeClients(clients) : "—",
+      });
+      followUpsEl.innerHTML = renderQueue(followUps({ clients, opportunities: demoOpportunities }), t("dashboard.noFollowUps"));
+
       if (projectsOk) {
         attentionEl.innerHTML = renderAttention(projectChecks(projects));
         pulseEl.innerHTML = renderPulse(projects);
@@ -455,5 +469,6 @@ export const dashboardPage = {
     pulseEl.removeAttribute("aria-busy");
     activityEl?.removeAttribute("aria-busy");
     healthEl?.removeAttribute("aria-busy");
+    followUpsEl?.removeAttribute("aria-busy");
   },
 };

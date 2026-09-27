@@ -2,15 +2,16 @@
 //
 // Two data origins meet on the Dashboard and are kept apart on purpose:
 //
-//   REAL  — `projects` and `activity` arrive from the configured repository
-//           (mock or Supabase) through the existing services.
-//   DEMO  — clients, opportunities, transactions and the financial summary come
-//           from src/data/operations-demo.js. Those modules have no backend
-//           yet, so every figure derived from them is presentation-only.
+//   REAL  — `clients`, `projects` and `activity` arrive from the configured
+//           repository (mock or Supabase) through the existing services.
+//   DEMO  — opportunities, transactions and the financial summary come from
+//           src/data/operations-demo.js. Those modules have no backend yet, so
+//           every figure derived from them is presentation-only.
 //
 // Nothing here reads a module directly: callers pass the data in, which keeps
 // these functions pure and testable.
 
+import { isActiveProject } from "./client-metrics.js";
 import { financialSummary } from "./financial-metrics.js";
 
 export const PERIODS = [
@@ -40,15 +41,13 @@ export function withinPeriod(value, id, now = new Date()) {
   return date.getTime() >= periodStart(id, now).getTime() && date.getTime() <= (now instanceof Date ? now : new Date(now)).getTime();
 }
 
-/* --- KPIs (presentation-only) ------------------------------------------ */
+/* --- KPIs --------------------------------------------------------------- */
 
 // "Active projects" means client engagements in delivery, not published cases:
-// a published portfolio entry is an editorial state, not an active job.
-export function activeEngagements(clients) {
-  return clients.reduce(
-    (total, client) => total + client.projects.filter((project) => project.status === "ACTIVE").length,
-    0,
-  );
+// a published portfolio entry is an editorial state, not an active job. Only
+// projects linked to a client record count, with the Client Hub's own rule.
+export function activeEngagements(projects) {
+  return projects.filter((project) => project.clientId && isActiveProject(project)).length;
 }
 
 export function activeClients(clients) {

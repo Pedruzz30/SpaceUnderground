@@ -287,7 +287,7 @@ export default {
     openOpportunitiesDetail: "Still in the pipeline",
     toReceive: "TO RECEIVE",
     toReceiveDetail: "Open receivables",
-    legend: "Operational figures are presentation data · projects and activity come from the admin database · the period applies to the financial snapshot",
+    legend: "Commercial and financial figures are presentation data · clients, projects and activity come from the admin database · the period applies to the financial snapshot",
     needsAttention: "NEEDS ATTENTION",
     itemsRequiringAction: "Items requiring action",
     quickActions: "QUICK ACTIONS",

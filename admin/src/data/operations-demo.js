@@ -1,132 +1,20 @@
 // PRESENTATION-ONLY DATA — Operations UI (Phase C).
 //
-// Clients, Commercial and Financial have no backend yet. This module exists so
-// the screens can be designed and reviewed with realistic content, and it is
+// Commercial and Financial have no backend yet. This module exists so those
+// screens can be designed and reviewed with realistic content, and it is
 // deliberately kept OUT of src/services: no repository, service or Supabase
 // query reads from here, and nothing here is ever written anywhere. When the
 // real tables land, these exports are replaced by services and this file goes.
+//
+// Clients moved to the real data layer in Clients V2 (client-service.js). The
+// `client` names below are free text on purpose: they are not linked to client
+// records, and Commercial V2 / Financial V2 are where that relationship lands.
 
 const DAY = 24 * 60 * 60 * 1000;
 
 function daysAgo(days) {
   return new Date(Date.now() - days * DAY).toISOString();
 }
-
-export const demoClients = [
-  {
-    id: "004",
-    code: "004",
-    name: "Lucas Souza",
-    company: "Souza Performance",
-    email: "lucas@example.com",
-    phone: "+55 21 90000-0004",
-    status: "ACTIVE",
-    since: "2025-02-11T12:00:00.000Z",
-    lastContactAt: daysAgo(0),
-    updatedAt: daysAgo(0),
-    totalValue: 3500,
-    projects: [
-      { name: "Souza Performance — System Web", status: "ACTIVE" },
-      { name: "Landing page / Black Friday", status: "COMPLETED" },
-      { name: "Brand microsite", status: "COMPLETED" },
-    ],
-    commercial: { contracted: 3500, openProposals: 0 },
-    financial: { received: 1750, pending: 1750 },
-    activity: [
-      { title: "Second installment received", detail: "R$ 1.750 confirmed", at: daysAgo(1) },
-      { title: "Project scope approved", detail: "System Web — phase 2", at: daysAgo(4) },
-      { title: "Client created", detail: "Imported from commercial pipeline", at: daysAgo(210) },
-    ],
-  },
-  {
-    id: "003",
-    code: "003",
-    name: "Luciano Pimenta",
-    company: "Pimenta Studio",
-    email: "luciano@example.com",
-    phone: "+55 21 90000-0003",
-    status: "ACTIVE",
-    since: "2025-05-02T12:00:00.000Z",
-    lastContactAt: daysAgo(2),
-    updatedAt: daysAgo(2),
-    totalValue: 4200,
-    projects: [{ name: "Pimenta Studio — Institutional", status: "ACTIVE" }],
-    commercial: { contracted: 4200, openProposals: 1 },
-    financial: { received: 3200, pending: 1000 },
-    activity: [
-      { title: "Installment scheduled", detail: "R$ 1.000 due this month", at: daysAgo(2) },
-      { title: "Proposal sent", detail: "Maintenance retainer", at: daysAgo(9) },
-    ],
-  },
-  {
-    id: "002",
-    code: "002",
-    name: "CIEP",
-    company: "CIEP / Institutional",
-    email: "contato@example.com",
-    phone: "+55 21 90000-0002",
-    status: "ACTIVE",
-    since: "2024-11-20T12:00:00.000Z",
-    lastContactAt: daysAgo(4),
-    updatedAt: daysAgo(4),
-    totalValue: null,
-    projects: [{ name: "CIEP — Public portal", status: "ACTIVE" }],
-    commercial: { contracted: null, openProposals: 0 },
-    financial: { received: 0, pending: 0 },
-    activity: [{ title: "Content review requested", detail: "Public portal copy", at: daysAgo(4) }],
-  },
-  {
-    id: "005",
-    code: "005",
-    name: "Academia X",
-    company: "Academia X",
-    email: "contato@academiax.example.com",
-    phone: "+55 21 90000-0005",
-    status: "LEAD",
-    since: null,
-    lastContactAt: daysAgo(0),
-    updatedAt: daysAgo(0),
-    totalValue: null,
-    projects: [],
-    commercial: { contracted: null, openProposals: 1 },
-    financial: { received: 0, pending: 0 },
-    activity: [{ title: "Inbound contact", detail: "System Web enquiry", at: daysAgo(0) }],
-  },
-  {
-    id: "001",
-    code: "001",
-    name: "Empresa Y",
-    company: "Empresa Y Logística",
-    email: "operacoes@empresay.example.com",
-    phone: "+55 21 90000-0001",
-    status: "INACTIVE",
-    since: "2024-06-03T12:00:00.000Z",
-    lastContactAt: daysAgo(46),
-    updatedAt: daysAgo(46),
-    totalValue: 5200,
-    projects: [{ name: "Internal automation", status: "COMPLETED" }],
-    commercial: { contracted: 5200, openProposals: 0 },
-    financial: { received: 5200, pending: 0 },
-    activity: [{ title: "Contract closed", detail: "Automation delivery signed off", at: daysAgo(46) }],
-  },
-  {
-    id: "006",
-    code: "006",
-    name: "Projeto Z",
-    company: "Projeto Z Cultural",
-    email: "projetoz@example.com",
-    phone: "+55 21 90000-0006",
-    status: "ARCHIVED",
-    since: "2024-02-18T12:00:00.000Z",
-    lastContactAt: daysAgo(190),
-    updatedAt: daysAgo(190),
-    totalValue: 4500,
-    projects: [{ name: "Institutional website", status: "COMPLETED" }],
-    commercial: { contracted: 4500, openProposals: 0 },
-    financial: { received: 4500, pending: 0 },
-    activity: [{ title: "Relationship archived", detail: "No active scope", at: daysAgo(190) }],
-  },
-];
 
 export const demoPipelineStages = [
   { id: "NEW", label: "NEW" },
@@ -216,7 +104,6 @@ export const demoTransactions = [
     type: "INCOME",
     description: "Lucas Souza / 2nd installment",
     client: "Lucas Souza",
-    clientId: "004",
     status: "PAID",
     amount: 1750,
   },
@@ -226,7 +113,6 @@ export const demoTransactions = [
     type: "EXPENSE",
     description: "Infrastructure",
     client: null,
-    clientId: null,
     status: "PAID",
     amount: -90,
   },
@@ -236,7 +122,6 @@ export const demoTransactions = [
     type: "RECEIVABLE",
     description: "Project installment",
     client: "Luciano Pimenta",
-    clientId: "003",
     status: "PENDING",
     amount: 1000,
   },
@@ -246,7 +131,6 @@ export const demoTransactions = [
     type: "INCOME",
     description: "Luciano Pimenta / 1st installment",
     client: "Luciano Pimenta",
-    clientId: "003",
     status: "PAID",
     amount: 3200,
   },
@@ -256,7 +140,6 @@ export const demoTransactions = [
     type: "EXPENSE",
     description: "Design tooling",
     client: null,
-    clientId: null,
     status: "PAID",
     amount: -160,
   },
@@ -266,7 +149,6 @@ export const demoTransactions = [
     type: "RECEIVABLE",
     description: "Lucas Souza / 3rd installment",
     client: "Lucas Souza",
-    clientId: "004",
     status: "PENDING",
     amount: 1750,
   },
@@ -276,7 +158,6 @@ export const demoTransactions = [
     type: "INCOME",
     description: "Empresa Y / final payment",
     client: "Empresa Y",
-    clientId: "001",
     status: "PAID",
     amount: 3450,
   },
@@ -286,12 +167,7 @@ export const demoTransactions = [
     type: "EXPENSE",
     description: "Storage and domains",
     client: null,
-    clientId: null,
     status: "PAID",
     amount: -1000,
   },
 ];
-
-export function findDemoClient(id) {
-  return demoClients.find((client) => client.id === String(id)) ?? null;
-}

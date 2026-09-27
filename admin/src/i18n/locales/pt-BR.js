@@ -287,7 +287,7 @@ export default {
     openOpportunitiesDetail: "Ainda no pipeline",
     toReceive: "A RECEBER",
     toReceiveDetail: "Recebíveis em aberto",
-    legend: "Indicadores operacionais são dados de apresentação · projetos e atividade vêm do banco do Admin · o período se aplica ao resumo financeiro",
+    legend: "Indicadores comerciais e financeiros são dados de apresentação · clientes, projetos e atividade vêm do banco do Admin · o período se aplica ao resumo financeiro",
     needsAttention: "PRECISA DE ATENÇÃO",
     itemsRequiringAction: "Itens que pedem ação",
     quickActions: "AÇÕES RÁPIDAS",

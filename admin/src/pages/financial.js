@@ -37,14 +37,10 @@ function amountCell(transaction) {
   return `<span class="ops-amount ops-amount--${tone}" data-label="${t("financial.value")}">${escapeHtml(formatSignedCurrency(transaction.amount))}</span>`;
 }
 
+// Demo transactions name a client as free text: they are not linked to real
+// client records yet, so the name is not a link (Financial V2 adds that).
 function clientCell(transaction) {
-  if (!transaction.client) return `<span class="ops-meta" data-label="${t("common.client")}" data-column="client">—</span>`;
-  if (!transaction.clientId) return `<span class="ops-meta" data-label="${t("common.client")}" data-column="client">${escapeHtml(transaction.client)}</span>`;
-  return `
-    <span data-label="${t("common.client")}" data-column="client">
-      <a class="ops-link" href="#/clients/${encodeURIComponent(transaction.clientId)}">${escapeHtml(transaction.client)}</a>
-    </span>
-  `;
+  return `<span class="ops-meta" data-label="${t("common.client")}" data-column="client">${escapeHtml(transaction.client || "—")}</span>`;
 }
 
 function transactionRow(transaction) {

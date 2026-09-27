@@ -36,22 +36,19 @@ const clients = [
     name: "Active One",
     status: "ACTIVE",
     lastContactAt: daysBefore(2),
-    projects: [{ status: "ACTIVE" }, { status: "COMPLETED" }],
   },
   {
     id: "002",
     name: "Active Two",
     status: "ACTIVE",
     lastContactAt: daysBefore(45),
-    projects: [{ status: "ACTIVE" }],
   },
-  { id: "003", name: "Fresh Lead", status: "LEAD", lastContactAt: daysBefore(1), projects: [] },
+  { id: "003", name: "Fresh Lead", status: "LEAD", lastContactAt: daysBefore(1) },
   {
     id: "004",
     name: "Old Archive",
     status: "ARCHIVED",
     lastContactAt: daysBefore(200),
-    projects: [{ status: "COMPLETED" }],
   },
 ];
 
@@ -126,7 +123,15 @@ describe("bar percentages", () => {
 
 describe("primary indicators", () => {
   it("counts active engagements rather than published cases", () => {
-    assert.equal(activeEngagements(clients), 2);
+    const engagements = [
+      { clientId: "001", status: "In Development", editorialStatus: "DRAFT" },
+      { clientId: "001", status: "Pilot", editorialStatus: "PUBLISHED" },
+      { clientId: "002", status: "Live", editorialStatus: "PUBLISHED" },
+      { clientId: "002", status: "MVP", editorialStatus: "ARCHIVED" },
+      { clientId: null, status: "In Development", editorialStatus: "DRAFT" },
+    ];
+    // Delivered, editorially archived and client-less work is not an engagement.
+    assert.equal(activeEngagements(engagements), 2);
   });
 
   it("counts only clients with an active relationship", () => {
