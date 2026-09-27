@@ -22,8 +22,17 @@ const page = await context.newPage();
 
 const errors = [];
 page.on("pageerror", (error) => errors.push(`pageerror: ${error}`));
+// The live demo steps frame third-party URLs such as https://example.com/embed,
+// whose availability is not the Admin's to guarantee. A resource that fails to
+// load from another origin is that site's problem, not an Admin error; every
+// other console error still fails the run.
+const ADMIN_ORIGIN = new URL(BASE_URL).origin;
+function isThirdPartyLoadFailure(message) {
+  const url = message.location()?.url ?? "";
+  return message.text().startsWith("Failed to load resource") && Boolean(url) && !url.startsWith(ADMIN_ORIGIN);
+}
 page.on("console", (message) => {
-  if (message.type() === "error") errors.push(`console: ${message.text()}`);
+  if (message.type() === "error" && !isThirdPartyLoadFailure(message)) errors.push(`console: ${message.text()}`);
 });
 
 const hash = () => page.evaluate(() => window.location.hash);
