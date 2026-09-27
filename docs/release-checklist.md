@@ -31,6 +31,10 @@ Run everything from the repo root unless noted.
 - [ ] `npm run test:e2e:i18n`
 - [ ] `cd admin && npm run test:e2e` (needs `npm run dev:mock` running)
 - [ ] `cd admin && npm run test:e2e:i18n` (needs `npm run dev:mock` running)
+- [ ] `cd admin && npm run test:e2e:clients` against the real project, only
+      after the clients foundation migration is applied there (needs `npm run dev` with
+      Supabase env and `ADMIN_EMAIL` / `ADMIN_PASSWORD`). It creates and then
+      deletes its own `E2E Client <timestamp>` rows.
 
 ### 3. The real database — the step that is actually skipped
 
@@ -62,6 +66,7 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       | `20260913211045` | `automation_runs` | APPLIED |
       | `20260914025524` | `011_business_workflows` | APPLIED |
       | `20260927225426` | `normalize_plan_status` | NOT APPLIED |
+      | `20260927225753` | `clients_foundation` | NOT APPLIED |
 
       The four recorded versions must never be renamed or repaired.
 - [ ] Repair the history for the schema production has but the CLI never
@@ -80,6 +85,13 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       added each file (`003`..`007` share one commit and take consecutive
       seconds), not deploy times. Skipping this makes `db push` try to re-run
       the foundation migrations.
+- [ ] `20260927225753_clients_foundation.sql` raises an error unless
+      `20260914025524_011_business_workflows` (which creates `public.clients`)
+      is applied first. The Client Hub and the Dashboard's client figures read
+      `clients` and `projects.client_id`, so deploy the Admin only after
+      clients foundation is in: before that, the Client Hub shows a
+      "database is missing an update" message and the Dashboard reads "—" for
+      the client KPIs. The public site does not depend on either.
 - [ ] The exact public query returns `200`, run against production with the
       publishable key:
 

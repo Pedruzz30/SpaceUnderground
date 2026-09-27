@@ -404,7 +404,7 @@ export const dashboardPage = {
     const projectsOk = projectsResult.status === "fulfilled";
     const projects = projectsOk ? projectsResult.value : [];
 
-    // Clients need migration 013. Until it is applied (or on any failure) the
+    // Clients need the clients foundation migration. Until it is applied (or on any failure) the
     // two client KPIs read "—" and follow ups list only the demo pipeline.
     const clientsOk = clientsResult.status === "fulfilled";
     const clients = clientsOk ? clientsResult.value : [];

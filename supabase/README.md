@@ -28,6 +28,7 @@ so older notes and commits stay easy to follow.
 | `20260913211045` | `automation_runs` | APPLIED (recorded) |
 | `20260914025524` | `011_business_workflows` | APPLIED (recorded) |
 | `20260927225426` | `normalize_plan_status` | **NOT APPLIED** |
+| `20260927225753` | `clients_foundation` | **NOT APPLIED** |
 
 The four recorded versions and names match
 `select version, name from supabase_migrations.schema_migrations` exactly and
@@ -94,6 +95,24 @@ unchanged and idempotent.
 applied only after the compatible code is deployed and smoke tested (see
 `docs/release-checklist.md`). Not applied yet.
 
+`migrations/20260927225753_clients_foundation.sql` (Clients V2) builds on the
+`clients` table from `20260914025524_011_business_workflows` and refuses to run
+without it. **Not applied to production yet.**
+
+- `clients.notes` and `clients.archived_at` (set and cleared by a trigger when
+  `status` enters or leaves `ARCHIVED`);
+- `clients.code` is `not null` and defaults to `public.next_client_code()`,
+  which draws `CLIENT-001`, `CLIENT-002`, ... from `clients_code_seq` and skips
+  codes typed by hand. Numbers are never reused and never derived from
+  `count(*)`. Existing rows without a code are backfilled in creation order;
+- `next_client_code()` is revoked from `anon`, and `clients_code_seq` from every
+  API role: Supabase's default privileges would otherwise let visitors burn
+  numbers through `/rpc`. The function is `security definer`, so admins still
+  get a code on insert;
+- `projects.client_id`, an optional foreign key (`on delete set null`). Existing
+  projects keep working without a client, and `projects.client` (the public
+  label) is untouched. The public site does not select `client_id`.
+
 Plus:
 
 - `is_admin()` — `security definer` helper used by the policies.
@@ -139,6 +158,7 @@ RLS is enabled on all CMS tables.
 | `activity_log_admin_read` | Only admins can read activity. No anonymous grant exists. |
 | `automation_runs` | RLS enabled with no policy: invisible to `anon` and `authenticated`; only the service role reaches it. |
 | `clients_admin_*`, `commercial_proposals_admin_*`, `commercial_project_handoffs_admin_*` | Admin-only select/insert/update/delete. `anon` has every grant revoked. |
+| `projects.client_id` / clients lifecycle | Admin-only through the policies above. The Admin never hard-deletes a client: archiving is reversible. |
 
 There is **no public write path**. Authorization lives here, not in the
 frontend: hiding a button or a route is not security.

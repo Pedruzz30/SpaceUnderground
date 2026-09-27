@@ -179,6 +179,25 @@ describe("modern publishable keys", () => {
   });
 });
 
+// Clients V2 adds a private table and an optional projects.client_id. The public
+// site must never reach for either: clients is admin-only (anon has no grant),
+// so selecting it would fail the whole Selected Work query.
+describe("clients stay out of the public query", () => {
+  it("never selects client_id or embeds clients", () => {
+    const columns = selectedColumns("PROJECT_COLUMNS");
+    assert.equal(columns.includes("client_id"), false);
+    assert.doesNotMatch(publicSource, /clients\(/, "the public query must not embed the clients table");
+  });
+
+  it("keeps projects.client_id optional", () => {
+    const file = migrationFiles.find((name) => name.includes("clients_foundation"));
+    assert.ok(file, "no migration adds the clients foundation");
+    const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf8");
+    assert.match(sql, /add column if not exists client_id uuid references public\.clients \(id\) on delete set null/i);
+    assert.doesNotMatch(sql, /client_id uuid[^;,]*not null|alter column client_id set not null/i, "existing projects must not need a client");
+  });
+});
+
 describe("plan status normalization migration", () => {
   it("ships the normalization for every canonical plan status", () => {
     // Found by purpose, not version: the version is a Supabase timestamp.

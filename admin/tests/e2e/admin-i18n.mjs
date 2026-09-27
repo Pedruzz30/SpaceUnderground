@@ -82,6 +82,7 @@ try {
     ["#/dashboard", ".page-heading > div > span", "CENTRAL DE CONTROLE", "COMMAND CENTER"],
     ["#/projects", ".page-heading h2", "PROJETOS", "PROJECTS"],
     ["#/clients", ".page-heading h2", "Diretório de clientes.", "Client directory."],
+    ["#/clients/new", ".page-heading h2", "Novo cliente.", "New client."],
     ["#/commercial", ".page-heading h2", "Pipeline de vendas.", "Sales pipeline."],
     ["#/financial", ".page-heading h2", "Controle financeiro.", "Financial control."],
     ["#/services", ".page-heading h2", "SERVICES", "SERVICES"],
@@ -162,6 +163,30 @@ try {
   const enCount = await textOf("[data-client-count]");
   check(/of \d+ clients/.test(enCount), "EN client count agrees with the total", enCount);
   check((await hash()) === "#/clients", "locale switch keeps the route", await hash());
+
+  /* ------------------------------------ CLIENT EDITOR: typed values survive */
+
+  await setLocale("pt-BR");
+  await gotoRoute("#/clients/mock-client-003", "[data-client-editor]");
+  await page.click('[data-tab="general"]');
+  await page.fill("#field-company", "Academia X Ltda");
+  await settle();
+  const clientHealthPt = await textOf("[data-client-health]");
+  check(/completo/.test(clientHealthPt) && /Empresa/.test(clientHealthPt), "client editor: PT health card", clientHealthPt);
+
+  await setLocale("en");
+  check((await page.inputValue("#field-company")) === "Academia X Ltda", "client editor: locale switch keeps typed text");
+  check(
+    (await page.locator('[role="tab"][aria-selected="true"]').getAttribute("data-tab")) === "general",
+    "client editor: locale switch keeps the open tab",
+  );
+  check((await textOf('label[for="field-company"]')) === "Company", "client editor: labels follow the switch");
+  const clientHealthEn = await textOf("[data-client-health]");
+  check(/complete/.test(clientHealthEn) && !/completo|Empresa/.test(clientHealthEn), "client editor: health card follows the switch", clientHealthEn);
+  check((await textOf("[data-save-state]")).toUpperCase() === "UNSAVED CHANGES", "client editor: dirty state follows the switch");
+  check((await textOf('#field-status option[value="LEAD"]')) === "Lead", "client editor: status options follow the switch");
+  await setLocale("pt-BR");
+  check((await textOf('#field-status option[value="INACTIVE"]')) === "Inativo", "client editor: status options return to PT");
 
   /* -------------------------------------- PROJECT EDITOR: derived signals */
 

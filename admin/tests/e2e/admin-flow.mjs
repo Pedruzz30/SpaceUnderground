@@ -633,6 +633,114 @@ try {
   await settle();
   assert.ok(await page.locator('[data-service-id="service-beta"]').count(), "archived service appears in archived filter");
 
+  /* ------------------------------------------------- clients v2 foundation */
+
+  await page.evaluate(() => window.__resetSpaceAdminMocks());
+  const clientRows = () => page.locator("[data-client-row]");
+  const clientMetric = (index) =>
+    page.locator("[data-client-metrics] .stat-card strong").nth(index).innerText();
+
+  await page.goto(`${BASE_URL}/#/clients`);
+  await page.waitForSelector("[data-client-row]");
+  assert.equal(await clientRows().count(), 4, "seeded clients listed");
+  assert.equal(await clientMetric(0), "4", "total clients derives from records");
+  assert.equal(await clientMetric(2), "1", "leads derives from records");
+
+  // Create.
+  await page.click("[data-new-client]");
+  await page.waitForSelector('[data-client-editor][data-mode="create"]');
+  assert.equal(await hash(), "#/clients/new", "new client opens the create route");
+  await page.click("[data-client-save]");
+  assert.ok(await page.locator('[data-field="name"] .field-error:not([hidden])').count(), "name is required");
+  await page.fill("#field-name", "Orbital Foods");
+  await page.fill("#field-company", "Orbital Foods Ltda");
+  await page.fill("#field-email", "ops@orbital.example.com");
+  await page.selectOption("#field-status", "ACTIVE");
+  await page.click('[data-tab="notes"]');
+  await page.fill("#field-notes", "Met at the E2E fair.");
+  await page.click("[data-client-save]");
+  await page.waitForSelector('[data-client-editor][data-mode="edit"]');
+  const clientHash = await hash();
+  assert.match(clientHash, /^#\/clients\/mock-client-/, "created client opens its record");
+  assert.match(await page.locator("[data-client-identity]").innerText(), /CLIENT-005/, "code assigned from the sequence");
+
+  // Locate in the list.
+  await page.goto(`${BASE_URL}/#/clients`);
+  await page.waitForSelector("[data-client-row]");
+  await page.fill("[data-search-clients]", "orbital");
+  await settle();
+  assert.equal(await clientRows().count(), 1, "search finds the new client");
+  await page.fill("[data-search-clients]", "client-005");
+  await settle();
+  assert.equal(await clientRows().count(), 1, "search matches the client code");
+
+  // Open and edit.
+  await page.locator("[data-client-row] .clients-row__name").first().click();
+  await page.waitForSelector('[data-client-editor][data-mode="edit"]');
+  assert.equal(await hash(), clientHash, "row opens the same record");
+  await page.click('[data-tab="general"]');
+  await page.fill("#field-phone", "+55 21 90000-0500");
+  await settle();
+  assert.ok(await page.locator("[data-save-state].is-unsaved").count(), "editing marks the record dirty");
+
+  // Leaving with unsaved changes asks first; staying keeps the edit.
+  await page.evaluate(() => {
+    window.location.hash = "#/clients";
+  });
+  await page.waitForSelector("[data-modal-cancel]");
+  await page.click("[data-modal-cancel]");
+  assert.equal(await hash(), clientHash, "staying keeps the editor open");
+  assert.equal(await page.inputValue("#field-phone"), "+55 21 90000-0500", "staying keeps the typed value");
+
+  // A duplicate code is reported on the field, not as a raw database error.
+  await page.fill("#field-code", "CLIENT-001");
+  await page.click("[data-client-save]");
+  await page.waitForSelector('[data-field="code"] .field-error:not([hidden])');
+  assert.ok(await page.locator("[data-save-state].is-error").count(), "a failed save shows the error state");
+  await page.fill("#field-code", "CLIENT-005");
+  await page.click("[data-client-save]");
+  await page.waitForSelector("[data-save-state].is-saved");
+  await page.reload();
+  await page.waitForSelector("[data-client-editor]");
+  await page.click('[data-tab="general"]');
+  assert.equal(await page.inputValue("#field-phone"), "+55 21 90000-0500", "client edit persisted");
+
+  // Link a project: unlink CASE 002 from its seed owner first so it is free.
+  await page.goto(`${BASE_URL}/#/clients/mock-client-002`);
+  await page.waitForSelector("[data-client-editor]");
+  await page.click('[data-tab="projects"]');
+  await page.click('[data-unlink-project="002"]');
+  await page.waitForSelector("[data-client-projects] [data-link-project-select]");
+  await page.goto(`${BASE_URL}/${clientHash}`);
+  await page.waitForSelector("[data-client-editor]");
+  await page.click('[data-tab="projects"]');
+  await page.selectOption("[data-link-project-select]", "002");
+  await page.click("[data-link-project]");
+  await page.waitForSelector('[data-client-project="002"]');
+  await page.click('[data-tab="activity"]');
+  assert.match(await page.locator("[data-client-activity]").innerText(), /Project linked to client/, "link is logged on the client");
+
+  // Archive, filter, restore.
+  await page.goto(`${BASE_URL}/#/clients`);
+  await page.waitForSelector("[data-client-row]");
+  const orbitalRow = page.locator("[data-client-row]", { hasText: "Orbital Foods" });
+  await orbitalRow.locator("[data-row-menu-toggle]").click();
+  await orbitalRow.locator("[data-client-archive]").click();
+  await page.click("[data-modal-confirm]");
+  await page.waitForSelector("[data-client-row] [data-client-unarchive]", { state: "attached" });
+  await page.click('[data-client-filter="ARCHIVED"]');
+  await settle();
+  assert.equal(await clientRows().count(), 1, "archived filter shows the archived client");
+  assert.match(await clientRows().first().innerText(), /Orbital Foods/);
+  await clientRows().first().locator("[data-row-menu-toggle]").click();
+  await clientRows().first().locator("[data-client-unarchive]").click();
+  await page.click("[data-modal-confirm]");
+  await page.waitForFunction(() => document.querySelectorAll("[data-client-row]").length === 0);
+  await page.click('[data-client-filter="INACTIVE"]');
+  await settle();
+  assert.ok(await page.locator("[data-client-row]", { hasText: "Orbital Foods" }).count(), "restored client returns as inactive");
+  assert.equal(await clientRows().count(), 2, "nothing was deleted along the way");
+
   assert.deepEqual(errors, [], "no console or page errors");
   console.log("admin flow: all checks passed");
 } finally {
