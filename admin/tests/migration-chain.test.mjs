@@ -42,7 +42,7 @@ const HISTORICAL = [
 ];
 
 // Written after the recorded history and not applied anywhere yet.
-const PENDING = ["normalize_plan_status"];
+const PENDING = ["normalize_plan_status", "clients_foundation"];
 
 function toDate(stamp) {
   const [, y, mo, d, h, mi, s] = stamp.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
@@ -152,6 +152,16 @@ describe("production history", () => {
     for (const purpose of PENDING) {
       assert.ok(version(migrationFile(purpose)) > last, `${purpose} must come after ${last}`);
     }
+  });
+});
+
+describe("clients foundation", () => {
+  it("comes after business workflows, which creates the clients table", () => {
+    assert.ok(version(migrationFile("clients_foundation")) > version(migrationFile("business_workflows")));
+  });
+
+  it("comes after the pending plan status normalization", () => {
+    assert.ok(version(migrationFile("clients_foundation")) > version(migrationFile("normalize_plan_status")));
   });
 });
 
