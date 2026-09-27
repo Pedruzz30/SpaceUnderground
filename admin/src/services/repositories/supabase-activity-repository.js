@@ -16,12 +16,12 @@ function mapRow(row) {
 }
 
 export const supabaseActivityRepository = {
-  async list({ limit = 40 } = {}) {
-    const { data, error } = await getSupabaseClient()
-      .from("activity_log")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(limit);
+  // entityType/entityId narrow the log to one record (activity_log_entity_idx).
+  async list({ limit = 40, entityType, entityId } = {}) {
+    let query = getSupabaseClient().from("activity_log").select("*");
+    if (entityType) query = query.eq("entity_type", entityType);
+    if (entityId) query = query.eq("entity_id", entityId);
+    const { data, error } = await query.order("created_at", { ascending: false }).limit(limit);
     if (error) throw toDataError(error, t("errors.data.loadActivity"));
     return (data ?? []).map(mapRow);
   },

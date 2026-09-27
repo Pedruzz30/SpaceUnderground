@@ -1,6 +1,7 @@
 import { isSupabaseMode } from "../../config/env.js";
 import { mockActivityRepository } from "./mock-activity-repository.js";
 import { mockAuthRepository } from "./mock-auth-repository.js";
+import { mockClientRepository } from "./mock-client-repository.js";
 import { mockContentRepository } from "./mock-content-repository.js";
 import { mockMediaRepository } from "./mock-media-repository.js";
 import { mockPlanRepository } from "./mock-plan-repository.js";
@@ -24,6 +25,7 @@ export async function getRepositories() {
       { supabaseContentRepository },
       { supabaseSettingsRepository },
       { supabaseActivityRepository },
+      { supabaseClientRepository },
     ] = await Promise.all([
       import("./supabase-project-repository.js"),
       import("./supabase-auth-repository.js"),
@@ -32,6 +34,7 @@ export async function getRepositories() {
       import("./supabase-content-repository.js"),
       import("./supabase-settings-repository.js"),
       import("./supabase-activity-repository.js"),
+      import("./supabase-client-repository.js"),
     ]);
 
     repositories = {
@@ -42,6 +45,7 @@ export async function getRepositories() {
       content: supabaseContentRepository,
       settings: supabaseSettingsRepository,
       activity: supabaseActivityRepository,
+      clients: supabaseClientRepository,
     };
   } else {
     repositories = {
@@ -52,6 +56,7 @@ export async function getRepositories() {
       content: mockContentRepository,
       settings: mockSettingsRepository,
       activity: mockActivityRepository,
+      clients: mockClientRepository,
     };
   }
 
@@ -84,4 +89,8 @@ export async function getContentRepository() {
 
 export async function getSettingsRepository() {
   return (await getRepositories()).settings;
+}
+
+export async function getClientRepository() {
+  return (await getRepositories()).clients;
 }

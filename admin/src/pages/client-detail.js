@@ -1,22 +1,82 @@
-import { badge, badgeType } from "../components/badge.js";
+import { badge, badgeType, healthBadge } from "../components/badge.js";
+import { confirmModal } from "../components/modal.js";
 import { bindTabs } from "../components/tabs.js";
-import { findDemoClient, demoTransactions } from "../data/operations-demo.js";
-import { onLocaleChange, t } from "../i18n/index.js";
-import { formatCurrency, formatFullDate, formatRelativeDay, formatSignedCurrency, formatDayMonth } from "../utils/format.js";
-import { escapeHtml } from "../utils/html.js";
+import { showToast } from "../components/toast.js";
+import { onLocaleChange, plural, statusLabel, t } from "../i18n/index.js";
+import { clearNavigationGuard, setNavigationGuard } from "../router/router.js";
+import {
+  CLIENT_STATUSES,
+  archiveClient,
+  createClient,
+  getClient,
+  getClientActivity,
+  getClientProjects,
+  linkProjectToClient,
+  newClientDefaults,
+  unarchiveClient,
+  unlinkProjectFromClient,
+  updateClient,
+  validateClient,
+} from "../services/client-service.js";
+import { describeError, toDataError } from "../services/errors.js";
+import { getProjects } from "../services/project-service.js";
+import { clientHealth } from "../utils/client-health.js";
+import { projectSummary } from "../utils/client-metrics.js";
+import { formatFullDate, formatRelativeDay } from "../utils/format.js";
+import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
-const TABS = [
-  { id: "overview", labelKey: "clientDetail.tabOverview" },
-  { id: "projects", labelKey: "clientDetail.tabProjects" },
-  { id: "commercial", labelKey: "clientDetail.tabCommercial" },
-  { id: "financial", labelKey: "clientDetail.tabFinancial" },
-  { id: "files", labelKey: "clientDetail.tabFiles" },
-  { id: "activity", labelKey: "clientDetail.tabActivity" },
-];
+const FORM_FIELDS = ["code", "name", "company", "email", "phone", "status", "notes"];
 
-// Every static label carries a data-i18n key, so a locale change is handled by
-// applyStaticTranslations() alone: the panels are never re-rendered and the
-// selected tab, scroll position and focus all survive untouched.
+function tabsFor(isCreate) {
+  // Projects and activity hang off a saved record, so a new client starts on
+  // the two tabs it can actually fill in.
+  return isCreate
+    ? [
+        ["general", "clientEditor.tabGeneral"],
+        ["notes", "clientEditor.tabNotes"],
+      ]
+    : [
+        ["overview", "clientEditor.tabOverview"],
+        ["general", "clientEditor.tabGeneral"],
+        ["notes", "clientEditor.tabNotes"],
+        ["projects", "clientEditor.tabProjects"],
+        ["activity", "clientEditor.tabActivity"],
+      ];
+}
+
+/* ----------------------------------------------------------------- markup */
+
+function fieldMarkup({ labelKey, name, value = "", type = "text", attrs = "", hintKey = "", rows = 6 }) {
+  const id = `field-${name}`;
+  const control =
+    type === "textarea"
+      ? `<textarea id="${id}" name="${name}" rows="${rows}" ${attrs}>${escapeHtml(value)}</textarea>`
+      : `<input id="${id}" name="${name}" type="${type}" value="${escapeAttribute(value)}" ${attrs}>`;
+  return `
+    <div class="field${type === "textarea" ? " field--wide" : ""}" data-field="${name}">
+      <label for="${id}" data-i18n="${labelKey}">${escapeHtml(t(labelKey))}</label>
+      ${control}
+      ${hintKey ? `<p class="field-hint" data-i18n="${hintKey}">${escapeHtml(t(hintKey))}</p>` : ""}
+      <p class="field-error" id="${id}-error" hidden></p>
+    </div>
+  `;
+}
+
+function statusSelect(value) {
+  return `
+    <div class="field" data-field="status">
+      <label for="field-status" data-i18n="clientEditor.status">${escapeHtml(t("clientEditor.status"))}</label>
+      <select id="field-status" name="status">
+        ${CLIENT_STATUSES.map(
+          (status) =>
+            `<option value="${status}" data-status-label="${status}" ${status === value ? "selected" : ""}>${escapeHtml(statusLabel(status))}</option>`,
+        ).join("")}
+      </select>
+      <p class="field-error" id="field-status-error" hidden></p>
+    </div>
+  `;
+}
+
 function figure(labelKey, value, accent = false) {
   return `
     <div>
@@ -26,46 +86,153 @@ function figure(labelKey, value, accent = false) {
   `;
 }
 
-function projectRow(project) {
+function healthCard(client) {
+  const health = clientHealth(client);
   return `
-    <div class="ops-row">
-      <span class="ops-row__primary">
-        <strong>${escapeHtml(project.name)}</strong>
-      </span>
-      <span data-label="${t("common.status")}">${badge(project.status, badgeType(project.status))}</span>
+    <strong>${escapeHtml(t("clientHealth.score", { score: health.score, total: health.total }))}</strong>
+    ${healthBadge(health.status, `clientHealth.status.${health.status}`)}
+    <div class="health-checks">
+      ${health.checks
+        .map(
+          (check) => `
+            <div class="health-check health-check--${check.ok ? "ok" : check.severity}">
+              <span aria-hidden="true">${check.ok ? "OK" : "!"}</span>
+              <strong data-i18n="clientHealth.checks.${check.key}">${escapeHtml(t(`clientHealth.checks.${check.key}`))}</strong>
+            </div>
+          `,
+        )
+        .join("")}
     </div>
   `;
 }
 
-function projectList(client) {
-  if (!client.projects.length) {
-    return `<p class="empty-inline" data-i18n="clientDetail.noProjectsLinked">${t("clientDetail.noProjectsLinked")}</p>`;
+function metaItem(labelKey, value) {
+  return `<div><span data-i18n="${labelKey}">${escapeHtml(t(labelKey))}</span><strong>${escapeHtml(value || "—")}</strong></div>`;
+}
+
+// The raw ISO string rides on the node so applyLocaleFormatting() re-reads the
+// date in the new locale without re-rendering.
+function dateItem(labelKey, value) {
+  const stamp = value ? ` data-full-date="${escapeAttribute(value)}"` : "";
+  return `<div><span data-i18n="${labelKey}">${escapeHtml(t(labelKey))}</span><strong${stamp}>${escapeHtml(formatFullDate(value))}</strong></div>`;
+}
+
+function detailsGrid(client) {
+  return `
+    <div class="meta-grid">
+      ${metaItem("clientEditor.email", client.email)}
+      ${metaItem("clientEditor.phone", client.phone)}
+      ${metaItem("clientEditor.company", client.company)}
+      ${dateItem("clientEditor.clientSince", client.createdAt)}
+      ${dateItem("clientEditor.lastUpdate", client.updatedAt)}
+      ${client.archivedAt ? dateItem("clientEditor.archivedOn", client.archivedAt) : ""}
+    </div>
+  `;
+}
+
+function overviewMarkup(client, projects) {
+  const summary = projectSummary(projects);
+  const archived = client.status === "ARCHIVED";
+  return `
+    <div class="project-overview client-overview">
+      <section class="overview-grid">
+        <article class="overview-card">
+          <span data-i18n="clientEditor.projectsSummary">${escapeHtml(t("clientEditor.projectsSummary"))}</span>
+          <div class="ops-figures">
+            ${figure("clientEditor.projectsActive", String(summary.active), true)}
+            ${figure("clientEditor.projectsDelivered", String(summary.delivered))}
+            ${figure("clientEditor.projectsTotal", String(summary.total))}
+          </div>
+        </article>
+        <article class="overview-card">
+          <span data-i18n="clientHealth.title">${escapeHtml(t("clientHealth.title"))}</span>
+          <div data-client-health>${healthCard(client)}</div>
+        </article>
+      </section>
+      ${detailsGrid(client)}
+      <div class="overview-actions">
+        <button type="button" class="button" data-client-lifecycle="${archived ? "unarchive" : "archive"}">${escapeHtml(
+          archived ? t("clients.actionUnarchive") : t("clients.actionArchive"),
+        )}</button>
+      </div>
+    </div>
+  `;
+}
+
+function projectRow(project) {
+  return `
+    <div class="ops-row" data-client-project="${escapeAttribute(project.id)}">
+      <span class="ops-row__primary">
+        <a href="#/projects/${encodeURIComponent(project.id)}"><strong>${escapeHtml(project.name || t("projects.untitled"))}</strong></a>
+        <small>CASE ${escapeHtml(project.caseNumber)} · <span data-status-label="${escapeAttribute(project.category)}">${escapeHtml(statusLabel(project.category))}</span></small>
+      </span>
+      <span data-label="${escapeAttribute(t("clientEditor.projectStatus"))}">${badge(project.status, badgeType(project.status))}</span>
+      <span data-label="${escapeAttribute(t("clientEditor.projectEditorial"))}">${badge(project.editorialStatus, badgeType(project.editorialStatus))}</span>
+      <span class="ops-meta" data-label="${escapeAttribute(t("common.updated"))}" data-relative-date="${escapeAttribute(project.updatedAt ?? "")}">${escapeHtml(formatRelativeDay(project.updatedAt))}</span>
+      <span class="client-projects__actions">
+        <a class="button button--compact" href="#/projects/${encodeURIComponent(project.id)}">${escapeHtml(t("clientEditor.openProject"))}</a>
+        <button type="button" class="button button--compact" data-unlink-project="${escapeAttribute(project.id)}">${escapeHtml(t("clientEditor.unlinkProject"))}</button>
+      </span>
+    </div>
+  `;
+}
+
+function linkControl(candidates) {
+  if (!candidates.length) {
+    return `<p class="field-hint" data-i18n="clientEditor.noProjectsToLink">${escapeHtml(t("clientEditor.noProjectsToLink"))}</p>`;
   }
-  return `<div class="ops-table client-projects">${client.projects.map(projectRow).join("")}</div>`;
+  return `
+    <div class="client-link-project">
+      <label class="sort-field">
+        <span data-i18n="clientEditor.linkProjectLabel">${escapeHtml(t("clientEditor.linkProjectLabel"))}</span>
+        <select data-link-project-select>
+          ${candidates
+            .map((project) => `<option value="${escapeAttribute(project.id)}">CASE ${escapeHtml(project.caseNumber)} · ${escapeHtml(project.name)}</option>`)
+            .join("")}
+        </select>
+      </label>
+      <button type="button" class="button" data-link-project>${escapeHtml(t("clientEditor.linkProject"))}</button>
+    </div>
+  `;
 }
 
-function projectCounts(client) {
-  const active = client.projects.filter((project) => project.status === "ACTIVE").length;
-  const completed = client.projects.filter((project) => project.status === "COMPLETED").length;
-  return { active, completed };
+function projectsMarkup(state) {
+  if (!state.projectsOk) {
+    return `<p class="empty-inline">${escapeHtml(state.projectsError)}</p>`;
+  }
+  const summary = projectSummary(state.projects);
+  return `
+    <div class="ops-figures">
+      ${figure("clientEditor.projectsActive", String(summary.active), true)}
+      ${figure("clientEditor.projectsDelivered", String(summary.delivered))}
+      ${figure("clientEditor.projectsTotal", String(summary.total))}
+    </div>
+    ${
+      state.projects.length
+        ? `<div class="ops-table client-projects">${state.projects.map(projectRow).join("")}</div>`
+        : `<p class="empty-inline" data-i18n="clientEditor.noProjectsLinked">${escapeHtml(t("clientEditor.noProjectsLinked"))}</p>`
+    }
+    ${linkControl(state.linkCandidates)}
+    <p class="ops-note" data-i18n="clientEditor.linkNote">${escapeHtml(t("clientEditor.linkNote"))}</p>
+  `;
 }
 
-// Activity entries are free historical notes written by the team, so they are
-// shown as recorded rather than translated.
-function activityList(client) {
-  if (!client.activity.length) {
-    return `<p class="empty-inline" data-i18n="clientDetail.noActivity">${t("clientDetail.noActivity")}</p>`;
+// Log titles and details are written by the system as it records events, the
+// same as on the Logs screen, so they are shown as recorded.
+function activityMarkup(entries) {
+  if (!entries.length) {
+    return `<p class="empty-inline" data-i18n="clientEditor.noActivity">${escapeHtml(t("clientEditor.noActivity"))}</p>`;
   }
   return `
     <div class="activity-list">
-      ${client.activity
+      ${entries
         .map(
           (entry) => `
             <div>
               <span></span>
               <strong>${escapeHtml(entry.title)}</strong>
-              <p>${escapeHtml(entry.detail)}</p>
-              <small data-relative-date="${escapeHtml(entry.at)}">${escapeHtml(formatRelativeDay(entry.at))}</small>
+              <p>${escapeHtml(entry.detail || entry.action || "")}</p>
+              <small data-relative-date="${escapeAttribute(entry.time ?? "")}">${escapeHtml(formatRelativeDay(entry.time))}</small>
             </div>
           `,
         )
@@ -74,236 +241,338 @@ function activityList(client) {
   `;
 }
 
-function amountClass(transaction) {
-  if (transaction.status === "PENDING") return "ops-amount--neutral";
-  return transaction.amount >= 0 ? "ops-amount--positive" : "ops-amount--negative";
-}
-
-function clientLedger(client) {
-  const rows = demoTransactions.filter((transaction) => transaction.clientId === client.id);
-  if (!rows.length) {
-    return `<p class="empty-inline" data-i18n="clientDetail.noTransactions">${t("clientDetail.noTransactions")}</p>`;
-  }
-
+function identityMeta(client) {
   return `
-    <div class="ops-table client-ledger">
-      ${rows
-        .map(
-          (transaction) => `
-            <div class="ops-row">
-              <span class="ops-meta" data-label="${t("clientDetail.columnDate")}" data-day-month="${escapeHtml(transaction.date)}">${escapeHtml(formatDayMonth(transaction.date))}</span>
-              <span class="ops-row__primary">
-                <strong>${escapeHtml(transaction.description)}</strong>
-                <small>${escapeHtml(transaction.type)}</small>
-              </span>
-              <span data-label="${t("common.status")}">${badge(transaction.status, badgeType(transaction.status))}</span>
-              <span class="ops-amount ${amountClass(transaction)}" data-label="${t("clientDetail.columnValue")}" data-currency="${transaction.amount}" data-currency-mode="${transaction.status === "PENDING" ? "absolute" : "signed"}">${escapeHtml(
-                transaction.status === "PENDING"
-                  ? formatCurrency(Math.abs(transaction.amount))
-                  : formatSignedCurrency(transaction.amount),
-              )}</span>
-            </div>
-          `,
-        )
-        .join("")}
-    </div>
+    <strong class="editor-identity__name" data-client-identity-name>${escapeHtml(client.name || t("clientEditor.untitled"))}</strong>
+    <span class="editor-identity__meta">${escapeHtml(client.code || t("clientEditor.codePending"))}</span>
+    ${badge(client.status, badgeType(client.status))}
   `;
 }
 
-function tabList() {
-  return `
-    <div class="tabs" role="tablist" aria-label="${t("clientDetail.sections")}" data-i18n-aria-label="clientDetail.sections">
-      ${TABS.map(
-        (tab, index) => `
-          <button type="button" role="tab" id="client-tab-${tab.id}" aria-selected="${index === 0}"
-            aria-controls="client-panel-${tab.id}" tabindex="${index === 0 ? 0 : -1}" data-i18n="${tab.labelKey}">${t(tab.labelKey)}</button>
-        `,
-      ).join("")}
-    </div>
-  `;
-}
-
-function panel(id, content) {
-  const index = TABS.findIndex((tab) => tab.id === id);
-  return `
-    <div class="tab-panel" id="client-panel-${id}" role="tabpanel" aria-labelledby="client-tab-${id}"${index === 0 ? "" : " hidden"}>
-      ${content}
-    </div>
-  `;
-}
-
-function panelHead(eyebrowKey, headingKey) {
-  return `
-    <header class="panel__head">
-      <div>
-        <span data-i18n="${eyebrowKey}">${t(eyebrowKey)}</span>
-        <h3 data-i18n="${headingKey}">${t(headingKey)}</h3>
-      </div>
-    </header>
-  `;
-}
-
-function overviewPanel(client) {
-  const counts = projectCounts(client);
-
-  return panel(
-    "overview",
-    `
-      <div class="ops-panel-grid">
-        <article class="panel">
-          ${panelHead("clientDetail.clientInformation", "clientDetail.record")}
-          <div class="ops-figures">
-            ${figure("clientDetail.reference", `${t("clients.clientPrefix")} / ${client.code}`)}
-            ${figure("common.status", client.status)}
-            ${figure("clientDetail.totalValue", formatCurrency(client.totalValue), true)}
-          </div>
-        </article>
-
-        <article class="panel">
-          ${panelHead("clientDetail.projects", "clientDetail.currentProjects")}
-          <div class="ops-figures">
-            ${figure("clientDetail.active", String(counts.active), true)}
-            ${figure("clientDetail.completed", String(counts.completed))}
-          </div>
-        </article>
-
-        <article class="panel">
-          ${panelHead("clientDetail.commercial", "clientDetail.commercialSummary")}
-          <div class="ops-figures">
-            ${figure("clientDetail.contracted", formatCurrency(client.commercial.contracted), true)}
-            ${figure("clientDetail.openProposals", String(client.commercial.openProposals))}
-          </div>
-        </article>
-
-        <article class="panel">
-          ${panelHead("clientDetail.financial", "clientDetail.financialSummary")}
-          <div class="ops-figures">
-            ${figure("clientDetail.received", formatCurrency(client.financial.received), true)}
-            ${figure("clientDetail.pending", formatCurrency(client.financial.pending))}
-          </div>
-        </article>
-
-        <article class="panel panel--wide">
-          ${panelHead("clientDetail.recentActivity", "clientDetail.clientTimeline")}
-          ${activityList(client)}
-        </article>
-      </div>
-    `,
-  );
-}
-
-// Client name, company, email and phone are the record itself and read the same
-// in both locales.
-function renderClient(client) {
-  const counts = projectCounts(client);
+function renderEditor(state) {
+  const { client, isCreate } = state;
+  const tabs = tabsFor(isCreate);
+  const panel = (id, content) => {
+    const index = tabs.findIndex(([tab]) => tab === id);
+    return `<div class="tab-panel" id="client-panel-${id}" role="tabpanel" aria-labelledby="client-tab-${id}"${index === 0 ? "" : " hidden"}>${content}</div>`;
+  };
 
   return `
     <section class="page-heading page-heading--split">
       <div>
-        <span>${t("clients.clientPrefix")} / ${escapeHtml(client.code)}</span>
-        <div class="client-heading__title">
-          <h2>${escapeHtml(client.name)}</h2>
-          ${badge(client.status, badgeType(client.status))}
+        <span data-i18n="${isCreate ? "clientEditor.newBreadcrumb" : "clientEditor.recordBreadcrumb"}">${escapeHtml(
+          t(isCreate ? "clientEditor.newBreadcrumb" : "clientEditor.recordBreadcrumb"),
+        )}</span>
+        <h2 data-i18n="${isCreate ? "clientEditor.newHeading" : "clientEditor.heading"}">${escapeHtml(t(isCreate ? "clientEditor.newHeading" : "clientEditor.heading"))}</h2>
+        <div class="editor-identity">
+          <span class="client-identity" data-client-identity>${identityMeta(client)}</span>
+          <span class="save-state is-saved" data-save-state ${isCreate ? "hidden" : ""}>${escapeHtml(t("common.saved"))}</span>
         </div>
-        <p data-client-summary>${escapeHtml(client.company || t("clientDetail.independent"))} · ${escapeHtml(
-          t("clientDetail.summaryLine", { active: counts.active, completed: counts.completed }),
-        )}</p>
       </div>
       <div class="heading-actions">
-        <a class="button" href="#/clients" data-i18n="clientDetail.allClients">${t("clientDetail.allClients")}</a>
+        <a class="button" href="#/clients" data-i18n="clientEditor.allClients">${escapeHtml(t("clientEditor.allClients"))}</a>
       </div>
     </section>
 
-    <div class="meta-grid">
-      <div><span data-i18n="clientDetail.email">${t("clientDetail.email")}</span><strong>${escapeHtml(client.email)}</strong></div>
-      <div><span data-i18n="clientDetail.phone">${t("clientDetail.phone")}</span><strong>${escapeHtml(client.phone || "—")}</strong></div>
-      <div><span data-i18n="clientDetail.company">${t("clientDetail.company")}</span><strong>${escapeHtml(client.company || "—")}</strong></div>
-      <div><span data-i18n="clientDetail.lastContact">${t("clientDetail.lastContact")}</span><strong data-relative-date="${escapeHtml(client.lastContactAt)}">${escapeHtml(formatRelativeDay(client.lastContactAt))}</strong></div>
-      <div><span data-i18n="clientDetail.clientSince">${t("clientDetail.clientSince")}</span><strong${client.since ? ` data-full-date="${escapeHtml(client.since)}"` : ""}>${escapeHtml(client.since ? formatFullDate(client.since) : "—")}</strong></div>
-    </div>
+    <form class="editor-form" data-client-editor data-mode="${isCreate ? "create" : "edit"}" novalidate>
+      <div class="editor-toolbar">
+        <button type="submit" class="button button--primary" data-client-save data-i18n="${isCreate ? "clientEditor.createClient" : "clientEditor.saveChanges"}">${escapeHtml(
+          t(isCreate ? "clientEditor.createClient" : "clientEditor.saveChanges"),
+        )}</button>
+      </div>
 
-    <section class="client-detail" data-client-detail>
-      ${tabList()}
-      ${overviewPanel(client)}
-      ${panel(
-        "projects",
-        `
-          <div class="ops-figures">
-            ${figure("clientDetail.active", String(counts.active), true)}
-            ${figure("clientDetail.completed", String(counts.completed))}
-            ${figure("clientDetail.total", String(client.projects.length))}
-          </div>
-          ${projectList(client)}
-          <p class="ops-note" data-i18n="clientDetail.portfolioNote">${t("clientDetail.portfolioNote")}</p>
-        `,
-      )}
-      ${panel(
-        "commercial",
-        `
-          <div class="ops-figures">
-            ${figure("clientDetail.contracted", formatCurrency(client.commercial.contracted), true)}
-            ${figure("clientDetail.openProposals", String(client.commercial.openProposals))}
-          </div>
-          <p class="empty-inline" data-i18n="clientDetail.commercialNote">${t("clientDetail.commercialNote")}</p>
-        `,
-      )}
-      ${panel(
-        "financial",
-        `
-          <div class="ops-figures">
-            ${figure("clientDetail.received", formatCurrency(client.financial.received), true)}
-            ${figure("clientDetail.pending", formatCurrency(client.financial.pending))}
-          </div>
-          ${clientLedger(client)}
-        `,
-      )}
-      ${panel(
-        "files",
-        `<p class="empty-inline" data-i18n="clientDetail.filesNote">${t("clientDetail.filesNote")}</p>`,
-      )}
-      ${panel("activity", activityList(client))}
-    </section>
+      <div class="tabs" role="tablist" aria-label="${escapeAttribute(t("clientEditor.sections"))}" data-i18n-aria-label="clientEditor.sections">
+        ${tabs
+          .map(
+            ([id, key], index) =>
+              `<button type="button" role="tab" id="client-tab-${id}" data-tab="${id}" aria-selected="${index === 0}" aria-controls="client-panel-${id}" tabindex="${index === 0 ? 0 : -1}" data-i18n="${key}">${escapeHtml(t(key))}</button>`,
+          )
+          .join("")}
+      </div>
 
-    <p class="ops-note ops-note--spaced" data-i18n="clients.presentationNote">${t("clients.presentationNote")}</p>
+      ${isCreate ? "" : panel("overview", `<div data-client-overview>${overviewMarkup(client, state.projects)}</div>`)}
+      ${panel(
+        "general",
+        `
+          <div class="form-grid">
+            ${fieldMarkup({ labelKey: "clientEditor.code", name: "code", value: client.code, hintKey: "clientEditor.codeHint", attrs: 'autocomplete="off" spellcheck="false"' })}
+            ${fieldMarkup({ labelKey: "clientEditor.name", name: "name", value: client.name, attrs: "required" })}
+            ${fieldMarkup({ labelKey: "clientEditor.company", name: "company", value: client.company })}
+            ${fieldMarkup({ labelKey: "clientEditor.email", name: "email", value: client.email, type: "email", attrs: 'autocomplete="off"' })}
+            ${fieldMarkup({ labelKey: "clientEditor.phone", name: "phone", value: client.phone, type: "tel", attrs: 'autocomplete="off"' })}
+            ${statusSelect(client.status)}
+          </div>
+        `,
+      )}
+      ${panel(
+        "notes",
+        `
+          <div class="form-grid">
+            ${fieldMarkup({ labelKey: "clientEditor.notes", name: "notes", value: client.notes, type: "textarea", hintKey: "clientEditor.notesHint", rows: 10 })}
+          </div>
+        `,
+      )}
+      ${isCreate ? "" : panel("projects", `<div data-client-projects>${projectsMarkup(state)}</div>`)}
+      ${isCreate ? "" : panel("activity", `<div data-client-activity>${activityMarkup(state.activity)}</div>`)}
+    </form>
   `;
 }
 
 function renderMissing(id) {
   return `
     <section class="empty-state">
-      <span>${t("clients.clientPrefix")} / ${escapeHtml(id ?? "—")}</span>
-      <h2 data-i18n="clientDetail.notFound">${t("clientDetail.notFound")}</h2>
-      <p data-i18n="clientDetail.notFoundBody">${t("clientDetail.notFoundBody")}</p>
-      <a class="button" href="#/clients" data-i18n="clientDetail.backToClients">${t("clientDetail.backToClients")}</a>
+      <span>${escapeHtml(id ?? "—")}</span>
+      <h2 data-i18n="clientEditor.notFound">${escapeHtml(t("clientEditor.notFound"))}</h2>
+      <p data-i18n="clientEditor.notFoundBody">${escapeHtml(t("clientEditor.notFoundBody"))}</p>
+      <a class="button" href="#/clients" data-i18n="clientEditor.allClients">${escapeHtml(t("clientEditor.allClients"))}</a>
     </section>
   `;
 }
 
-export const clientDetailPage = {
-  title: () => t("clientDetail.title"),
-  breadcrumb: () => t("clientDetail.breadcrumb"),
-  render: ({ id }) => {
-    const client = findDemoClient(id);
-    return client ? renderClient(client) : renderMissing(id);
-  },
-  afterRender: ({ id }) => {
-    const root = document.querySelector("[data-client-detail]");
-    bindTabs(root);
+/* ------------------------------------------------------------------- data */
 
-    const client = findDemoClient(id);
-    if (!client) return;
+async function loadState(id) {
+  if (id === "new") {
+    return { client: newClientDefaults(), isCreate: true, projects: [], projectsOk: true, linkCandidates: [], activity: [] };
+  }
 
-    // Only the numeric summary line has to be rebuilt by hand; every other label
-    // is marked up and handled by applyStaticTranslations().
-    onLocaleChange(document.querySelector(".page-heading"), () => {
-      const counts = projectCounts(client);
-      const summary = document.querySelector("[data-client-summary]");
-      if (summary) {
-        summary.textContent = `${client.company || t("clientDetail.independent")} · ${t("clientDetail.summaryLine", {
-          active: counts.active,
-          completed: counts.completed,
-        })}`;
-      }
+  const client = await getClient(id);
+  if (!client) return null;
+
+  // Projects and activity only enrich the record; either failing leaves the
+  // client itself editable.
+  const [linked, all, activity] = await Promise.allSettled([getClientProjects(client.id), getProjects(), getClientActivity(client.id)]);
+  const projectsOk = linked.status === "fulfilled";
+
+  return {
+    client,
+    isCreate: false,
+    projects: projectsOk ? linked.value : [],
+    projectsOk,
+    projectsError: projectsOk ? "" : describeError(linked.reason, t("clientEditor.projectsLoadError")),
+    // Only unowned projects are offered, so linking never silently moves a
+    // project away from another client.
+    linkCandidates: all.status === "fulfilled" ? all.value.filter((project) => !project.clientId) : [],
+    activity: activity.status === "fulfilled" ? activity.value : [],
+  };
+}
+
+/* ------------------------------------------------------------------ mount */
+
+function mount(page, state, { tab } = {}) {
+  page.innerHTML = renderEditor(state);
+  const form = page.querySelector("[data-client-editor]");
+  const saveState = page.querySelector("[data-save-state]");
+  const saveButton = form.querySelector("[data-client-save]");
+  const { isCreate } = state;
+
+  bindTabs(form);
+  if (tab) form.querySelector(`[data-tab="${tab}"]`)?.click();
+
+  const collect = () =>
+    Object.fromEntries(FORM_FIELDS.map((field) => [field, String(form.elements[field]?.value ?? "").trim()]));
+
+  let savedSnapshot = JSON.stringify(collect());
+  let dirty = false;
+  let saving = false;
+  let failed = false;
+
+  function paintSaveState() {
+    if (!saveState) return;
+    const [key, cls] = saving
+      ? ["clientEditor.saving", "is-saving"]
+      : failed
+        ? ["clientEditor.saveFailed", "is-error"]
+        : dirty
+          ? ["shell.unsavedChanges", "is-unsaved"]
+          : ["common.saved", "is-saved"];
+    saveState.hidden = isCreate && !dirty && !saving && !failed;
+    saveState.textContent = t(key);
+    saveState.className = `save-state ${cls}`;
+  }
+
+  function paintIdentity() {
+    const values = { ...state.client, ...collect() };
+    const identity = page.querySelector("[data-client-identity]");
+    if (identity) identity.innerHTML = identityMeta({ ...values, code: values.code || state.client.code });
+    const health = page.querySelector("[data-client-health]");
+    if (health) health.innerHTML = healthCard(values);
+  }
+
+  function clearErrors() {
+    form.querySelectorAll(".field-error").forEach((node) => {
+      node.hidden = true;
+      node.textContent = "";
     });
+    form.querySelectorAll("[aria-invalid]").forEach((node) => node.removeAttribute("aria-invalid"));
+  }
+
+  function showErrors(errors) {
+    clearErrors();
+    let first = null;
+    Object.entries(errors).forEach(([field, message]) => {
+      const container = form.querySelector(`[data-field="${field}"]`);
+      const input = container?.querySelector("input, select, textarea");
+      const error = container?.querySelector(".field-error");
+      if (error) {
+        error.textContent = message;
+        error.hidden = false;
+      }
+      input?.setAttribute("aria-invalid", "true");
+      first ??= input;
+    });
+    // A field on a hidden tab cannot take focus, so open its tab first.
+    const panelId = first?.closest("[role='tabpanel']")?.id;
+    if (panelId) form.querySelector(`[aria-controls="${panelId}"]`)?.click();
+    first?.focus();
+    showToast(t("clientEditor.fixHighlighted"));
+  }
+
+  function markDirty() {
+    dirty = JSON.stringify(collect()) !== savedSnapshot;
+    failed = false;
+    paintSaveState();
+    paintIdentity();
+  }
+
+  async function save() {
+    if (saving) return;
+    const values = collect();
+    const errors = validateClient(values);
+    if (Object.keys(errors).length) {
+      showErrors(errors);
+      return;
+    }
+    clearErrors();
+
+    saving = true;
+    saveButton.disabled = true;
+    paintSaveState();
+    try {
+      const saved = isCreate ? await createClient(values) : await updateClient(state.client.id, values);
+      dirty = false;
+      clearNavigationGuard();
+      showToast(isCreate ? t("clientEditor.clientCreated") : t("clientEditor.clientSaved"));
+      if (isCreate) {
+        window.location.hash = `#/clients/${encodeURIComponent(saved.id)}`;
+        return;
+      }
+      await reload(page, saved.id, { tab: activeTab(form) });
+    } catch (error) {
+      const dataError = toDataError(error, t("clientEditor.saveError"));
+      failed = true;
+      if (dataError.field && FORM_FIELDS.includes(dataError.field)) showErrors({ [dataError.field]: dataError.message });
+      else showToast(dataError.message);
+    } finally {
+      saving = false;
+      if (saveButton.isConnected) saveButton.disabled = false;
+      if (saveState?.isConnected) paintSaveState();
+    }
+  }
+
+  async function changeLifecycle(archive) {
+    if (dirty) {
+      showToast(t("clientEditor.saveBeforeArchive"));
+      return;
+    }
+    const confirmed = await confirmModal({
+      title: archive ? t("clients.archiveTitle") : t("clients.unarchiveTitle"),
+      body: `<p>${escapeHtml(archive ? t("clients.archiveBody") : t("clients.unarchiveBody"))}</p>`,
+      confirmLabel: archive ? t("clients.actionArchive") : t("clients.actionUnarchive"),
+      danger: archive,
+    });
+    if (!confirmed) return;
+    try {
+      if (archive) await archiveClient(state.client.id);
+      else await unarchiveClient(state.client.id);
+      showToast(archive ? t("clients.clientArchived") : t("clients.clientUnarchived"));
+      await reload(page, state.client.id, { tab: activeTab(form) });
+    } catch (error) {
+      showToast(describeError(error, t("clients.archiveError")));
+    }
+  }
+
+  async function changeLink(projectId, link) {
+    try {
+      if (link) await linkProjectToClient(state.client.id, projectId);
+      else await unlinkProjectFromClient(state.client.id, projectId);
+      showToast(link ? t("clientEditor.projectLinked") : t("clientEditor.projectUnlinked"));
+      // Keep whatever the user typed in the form: only the side panels reload.
+      const fresh = await loadState(state.client.id);
+      if (!fresh || !form.isConnected) return;
+      Object.assign(state, { projects: fresh.projects, projectsOk: fresh.projectsOk, projectsError: fresh.projectsError, linkCandidates: fresh.linkCandidates, activity: fresh.activity });
+      paintPanels();
+    } catch (error) {
+      showToast(describeError(error, t("clientEditor.linkError")));
+    }
+  }
+
+  function paintPanels() {
+    const overview = page.querySelector("[data-client-overview]");
+    if (overview) overview.innerHTML = overviewMarkup({ ...state.client, ...collect(), code: state.client.code }, state.projects);
+    const projects = page.querySelector("[data-client-projects]");
+    if (projects) projects.innerHTML = projectsMarkup(state);
+    const activity = page.querySelector("[data-client-activity]");
+    if (activity) activity.innerHTML = activityMarkup(state.activity);
+  }
+
+  form.addEventListener("input", markDirty);
+  form.addEventListener("change", markDirty);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    save();
+  });
+  form.addEventListener("click", (event) => {
+    const lifecycle = event.target.closest("[data-client-lifecycle]");
+    if (lifecycle) changeLifecycle(lifecycle.dataset.clientLifecycle === "archive");
+
+    if (event.target.closest("[data-link-project]")) {
+      const select = form.querySelector("[data-link-project-select]");
+      if (select?.value) changeLink(select.value, true);
+    }
+
+    const unlink = event.target.closest("[data-unlink-project]");
+    if (unlink) changeLink(unlink.dataset.unlinkProject, false);
+  });
+
+  // Every static label carries data-i18n; the pieces built from dictionary
+  // lookups (badges, health, figures, relative dates) are repainted from the
+  // live form values, so typed text and the open tab survive a locale switch.
+  onLocaleChange(form, () => {
+    paintPanels();
+    paintIdentity();
+    paintSaveState();
+  });
+
+  paintSaveState();
+  setNavigationGuard(() => dirty);
+}
+
+function activeTab(form) {
+  return form.querySelector('[role="tab"][aria-selected="true"]')?.dataset.tab;
+}
+
+async function reload(page, id, options) {
+  const state = await loadState(id);
+  if (!page.isConnected) return;
+  if (!state) {
+    page.innerHTML = renderMissing(id);
+    return;
+  }
+  mount(page, state, options);
+}
+
+export const clientDetailPage = {
+  title: () => t("clientEditor.title"),
+  breadcrumb: () => t("clientEditor.breadcrumb"),
+  render: () => `<section class="empty-state" aria-busy="true"><span data-i18n="clientEditor.loading">${escapeHtml(t("clientEditor.loading"))}</span></section>`,
+  afterRender: async ({ id }) => {
+    const page = document.querySelector(".page");
+    try {
+      await reload(page, id);
+    } catch (error) {
+      if (!page.isConnected) return;
+      page.innerHTML = `<section class="empty-state"><p>${escapeHtml(describeError(error, t("clientEditor.loadError")))}</p><a class="button" href="#/clients" data-i18n="clientEditor.allClients">${escapeHtml(t("clientEditor.allClients"))}</a></section>`;
+    }
   },
 };

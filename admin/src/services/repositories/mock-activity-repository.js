@@ -14,8 +14,10 @@ function readAll() {
 }
 
 export const mockActivityRepository = {
-  async list() {
-    return readAll();
+  async list({ entityType, entityId } = {}) {
+    return readAll().filter(
+      (entry) => (!entityType || entry.entityType === entityType) && (!entityId || entry.entityId === entityId),
+    );
   },
 
   async add(entry) {

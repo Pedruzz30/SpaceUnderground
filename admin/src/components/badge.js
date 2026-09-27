@@ -1,5 +1,5 @@
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
-import { statusLabel } from "../i18n/index.js";
+import { statusLabel, t } from "../i18n/index.js";
 
 const SUCCESS = ["live", "published", "active", "paid", "won", "received"];
 const WARNING = ["draft", "pilot", "prototype", "mvp"];
@@ -19,4 +19,13 @@ export function badgeType(value) {
   if (WARNING.some((item) => key.includes(item))) return "warning";
   if (MUTED.includes(key)) return "muted";
   return "neutral";
+}
+
+const HEALTH_TYPES = { healthy: "success", attention: "warning", incomplete: "muted" };
+
+// Health labels come from a dictionary key rather than a stored enum, so the
+// key rides on data-i18n and a locale change re-labels the badge in place.
+export function healthBadge(status, labelKey) {
+  const type = HEALTH_TYPES[status] ?? "neutral";
+  return `<span class="badge badge--${type}" data-i18n="${escapeAttribute(labelKey)}">${escapeHtml(t(labelKey))}</span>`;
 }

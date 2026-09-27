@@ -1,80 +1,109 @@
-import { badge, badgeType } from "../components/badge.js";
+import { badge, badgeType, healthBadge } from "../components/badge.js";
+import { confirmModal } from "../components/modal.js";
+import { bindRowMenus, rowMenu } from "../components/row-menu.js";
 import { statCard } from "../components/stat-card.js";
 import { showToast } from "../components/toast.js";
-import { demoClients } from "../data/operations-demo.js";
-import { onLocaleChange, plural, t } from "../i18n/index.js";
-import { formatCurrency, formatRelativeDay } from "../utils/format.js";
-import { escapeHtml } from "../utils/html.js";
+import { onLocaleChange, plural, statusLabel, t } from "../i18n/index.js";
+import { archiveClient, getClients, unarchiveClient, CLIENT_STATUSES } from "../services/client-service.js";
+import { describeError } from "../services/errors.js";
+import { getProjects } from "../services/project-service.js";
+import { clientHealth } from "../utils/client-health.js";
+import { clientMetrics, groupProjectsByClient, matchesClientQuery, projectSummary } from "../utils/client-metrics.js";
+import { formatRelativeDay } from "../utils/format.js";
+import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
-const FILTERS = ["ALL", "ACTIVE", "LEAD", "INACTIVE", "ARCHIVED"];
+const FILTERS = ["ALL", ...CLIENT_STATUSES];
 
-function activeProjects(client) {
-  return client.projects.filter((project) => project.status === "ACTIVE").length;
+const METRICS = [
+  ["total", "clients.totalClients", "clients.totalClientsDetail"],
+  ["active", "clients.active", "clients.activeDetail"],
+  ["leads", "clients.leads", "clients.leadsDetail"],
+  ["withActiveProjects", "clients.withActiveProjects", "clients.withActiveProjectsDetail"],
+  ["inactiveOrArchived", "clients.inactiveArchived", "clients.inactiveArchivedDetail"],
+];
+
+// Before the first read resolves the cards show a dash, never a zero that
+// could be mistaken for a real count.
+function renderMetrics(values = null) {
+  return METRICS.map(([field, labelKey, detailKey]) =>
+    statCard({
+      label: t(labelKey),
+      labelKey,
+      value: values ? values[field] : "—",
+      detail: t(detailKey),
+      detailKey,
+    }),
+  ).join("");
 }
 
-function renderMetrics(clients) {
-  const active = clients.filter((client) => client.status === "ACTIVE").length;
-  const withProjects = clients.filter((client) => activeProjects(client) > 0).length;
-  const inactive = clients.filter((client) => client.status === "INACTIVE").length;
-
+function projectsCell(summary, projectsOk) {
+  if (!projectsOk) return `<span class="ops-meta" data-label="${t("clients.columnProjects")}">—</span>`;
+  if (!summary.total) {
+    return `<span class="ops-meta" data-label="${t("clients.columnProjects")}">${escapeHtml(t("clients.noProjects"))}</span>`;
+  }
   return `
-    ${statCard({
-      label: t("clients.totalClients"),
-      labelKey: "clients.totalClients",
-      value: clients.length,
-      detail: t("clients.totalClientsDetail"),
-      detailKey: "clients.totalClientsDetail",
-    })}
-    ${statCard({
-      label: t("clients.active"),
-      labelKey: "clients.active",
-      value: active,
-      detail: t("clients.activeDetail"),
-      detailKey: "clients.activeDetail",
-    })}
-    ${statCard({
-      label: t("clients.withActiveProjects"),
-      labelKey: "clients.withActiveProjects",
-      value: withProjects,
-      detail: t("clients.withActiveProjectsDetail"),
-      detailKey: "clients.withActiveProjectsDetail",
-    })}
-    ${statCard({
-      label: t("clients.inactive"),
-      labelKey: "clients.inactive",
-      value: inactive,
-      detail: t("clients.inactiveDetail"),
-      detailKey: "clients.inactiveDetail",
-    })}
+    <span class="ops-stack" data-label="${t("clients.columnProjects")}">
+      <span class="ops-meta">${escapeHtml(plural("clients.projectCount", summary.total))}</span>
+      <small>${escapeHtml(plural("clients.activeProjectCount", summary.active))}</small>
+    </span>
   `;
 }
 
-function projectsLabel(client) {
-  const total = client.projects.length;
-  if (!total) return t("clients.noProjects");
-  return plural("clients.projectCount", total);
-}
+// Client name, company, email and phone are records rather than copy: they
+// read identically in both locales.
+function clientRow(client, projects, projectsOk) {
+  const health = clientHealth(client);
+  const archived = client.status === "ARCHIVED";
+  const href = `#/clients/${encodeURIComponent(client.id)}`;
 
-// Client name, company, email and phone are records rather than copy: they read
-// identically in both locales.
-function clientRow(client) {
   return `
-    <a class="ops-row ops-row--link" href="#/clients/${encodeURIComponent(client.id)}" data-client-row>
+    <article class="ops-row clients-row" data-client-row data-client-id="${escapeAttribute(client.id)}">
       <span class="ops-row__primary">
-        <strong>${escapeHtml(client.name)}</strong>
-        <small>${t("clients.clientPrefix")} / ${escapeHtml(client.code)} · ${escapeHtml(client.company || "—")}</small>
+        <a class="clients-row__name" href="${escapeAttribute(href)}"><strong>${escapeHtml(client.name)}</strong></a>
+        <small>${escapeHtml(client.code)} · ${escapeHtml(client.company || "—")}</small>
       </span>
       <span class="ops-stack" data-label="${t("clients.columnContact")}">
-        <span class="ops-meta">${escapeHtml(client.email)}</span>
+        <span class="ops-meta">${escapeHtml(client.email || "—")}</span>
         <small>${escapeHtml(client.phone || "—")}</small>
       </span>
-      <span class="ops-meta" data-label="${t("clients.columnProjects")}">${escapeHtml(projectsLabel(client))}</span>
+      ${projectsCell(projectSummary(projects), projectsOk)}
       <span data-label="${t("clients.columnStatus")}">${badge(client.status, badgeType(client.status))}</span>
-      <span class="ops-meta" data-label="${t("clients.columnTotalValue")}">${escapeHtml(formatCurrency(client.totalValue))}</span>
-      <span class="ops-meta" data-label="${t("clients.columnUpdated")}">${escapeHtml(formatRelativeDay(client.updatedAt))}</span>
-      <span class="ops-row__arrow" aria-hidden="true">&rarr;</span>
-    </a>
+      <span data-label="${t("clients.columnHealth")}">${healthBadge(health.status, `clientHealth.status.${health.status}`)}</span>
+      <span class="ops-meta" data-label="${t("clients.columnUpdated")}" data-relative-date="${escapeAttribute(client.updatedAt ?? "")}">${escapeHtml(formatRelativeDay(client.updatedAt))}</span>
+      <span class="clients-row__actions">
+        <a class="button button--compact" href="${escapeAttribute(href)}" data-client-open="${escapeAttribute(client.id)}">${escapeHtml(t("clients.actionOpen"))}</a>
+        ${rowMenu({
+          label: t("clients.actions"),
+          items: [
+            { label: t("clients.actionOpen"), href },
+            archived
+              ? { label: t("clients.actionUnarchive"), attrs: `data-client-unarchive="${escapeAttribute(client.id)}"` }
+              : { label: t("clients.actionArchive"), attrs: `data-client-archive="${escapeAttribute(client.id)}"` },
+          ],
+        })}
+      </span>
+    </article>
   `;
+}
+
+function filterButton(filter, activeFilter) {
+  const isActive = filter === activeFilter;
+  // ALL is a UI word; the lifecycle values are stored enums re-labelled
+  // through statusLabel() by applyStaticTranslations().
+  const label =
+    filter === "ALL"
+      ? `data-i18n="common.all">${escapeHtml(t("common.all"))}`
+      : `data-status-label="${filter}">${escapeHtml(statusLabel(filter))}`;
+  return `<button type="button" class="${isActive ? "is-active" : ""}" data-client-filter="${filter}" aria-pressed="${isActive}" ${label}</button>`;
+}
+
+async function confirmLifecycle(archive) {
+  return confirmModal({
+    title: archive ? t("clients.archiveTitle") : t("clients.unarchiveTitle"),
+    body: `<p>${escapeHtml(archive ? t("clients.archiveBody") : t("clients.unarchiveBody"))}</p>`,
+    confirmLabel: archive ? t("clients.actionArchive") : t("clients.actionUnarchive"),
+    danger: archive,
+  });
 }
 
 export const clientsPage = {
@@ -88,93 +117,123 @@ export const clientsPage = {
         <p data-i18n="clients.intro">${t("clients.intro")}</p>
       </div>
       <div class="heading-actions">
-        <button class="button button--primary" type="button" data-new-client data-i18n="clients.newClient">${t("clients.newClient")}</button>
+        <a class="button button--primary" href="#/clients/new" data-new-client data-i18n="clients.newClient">${t("clients.newClient")}</a>
       </div>
     </section>
 
-    <section class="stats-grid stats-grid--quad" aria-label="${t("clients.summary")}" data-i18n-aria-label="clients.summary" data-client-metrics>
-      ${renderMetrics(demoClients)}
+    <section class="stats-grid stats-grid--quad stats-grid--five" aria-label="${t("clients.summary")}" data-i18n-aria-label="clients.summary" data-client-metrics>
+      ${renderMetrics()}
     </section>
 
     <section class="panel">
       <div class="toolbar">
         <label class="search-field">
           <span data-i18n="clients.searchClients">${t("clients.searchClients")}</span>
-          <input data-search-clients type="search" placeholder="${t("clients.searchPlaceholder")}" data-i18n-placeholder="clients.searchPlaceholder">
+          <input data-search-clients type="search" placeholder="${t("clients.searchPlaceholder")}" data-i18n-placeholder="clients.searchPlaceholder" disabled>
         </label>
         <div class="toolbar__controls">
           <div class="segmented" role="group" aria-label="${t("clients.filterByStatus")}" data-i18n-aria-label="clients.filterByStatus">
-            ${FILTERS.map(
-              (filter, index) => `
-                <button type="button" class="${index === 0 ? "is-active" : ""}" data-client-filter="${filter}" aria-pressed="${index === 0}">${filter}</button>
-              `,
-            ).join("")}
+            ${FILTERS.map((filter) => filterButton(filter, "ALL")).join("")}
           </div>
         </div>
       </div>
 
       <p class="ops-count" data-client-count></p>
+      <p class="ops-note" data-client-projects-note hidden></p>
 
       <div class="ops-table-scroll">
-        <div class="ops-table clients-table" data-client-list aria-live="polite">
-          <div class="ops-table__head" aria-hidden="true">
-            <span data-i18n="clients.columnClient">${t("clients.columnClient")}</span><span data-i18n="clients.columnContact">${t("clients.columnContact")}</span><span data-i18n="clients.columnProjects">${t("clients.columnProjects")}</span><span data-i18n="clients.columnStatus">${t("clients.columnStatus")}</span><span data-i18n="clients.columnTotalValue">${t("clients.columnTotalValue")}</span><span data-i18n="clients.columnUpdated">${t("clients.columnUpdated")}</span><span></span>
-          </div>
+        <div class="ops-table clients-table" data-client-list aria-live="polite" aria-busy="true">
+          <p class="empty-inline" data-i18n="clients.loading">${t("clients.loading")}</p>
         </div>
       </div>
     </section>
-
-    <p class="ops-note ops-note--spaced" data-i18n="clients.presentationNote">${t("clients.presentationNote")}</p>
   `,
-  afterRender: () => {
+  afterRender: async () => {
     const list = document.querySelector("[data-client-list]");
     const count = document.querySelector("[data-client-count]");
     const search = document.querySelector("[data-search-clients]");
+    const metrics = document.querySelector("[data-client-metrics]");
+    const projectsNote = document.querySelector("[data-client-projects-note]");
     const filters = [...document.querySelectorAll("[data-client-filter]")];
-    const head = list.querySelector(".ops-table__head");
-    let activeFilter = "ALL";
 
-    document.querySelector("[data-new-client]")?.addEventListener("click", () => {
-      showToast(t("clients.creationSoon"));
-    });
+    let activeFilter = "ALL";
+    let clients = [];
+    let projectsByClient = new Map();
+    let projectsOk = false;
+    let loaded = false;
+
+    const head = () => `
+      <div class="ops-table__head" aria-hidden="true">
+        <span>${t("clients.columnClient")}</span><span>${t("clients.columnContact")}</span><span>${t("clients.columnProjects")}</span><span>${t("clients.columnStatus")}</span><span>${t("clients.columnHealth")}</span><span>${t("clients.columnUpdated")}</span><span>${t("clients.columnActions")}</span>
+      </div>
+    `;
 
     const renderList = () => {
-      const query = search.value.trim().toLowerCase();
-      const visible = demoClients
-        .filter((client) => {
-          const matchesQuery =
-            !query ||
-            [client.name, client.company, client.email, client.phone, client.code].some((value) =>
-              String(value ?? "").toLowerCase().includes(query),
-            );
-          const matchesFilter = activeFilter === "ALL" || client.status === activeFilter;
-          return matchesQuery && matchesFilter;
-        })
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-
-      const emptyMessage = query
-        ? t("clients.noMatch", { query: escapeHtml(search.value.trim()) })
-        : t("clients.emptyForStatus");
-
-      list.innerHTML = "";
-      list.append(head);
-      list.insertAdjacentHTML(
-        "beforeend",
-        visible.length ? visible.map(clientRow).join("") : `<p class="empty-inline">${emptyMessage}</p>`,
+      if (!loaded) return;
+      const query = search.value.trim();
+      const visible = clients.filter(
+        (client) => matchesClientQuery(client, query) && (activeFilter === "ALL" || client.status === activeFilter),
       );
+
+      const emptyMessage = !clients.length
+        ? t("clients.noClients")
+        : query
+          ? t("clients.noMatch", { query: escapeHtml(query) })
+          : t("clients.emptyForStatus");
+
+      list.innerHTML = `${head()}${
+        visible.length
+          ? visible.map((client) => clientRow(client, projectsByClient.get(client.id) ?? [], projectsOk)).join("")
+          : `<p class="empty-inline">${emptyMessage}</p>`
+      }`;
+
+      metrics.innerHTML = renderMetrics(clientMetrics(clients, projectsByClient));
 
       // The noun agrees with the total, not with the filtered count, so a
       // single match still reads "1 de 6 clientes".
-      count.textContent = plural("clients.countLabel", demoClients.length, {
-        visible: visible.length,
-        total: demoClients.length,
-      });
+      count.textContent = plural("clients.countLabel", clients.length, { visible: visible.length, total: clients.length });
 
-      list.querySelectorAll("[data-client-row]").forEach((row) => {
-        // Immediate feedback while the detail route renders.
-        row.addEventListener("click", () => row.classList.add("is-selected"));
-      });
+      projectsNote.hidden = projectsOk;
+      projectsNote.textContent = projectsOk ? "" : t("clients.projectsUnavailable");
     };
+
+    const load = async () => {
+      // Projects only enrich the list: if they fail, clients still render.
+      const [clientsResult, projectsResult] = await Promise.allSettled([getClients(), getProjects()]);
+      if (!list.isConnected) return false;
+
+      if (clientsResult.status === "rejected") {
+        list.removeAttribute("aria-busy");
+        list.innerHTML = `<p class="empty-inline">${escapeHtml(describeError(clientsResult.reason, t("clients.loadError")))}</p>`;
+        return false;
+      }
+
+      clients = clientsResult.value;
+      projectsOk = projectsResult.status === "fulfilled";
+      projectsByClient = projectsOk ? groupProjectsByClient(projectsResult.value) : new Map();
+      loaded = true;
+      return true;
+    };
+
+    const changeLifecycle = async (id, archive) => {
+      if (!(await confirmLifecycle(archive))) return;
+      try {
+        if (archive) await archiveClient(id);
+        else await unarchiveClient(id);
+        showToast(archive ? t("clients.clientArchived") : t("clients.clientUnarchived"));
+        if (await load()) renderList();
+      } catch (error) {
+        showToast(describeError(error, t("clients.archiveError")));
+      }
+    };
+
+    bindRowMenus(list);
+    list.addEventListener("click", (event) => {
+      const archive = event.target.closest("[data-client-archive]");
+      const restore = event.target.closest("[data-client-unarchive]");
+      if (archive) changeLifecycle(archive.dataset.clientArchive, true);
+      if (restore) changeLifecycle(restore.dataset.clientUnarchive, false);
+    });
 
     filters.forEach((button) => {
       button.addEventListener("click", () => {
@@ -187,16 +246,17 @@ export const clientsPage = {
         renderList();
       });
     });
-
     search.addEventListener("input", renderList);
-    renderList();
 
-    // Re-labels rows and metrics from the live search/filter state, so switching
-    // locale keeps the typed query, the active filter and the scroll position.
-    onLocaleChange(list, () => {
-      const metrics = document.querySelector("[data-client-metrics]");
-      if (metrics) metrics.innerHTML = renderMetrics(demoClients);
+    // Re-labels rows and metrics from the live search/filter state, so
+    // switching locale keeps the typed query, the active filter and the scroll
+    // position, without a new query.
+    onLocaleChange(list, renderList);
+
+    if (await load()) {
+      list.removeAttribute("aria-busy");
+      search.disabled = false;
       renderList();
-    });
+    }
   },
 };

@@ -22,8 +22,14 @@ function uniqueViolationField(details) {
   const text = String(details).toLowerCase();
   if (text.includes("slug")) return "slug";
   if (text.includes("case_number")) return "caseNumber";
+  if (text.includes("clients_code")) return "code";
   return null;
 }
+
+// A table or column the code expects but the database does not have yet: the
+// migration behind the feature has not been applied. Said plainly instead of
+// surfacing PostgREST's schema-cache wording.
+const SCHEMA_MISSING = new Set(["42P01", "42703", "PGRST204", "PGRST205"]);
 
 export function toDataError(error, fallbackMessage) {
   if (error instanceof DataError) return error;
@@ -39,11 +45,18 @@ export function toDataError(error, fallbackMessage) {
     if (field === "caseNumber") {
       return new DataError(t("errors.caseNumberTaken"), { code, field, cause: error });
     }
+    if (field === "code") {
+      return new DataError(t("errors.clientCodeInUse"), { code, field, cause: error });
+    }
     return new DataError(t("errors.valueInUse"), { code, cause: error });
   }
 
   if (code === "PGRST116" || code === "not_found") {
     return new DataError(t("errors.notFound"), { code: "not_found", cause: error });
+  }
+
+  if (SCHEMA_MISSING.has(code)) {
+    return new DataError(t("errors.schemaOutdated"), { code: "schema_outdated", cause: error });
   }
 
   if (code === "42501" || code === "unauthorized") {

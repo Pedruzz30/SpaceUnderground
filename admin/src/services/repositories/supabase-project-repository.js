@@ -155,6 +155,17 @@ export const supabaseProjectRepository = {
     return unwrap(result, t("errors.data.loadProjects")).map(mapProjectFromDatabase);
   },
 
+  // Summary rows for the client record: no gallery or modules, which the
+  // client's project list never renders.
+  async listByClient(clientId) {
+    const result = await getSupabaseClient()
+      .from(TABLE)
+      .select("*")
+      .eq("client_id", clientId)
+      .order("case_number", { ascending: true });
+    return unwrap(result, t("errors.data.loadProjects")).map(mapProjectFromDatabase);
+  },
+
   async getById(id) {
     return mapProjectFromDatabase(await findRow(id, PROJECT_SELECT));
   },

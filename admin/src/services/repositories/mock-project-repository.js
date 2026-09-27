@@ -82,6 +82,12 @@ export const mockProjectRepository = {
     return readAll().map(normalizeGallery);
   },
 
+  async listByClient(clientId) {
+    return readAll()
+      .filter((project) => clientId && project.clientId === clientId)
+      .map(normalizeGallery);
+  },
+
   async getById(id) {
     const project = readAll().find((entry) => entry.id === id);
     return project ? normalizeGallery(project) : null;
