@@ -4,7 +4,7 @@
    .ops-amount, .activity-list, .stats-grid) are reused as-is. */
 
 .dash-legend {
-  margin: calc(var(--space-3) * -1) 0 var(--space-4);
+  margin: calc(var(--space-2) * -1) 0 var(--space-4);
 }
 
 .dash-period {
