@@ -12,7 +12,14 @@ const PRELOAD_MARGIN = "800px 0px";
 // browser resamples the whole frame, live site included, and every line and
 // letter goes soft; flat, it renders at full resolution.
 const SETTLE_RATIO = 0.35;
-const STATE_CLASS_NAMES = ["is-preview-loading", "is-preview-live", "is-preview-sleeping", "is-preview-fallback", "is-preview-unavailable"];
+const STATE_CLASS_NAMES = [
+  "is-preview-loading",
+  "is-preview-live",
+  "is-preview-sleeping",
+  "is-preview-still",
+  "is-preview-fallback",
+  "is-preview-unavailable",
+];
 const VIEW_CLASS_NAMES = ["is-view-site", "is-view-detail", "is-view-origin"];
 
 // Resolved through t() at paint time rather than frozen into a lookup, so the
@@ -21,6 +28,7 @@ const STATE_KEYS = {
   loading: "work.previewStatus.loading",
   live: "work.previewStatus.live",
   sleeping: "work.previewStatus.sleeping",
+  still: "work.previewStatus.still",
   fallback: "work.previewStatus.fallback",
   unavailable: "work.previewStatus.unavailable",
 };
@@ -143,8 +151,20 @@ function createLivePreview(frame, mobileMedia) {
   let posterUrl = frame.dataset.projectPoster || "";
   let hasLivePreview = hasLivePreviewUrl(previewUrl);
 
+  // Phones never load the embed, so there the still image is the preview and
+  // the status says so, instead of waiting forever in standby.
+  const restingState = () => (!hasLivePreview ? "unavailable" : mobileMedia.matches ? "still" : "sleeping");
+
+  // No image at all shows the designed placeholder (name, case, accent)
+  // instead of an empty frame.
   const applyPoster = (next) => {
-    if (!poster || !next) return;
+    if (!poster) return;
+    frame.classList.toggle("is-poster-missing", !next);
+    if (!next) {
+      posterSources.forEach((node) => node.removeAttribute("srcset"));
+      poster.removeAttribute("src");
+      return;
+    }
     const formats = typeof next === "string" ? { png: next } : next;
 
     posterSources.forEach((node, format) => {
@@ -181,7 +201,7 @@ function createLivePreview(frame, mobileMedia) {
     if (iframe.src !== "about:blank") iframe.src = "about:blank";
     hasLoaded = false;
     if (activePreview === frame) activePreview = null;
-    setPreviewState(frame, hasLivePreview ? "sleeping" : "unavailable");
+    setPreviewState(frame, restingState());
   };
 
   // The embed is laid out once, at the desktop size, plus room for a
@@ -215,7 +235,7 @@ function createLivePreview(frame, mobileMedia) {
   const load = ({ preload = false } = {}) => {
     clearSleepTimer();
     if (!iframe || mobileMedia.matches) {
-      setPreviewState(frame, hasLivePreview ? "sleeping" : "unavailable");
+      setPreviewState(frame, restingState());
       return;
     }
 
@@ -258,7 +278,11 @@ function createLivePreview(frame, mobileMedia) {
   let posterFailed = false;
 
   poster?.addEventListener("error", () => {
-    if (posterFailed || !posterFallback) return;
+    if (!poster.getAttribute("src")) return;
+    if (posterFailed || !posterFallback) {
+      frame.classList.add("is-poster-missing");
+      return;
+    }
     posterFailed = true;
     applyPoster(posterFallback);
   });
@@ -289,7 +313,7 @@ function createLivePreview(frame, mobileMedia) {
     }
     applyPoster(posterUrl);
     updateLiveControls();
-    setPreviewState(frame, hasLivePreview ? "sleeping" : "unavailable");
+    setPreviewState(frame, restingState());
   };
 
   iframe?.addEventListener("load", () => {
@@ -389,12 +413,14 @@ function createLivePreview(frame, mobileMedia) {
 
   mobileMedia.addEventListener("change", (event) => {
     if (event.matches) unload();
+    else if (frame.classList.contains("is-preview-active")) load({ preload: true });
+    else setPreviewState(frame, restingState());
   });
 
   currentMode = setMode(frame, "overview", modeButtons);
   applyPoster(posterUrl);
   updateLiveControls();
-  setPreviewState(frame, hasLivePreview ? "sleeping" : "unavailable");
+  setPreviewState(frame, restingState());
   updateScale();
   preloadObserver.observe(frame);
   activeObserver.observe(frame);
@@ -435,6 +461,10 @@ function createProjectViewer(frame, preview) {
     origin: pick("data-viewer-origin"),
     coordinates: pick("data-viewer-coordinates"),
     name: pick("data-viewer-name"),
+    // The placeholder repeats the case and name inside the frame; its own
+    // hooks keep [data-viewer-*] pointing at one element each.
+    placeholderCase: pick("data-placeholder-case"),
+    placeholderName: pick("data-placeholder-name"),
     year: pick("data-viewer-year"),
     specs: pick("data-viewer-specs"),
     links: pick("data-viewer-link"),
@@ -477,6 +507,8 @@ function createProjectViewer(frame, preview) {
     write(fields.origin, project.origin || "");
     write(fields.coordinates, (project.coordinates || []).join("\n"));
     write(fields.name, project.name || "");
+    write(fields.placeholderCase, t("work.caseIndex", { id: project.id }));
+    write(fields.placeholderName, project.name || "");
     write(fields.year, t("work.yearValue", { year: project.year }));
     write(fields.specs, t("work.specs", { type: project.type, tech: project.tech, status: project.status }));
 

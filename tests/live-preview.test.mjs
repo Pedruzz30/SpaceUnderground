@@ -1,12 +1,15 @@
-// The live project preview's geometry: the embed is laid out at one desktop
-// size and only scaled.
+// The live project preview's geometry and posters: the embed is laid out at
+// one desktop size and only scaled, and every project gets an image or a
+// designed placeholder, never an empty frame.
 //
 //   npm test
 
 import { strict as assert } from "node:assert";
+import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 
 const { MODE_ZOOM, RENDER_HEIGHT, RENDER_WIDTH, SCROLLBAR_ALLOWANCE, previewScale } = await import("../src/scripts/preview-geometry.js");
+const { BUNDLED_POSTERS, resolvePoster } = await import("../src/scripts/project-posters.js");
 
 const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} is not ${expected}`);
 
@@ -36,5 +39,41 @@ describe("live preview geometry", () => {
     assert.equal(previewScale({ width: 0, height: 480 }), 0);
     assert.equal(previewScale({}), 0);
     assert.equal(previewScale(), 0);
+  });
+});
+
+describe("project posters", () => {
+  it("ships every bundled poster it points at", () => {
+    for (const [slug, poster] of Object.entries(BUNDLED_POSTERS)) {
+      for (const format of ["avif", "webp", "png"]) {
+        if (!poster[format]) continue;
+        assert.ok(existsSync(new URL(`../public/${poster[format].replace("./", "")}`, import.meta.url)), `${slug}: ${poster[format]} is missing`);
+      }
+      assert.ok(poster.width > 0 && poster.height > 0, `${slug} declares its size`);
+    }
+  });
+
+  it("uses the uploaded poster first, with the bundled one as its fallback", () => {
+    assert.deepEqual(resolvePoster({ slug: "ink-tattoo", poster_url: "https://cdn.example.com/ink.png" }), {
+      poster: "https://cdn.example.com/ink.png",
+      posterFallback: BUNDLED_POSTERS["ink-tattoo"],
+    });
+  });
+
+  it("uses a signed storage URL, and falls back to the bundled poster when signing failed", () => {
+    const signed = new Map([["projects/ink/poster.png", "https://storage.example.com/signed"]]);
+    assert.equal(resolvePoster({ slug: "ink-tattoo", poster_url: "projects/ink/poster.png" }, signed).poster, "https://storage.example.com/signed");
+    assert.equal(resolvePoster({ slug: "ink-tattoo", poster_url: "projects/ink/poster.png" }, new Map()).poster, BUNDLED_POSTERS["ink-tattoo"]);
+  });
+
+  it("stands in the bundled artwork when nothing was uploaded", () => {
+    for (const slug of ["ink-tattoo", "lucas-souza", "jarvis-ai", "despensa-digital"]) {
+      assert.deepEqual(resolvePoster({ slug, poster_url: "" }), { poster: BUNDLED_POSTERS[slug], posterFallback: null }, slug);
+    }
+  });
+
+  it("returns no image for a project with nothing uploaded or shipped, so the placeholder shows", () => {
+    assert.deepEqual(resolvePoster({ slug: "new-project", poster_url: null }), { poster: "", posterFallback: null });
+    assert.deepEqual(resolvePoster({}), { poster: "", posterFallback: null });
   });
 });

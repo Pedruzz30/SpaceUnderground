@@ -80,6 +80,7 @@ export default {
       loading: "PREVIEW / INITIALIZING",
       live: "● LIVE PREVIEW",
       sleeping: "PREVIEW / STANDBY",
+      still: "PREVIEW / STILL",
       fallback: "PREVIEW / FALLBACK",
       unavailable: "PREVIEW / UNAVAILABLE",
     },
@@ -141,6 +142,7 @@ export default {
     labelPending: "WAITING",
     yearPending: "YEAR — --",
     namePending: "Selected Work",
+    posterPending: "Preview in preparation",
   },
   jarvis: {
     productAria: "JARVIS — Space Underground experimental AI lab",

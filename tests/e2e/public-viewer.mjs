@@ -90,6 +90,31 @@ const fixture = [
     project_gallery: [],
     project_modules: [],
   },
+  {
+    case_number: 4,
+    name: "Projeto Sem Capa",
+    slug: "projeto-sem-capa",
+    client: "Estúdio Novo",
+    category: "Website",
+    description: "Projeto ainda sem imagem de capa.",
+    status: "Live",
+    year: 2026,
+    accent: "#ff7a45",
+    tech_stack: ["HTML"],
+    presentation_system: "SISTEMA DE EXPERIÊNCIA / 04",
+    presentation_label: "SITE",
+    presentation_address: "ESTÚDIO NOVO / PRODUÇÃO",
+    presentation_type: "SITE INSTITUCIONAL",
+    origin: "RJ / BR",
+    coordinates: ["22°54'S", "43°12'W"],
+    poster_url: "",
+    project_url: "https://example.com/novo",
+    preview_url: null,
+    live_preview_enabled: false,
+    translations: { en: { description: "Project with no cover image yet.", presentation_type: "COMPANY WEBSITE" } },
+    project_gallery: [],
+    project_modules: [],
+  },
 ];
 
 async function openFixturePage({ width = 1440, height = 1000, locale = "pt-BR" } = {}) {
@@ -257,6 +282,44 @@ try {
     await context.close();
   }
 
+  {
+    const { context, page } = await openFixturePage();
+    await page.locator("#work").scrollIntoViewIfNeeded();
+    await page.waitForFunction(() => document.querySelector(".signal-ui__poster")?.getAttribute("src")?.includes("tattoo-preview-poster"));
+    check(true, "a project with no uploaded poster shows the artwork shipped with the site");
+    await page.click('[data-project-slot="case-003"]');
+    await page.waitForFunction(() => document.querySelector(".signal-ui__poster")?.getAttribute("src") === "./jarvis-preview-poster-pt.svg");
+    check(true, "JARVIS AI gets its own shipped poster");
+    await page.click('[data-project-slot="case-004"]');
+    await page.waitForFunction(() => document.querySelector("[data-project-viewer]")?.classList.contains("is-poster-missing"));
+    const placeholder = await page.evaluate(() => {
+      const node = document.querySelector(".signal-ui__placeholder");
+      return {
+        visible: getComputedStyle(node).display !== "none",
+        name: node.querySelector("[data-placeholder-name]").textContent.trim(),
+        caseLabel: node.querySelector("[data-placeholder-case]").textContent.trim(),
+        poster: document.querySelector(".signal-ui__poster").getAttribute("src"),
+      };
+    });
+    check(placeholder.visible && placeholder.name === "Projeto Sem Capa" && placeholder.caseLabel === "CASE / 004", "a project with no image at all shows its placeholder, not a black frame", JSON.stringify(placeholder));
+    check(placeholder.poster === null, "the previous project's poster does not linger", String(placeholder.poster));
+    await page.click('[data-project-slot="case-001"]');
+    await page.waitForFunction(() => !document.querySelector("[data-project-viewer]")?.classList.contains("is-poster-missing"));
+    check(true, "switching back to a project with a poster hides the placeholder");
+    await context.close();
+  }
+
+  {
+    const { context, page } = await openFixturePage({ width: 390, height: 900 });
+    await page.locator("#work").scrollIntoViewIfNeeded();
+    await page.waitForTimeout(600);
+    const phone = await page.evaluate(() => {
+      const frame = document.querySelector("[data-project-viewer]");
+      return { state: frame.dataset.previewState, status: frame.querySelector("[data-preview-status]").textContent.trim() };
+    });
+    check(phone.state === "still" && phone.status === "PRÉVIA / IMAGEM", "on a phone the status says it is a still image, not standby", JSON.stringify(phone));
+    await context.close();
+  }
 } finally {
   await browser.close();
 }

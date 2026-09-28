@@ -500,9 +500,61 @@
 
 .signal-ui.is-preview-loading .signal-ui__poster,
 .signal-ui.is-preview-sleeping .signal-ui__poster,
+.signal-ui.is-preview-still .signal-ui__poster,
 .signal-ui.is-preview-fallback .signal-ui__poster,
 .signal-ui.is-preview-unavailable .signal-ui__poster {
   opacity: 1;
+}
+
+/* A project with no image yet: its case, name and accent instead of a black
+   frame. Hidden as soon as the live site is on screen. */
+.signal-ui__placeholder {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: none;
+  align-content: center;
+  justify-items: start;
+  gap: clamp(0.3rem, 0.8vw, 0.65rem);
+  padding: clamp(1rem, 4vw, 3.5rem);
+  background:
+    radial-gradient(circle at 78% 30%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 42%),
+    linear-gradient(color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px) 0 0 / 40px 40px,
+    #0b0c0b;
+  color: #eceee7;
+  pointer-events: none;
+}
+
+.signal-ui__placeholder > span,
+.signal-ui__placeholder > small {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: clamp(0.5rem, 0.8vw, 0.72rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.signal-ui__placeholder > strong {
+  max-width: 14ch;
+  font-family: var(--display);
+  font-size: clamp(1.2rem, 3.4vw, 3.2rem);
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+}
+
+.signal-ui__placeholder > small {
+  color: color-mix(in srgb, #eceee7 60%, transparent);
+}
+
+.signal-ui.is-poster-missing .signal-ui__placeholder {
+  display: grid;
+}
+
+.signal-ui.is-poster-missing .signal-ui__poster,
+.signal-ui.is-preview-live .signal-ui__placeholder {
+  display: none;
 }
 
 .signal-ui.is-preview-live .signal-ui__browser {
@@ -818,8 +870,6 @@
   transform: translate(var(--view-x), var(--view-y)) scale(1);
 }
 
-
-
 @media (max-width: 760px) {
   .signal-ui {
     top: 13%;
@@ -892,8 +942,6 @@
     font-size: clamp(0.78rem, 3.1vw, 0.96rem);
   }
 }
-
-
 
 @media (max-width: 759px) {
   .signal-ui__website-surface {
