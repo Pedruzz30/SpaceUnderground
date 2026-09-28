@@ -1,5 +1,5 @@
-/* Operations workspaces: Clients, Commercial pipeline, Financial ledger and the
-   CMS hub. Everything here extends the existing shell/panel/badge language —
+/* Operations workspaces: Clients and the CMS hub (Commercial and Financial
+   have their own sheets). Everything here extends the existing shell/panel/badge language —
    no second design system, no new colour tokens. */
 
 /* --- shared operations primitives ------------------------------------- */
@@ -260,122 +260,6 @@
   color: var(--text-soft);
 }
 
-/* --- commercial pipeline ---------------------------------------------- */
-
-.pipeline {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(14rem, 1fr);
-  gap: var(--space-3);
-  overflow-x: auto;
-  padding-bottom: var(--space-2);
-  scroll-snap-type: x proximity;
-}
-
-.pipeline__column {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--space-3);
-  background: rgba(255, 255, 255, 0.012);
-  scroll-snap-align: start;
-}
-
-.pipeline__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.6rem;
-}
-
-.pipeline__head h3 {
-  margin: 0;
-  color: var(--text-soft);
-  font: 600 0.62rem/1 var(--mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.pipeline__count {
-  min-width: 1.6rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.24rem 0.45rem;
-  color: var(--text-muted);
-  font: 600 0.58rem/1 var(--mono);
-  text-align: center;
-}
-
-.pipeline__body {
-  display: grid;
-  align-content: start;
-  gap: 0.6rem;
-  min-height: 4rem;
-}
-
-.pipeline-card {
-  display: grid;
-  gap: 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.8rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 46%),
-    rgba(255, 255, 255, 0.018);
-  cursor: grab;
-  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
-}
-
-.pipeline-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
-  background: linear-gradient(180deg, rgba(198, 255, 0, 0.055), rgba(255, 255, 255, 0.022));
-  transform: translateY(-1px);
-}
-
-.pipeline-card:active {
-  cursor: grabbing;
-  transform: none;
-}
-
-.pipeline-card__head {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.pipeline-card__client {
-  min-width: 0;
-  color: var(--accent);
-  font: 600 0.66rem/1.3 var(--mono);
-  letter-spacing: 0.08em;
-  overflow-wrap: anywhere;
-}
-
-.pipeline-card__type {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 0.85rem;
-}
-
-.pipeline-card__range {
-  margin: 0;
-  color: var(--text-soft);
-  font: 500 0.72rem/1.3 var(--mono);
-}
-
-.pipeline-card__foot {
-  color: var(--text-muted);
-  font: 500 0.6rem/1.3 var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
 /* --- shared figures ----------------------------------------------------- */
 
 .ops-figures {
@@ -559,9 +443,6 @@
     grid-column: 1;
   }
 
-  .pipeline {
-    grid-auto-columns: min(78vw, 18rem);
-  }
 }
 
 @media (max-width: 760px) {

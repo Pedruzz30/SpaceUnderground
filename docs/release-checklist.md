@@ -70,6 +70,7 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       | `20260927225753` | `clients_foundation` | APPLIED |
       | `20260928013040` | `clients_post_review_hardening` | NOT APPLIED |
       | `20260928031922` | `financial_foundation` | NOT APPLIED |
+      | `20260928035023` | `commercial_opportunities` | NOT APPLIED |
 
       Recorded versions must never be renamed or repaired. After the normalize,
       production plans read `Max` = `ON_REQUEST`, `Plus` = `AVAILABLE`,
@@ -103,6 +104,14 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       first. The public site does not depend on it.
 - [ ] Right after applying it, as `anon` with the publishable key,
       `financial_transactions?select=id&limit=1` is refused (`401`/`42501`).
+- [ ] Apply `20260928035023_commercial_opportunities.sql` **before** deploying
+      the Admin that reads `public.commercial_opportunities`: until it is in,
+      the Commercial page shows "database is missing an update" and the
+      Dashboard's pipeline panel reads as unavailable. It needs the clients
+      migrations first and leaves `commercial_proposals` untouched. The public
+      site does not depend on it.
+- [ ] Right after applying it, as `anon` with the publishable key,
+      `commercial_opportunities?select=id&limit=1` is refused (`401`/`42501`).
 - [ ] Right after applying the clients hardening, as `anon` with the publishable key:
       the public project query above still returns `200`, and
       `projects?select=client_id&limit=1` is refused (`401`/`42501`). A new

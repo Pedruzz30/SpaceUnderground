@@ -31,6 +31,7 @@ so older notes and commits stay easy to follow.
 | `20260927225753` | `clients_foundation` | APPLIED (recorded) |
 | `20260928013040` | `clients_post_review_hardening` | **NOT APPLIED** |
 | `20260928031922` | `financial_foundation` | **NOT APPLIED** |
+| `20260928035023` | `commercial_opportunities` | **NOT APPLIED** |
 
 Every recorded version and name matches
 `select version, name from supabase_migrations.schema_migrations` exactly and
@@ -155,6 +156,25 @@ ledger. **This migration is not applied to production yet.**
   client or a project keeps the ledger entry.
 - Admin-only: `anon` has no grant, and the four policies require `is_admin()`.
   The public site never reads this table.
+
+`migrations/20260928035023_commercial_opportunities.sql` creates the Commercial
+V2 pipeline. **This migration is not applied to production yet.**
+
+- `commercial_opportunities`: one row per deal, `stage` `NEW` -> `CONTACTED` ->
+  `PROPOSAL` -> `NEGOTIATION` -> `WON` | `LOST`, with `priority`, `source`,
+  `estimated_value numeric(12,2)` and a fractional `position` for the order
+  inside a board column.
+- A lead usually exists before a client or a service does, so `client_id` and
+  `plan_id` are optional (`on delete set null`) and the contact lives on the
+  row (`contact_name`, `company`, `email`, `phone`).
+- The trigger `stamp_commercial_opportunity_stage()` owns `stage_changed_at`
+  (moved only by a stage change), `closed_at` (set on `WON`/`LOST`, kept on
+  edits, cleared on reopen) and clears `lost_reason` outside `LOST`. A lost
+  deal must carry a reason.
+- `commercial_proposals` is not touched: it still requires a client and a plan
+  and stays the contract the automation service reads on
+  `commercial.proposal.accepted`.
+- Admin-only: `anon` has no grant, and the four policies require `is_admin()`.
 
 Plus:
 

@@ -46,7 +46,7 @@ const HISTORICAL = [
 ];
 
 // Written after the recorded history and not applied anywhere yet.
-const PENDING = ["clients_post_review_hardening", "financial_foundation"];
+const PENDING = ["clients_post_review_hardening", "financial_foundation", "commercial_opportunities"];
 
 function toDate(stamp) {
   const [, y, mo, d, h, mi, s] = stamp.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
@@ -179,6 +179,16 @@ describe("financial migrations", () => {
   });
 });
 
+describe("commercial migrations", () => {
+  it("comes after the clients migrations, whose table it links to", () => {
+    assert.ok(version(migrationFile("commercial_opportunities")) > version(migrationFile("clients_post_review_hardening")));
+  });
+
+  it("comes after business workflows, whose proposals it leaves untouched", () => {
+    assert.ok(version(migrationFile("commercial_opportunities")) > version(migrationFile("business_workflows")));
+  });
+});
+
 describe("fresh database", () => {
   it("applies every migration in order to an empty Supabase-shaped database", async () => {
     for (const name of FILES) {
@@ -187,7 +197,7 @@ describe("fresh database", () => {
   });
 
   it("re-applies the migrations that must be safe to run twice", async () => {
-    for (const purpose of ["automation_runs", "business_workflows", "clients_post_review_hardening", "financial_foundation"]) {
+    for (const purpose of ["automation_runs", "business_workflows", "clients_post_review_hardening", "financial_foundation", "commercial_opportunities"]) {
       const name = migrationFile(purpose);
       await assert.doesNotReject(() => db.exec(read(name)), `${name} is not idempotent`);
     }

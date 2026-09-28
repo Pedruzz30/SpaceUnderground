@@ -856,6 +856,93 @@ try {
     assert.ok(finLog.includes(action), `${action} is logged`);
   }
 
+  /* --------------------------------------------- commercial v2 foundation */
+
+  await page.evaluate(() => window.__resetSpaceAdminMocks());
+  await page.evaluate(() => localStorage.setItem("space-admin:financial:v1", "[]"));
+  const COM_FIXTURE = [
+    { id: "deal-lead", title: "E2E website", stage: "NEW", priority: "HIGH", source: "WEBSITE", clientId: null, planId: null, contactName: "Nina Prado", company: "Prado Studio", email: "nina@example.com", phone: "", estimatedValue: 3000, expectedCloseDate: null, nextAction: "Call back", nextActionAt: isoDay(-1), lastContactAt: null, lostReason: null, position: 0, notes: "", stageChangedAt: new Date().toISOString(), closedAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    { id: "deal-cold", title: "E2E landing", stage: "PROPOSAL", priority: "LOW", source: "REFERRAL", clientId: "mock-client-001", planId: "mock-plan-plus", contactName: "", company: "", email: "", phone: "", estimatedValue: 1500, expectedCloseDate: null, nextAction: "", nextActionAt: null, lastContactAt: null, lostReason: null, position: 0, notes: "", stageChangedAt: new Date().toISOString(), closedAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  ];
+  await page.evaluate((fixture) => localStorage.setItem("space-admin:commercial:v1", JSON.stringify(fixture)), COM_FIXTURE);
+  await page.goto(`${BASE_URL}/#/commercial`);
+  await page.waitForSelector("[data-com-board]:not([aria-busy]) [data-opportunity-id]");
+
+  const comMetric = async (index) =>
+    (await page.locator("[data-com-metrics] .project-metric strong").nth(index).innerText()).replace(/ /g, " ");
+  const dealStage = (id) => page.getAttribute(`[data-opportunity-id="${id}"]`, "data-stage");
+  const openDealMenu = (id) => page.locator(`[data-opportunity-id="${id}"] [data-row-menu-toggle]`).click();
+
+  assert.equal(await comMetric(0), "R$ 4.500", "open pipeline is the sum of open deals");
+  assert.equal(await comMetric(5), "1", "the missed next action is counted");
+  assert.equal(await page.locator('[data-opportunity-id="deal-lead"].is-overdue').count(), 1, "the overdue card is flagged");
+
+  // Moving through the menu, the path keyboard and touch users take.
+  await openDealMenu("deal-lead");
+  await page.click('[data-opportunity-id="deal-lead"] [data-com-action="move"][data-stage="CONTACTED"]');
+  await page.waitForFunction(() => document.querySelector('[data-opportunity-id="deal-lead"]')?.dataset.stage === "CONTACTED");
+
+  // Winning a lead creates the client and the receivable.
+  await openDealMenu("deal-lead");
+  await page.click('[data-opportunity-id="deal-lead"] [data-com-action="win"]');
+  await page.waitForSelector("[data-win-form]");
+  await page.fill("[data-win-form] [name=installments]", "3");
+  await page.click("[data-modal-confirm]");
+  await page.waitForFunction(() => document.querySelector('[data-opportunity-id="deal-lead"]')?.dataset.stage === "WON");
+  const afterWin = await page.evaluate(() => ({
+    clients: JSON.parse(localStorage.getItem("space-admin:clients:v1") || "[]").map((client) => client.name),
+    ledger: JSON.parse(localStorage.getItem("space-admin:financial:v1") || "[]").map((entry) => [entry.type, entry.status, entry.amount]),
+  }));
+  assert.ok(afterWin.clients.includes("Nina Prado"), "the lead became a client");
+  assert.deepEqual(afterWin.ledger, [["INCOME", "PENDING", 1000], ["INCOME", "PENDING", 1000], ["INCOME", "PENDING", 1000]], "the value is to receive in three parts");
+  assert.equal(await comMetric(3), "R$ 3.000", "the win counts in the period");
+
+  // Losing needs a reason.
+  await openDealMenu("deal-cold");
+  await page.click('[data-opportunity-id="deal-cold"] [data-com-action="lose"]');
+  await page.waitForSelector("[data-lost-form]");
+  await page.click("[data-modal-confirm]");
+  await settle();
+  assert.ok(await page.locator('[data-lost-form] [data-error-for="lostReason"]:not([hidden])').count(), "a loss without a reason is refused");
+  await page.selectOption("[data-lost-form] [name=lostReason]", "PRICE");
+  await page.click("[data-modal-confirm]");
+  await page.waitForFunction(() => document.querySelector('[data-opportunity-id="deal-cold"]')?.dataset.stage === "LOST");
+  assert.equal(await comMetric(4), "50%", "one won and one lost is half converted");
+
+  // Reopening brings it back to negotiation.
+  await openDealMenu("deal-cold");
+  await page.click('[data-opportunity-id="deal-cold"] [data-com-action="reopen"]');
+  await page.waitForFunction(() => document.querySelector('[data-opportunity-id="deal-cold"]')?.dataset.stage === "NEGOTIATION");
+
+  // A new deal needs a title and somebody on the other side.
+  await page.click("[data-com-new]");
+  await page.waitForSelector("[data-com-form]");
+  await page.click("[data-modal-confirm]");
+  await settle();
+  assert.ok(await page.locator('[data-com-form] [data-error-for="title"]:not([hidden])').count(), "missing title is flagged");
+  assert.ok(await page.locator('[data-com-form] [data-error-for="contactName"]:not([hidden])').count(), "missing contact is flagged");
+  await page.fill("[data-com-form] [name=title]", "E2E automation");
+  await page.fill("[data-com-form] [name=company]", "Robo Ltda");
+  await page.fill("[data-com-form] [name=estimatedValue]", "2.500,00");
+  await page.click("[data-modal-confirm]");
+  await page.waitForFunction(() => !document.querySelector("[data-com-form]"));
+  const created = page.locator("[data-opportunity-id]", { hasText: "E2E automation" });
+  await created.waitFor();
+  assert.equal(await created.getAttribute("data-stage"), "NEW", "a new deal starts as new");
+
+  // Deleting asks first.
+  const createdId = await created.getAttribute("data-opportunity-id");
+  await openDealMenu(createdId);
+  await page.click(`[data-opportunity-id="${createdId}"] [data-com-action="delete"]`);
+  await page.click("[data-modal-confirm]");
+  await page.waitForFunction((id) => !document.querySelector(`[data-opportunity-id="${id}"]`), createdId);
+
+  const comLog = await page.evaluate(() => JSON.parse(localStorage.getItem("space-admin:activity:v1") || "[]").map((entry) => entry.action));
+  for (const action of ["commercial.stage_changed", "commercial.won", "commercial.lost", "commercial.reopened", "commercial.created", "commercial.deleted"]) {
+    assert.ok(comLog.includes(action), `${action} is logged`);
+  }
+  assert.ok(comLog.includes("client.created") && comLog.includes("financial.installments_created"), "the win's side effects are logged too");
+
   assert.deepEqual(errors, [], "no console or page errors");
   console.log("admin flow: all checks passed");
 } finally {
