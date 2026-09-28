@@ -68,7 +68,7 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       | `20260914025524` | `011_business_workflows` | APPLIED |
       | `20260927225426` | `normalize_plan_status` | APPLIED |
       | `20260927225753` | `clients_foundation` | APPLIED |
-      | `20260928013040` | `clients_post_review_hardening` | NOT APPLIED |
+      | `20260928013040` | `clients_post_review_hardening` | APPLIED |
       | `20260928031922` | `financial_foundation` | NOT APPLIED |
       | `20260928035023` | `commercial_opportunities` | NOT APPLIED |
 
@@ -93,10 +93,9 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       to re-run the foundation migrations.
 - [x] `20260927225753_clients_foundation.sql` is applied (it requires
       `20260914025524_011_business_workflows`, which creates `public.clients`).
-- [ ] Apply `20260928013040_clients_post_review_hardening.sql` **before**
-      deploying the Admin that reads `clients.last_contact_at`: until it is in,
-      the Client Hub shows "database is missing an update" and the Dashboard
-      reads "—" for the client KPIs. The public site does not depend on it.
+- [x] `20260928013040_clients_post_review_hardening.sql` is applied (the
+      Admin reads `clients.last_contact_at`, and `anon` no longer reads
+      `projects.client_id`).
 - [ ] Apply `20260928031922_financial_foundation.sql` **before** deploying the
       Admin that reads `public.financial_transactions`: until it is in, the
       Financial page shows "database is missing an update" and the Dashboard's

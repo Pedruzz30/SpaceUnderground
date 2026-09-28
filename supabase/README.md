@@ -29,7 +29,7 @@ so older notes and commits stay easy to follow.
 | `20260914025524` | `011_business_workflows` | APPLIED (recorded) |
 | `20260927225426` | `normalize_plan_status` | APPLIED (recorded) |
 | `20260927225753` | `clients_foundation` | APPLIED (recorded) |
-| `20260928013040` | `clients_post_review_hardening` | **NOT APPLIED** |
+| `20260928013040` | `clients_post_review_hardening` | APPLIED (recorded) |
 | `20260928031922` | `financial_foundation` | **NOT APPLIED** |
 | `20260928035023` | `commercial_opportunities` | **NOT APPLIED** |
 
@@ -125,8 +125,8 @@ without it. Applied in production.
   of moving or clearing a link someone else made.
 
 `migrations/20260928013040_clients_post_review_hardening.sql` follows the applied
-clients foundation, which is not edited. **This migration is not applied to
-production yet.**
+clients foundation, which is not edited. It is applied to production and must
+not be edited either.
 
 - Takes `projects.client_id` off the public surface. The foundation added it to
   a table `anon` could read table-wide, so `projects?select=client_id` exposed

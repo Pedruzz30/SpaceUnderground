@@ -29,6 +29,7 @@ const RECORDED_IN_PRODUCTION = [
   "20260914025524_011_business_workflows.sql",
   "20260927225426_normalize_plan_status.sql",
   "20260927225753_clients_foundation.sql",
+  "20260928013040_clients_post_review_hardening.sql",
 ];
 
 // Schema production already had before the CLI recorded anything. Their
@@ -46,7 +47,7 @@ const HISTORICAL = [
 ];
 
 // Written after the recorded history and not applied anywhere yet.
-const PENDING = ["clients_post_review_hardening", "financial_foundation", "commercial_opportunities"];
+const PENDING = ["financial_foundation", "commercial_opportunities"];
 
 function toDate(stamp) {
   const [, y, mo, d, h, mi, s] = stamp.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
@@ -156,6 +157,16 @@ describe("production history", () => {
     for (const purpose of PENDING) {
       assert.ok(version(migrationFile(purpose)) > last, `${purpose} must come after ${last}`);
     }
+  });
+
+  // Every file past the recorded history is one the next release applies, so
+  // an unlisted one would reach production without anyone reviewing it.
+  it("has exactly the pending migrations after the recorded history, in order", () => {
+    const last = version(RECORDED_IN_PRODUCTION.at(-1));
+    assert.deepEqual(
+      FILES.filter((name) => version(name) > last),
+      PENDING.map((purpose) => migrationFile(purpose)),
+    );
   });
 });
 
