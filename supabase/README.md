@@ -4,9 +4,50 @@ Database foundation for the admin panel and CMS. The public site now reads
 published project, media, plan, content and settings data through the anon key
 and RLS.
 
-## What the migrations create
+## Migration format
 
-`migrations/001_admin_foundation.sql`
+Migrations follow the Supabase CLI format `YYYYMMDDHHMMSS_<name>.sql`. The
+14 digit timestamp is the version the CLI records in
+`supabase_migrations.schema_migrations`; the rest of the name only describes
+the migration. Versions are unique and sort chronologically, which
+`admin/tests/migration-chain.test.mjs` enforces.
+
+The project used to number migrations `001_` to `012_`. That broke twice: two
+files shared `010`, and production recorded CLI timestamps while the repository
+kept ordinals. Every file now carries a timestamp; the historical ones keep
+their old ordinal inside the name (`20260909062014_001_admin_foundation.sql`)
+so older notes and commits stay easy to follow.
+
+### Known remote state (production `zvzfkfvxbuofgqrrogxh`)
+
+| Version | Migration | State |
+| --- | --- | --- |
+| `20260909062014` .. `20260910225035` | `001` .. `007` (admin foundation to activity log) | APPLIED (recorded by history repair) |
+| `20260912202425` | `editorial_i18n` | APPLIED (recorded) |
+| `20260913031225` | `project_live_preview` | APPLIED (recorded) |
+| `20260913211045` | `automation_runs` | APPLIED (recorded) |
+| `20260914025524` | `011_business_workflows` | APPLIED (recorded) |
+| `20260927225426` | `normalize_plan_status` | APPLIED (recorded) |
+| `20260927225753` | `clients_foundation` | APPLIED (recorded) |
+| `20260928013040` | `clients_post_review_hardening` | **NOT APPLIED** |
+| `20260928031922` | `financial_foundation` | **NOT APPLIED** |
+| `20260928035023` | `commercial_opportunities` | **NOT APPLIED** |
+
+Every recorded version and name matches
+`select version, name from supabase_migrations.schema_migrations` exactly and
+must never be renamed. `011_business_workflows` keeps its old ordinal in the
+name because that is the name production recorded.
+
+The versions of `001`..`007` are reconciliation identifiers, not deploy
+times: each is the UTC time of the commit that first added the file.
+`003`..`007` were added in the same commit (`3ee8c2f`, 2026-09-10 22:50:31
+UTC), so they take consecutive seconds from `225031` to keep their order.
+Their schema already existed in production, so the CLI history was repaired to
+mark these seven versions as applied (their SQL was not re-run).
+
+### What each migration creates
+
+`migrations/20260909062014_001_admin_foundation.sql`
 
 | Table | Purpose |
 | --- | --- |
@@ -14,30 +55,126 @@ and RLS.
 | `projects` | Portfolio cases. `id` is a uuid; `case_number` is the editorial identity (CASE 001). |
 | `project_gallery` | Gallery images per project. Not wired to uploads yet. |
 
-`migrations/002_project_media_storage.sql` creates the private `project-media`
-bucket and storage policies.
+`migrations/20260910011630_002_project_media_storage.sql` creates the private
+`project-media` bucket and storage policies.
 
-`migrations/003_project_presentation.sql` adds the project viewer presentation
-columns and the ordered `project_modules` table.
+`migrations/20260910225031_003_project_presentation.sql` adds the project
+viewer presentation columns and the ordered `project_modules` table.
 
-`migrations/004_plans_cms.sql` adds public commercial plans plus ordered
-`plan_features`.
+`migrations/20260910225032_004_plans_cms.sql` adds public commercial plans plus
+ordered `plan_features`.
 
-`migrations/005_site_content.sql` adds structured public content by key.
+`migrations/20260910225033_005_site_content.sql` adds structured public
+content by key.
 
-`migrations/006_site_settings.sql` adds safe public runtime settings. Build-time
-SEO generation still belongs to `site.config.js`; editing settings in the admin
-does not pretend to rebuild sitemap/canonical output.
+`migrations/20260910225034_006_site_settings.sql` adds safe public runtime
+settings. Build-time SEO generation still belongs to `site.config.js`; editing
+settings in the admin does not pretend to rebuild sitemap/canonical output.
 
-`migrations/007_activity_log.sql` adds the admin-only activity log.
+`migrations/20260910225035_007_activity_log.sql` adds the admin-only activity
+log.
 
-`migrations/008_editorial_i18n.sql` adds the optional `translations` JSONB
-columns. pt-BR text stays in the existing columns as the primary source.
+`migrations/20260912202425_editorial_i18n.sql` adds the optional
+`translations` JSONB columns. pt-BR text stays in the existing columns as the
+primary source.
 
-`migrations/009_project_live_preview.sql` adds
+`migrations/20260913031225_project_live_preview.sql` adds
 `projects.live_preview_enabled`. The public viewer only frames `preview_url`
 when this flag is true, so a URL alone never puts a project on the site. The
 column defaults to false and the migration enables CASE 001 and 002.
+
+`migrations/20260913211045_automation_runs.sql` adds `automation_runs`, the
+workflow engine's run history. RLS is on with no policy: only the automation
+service (service role) reads or writes it.
+
+`migrations/20260914025524_011_business_workflows.sql` adds `clients`,
+`commercial_proposals` and `commercial_project_handoffs`, all admin-only.
+Both this and `automation_runs` were created in production from the automation
+branch before they joined this repository's main line; their content is
+unchanged and idempotent.
+
+`migrations/20260927225426_normalize_plan_status.sql` is a data-only normalization of
+`plans.status` to the canonical values (`AVAILABLE`, `ON_REQUEST`, ...). It is
+applied only after the compatible code is deployed and smoke tested (see
+`docs/release-checklist.md`). Applied: production plans read `Max` =
+`ON_REQUEST`, `Plus` = `AVAILABLE`, `Pro` = `AVAILABLE`.
+
+`migrations/20260927225753_clients_foundation.sql` (Clients V2) builds on the
+`clients` table from `20260914025524_011_business_workflows` and refuses to run
+without it. Applied in production.
+
+- `clients.notes` and `clients.archived_at` (set and cleared by a trigger when
+  `status` enters or leaves `ARCHIVED`);
+- `clients.code` is `not null` and defaults to `public.next_client_code()`,
+  which draws `CLIENT-001`, `CLIENT-002`, ... from `clients_code_seq` and skips
+  codes typed by hand. Numbers are never reused and never derived from
+  `count(*)`. Existing rows without a code are backfilled in creation order;
+- `next_client_code()` is revoked from `anon`, and `clients_code_seq` from every
+  API role: Supabase's default privileges would otherwise let visitors burn
+  numbers through `/rpc`. `authenticated` keeps `EXECUTE` because an admin's
+  insert evaluates the column default, but the function itself only serves an
+  admin (`is_admin()`), the service role, or SQL with no request JWT
+  (migrations, SQL editor). Public sign-up is open, so any other signed-in
+  user is refused with `42501` before `nextval()`, and a refused call never
+  consumes a number;
+- `projects.client_id`, an optional foreign key (`on delete set null`). Existing
+  projects keep working without a client, and `projects.client` (the public
+  label) is untouched. The public site does not select `client_id`. The Admin
+  links with a conditional `UPDATE ... where client_id is null` and unlinks
+  with `where client_id = <expected client>`, so a stale tab is refused instead
+  of moving or clearing a link someone else made.
+
+`migrations/20260928013040_clients_post_review_hardening.sql` follows the applied
+clients foundation, which is not edited. **This migration is not applied to
+production yet.**
+
+- Takes `projects.client_id` off the public surface. The foundation added it to
+  a table `anon` could read table-wide, so `projects?select=client_id` exposed
+  the owner of every published project. Now `anon` has column-level `SELECT`
+  on every public column except `client_id`, and `projects_public_read` applies
+  to `anon` only, so a signed-in non-admin (sign-up is open) matches no project
+  row at all. Admins keep full access through `projects_admin_all`. Column
+  grants do not cover columns added later: a new public column must be added
+  to the grant, which `tests/schema-contract.test.mjs` enforces.
+- Adds `clients.last_contact_at timestamptz`, null until someone records a real
+  contact in the Admin. No trigger maintains it: editing a record is not
+  talking to the client. The Dashboard's quiet-relationship follow-up reads it.
+
+`migrations/20260928031922_financial_foundation.sql` creates the Financial V2
+ledger. **This migration is not applied to production yet.**
+
+- `financial_transactions`: one row per amount the studio expects to receive or
+  pay. `type` is `INCOME` or `EXPENSE` (there is no receivable type: "to
+  receive" is pending income), `status` is `PENDING`, `PAID` or `CANCELLED`,
+  and `amount numeric(12,2)` is always positive, the sign coming from `type`.
+  Only `PAID` counts toward revenue and expenses.
+- `due_date` is when the money is expected; `paid_at` is owned by the database
+  (`stamp_financial_paid_at()`): stamped when an entry becomes `PAID` (today
+  unless the Admin sends the real date), kept on later edits, cleared when it
+  leaves `PAID`. A check constraint makes a paid row without a date impossible.
+- Optional `client_id` and `project_id`, both `on delete set null`: removing a
+  client or a project keeps the ledger entry.
+- Admin-only: `anon` has no grant, and the four policies require `is_admin()`.
+  The public site never reads this table.
+
+`migrations/20260928035023_commercial_opportunities.sql` creates the Commercial
+V2 pipeline. **This migration is not applied to production yet.**
+
+- `commercial_opportunities`: one row per deal, `stage` `NEW` -> `CONTACTED` ->
+  `PROPOSAL` -> `NEGOTIATION` -> `WON` | `LOST`, with `priority`, `source`,
+  `estimated_value numeric(12,2)` and a fractional `position` for the order
+  inside a board column.
+- A lead usually exists before a client or a service does, so `client_id` and
+  `plan_id` are optional (`on delete set null`) and the contact lives on the
+  row (`contact_name`, `company`, `email`, `phone`).
+- The trigger `stamp_commercial_opportunity_stage()` owns `stage_changed_at`
+  (moved only by a stage change), `closed_at` (set on `WON`/`LOST`, kept on
+  edits, cleared on reopen) and clears `lost_reason` outside `LOST`. A lost
+  deal must carry a reason.
+- `commercial_proposals` is not touched: it still requires a client and a plan
+  and stays the contract the automation service reads on
+  `commercial.proposal.accepted`.
+- Admin-only: `anon` has no grant, and the four policies require `is_admin()`.
 
 Plus:
 
@@ -82,6 +219,9 @@ RLS is enabled on all CMS tables.
 | `site_content_public_read` | Public visitors may read structured site content. |
 | `site_settings_public_read` | Public visitors may read safe runtime settings. |
 | `activity_log_admin_read` | Only admins can read activity. No anonymous grant exists. |
+| `automation_runs` | RLS enabled with no policy: invisible to `anon` and `authenticated`; only the service role reaches it. |
+| `clients_admin_*`, `commercial_proposals_admin_*`, `commercial_project_handoffs_admin_*` | Admin-only select/insert/update/delete. `anon` has every grant revoked. |
+| `projects.client_id` / clients lifecycle | Admin-only through the policies above. The Admin never hard-deletes a client: archiving is reversible. |
 
 There is **no public write path**. Authorization lives here, not in the
 frontend: hiding a button or a route is not security.
@@ -94,8 +234,8 @@ With the Supabase CLI, apply migrations in order:
 supabase db push
 ```
 
-Or paste each migration into the SQL editor in order. Do not edit already
-applied migrations `001` and `002`; create incremental migrations instead.
+Or paste each migration into the SQL editor in order. Never edit or rename an
+applied migration; create a new timestamped migration instead.
 
 ### Verifying it before deploying
 

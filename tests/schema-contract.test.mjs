@@ -179,10 +179,47 @@ describe("modern publishable keys", () => {
   });
 });
 
+// Clients V2 adds a private table and an optional projects.client_id. The public
+// site must never reach for either: clients is admin-only (anon has no grant),
+// so selecting it would fail the whole Selected Work query.
+describe("clients stay out of the public query", () => {
+  it("never selects client_id or embeds clients", () => {
+    const columns = selectedColumns("PROJECT_COLUMNS");
+    assert.equal(columns.includes("client_id"), false);
+    assert.doesNotMatch(publicSource, /clients\(/, "the public query must not embed the clients table");
+  });
+
+  it("lets anon read every column the public query selects, and never client_id", () => {
+    // Since the post-review hardening anon reads public.projects through a
+    // column-level grant. Column grants do not cover columns added later, so a
+    // column the site starts selecting has to be granted in a migration too.
+    const grants = [...migrationSql.matchAll(/grant select \(([^)]*)\) on public\.projects to anon/gi)];
+    assert.ok(grants.length > 0, "no column-level anon grant on public.projects");
+    const granted = grants.at(-1)[1].split(",").map((column) => column.trim());
+
+    const missing = selectedColumns("PROJECT_COLUMNS").filter((column) => !granted.includes(column));
+    assert.deepEqual(missing, [], `selected by the public site but not granted to anon: ${missing.join(", ")}`);
+    for (const column of ["editorial_status", "visible", "case_number", "id"]) {
+      assert.ok(granted.includes(column), `the public filters and policies need ${column}`);
+    }
+    assert.equal(granted.includes("client_id"), false, "client_id must never be granted to anon");
+  });
+
+  it("keeps projects.client_id optional", () => {
+    const file = migrationFiles.find((name) => name.includes("clients_foundation"));
+    assert.ok(file, "no migration adds the clients foundation");
+    const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf8");
+    assert.match(sql, /add column if not exists client_id uuid references public\.clients \(id\) on delete set null/i);
+    assert.doesNotMatch(sql, /client_id uuid[^;,]*not null|alter column client_id set not null/i, "existing projects must not need a client");
+  });
+});
+
 describe("plan status normalization migration", () => {
-  it("ships migration 010 for every canonical plan status", () => {
-    const file = migrationFiles.find((name) => name === "010_normalize_plan_status.sql");
-    assert.ok(file, "migration 010_normalize_plan_status.sql is missing");
+  it("ships the normalization for every canonical plan status", () => {
+    // Found by purpose, not version: the version is a Supabase timestamp.
+    const matches = migrationFiles.filter((name) => /^\d{14}_normalize_plan_status\.sql$/.test(name));
+    assert.equal(matches.length, 1, `expected one *_normalize_plan_status.sql migration, found ${matches.length}`);
+    const [file] = matches;
 
     const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf8");
     assert.match(sql, /update\s+public\.plans/i, "migration must be limited to public.plans data");

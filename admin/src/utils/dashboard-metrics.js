@@ -1,17 +1,15 @@
 // Pure derivations behind the Dashboard command center.
 //
-// Two data origins meet on the Dashboard and are kept apart on purpose:
-//
-//   REAL  — `projects` and `activity` arrive from the configured repository
-//           (mock or Supabase) through the existing services.
-//   DEMO  — clients, opportunities, transactions and the financial summary come
-//           from src/data/operations-demo.js. Those modules have no backend
-//           yet, so every figure derived from them is presentation-only.
+// Every input is real: clients, projects, activity, the financial ledger and
+// the commercial pipeline arrive from the configured repository (mock or
+// Supabase) through their services.
 //
 // Nothing here reads a module directly: callers pass the data in, which keeps
 // these functions pure and testable.
 
-import { financialSummary } from "./financial-metrics.js";
+import { isActiveProject } from "./client-metrics.js";
+import { daysInStage, displayName, isActionOverdue, isOpen, normalizeOpportunity } from "./commercial-metrics.js";
+import { effectiveDate, financialSummary, isOverdue, normalizeEntry, openPayables, openReceivables } from "./financial-metrics.js";
 
 export const PERIODS = [
   { id: "month", label: "This month", labelKey: "dashboard.periods.month" },
@@ -40,26 +38,25 @@ export function withinPeriod(value, id, now = new Date()) {
   return date.getTime() >= periodStart(id, now).getTime() && date.getTime() <= (now instanceof Date ? now : new Date(now)).getTime();
 }
 
-/* --- KPIs (presentation-only) ------------------------------------------ */
+/* --- KPIs --------------------------------------------------------------- */
 
 // "Active projects" means client engagements in delivery, not published cases:
-// a published portfolio entry is an editorial state, not an active job.
-export function activeEngagements(clients) {
-  return clients.reduce(
-    (total, client) => total + client.projects.filter((project) => project.status === "ACTIVE").length,
-    0,
-  );
+// a published portfolio entry is an editorial state, not an active job. Only
+// projects linked to a client record count, with the Client Hub's own rule.
+export function activeEngagements(projects) {
+  return projects.filter((project) => project.clientId && isActiveProject(project)).length;
 }
 
 export function activeClients(clients) {
   return clients.filter((client) => client.status === "ACTIVE").length;
 }
 
+// Won and lost deals are both closed.
 export function openOpportunities(opportunities) {
-  return opportunities.filter((opportunity) => opportunity.stage !== "WON").length;
+  return opportunities.filter((opportunity) => isOpen(opportunity)).length;
 }
 
-/* --- Commercial pipeline (presentation-only) --------------------------- */
+/* --- Commercial pipeline ------------------------------------------------ */
 
 export function pipelineSummary(stages, opportunities) {
   const counted = stages.map((stage) => ({
@@ -68,7 +65,7 @@ export function pipelineSummary(stages, opportunities) {
     count: opportunities.filter((opportunity) => opportunity.stage === stage.id).length,
   }));
 
-  const open = opportunities.filter((opportunity) => opportunity.stage !== "WON");
+  const open = opportunities.filter((opportunity) => isOpen(opportunity));
 
   return {
     stages: counted,
@@ -78,14 +75,19 @@ export function pipelineSummary(stages, opportunities) {
   };
 }
 
-/* --- Financial (presentation-only) ------------------------------------- */
+/* --- Financial ----------------------------------------------------------- */
 
 // The period window is the only thing the Dashboard adds: the rules for what
 // counts as revenue or an expense live in financial-metrics.js, so this and the
 // Financial page can never disagree. "To receive" is deliberately absent — an
 // open balance is point-in-time, not something a date range scopes.
 export function financialTotals(transactions, periodId, now = new Date()) {
-  const scoped = transactions.filter((transaction) => withinPeriod(transaction.date, periodId, now));
+  // An entry's day is a calendar date: read it at local midnight, so an entry
+  // dated the 1st is inside "this month" whatever the timezone offset.
+  const scoped = transactions.filter((transaction) => {
+    const day = effectiveDate(transaction);
+    return Boolean(day) && withinPeriod(new Date(`${day}T00:00:00`), periodId, now);
+  });
   const { revenue, expenses, result } = financialSummary(scoped);
 
   return { revenue, expenses, result, transactions: scoped };
@@ -112,36 +114,62 @@ const WEIGHT = {
 export function operationalChecks({ transactions = [], opportunities = [] } = {}) {
   const items = [];
 
-  transactions
-    .filter((transaction) => transaction.type === "RECEIVABLE" && transaction.status === "PENDING")
-    .forEach((transaction) => {
-      items.push({
-        weight: WEIGHT.receivable,
-        tone: "warning",
-        category: "FINANCIAL",
-        title: transaction.client || transaction.description,
-        detail: `${transaction.description} pending`,
-        detailKey: "dashboard.attention.transactionPending",
-        detailParams: { description: transaction.description },
-        amount: Math.abs(transaction.amount),
-        href: "#/financial",
-      });
-    });
+  // Every open receivable, late ones first and flagged; payables only once
+  // they are late, since a bill that is not due yet needs no action.
+  const financialItem = (transaction, overdue, detailKey) => {
+    const entry = normalizeEntry(transaction);
+    return {
+      weight: overdue ? WEIGHT.receivable - 1 : WEIGHT.receivable,
+      tone: overdue ? "danger" : "warning",
+      category: "FINANCIAL",
+      title: entry.clientName || entry.client || entry.description,
+      detail: `${entry.description} ${overdue ? "overdue" : "pending"}`,
+      detailKey,
+      detailParams: { description: entry.description },
+      amount: entry.amount,
+      href: "#/financial",
+    };
+  };
 
-  opportunities
-    .filter((opportunity) => opportunity.stage !== "WON" && opportunity.priority === "HIGH")
-    .forEach((opportunity) => {
+  openReceivables(transactions).forEach((transaction) => {
+    const overdue = isOverdue(transaction);
+    items.push(financialItem(transaction, overdue, overdue ? "dashboard.attention.transactionOverdue" : "dashboard.attention.transactionPending"));
+  });
+  openPayables(transactions)
+    .filter((transaction) => isOverdue(transaction))
+    .forEach((transaction) => items.push(financialItem(transaction, true, "dashboard.attention.payableOverdue")));
+
+  // One item per deal: a missed next action says so; otherwise an open high
+  // priority deal is flagged with whatever activity it carries.
+  opportunities.filter((opportunity) => isOpen(opportunity)).forEach((opportunity) => {
+    const deal = normalizeOpportunity(opportunity);
+    const title = displayName(deal);
+    if (isActionOverdue(deal)) {
       items.push({
         weight: WEIGHT.highPriority,
         tone: "danger",
         category: "COMMERCIAL",
-        title: opportunity.client,
-        detail: `High priority · ${opportunity.activity.toLowerCase()}`,
-        detailKey: "dashboard.attention.highPriority",
-        detailParams: { activity: opportunity.activity.toLowerCase() },
+        title,
+        detail: `Next action overdue · ${deal.nextAction || deal.title}`,
+        detailKey: "dashboard.attention.actionOverdue",
+        detailParams: { action: deal.nextAction || deal.title },
         href: "#/commercial",
       });
+      return;
+    }
+    if (deal.priority !== "HIGH") return;
+    const activity = String(deal.activity || deal.nextAction || "").toLowerCase();
+    items.push({
+      weight: WEIGHT.highPriority,
+      tone: "danger",
+      category: "COMMERCIAL",
+      title,
+      detail: activity ? `High priority · ${activity}` : "High priority",
+      detailKey: activity ? "dashboard.attention.highPriority" : "dashboard.attention.highPriorityPlain",
+      detailParams: { activity },
+      href: "#/commercial",
     });
+  });
 
   return items;
 }
@@ -222,17 +250,25 @@ export function followUps({ clients = [], opportunities = [] } = {}, now = new D
     });
 
   opportunities
-    .filter((opportunity) => opportunity.stage === "PROPOSAL")
+    .filter((opportunity) => normalizeOpportunity(opportunity).stage === "PROPOSAL")
     .forEach((opportunity) => {
-      items.push({
-        weight: 20,
-        category: "PROPOSAL",
-        title: opportunity.client,
-        detail: `${opportunity.activity} · awaiting reply`,
-        detailKey: "dashboard.followUp.awaitingReply",
-        detailParams: { activity: opportunity.activity },
-        href: "#/commercial",
-      });
+      const days = daysInStage(opportunity, now instanceof Date ? now : new Date(now));
+      const base = { weight: 20, category: "PROPOSAL", title: displayName(opportunity), href: "#/commercial" };
+      if (opportunity.activity) {
+        items.push({
+          ...base,
+          detail: `${opportunity.activity} · awaiting reply`,
+          detailKey: "dashboard.followUp.awaitingReply",
+          detailParams: { activity: opportunity.activity },
+        });
+      } else {
+        items.push({
+          ...base,
+          detail: `Proposal waiting ${days ?? 0} days`,
+          detailKey: "dashboard.followUp.proposalWaiting",
+          detailParams: { days: days ?? 0 },
+        });
+      }
     });
 
   clients

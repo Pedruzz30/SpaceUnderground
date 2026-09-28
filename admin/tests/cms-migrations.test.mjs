@@ -1,10 +1,9 @@
 import { strict as assert } from "node:assert";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
+import { readMigration } from "./helpers/migration-files.mjs";
 
-const migration = (name) => readFileSync(fileURLToPath(new URL(`../../supabase/migrations/${name}`, import.meta.url)), "utf8");
+const migration = readMigration;
 
 const ADMIN_ID = "11111111-1111-1111-1111-111111111111";
 const USER_ID = "22222222-2222-2222-2222-222222222222";
@@ -53,13 +52,13 @@ before(async () => {
   ]);
 
   for (const name of [
-    "001_admin_foundation.sql",
-    "003_project_presentation.sql",
-    "004_plans_cms.sql",
-    "005_site_content.sql",
-    "006_site_settings.sql",
-    "007_activity_log.sql",
-    "008_editorial_i18n.sql",
+    "admin_foundation",
+    "project_presentation",
+    "plans_cms",
+    "site_content",
+    "site_settings",
+    "activity_log",
+    "editorial_i18n",
   ]) {
     await db.exec(migration(name));
   }
@@ -82,12 +81,12 @@ after(async () => {
 describe("cms migrations", () => {
   it("re-apply without error", async () => {
     for (const name of [
-      "003_project_presentation.sql",
-      "004_plans_cms.sql",
-      "005_site_content.sql",
-      "006_site_settings.sql",
-      "007_activity_log.sql",
-      "008_editorial_i18n.sql",
+      "project_presentation",
+      "plans_cms",
+      "site_content",
+      "site_settings",
+      "activity_log",
+      "editorial_i18n",
     ]) {
       await db.exec(migration(name));
     }

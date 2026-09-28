@@ -43,6 +43,33 @@
   color: var(--warning);
 }
 
+.save-state.is-saving {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
+}
+
+.save-state.is-error {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+  color: var(--danger);
+}
+
+/* Repainted as one unit on every keystroke, but laid out as part of the
+   surrounding identity row. */
+.client-identity {
+  display: contents;
+}
+
+.client-contact-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.client-contact-field input {
+  flex: 1 1 10rem;
+}
+
 .editor-toolbar {
   position: sticky;
   z-index: 8;
@@ -55,7 +82,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.75rem;
-  background: rgba(12, 15, 11, 0.86);
+  background: rgba(8, 8, 8, 0.86);
   backdrop-filter: blur(14px);
 }
 
@@ -66,14 +93,14 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.35rem;
-  background: rgba(255, 255, 255, 0.018);
+  background: var(--surface);
 }
 
 .tabs [role="tab"] {
   flex: 1;
   min-height: 2.65rem;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   padding: 0.75rem 1rem;
   color: var(--text-muted);
@@ -97,9 +124,9 @@
 }
 
 .tabs [role="tab"][aria-selected="true"] {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
-  background: var(--accent-soft);
-  color: var(--accent);
+  border-color: var(--border);
+  background: var(--surface-strong);
+  color: var(--text-primary);
 }
 
 .tabs [role="tab"][aria-selected="true"]::after {
@@ -112,9 +139,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-4);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.028), transparent 36%),
-    rgba(7, 8, 6, 0.42);
+  background: var(--surface);
 }
 
 .tab-panel[hidden] {
@@ -232,7 +257,7 @@
   height: min(620px, 68vh);
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: #050605;
+  background: var(--bg);
 }
 
 .readiness-modal ul {
@@ -327,7 +352,7 @@ fieldset.field legend {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.8rem;
-  background: rgba(5, 6, 5, 0.38);
+  background: var(--bg);
 }
 
 .chip-list {
@@ -342,7 +367,7 @@ fieldset.field legend {
   gap: 0.4rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(198, 255, 0, 0.055);
+  background: var(--accent-soft);
   padding: 0.35rem 0.4rem 0.35rem 0.65rem;
   color: var(--text-primary);
   font: 600 0.66rem/1 var(--mono);
@@ -473,7 +498,7 @@ fieldset.field legend {
   aspect-ratio: 4 / 3;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: #050605;
+  background: var(--bg);
   box-shadow: var(--shadow-soft);
 }
 
@@ -493,7 +518,7 @@ fieldset.field legend {
   height: 1.5rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(8, 9, 8, 0.85);
+  background: rgba(8, 8, 8, 0.85);
   color: var(--text-primary);
   font-size: 0.9rem;
   line-height: 1;
@@ -546,7 +571,7 @@ fieldset.field legend {
   border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--danger) 10%, transparent), transparent 38%),
-    rgba(8, 9, 8, 0.9);
+    rgba(8, 8, 8, 0.9);
 }
 
 .danger-zone > p {
@@ -568,7 +593,7 @@ fieldset.field legend {
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(4, 5, 4, 0.72);
+  background: rgba(0, 0, 0, 0.72);
   padding: var(--space-4);
   backdrop-filter: blur(10px);
 }
@@ -579,7 +604,7 @@ fieldset.field legend {
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: linear-gradient(180deg, #12150f, #0a0c0a);
+  background: var(--surface-strong);
   padding: var(--space-4);
   box-shadow: var(--shadow);
 }

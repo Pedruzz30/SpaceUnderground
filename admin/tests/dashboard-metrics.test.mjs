@@ -22,6 +22,7 @@ import {
   rankAttention,
   withinPeriod,
 } from "../src/utils/dashboard-metrics.js";
+import { mapClientFromDatabase } from "../src/services/mappers/client-mapper.js";
 
 const NOW = new Date("2026-09-20T12:00:00.000Z");
 const DAY = 24 * 60 * 60 * 1000;
@@ -36,22 +37,19 @@ const clients = [
     name: "Active One",
     status: "ACTIVE",
     lastContactAt: daysBefore(2),
-    projects: [{ status: "ACTIVE" }, { status: "COMPLETED" }],
   },
   {
     id: "002",
     name: "Active Two",
     status: "ACTIVE",
     lastContactAt: daysBefore(45),
-    projects: [{ status: "ACTIVE" }],
   },
-  { id: "003", name: "Fresh Lead", status: "LEAD", lastContactAt: daysBefore(1), projects: [] },
+  { id: "003", name: "Fresh Lead", status: "LEAD", lastContactAt: daysBefore(1) },
   {
     id: "004",
     name: "Old Archive",
     status: "ARCHIVED",
     lastContactAt: daysBefore(200),
-    projects: [{ status: "COMPLETED" }],
   },
 ];
 
@@ -126,7 +124,15 @@ describe("bar percentages", () => {
 
 describe("primary indicators", () => {
   it("counts active engagements rather than published cases", () => {
-    assert.equal(activeEngagements(clients), 2);
+    const engagements = [
+      { clientId: "001", status: "In Development", editorialStatus: "DRAFT" },
+      { clientId: "001", status: "Pilot", editorialStatus: "PUBLISHED" },
+      { clientId: "002", status: "Live", editorialStatus: "PUBLISHED" },
+      { clientId: "002", status: "MVP", editorialStatus: "ARCHIVED" },
+      { clientId: null, status: "In Development", editorialStatus: "DRAFT" },
+    ];
+    // Delivered, editorially archived and client-less work is not an engagement.
+    assert.equal(activeEngagements(engagements), 2);
   });
 
   it("counts only clients with an active relationship", () => {
@@ -280,5 +286,41 @@ describe("system health", () => {
     const status = adminDataStatus({ projectsOk: true, activityOk: false });
     assert.notEqual(status.label, "CONNECTED");
     assert.equal(status.tone, "warn");
+  });
+});
+
+// Clients as the repository returns them: straight from database rows, so the
+// rule is exercised on the real last_contact_at column, not on a demo field.
+describe("follow ups from a recorded last contact", () => {
+  const row = (name, status, lastContact) =>
+    mapClientFromDatabase({ id: name, code: "CLIENT-001", name, status, last_contact_at: lastContact });
+  const quiet = (items) => items.filter((item) => item.category === "CLIENT").map((item) => item.title);
+
+  it("surfaces an active client whose last recorded contact is old", () => {
+    const items = followUps({ clients: [row("Active Old", "ACTIVE", daysBefore(45))] }, NOW);
+    assert.deepEqual(quiet(items), ["Active Old"]);
+    assert.equal(items[0].detailParams.days, 45);
+  });
+
+  it("applies the same rule to an inactive client with an old contact", () => {
+    // The rule only leaves out leads and archived clients.
+    const items = followUps({ clients: [row("Inactive Old", "INACTIVE", daysBefore(60))] }, NOW);
+    assert.deepEqual(quiet(items), ["Inactive Old"]);
+  });
+
+  it("stays quiet about a recent contact", () => {
+    const items = followUps({ clients: [row("Recent", "ACTIVE", daysBefore(5))] }, NOW);
+    assert.deepEqual(quiet(items), []);
+  });
+
+  it("never invents a contact for a client with none recorded", () => {
+    const items = followUps({ clients: [row("Never", "ACTIVE", null)] }, NOW);
+    assert.deepEqual(quiet(items), []);
+  });
+
+  it("reads a timestamp with any offset as the same instant", () => {
+    const offset = new Date(new Date(daysBefore(40)).getTime()).toISOString().replace("Z", "+00:00");
+    const items = followUps({ clients: [row("Offset", "ACTIVE", offset)] }, NOW);
+    assert.equal(items[0].detailParams.days, 40);
   });
 });

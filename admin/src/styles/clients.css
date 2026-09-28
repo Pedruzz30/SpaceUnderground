@@ -1,0 +1,519 @@
+/* Clients: the hub reads as a call sheet (who, how to reach them, what is
+   open with them, when someone last spoke to them) and the record as a
+   profile with the relationship around it. The summary strip, status chips
+   and dialogs reuse hub.css, logs.css, commercial.css and financial.css. */
+
+/* --- hub ---------------------------------------------------------------------- */
+
+.clients-toolbar {
+  display: grid;
+  grid-template-columns: minmax(14rem, 2fr) repeat(2, minmax(10rem, 1fr));
+  align-items: end;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.clients-toolbar .sort-field {
+  min-width: 0;
+}
+
+.clients-table .ops-table__head,
+.clients-table .ops-row {
+  grid-template-columns:
+    minmax(12rem, 1.5fr) minmax(10rem, 1.2fr) minmax(8rem, 1fr) minmax(8rem, 1fr) 6.5rem 7rem 5.5rem;
+}
+
+.clients-row.is-archived {
+  opacity: 0.72;
+}
+
+.clients-row__who {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.clients-row__identity {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+}
+
+.clients-row__identity strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clients-row__contact .contact-links {
+  margin-top: 0.3rem;
+}
+
+.clients-row__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.clients-table .ops-stack small.is-live {
+  color: var(--text-soft);
+}
+
+.clients-table .is-danger,
+.client-deal small.is-danger {
+  color: var(--danger);
+}
+
+.clients-table .is-warning {
+  color: var(--warning);
+}
+
+.clients-table .is-muted {
+  color: var(--text-muted);
+}
+
+/* --- avatar ------------------------------------------------------------------- */
+
+.client-avatar {
+  display: grid;
+  flex: none;
+  width: 2.4rem;
+  height: 2.4rem;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface-strong);
+  color: var(--text-soft);
+  font: 600 0.8rem/1 var(--display);
+  letter-spacing: -0.02em;
+}
+
+.client-avatar--active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  color: var(--accent);
+}
+
+.client-avatar--lead {
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
+  color: var(--warning);
+}
+
+.client-avatar--inactive,
+.client-avatar--archived {
+  color: var(--text-muted);
+}
+
+.client-avatar--large {
+  width: 4rem;
+  height: 4rem;
+  font-size: 1.25rem;
+}
+
+/* --- contact links -------------------------------------------------------------- */
+
+.contact-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.contact-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-soft);
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.contact-link:hover,
+.contact-link:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--accent);
+}
+
+.contact-link--whatsapp:hover,
+.contact-link--whatsapp:focus-visible {
+  color: var(--success);
+}
+
+.contact-links--labelled .contact-link {
+  min-height: 2.55rem;
+  padding: 0 0.8rem;
+  font: 500 0.66rem/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* --- record heading --------------------------------------------------------------- */
+
+.client-heading__profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.client-heading__profile > div {
+  min-width: 0;
+}
+
+.client-heading__profile h2 {
+  overflow-wrap: anywhere;
+}
+
+.client-heading__actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Tabs and the save action share one row, like the service editor. */
+@media (min-width: 901px) {
+  .client-editor-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: var(--space-3);
+  }
+
+  .client-editor-form > .tabs {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  .client-editor-form > .tabs [role="tab"] {
+    padding-inline: 0.45rem;
+    white-space: nowrap;
+  }
+
+  .client-editor-form > .editor-toolbar {
+    position: sticky;
+    grid-row: 1;
+    grid-column: 2;
+    align-self: stretch;
+    align-items: center;
+    padding: 0.35rem;
+  }
+
+  .client-editor-form > .tab-panel {
+    grid-column: 1 / -1;
+  }
+}
+
+/* --- overview ------------------------------------------------------------------------ */
+
+.client-kpis {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+
+.client-kpis .project-metric strong {
+  font-size: clamp(1.15rem, 1.7vw, 1.5rem);
+  white-space: nowrap;
+}
+
+.client-kpis .is-danger strong {
+  color: var(--danger);
+}
+
+.client-signals {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.8rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.client-signal {
+  display: grid;
+  grid-template-columns: 0.55rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+}
+
+.client-signal i {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.client-signal--danger {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+
+.client-signal--danger i {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.client-signal--warning i {
+  background: var(--warning);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--warning) 14%, transparent);
+}
+
+.client-signal .text-link {
+  min-height: 1.9rem;
+  border-color: transparent;
+  background: transparent;
+  padding: 0 0.4rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.client-signal .text-link:hover {
+  color: var(--accent);
+}
+
+.client-signals__empty {
+  margin: 0.8rem 0 0;
+  border: 1px dashed color-mix(in srgb, var(--success) 40%, var(--border));
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  color: var(--success);
+  font-size: 0.86rem;
+}
+
+.client-recent h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--text-soft);
+  font: 500 0.66rem/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.client-activity .is-contact > span {
+  background: var(--success);
+}
+
+/* --- duplicate warning ----------------------------------------------------------------- */
+
+.client-duplicate {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning) 7%, transparent);
+  padding: 0.75rem 0.9rem;
+  color: var(--text-soft);
+  font-size: 0.86rem;
+}
+
+.client-duplicate strong {
+  color: var(--warning);
+  font: 600 0.62rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.client-duplicate p {
+  margin: 0;
+}
+
+.client-duplicate a {
+  margin-left: 0.3rem;
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* --- commercial and financial tabs ------------------------------------------------------ */
+
+.client-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.client-panel__head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.client-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.client-deals,
+.client-entries {
+  margin-top: var(--space-3);
+}
+
+.client-deals .ops-row {
+  grid-template-columns: minmax(0, 1fr) 8rem 8rem;
+}
+
+.client-entries .ops-row {
+  grid-template-columns: 8.5rem minmax(0, 1fr) 7rem 8rem 6.5rem;
+}
+
+/* --- contact dialog ---------------------------------------------------------------------- */
+
+.contact-form__channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.contact-channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.contact-channel input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.contact-channel:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.contact-channel:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- responsive ---------------------------------------------------------------------------- */
+
+@media (max-width: 1400px) {
+  .clients-table {
+    min-width: 56rem;
+  }
+}
+
+@media (max-width: 1180px) {
+  .client-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .client-kpis .project-metric:nth-child(4) {
+    border-left: 0;
+  }
+
+  .client-kpis .project-metric:nth-child(n + 4) {
+    border-top: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 860px) {
+  .clients-table {
+    min-width: 0;
+  }
+
+  /* This sheet loads after operations.css, so the stacked-row template has
+     to be restated here or the desktop columns survive on a phone. */
+  .clients-table .ops-table__head,
+  .clients-table .ops-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .clients-row__who .client-avatar {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .client-entries .ops-row,
+  .client-deals .ops-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .clients-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .clients-toolbar .search-field {
+    grid-column: 1 / -1;
+  }
+
+  .clients-metrics,
+  .client-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .clients-metrics .project-metric:nth-child(n),
+  .client-kpis .project-metric:nth-child(n) {
+    border-top: 0;
+    border-left: 1px solid var(--border);
+  }
+
+  .clients-metrics .project-metric:nth-child(odd),
+  .client-kpis .project-metric:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .clients-metrics .project-metric:nth-child(n + 3),
+  .client-kpis .project-metric:nth-child(n + 3) {
+    border-top: 1px solid var(--border);
+  }
+
+  .clients-metrics .project-metric strong {
+    font-size: 1.3rem;
+    white-space: nowrap;
+  }
+
+  .client-heading__profile {
+    align-items: flex-start;
+  }
+
+  .client-avatar--large {
+    width: 3rem;
+    height: 3rem;
+    font-size: 1rem;
+  }
+
+  .client-heading__actions {
+    justify-content: stretch;
+  }
+
+  .client-heading__actions > .button,
+  .client-heading__actions > span {
+    flex: 1 1 100%;
+  }
+
+  .client-heading__actions .contact-links {
+    display: flex;
+  }
+
+  .client-heading__actions .contact-link {
+    flex: 1;
+  }
+
+  .client-signal {
+    grid-template-columns: 0.55rem minmax(0, 1fr);
+  }
+
+  .client-signal .text-link {
+    grid-column: 2;
+    justify-self: start;
+    padding: 0;
+  }
+}

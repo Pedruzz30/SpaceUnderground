@@ -1,4 +1,4 @@
-// Applies 002_project_media_storage.sql to a real Postgres engine and verifies
+// Applies the project media storage migration to a real Postgres engine and verifies
 // that access to project images follows the state of the owning project.
 //
 // Supabase's storage schema is not part of the migration, so the pieces the
@@ -6,12 +6,11 @@
 // the same shapes Supabase uses.
 
 import { strict as assert } from "node:assert";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
+import { readMigration } from "./helpers/migration-files.mjs";
 
-const migration = (name) => readFileSync(fileURLToPath(new URL(`../../supabase/migrations/${name}`, import.meta.url)), "utf8");
+const migration = readMigration;
 
 const ADMIN_ID = "11111111-1111-1111-1111-111111111111";
 const USER_ID = "22222222-2222-2222-2222-222222222222";
@@ -94,8 +93,8 @@ before(async () => {
     "someone@space.local",
   ]);
 
-  await db.exec(migration("001_admin_foundation.sql"));
-  await db.exec(migration("002_project_media_storage.sql"));
+  await db.exec(migration("admin_foundation"));
+  await db.exec(migration("project_media_storage"));
 
   await db.query("insert into public.admins (user_id, role) values ($1,'owner')", [ADMIN_ID]);
 
@@ -127,7 +126,7 @@ describe("media bucket", () => {
   });
 
   it("re-applies without error", async () => {
-    await db.exec(migration("002_project_media_storage.sql"));
+    await db.exec(migration("project_media_storage"));
   });
 });
 

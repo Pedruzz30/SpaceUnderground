@@ -2,17 +2,14 @@ import { badge, badgeType } from "../components/badge.js";
 import { statCard } from "../components/stat-card.js";
 import { spaceStatus } from "../data/dashboard.js";
 import { DATA_SOURCE } from "../config/env.js";
-import {
-  demoClients,
-  demoOpportunities,
-  demoPipelineStages,
-  demoTransactions,
-} from "../data/operations-demo.js";
 import { getActivityWithStatus } from "../services/activity-service.js";
+import { getClients } from "../services/client-service.js";
+import { getOpportunitiesWithStatus } from "../services/commercial-service.js";
+import { getTransactionsWithStatus } from "../services/financial-service.js";
 import { getProjects } from "../services/project-service.js";
 import { describeError } from "../services/errors.js";
 import { onLocaleChange, statusLabel, t } from "../i18n/index.js";
-import { pendingReceivables } from "../utils/financial-metrics.js";
+import { effectiveDate, normalizeEntry, pendingReceivables, signedAmount } from "../utils/financial-metrics.js";
 import { formatCurrency, formatRelativeDay, formatSignedCurrency } from "../utils/format.js";
 import {
   PERIODS,
@@ -30,15 +27,23 @@ import {
   projectHealth,
   rankAttention,
 } from "../utils/dashboard-metrics.js";
-import { escapeAttribute, escapeHtml } from "../utils/html.js";
+import { escapeHtml } from "../utils/html.js";
 
 // The Dashboard mixes two origins and says so on screen:
-//   REAL — projects and the activity log, through the configured repository.
-//   DEMO — clients, commercial and financial, from operations-demo.js.
-// Nothing here queries Supabase for the demo domains, and no demo record is
-// ever written back into a repository.
+// Every panel is real: clients, projects, the commercial pipeline, the
+// financial ledger and the activity log, through the configured repository.
+// Each block resolves on its own, so one failing read never blanks the rest.
 
 const DEFAULT_PERIOD = "month";
+
+// The ledger for the Dashboard on screen. `ledgerOk` is null while the read is
+// in flight, so the financial figures read "—" instead of a zero that could be
+// mistaken for a real balance. Reset on every render.
+let ledgerEntries = [];
+let ledgerOk = null;
+// Same contract for the commercial pipeline.
+let dealEntries = [];
+let dealsOk = null;
 
 /* ---------------------------------------------------------------- helpers */
 
@@ -68,27 +73,27 @@ function textLink(href, label) {
 
 /* ------------------------------------------------------------------- KPIs */
 
-// All four are presentation-only: the operational domains have no backend yet.
-function renderKpis() {
+// Every figure reads "—" until its query resolves (or if it fails).
+function renderKpis({ engagements = "—", clients = "—" } = {}) {
   return `
     ${statCard({
       label: t("dashboard.activeProjects"),
-      value: activeEngagements(demoClients),
+      value: engagements,
       detail: t("dashboard.activeProjectsDetail"),
     })}
     ${statCard({
       label: t("dashboard.activeClients"),
-      value: activeClients(demoClients),
+      value: clients,
       detail: t("dashboard.activeClientsDetail"),
     })}
     ${statCard({
       label: t("dashboard.openOpportunities"),
-      value: openOpportunities(demoOpportunities),
+      value: dealsOk ? openOpportunities(dealEntries) : "—",
       detail: t("dashboard.openOpportunitiesDetail"),
     })}
     ${statCard({
       label: t("dashboard.toReceive"),
-      value: escapeHtml(formatCurrency(pendingReceivables(demoTransactions))),
+      value: ledgerOk ? escapeHtml(formatCurrency(pendingReceivables(ledgerEntries))) : "—",
       detail: t("dashboard.toReceiveDetail"),
     })}
   `;
@@ -96,12 +101,20 @@ function renderKpis() {
 
 /* -------------------------------------------------------------- attention */
 
+// Categories are identities in the metrics (FINANCIAL, LEAD...); the screen
+// reads their label in the active locale, falling back to the identity.
+function queueCategory(category) {
+  const key = `dashboard.queueCategories.${category}`;
+  const label = t(key);
+  return label === key ? category : label;
+}
+
 function queueItem(item) {
   return `
     <a class="dash-queue-item" href="${escapeHtml(item.href)}">
       <span class="dash-dot dash-dot--${escapeHtml(item.tone || "neutral")}" aria-hidden="true"></span>
       <span class="dash-queue-item__body">
-        <span class="dash-queue-item__category">${escapeHtml(item.category)}</span>
+        <span class="dash-queue-item__category">${escapeHtml(queueCategory(item.category))}</span>
         <strong>${escapeHtml(item.title)}</strong>
         <span class="dash-queue-item__detail">${escapeHtml(item.detailKey ? t(item.detailKey, item.detailParams ?? {}) : item.detail)}</span>
       </span>
@@ -120,7 +133,7 @@ function renderQueue(items, emptyMessage) {
 // arrive with the repository query and are merged in afterwards.
 function renderAttention(projectItems, { projectsFailed = false, pending = false } = {}) {
   const items = rankAttention([
-    ...operationalChecks({ transactions: demoTransactions, opportunities: demoOpportunities }),
+    ...operationalChecks({ transactions: ledgerEntries, opportunities: dealEntries }),
     ...projectItems,
   ]);
 
@@ -170,8 +183,12 @@ function renderPulse(projects) {
 
 /* ------------------------------------------------------------- commercial */
 
+const PIPELINE_STAGES = ["NEW", "CONTACTED", "PROPOSAL", "NEGOTIATION", "WON"].map((id) => ({ id, label: id }));
+
 function renderPipeline() {
-  const summary = pipelineSummary(demoPipelineStages, demoOpportunities);
+  if (dealsOk === null) return `<p class="empty-inline">${escapeHtml(t("common.loading"))}...</p>`;
+  if (dealsOk === false) return `<p class="empty-inline" data-i18n="dashboard.commercialUnavailable">${t("dashboard.commercialUnavailable")}</p>`;
+  const summary = pipelineSummary(PIPELINE_STAGES, dealEntries);
 
   return `
     <div class="dash-pipeline">
@@ -179,7 +196,7 @@ function renderPipeline() {
         .map(
           (stage) => `
             <div class="dash-pipeline__row${stage.id === "WON" ? " dash-pipeline__row--won" : ""}">
-              <span class="dash-pipeline__label" data-status-label="${escapeAttribute(stage.id)}">${escapeHtml(statusLabel(stage.id))}</span>
+              <span class="dash-pipeline__label">${escapeHtml(t(`commercial.stages.${stage.id}`))}</span>
               <span class="dash-pipeline__track">
                 <span class="dash-pipeline__fill" style="--dash-fill:${barPercent(stage.count, summary.max)}%"></span>
               </span>
@@ -199,33 +216,48 @@ function renderPipeline() {
 
 /* -------------------------------------------------------------- financial */
 
+// Pending money has not moved yet, so it stays neutral instead of claiming
+// the colour the ledger reserves for settled amounts.
 function ledgerLine(transaction) {
-  const settled = transaction.status !== "PENDING";
-  const tone = !settled ? "neutral" : transaction.amount >= 0 ? "positive" : "negative";
-  const value = settled ? formatSignedCurrency(transaction.amount) : formatCurrency(Math.abs(transaction.amount));
+  const entry = normalizeEntry(transaction);
+  const settled = entry.status === "PAID";
+  const tone = !settled ? "neutral" : entry.type === "INCOME" ? "positive" : "negative";
+  const value = settled ? formatSignedCurrency(signedAmount(entry)) : formatCurrency(entry.amount);
+  const typeLabel = entry.status === "PAID" ? t(`financial.types.${entry.type}`) : t(`financial.statuses.${entry.status}`);
 
   return `
     <li>
-      <span class="dash-ledger__type">${escapeHtml(transaction.type)}</span>
+      <span class="dash-ledger__type">${escapeHtml(typeLabel.toUpperCase())}</span>
       <span class="dash-ledger__description">${escapeHtml(transaction.description)}</span>
       <span class="ops-amount ops-amount--${tone}">${escapeHtml(value)}</span>
     </li>
   `;
 }
 
+// periodLabel() is the English identity of a period; the screen reads the
+// active locale's label for the same id.
+function localizedPeriod(periodId) {
+  const period = PERIODS.find((item) => item.id === periodId);
+  return period ? t(period.labelKey) : periodLabel(periodId);
+}
+
 // Revenue, expenses and result are recomputed from the transactions inside the
 // selected period — the only figures the period selector can honestly change.
 // "To receive" stays a point-in-time balance and lives in the KPI strip.
 function renderFinancial(periodId) {
-  const totals = financialTotals(demoTransactions, periodId);
+  if (ledgerOk === null) return `<p class="empty-inline">${escapeHtml(t("common.loading"))}...</p>`;
+  if (ledgerOk === false) return `<p class="empty-inline" data-i18n="dashboard.financialUnavailable">${t("dashboard.financialUnavailable")}</p>`;
+
+  const totals = financialTotals(ledgerEntries, periodId);
   const max = Math.max(totals.revenue, totals.expenses, 1);
-  const recent = [...totals.transactions]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  const recent = totals.transactions
+    .filter((transaction) => normalizeEntry(transaction).status !== "CANCELLED")
+    .sort((a, b) => String(effectiveDate(b)).localeCompare(String(effectiveDate(a))))
     .slice(0, 3);
 
   return `
     <p class="dash-hero">
-      <span>${t("dashboard.result")} · ${escapeHtml(periodLabel(periodId).toUpperCase())}</span>
+      <span>${t("dashboard.result")} · ${escapeHtml(localizedPeriod(periodId).toUpperCase())}</span>
       <strong>${escapeHtml(formatCurrency(totals.result))}</strong>
     </p>
 
@@ -292,7 +324,12 @@ function renderHealth({ projects, projectsOk, activityOk }) {
 export const dashboardPage = {
   title: () => t("dashboard.title"),
   breadcrumb: () => t("dashboard.breadcrumb"),
-  render: () => `
+  render: () => {
+    ledgerEntries = [];
+    ledgerOk = null;
+    dealEntries = [];
+    dealsOk = null;
+    return `
     <section class="page-heading page-heading--split">
       <div>
         <span data-i18n="dashboard.eyebrow">${t("dashboard.eyebrow")}</span>
@@ -312,7 +349,7 @@ export const dashboardPage = {
       </div>
     </section>
 
-    <section class="stats-grid stats-grid--quad dash-kpis" aria-label="${t("dashboard.primaryIndicators")}">
+    <section class="stats-grid stats-grid--quad dash-kpis" aria-label="${t("dashboard.primaryIndicators")}" data-dash-kpis>
       ${renderKpis()}
     </section>
 
@@ -353,12 +390,14 @@ export const dashboardPage = {
 
       <article class="panel dash-panel--commercial" aria-labelledby="dash-commercial-title">
         ${panelHead(t("dashboard.commercialPipeline"), t("dashboard.opportunitiesByStage"), "dash-commercial-title", textLink("#/commercial", t("dashboard.openCommercial")))}
-        ${renderPipeline()}
+        <div data-pipeline>${renderPipeline()}</div>
       </article>
 
       <article class="panel dash-panel--followups" aria-labelledby="dash-followups-title">
         ${panelHead(t("dashboard.followUps"), t("dashboard.peopleToContactNext"), "dash-followups-title")}
-        ${renderQueue(followUps({ clients: demoClients, opportunities: demoOpportunities }), t("dashboard.noFollowUps"))}
+        <div data-followups aria-busy="true">
+          <p class="empty-inline">${t("common.loading")}...</p>
+        </div>
       </article>
 
       <article class="panel dash-panel--activity" aria-labelledby="dash-activity-title">
@@ -375,7 +414,8 @@ export const dashboardPage = {
         </div>
       </article>
     </div>
-  `,
+  `;
+  },
   afterRender: async () => {
     const financeEl = document.querySelector("[data-finance]");
     const periodEl = document.querySelector("[data-dash-period]");
@@ -387,19 +427,41 @@ export const dashboardPage = {
 
     // One failing query must never blank the Dashboard: the demo-backed panels
     // are already on screen, and each real block resolves independently.
-    const [projectsResult, activityResult] = await Promise.allSettled([
+    const [projectsResult, activityResult, clientsResult, ledgerResult, dealsResult] = await Promise.allSettled([
       getProjects(),
       getActivityWithStatus({ limit: 6 }),
+      getClients(),
+      getTransactionsWithStatus(),
+      getOpportunitiesWithStatus(),
     ]);
 
     const attentionEl = document.querySelector("[data-attention]");
     const pulseEl = document.querySelector("[data-pulse]");
     const activityEl = document.querySelector("[data-activity]");
     const healthEl = document.querySelector("[data-health]");
+    const kpisEl = document.querySelector("[data-dash-kpis]");
+    const followUpsEl = document.querySelector("[data-followups]");
     if (!pulseEl?.isConnected) return;
 
     const projectsOk = projectsResult.status === "fulfilled";
     const projects = projectsOk ? projectsResult.value : [];
+
+    // Clients need the clients foundation migration. Until it is applied (or on any failure) the
+    // two client KPIs read "—" and follow ups list only the demo pipeline.
+    const clientsOk = clientsResult.status === "fulfilled";
+    const clients = clientsOk ? clientsResult.value : [];
+
+    // The ledger needs the financial foundation migration. Until it is applied
+    // (or on any failure) the financial panel says so and the balance reads "—".
+    const ledger = ledgerResult.status === "fulfilled" ? ledgerResult.value : { items: [], ok: false };
+    const clientNames = new Map(clients.map((client) => [client.id, client.name]));
+    ledgerEntries = ledger.items.map((entry) => ({ ...entry, clientName: clientNames.get(entry.clientId) ?? "" }));
+    ledgerOk = ledger.ok;
+
+    const deals = dealsResult.status === "fulfilled" ? dealsResult.value : { items: [], ok: false };
+    dealEntries = deals.items.map((deal) => ({ ...deal, clientName: clientNames.get(deal.clientId) ?? "" }));
+    dealsOk = deals.ok;
+    const pipelineEl = document.querySelector("[data-pipeline]");
 
     // An outage and an empty log are different facts: getActivityWithStatus()
     // reports the read failure that getActivity() deliberately swallows.
@@ -411,6 +473,13 @@ export const dashboardPage = {
     // change replays this, so the Dashboard re-reads in the other language
     // without issuing a single new query.
     function paintData() {
+      kpisEl.innerHTML = renderKpis({
+        engagements: projectsOk ? activeEngagements(projects) : "—",
+        clients: clientsOk ? activeClients(clients) : "—",
+      });
+      followUpsEl.innerHTML = renderQueue(followUps({ clients, opportunities: dealEntries }), t("dashboard.noFollowUps"));
+      if (pipelineEl) pipelineEl.innerHTML = renderPipeline();
+
       if (projectsOk) {
         attentionEl.innerHTML = renderAttention(projectChecks(projects));
         pulseEl.innerHTML = renderPulse(projects);
@@ -443,6 +512,7 @@ export const dashboardPage = {
     }
 
     paintData();
+    financeEl.innerHTML = renderFinancial(periodEl.value);
 
     // The selected period is read back from the live control, so switching
     // locale keeps whatever range the user had chosen.
@@ -455,5 +525,6 @@ export const dashboardPage = {
     pulseEl.removeAttribute("aria-busy");
     activityEl?.removeAttribute("aria-busy");
     healthEl?.removeAttribute("aria-busy");
+    followUpsEl?.removeAttribute("aria-busy");
   },
 };

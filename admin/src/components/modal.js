@@ -19,7 +19,13 @@ export function closeModal() {
   if (dismissed.value) onDismiss?.();
 }
 
-export function openModal({ title, body, actions = [], onDismiss }) {
+// An action's onSelect may be async. Returning (or resolving to) false keeps the
+// dialog open, which is how a form refuses to close on a validation error;
+// anything else closes it. While an action runs the dialog is locked: every
+// button is disabled and Escape or a click outside does nothing, so the work
+// can never finish behind a dialog the user thinks was cancelled. An action
+// that throws keeps the dialog open; callers report their own errors.
+export function openModal({ title, body, actions = [], onDismiss, className = "" }) {
   closeModal();
 
   const previousFocus = document.activeElement;
@@ -27,7 +33,7 @@ export function openModal({ title, body, actions = [], onDismiss }) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="${titleId}">
+    <div class="modal${className ? ` ${escapeHtml(className)}` : ""}" role="dialog" aria-modal="true" aria-labelledby="${titleId}">
       <h2 id="${titleId}">${escapeHtml(title)}</h2>
       <div class="modal__body">${body}</div>
       <div class="modal__actions">
@@ -46,22 +52,43 @@ export function openModal({ title, body, actions = [], onDismiss }) {
 
   document.body.appendChild(overlay);
 
+  const buttons = [...overlay.querySelectorAll("[data-modal-action]")];
+  const state = { pending: false };
+  const lock = (pending) => {
+    state.pending = pending;
+    overlay.classList.toggle("is-pending", pending);
+    buttons.forEach((item) => {
+      item.disabled = pending;
+    });
+  };
+
   actions.forEach((action, index) => {
-    overlay.querySelector(`[data-modal-action="${index}"]`)?.addEventListener("click", () => {
+    const button = overlay.querySelector(`[data-modal-action="${index}"]`);
+    button?.addEventListener("click", async () => {
+      if (state.pending) return;
+      lock(true);
+      let result;
+      try {
+        result = await action.onSelect?.();
+      } catch {
+        result = false;
+      } finally {
+        lock(false);
+      }
+      if (result === false || !overlay.isConnected) return;
       if (active) active.dismissed.value = false;
-      action.onSelect?.();
       closeModal();
     });
   });
 
   overlay.addEventListener("mousedown", (event) => {
-    if (event.target === overlay) closeModal();
+    if (event.target === overlay && !state.pending) closeModal();
   });
 
   const keyHandler = (event) => {
     if (event.key === "Escape") {
       event.preventDefault();
-      closeModal();
+      if (!state.pending) closeModal();
       return;
     }
 

@@ -1,0 +1,58 @@
+// Seed for the mock client repository only. Supabase mode never reads this:
+// real clients live in public.clients. Ids are stable so the seed projects in
+// data/projects.js can point at them through clientId.
+
+export const seedClients = [
+  {
+    id: "mock-client-001",
+    code: "CLIENT-001",
+    name: "INK Tattoo",
+    company: "INK Tattoo Studio",
+    email: "contato@inktattoo.example.com",
+    phone: "+55 21 90000-0101",
+    status: "ACTIVE",
+    notes: "Portfolio site live. Monthly content refresh agreed by message.",
+    createdAt: "2026-06-02T12:00:00.000Z",
+    updatedAt: "2026-09-04T12:00:00.000Z",
+    archivedAt: null,
+  },
+  {
+    id: "mock-client-002",
+    code: "CLIENT-002",
+    name: "Lucas Souza",
+    company: "Souza Performance",
+    email: "lucas@example.com",
+    phone: "+55 21 90000-0004",
+    status: "ACTIVE",
+    notes: "",
+    createdAt: "2026-06-20T12:00:00.000Z",
+    updatedAt: "2026-09-10T12:00:00.000Z",
+    archivedAt: null,
+  },
+  {
+    id: "mock-client-003",
+    code: "CLIENT-003",
+    name: "Academia X",
+    company: "",
+    email: "contato@academiax.example.com",
+    phone: "",
+    status: "LEAD",
+    notes: "Inbound enquiry about a member portal.",
+    createdAt: "2026-09-18T12:00:00.000Z",
+    updatedAt: "2026-09-18T12:00:00.000Z",
+    archivedAt: null,
+  },
+  {
+    id: "mock-client-004",
+    code: "CLIENT-004",
+    name: "Empresa Y",
+    company: "Empresa Y Logística",
+    email: "operacoes@empresay.example.com",
+    phone: "+55 21 90000-0001",
+    status: "INACTIVE",
+    notes: "",
+    createdAt: "2026-02-03T12:00:00.000Z",
+    updatedAt: "2026-07-12T12:00:00.000Z",
+    archivedAt: null,
+  },
+];

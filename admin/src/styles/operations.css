@@ -1,11 +1,16 @@
-/* Operations workspaces: Clients, Commercial pipeline, Financial ledger and the
-   CMS hub. Everything here extends the existing shell/panel/badge language —
+/* Operations workspaces: Clients and the CMS hub (Commercial and Financial
+   have their own sheets). Everything here extends the existing shell/panel/badge language —
    no second design system, no new colour tokens. */
 
 /* --- shared operations primitives ------------------------------------- */
 
 .stats-grid--quad {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* Five figures on wide screens; below that the quad breakpoints take over. */
+.stats-grid--five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .ops-note {
@@ -75,10 +80,10 @@
   width: 100%;
   margin-top: 0.35rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 0.9rem;
   gap: 0.85rem;
-  background: rgba(255, 255, 255, 0.02);
+  background: transparent;
   color: var(--text-muted);
   text-align: left;
   transition: border-color 120ms ease, background 120ms ease;
@@ -104,10 +109,14 @@
 }
 
 .ops-row--link:hover,
-.ops-row--link:focus-visible,
+.ops-row--link:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
 .ops-row--link.is-selected {
   border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
-  background: linear-gradient(90deg, rgba(198, 255, 0, 0.065), rgba(255, 255, 255, 0.026));
+  background: var(--surface-hover);
 }
 
 .ops-row--link:active {
@@ -160,7 +169,25 @@
 .clients-table .ops-table__head,
 .clients-table .ops-row {
   grid-template-columns:
-    minmax(11rem, 1.4fr) minmax(10rem, 1.2fr) 6.5rem 7.5rem 8rem 6.5rem 1.5rem;
+    minmax(11rem, 1.4fr) minmax(10rem, 1.2fr) 7rem 7rem 7.5rem 6rem 7rem;
+}
+
+.clients-row__name {
+  min-width: 0;
+  color: inherit;
+}
+
+.clients-row__name:hover strong,
+.clients-row__name:focus-visible strong {
+  color: var(--accent);
+}
+
+.clients-row__actions,
+.client-projects__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
 }
 
 .ledger-table .ops-table__head,
@@ -169,12 +196,20 @@
     5.5rem 7.5rem minmax(11rem, 1.5fr) minmax(8rem, 1fr) 7rem 8.5rem;
 }
 
-.client-projects .ops-row {
-  grid-template-columns: minmax(0, 1fr) 7.5rem;
+.client-projects {
+  margin-block: var(--space-3);
 }
 
-.client-ledger .ops-row {
-  grid-template-columns: 5.5rem minmax(0, 1fr) 7rem 8.5rem;
+.client-projects .ops-row {
+  grid-template-columns: minmax(0, 1fr) 7.5rem 7rem 6rem auto;
+}
+
+.client-link-project {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .ops-meta {
@@ -225,148 +260,7 @@
   color: var(--text-soft);
 }
 
-/* --- commercial pipeline ---------------------------------------------- */
-
-.pipeline {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(14rem, 1fr);
-  gap: var(--space-3);
-  overflow-x: auto;
-  padding-bottom: var(--space-2);
-  scroll-snap-type: x proximity;
-}
-
-.pipeline__column {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--space-3);
-  background: rgba(255, 255, 255, 0.012);
-  scroll-snap-align: start;
-}
-
-.pipeline__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.6rem;
-}
-
-.pipeline__head h3 {
-  margin: 0;
-  color: var(--text-soft);
-  font: 600 0.62rem/1 var(--mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.pipeline__count {
-  min-width: 1.6rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.24rem 0.45rem;
-  color: var(--text-muted);
-  font: 600 0.58rem/1 var(--mono);
-  text-align: center;
-}
-
-.pipeline__body {
-  display: grid;
-  align-content: start;
-  gap: 0.6rem;
-  min-height: 4rem;
-}
-
-.pipeline-card {
-  display: grid;
-  gap: 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.8rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 46%),
-    rgba(255, 255, 255, 0.018);
-  cursor: grab;
-  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
-}
-
-.pipeline-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
-  background: linear-gradient(180deg, rgba(198, 255, 0, 0.055), rgba(255, 255, 255, 0.022));
-  transform: translateY(-1px);
-}
-
-.pipeline-card:active {
-  cursor: grabbing;
-  transform: none;
-}
-
-.pipeline-card__head {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.pipeline-card__client {
-  min-width: 0;
-  color: var(--accent);
-  font: 600 0.66rem/1.3 var(--mono);
-  letter-spacing: 0.08em;
-  overflow-wrap: anywhere;
-}
-
-.pipeline-card__type {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 0.85rem;
-}
-
-.pipeline-card__range {
-  margin: 0;
-  color: var(--text-soft);
-  font: 500 0.72rem/1.3 var(--mono);
-}
-
-.pipeline-card__foot {
-  color: var(--text-muted);
-  font: 500 0.6rem/1.3 var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-/* --- client detail ----------------------------------------------------- */
-
-.client-heading__title {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.client-heading__title h2 {
-  margin: 0.4rem 0;
-}
-
-.client-detail {
-  margin-top: var(--space-4);
-}
-
-.ops-panel-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: var(--space-3);
-}
-
-.ops-panel-grid .panel--wide {
-  grid-column: 1 / -1;
-}
+/* --- shared figures ----------------------------------------------------- */
 
 .ops-figures {
   display: grid;
@@ -431,7 +325,12 @@
 
 @media (max-width: 1400px) {
   .clients-table {
-    min-width: 48.5rem;
+    min-width: 49rem;
+  }
+
+  /* Open stays reachable from the name and from the row menu. */
+  .clients-row__actions [data-client-open] {
+    display: none;
   }
 
   .ledger-table {
@@ -440,7 +339,11 @@
 
   .clients-table .ops-table__head,
   .clients-table .ops-row {
-    grid-template-columns: minmax(8rem, 1.4fr) minmax(8rem, 1.2fr) 5.5rem 6.5rem 6.5rem 5.5rem 1.2rem;
+    grid-template-columns: minmax(8rem, 1.4fr) minmax(8rem, 1.2fr) 6rem 6.5rem 7rem 5rem 2.5rem;
+  }
+
+  .stats-grid--five {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .ledger-table .ops-table__head,
@@ -524,9 +427,22 @@
     transform: none;
   }
 
-  .pipeline {
-    grid-auto-columns: min(78vw, 18rem);
+  /* Actions sit next to the name on the first line, like the arrow does. */
+  .clients-row__actions,
+  .client-projects__actions {
+    grid-column: 2;
+    grid-row: 1;
   }
+
+  .clients-row__actions [data-client-open] {
+    display: inline-flex;
+  }
+
+  .clients-row .ops-row__primary,
+  .client-projects .ops-row__primary {
+    grid-column: 1;
+  }
+
 }
 
 @media (max-width: 760px) {

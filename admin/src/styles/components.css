@@ -5,14 +5,14 @@
   justify-content: center;
   min-height: 2.55rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 0 1rem;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 70%, transparent), var(--surface));
+  background: var(--surface);
   color: var(--text-primary);
-  font: 600 0.68rem/1 var(--mono);
+  font: 500 0.68rem/1 var(--mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, color 140ms ease;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
 }
 
 .button:disabled {
@@ -22,20 +22,20 @@
 
 .button:hover,
 .text-link:hover {
-  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+  border-color: var(--border-strong);
   background: var(--surface-hover);
-}
-
-.button:hover,
-.text-link:hover {
-  transform: translateY(-1px);
 }
 
 .button--primary {
   border-color: var(--accent);
-  background: linear-gradient(180deg, #d8ff45, var(--accent));
-  color: #070806;
-  box-shadow: 0 0 0 1px rgba(198, 255, 0, 0.18), 0 12px 32px rgba(198, 255, 0, 0.14);
+  background: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.button--primary:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 
 .button--danger {
@@ -77,28 +77,14 @@
 .panel {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 42%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, transparent), rgba(8, 9, 8, 0.92));
-  box-shadow: var(--shadow-soft);
+  background: var(--surface);
 }
 
 .stat-card {
   position: relative;
   overflow: hidden;
-  min-height: 140px;
+  min-height: 132px;
   padding: var(--space-4);
-}
-
-.stat-card::after {
-  content: "";
-  position: absolute;
-  right: -30px;
-  bottom: -44px;
-  width: 124px;
-  height: 124px;
-  border: 1px solid rgba(198, 255, 0, 0.12);
-  border-radius: 50%;
 }
 
 .stat-card span {
@@ -109,10 +95,11 @@
 
 .stat-card strong {
   display: block;
-  margin: 1.35rem 0 0.5rem;
-  color: var(--accent);
-  font-size: 2.25rem;
-  font-weight: 650;
+  margin: 1.2rem 0 0.4rem;
+  color: var(--text-primary);
+  font: 600 2.4rem/1 var(--display);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-card p,
@@ -184,9 +171,9 @@
   align-items: center;
   width: 100%;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 0.9rem;
-  background: rgba(255, 255, 255, 0.02);
+  background: transparent;
   color: var(--text-muted);
   grid-template-columns: 4rem minmax(0, 1fr) 7rem 6rem;
   gap: 0.85rem;
@@ -208,8 +195,8 @@
 .compact-list a:hover,
 .project-row:hover,
 .project-row:focus-visible {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
-  background: linear-gradient(90deg, rgba(198, 255, 0, 0.065), rgba(255, 255, 255, 0.026));
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .compact-list strong,
@@ -297,8 +284,8 @@ select,
 textarea {
   width: 100%;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  background: rgba(5, 6, 5, 0.74);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
   color: var(--text-primary);
   padding: 0.8rem 0.85rem;
   transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
@@ -314,8 +301,8 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: color-mix(in srgb, var(--accent) 56%, var(--border));
-  background: #090b09;
-  box-shadow: 0 0 0 3px rgba(198, 255, 0, 0.09);
+  background: var(--bg);
+  box-shadow: 0 0 0 3px var(--accent-soft);
   outline: none;
 }
 
@@ -339,7 +326,7 @@ textarea {
   min-height: 2.25rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.015);
+  background: transparent;
   color: var(--text-muted);
   padding: 0 0.75rem;
   font: 600 0.6rem/1 var(--mono);
@@ -361,12 +348,6 @@ textarea {
   gap: 0.6rem;
   grid-template-columns:
     3.2rem minmax(8rem, 1.2fr) minmax(5.2rem, 0.8fr) 5.4rem 6.4rem 5.2rem 5.6rem 5.8rem 4rem 6.4rem;
-}
-
-.service-table__head,
-.service-row {
-  grid-template-columns:
-    minmax(9rem, 1.25fr) minmax(7rem, 0.85fr) minmax(6rem, 0.75fr) 6.4rem 5.4rem 6rem 5.6rem 6rem 4.8rem 6.4rem;
 }
 
 .project-table__head {
@@ -414,8 +395,8 @@ textarea {
   display: grid;
   min-height: 24rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
+  border-radius: var(--radius);
+  background: var(--surface-strong);
   padding: var(--space-4);
 }
 
@@ -489,8 +470,10 @@ textarea {
 
 .project-metric strong {
   display: block;
-  color: var(--accent);
-  font: 700 1.05rem/1 var(--mono);
+  color: var(--text-primary);
+  font: 600 1.2rem/1 var(--display);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .project-metric span,
@@ -615,7 +598,9 @@ textarea {
 
 .empty-state span {
   color: var(--accent);
-  font-family: var(--mono);
+  font: 500 0.66rem/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .empty-state h2 {
@@ -639,7 +624,7 @@ textarea {
   margin-bottom: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: #050605;
+  background: var(--bg);
   aspect-ratio: 16 / 9;
 }
 
@@ -679,7 +664,7 @@ textarea {
   max-width: min(360px, calc(100vw - 2rem));
   border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--border));
   border-radius: var(--radius);
-  background: #10140d;
+  background: var(--surface-strong);
   color: var(--text-primary);
   padding: 0.85rem 1rem;
   box-shadow: var(--shadow);
@@ -705,9 +690,7 @@ textarea {
   width: min(480px, 100%);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background:
-    linear-gradient(180deg, rgba(198, 255, 0, 0.07), transparent 34%),
-    linear-gradient(180deg, #111410, #090b09);
+  background: var(--surface);
   padding: var(--space-5);
   box-shadow: var(--shadow);
 }
@@ -841,8 +824,8 @@ textarea {
   width: 3.5rem;
   aspect-ratio: 1;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  background: rgba(5, 6, 5, 0.7);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
 }
 
 .asset-thumb img {
@@ -914,7 +897,7 @@ textarea {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-2);
-  background: rgba(12, 15, 11, 0.86);
+  background: rgba(8, 8, 8, 0.86);
   backdrop-filter: blur(14px);
 }
 
@@ -1082,7 +1065,7 @@ textarea {
 
 .locale-tabs button[aria-pressed="true"] {
   background: var(--accent);
-  color: #070806;
+  color: var(--ink);
 }
 
 .locale-hint {
@@ -1153,7 +1136,7 @@ textarea {
   min-width: 11rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
-  background: var(--surface, #0c0d0b);
+  background: var(--surface-strong);
   box-shadow: 0 12px 28px rgb(0 0 0 / 45%);
   padding: 0.25rem;
 }
@@ -1165,7 +1148,7 @@ textarea {
   border-radius: 0.35rem;
   background: transparent;
   padding: 0.45rem 0.55rem;
-  color: var(--text);
+  color: var(--text-primary);
   font: 600 0.6rem/1 var(--mono);
   letter-spacing: 0.06em;
   text-align: left;

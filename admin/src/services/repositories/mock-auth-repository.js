@@ -16,9 +16,12 @@ function readSession() {
 
 export const mockAuthRepository = {
   async signIn({ email }) {
+    const now = new Date().toISOString();
     const session = {
-      user: { id: "mock-admin", email: email || "admin@spaceunderground.local" },
+      user: { id: "mock-admin", email: email || "admin@spaceunderground.local", lastSignInAt: now, createdAt: "2026-09-01T12:00:00.000Z" },
       isAdmin: true,
+      role: "owner",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
     return session;
@@ -34,5 +37,17 @@ export const mockAuthRepository = {
 
   async isAdmin() {
     return Boolean(readSession());
+  },
+
+  // Mock mode has no real password to change; the rules still run in the service.
+  async changePassword() {},
+
+  async signOutEverywhere() {
+    sessionStorage.removeItem(SESSION_KEY);
+  },
+
+  async listAdmins() {
+    const session = readSession();
+    return session ? [{ userId: session.user.id, role: session.role ?? "owner", createdAt: session.user.createdAt ?? null }] : [];
   },
 };

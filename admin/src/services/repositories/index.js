@@ -1,7 +1,10 @@
 import { isSupabaseMode } from "../../config/env.js";
 import { mockActivityRepository } from "./mock-activity-repository.js";
 import { mockAuthRepository } from "./mock-auth-repository.js";
+import { mockClientRepository } from "./mock-client-repository.js";
+import { mockCommercialRepository } from "./mock-commercial-repository.js";
 import { mockContentRepository } from "./mock-content-repository.js";
+import { mockFinancialRepository } from "./mock-financial-repository.js";
 import { mockMediaRepository } from "./mock-media-repository.js";
 import { mockPlanRepository } from "./mock-plan-repository.js";
 import { mockProjectRepository } from "./mock-project-repository.js";
@@ -24,6 +27,9 @@ export async function getRepositories() {
       { supabaseContentRepository },
       { supabaseSettingsRepository },
       { supabaseActivityRepository },
+      { supabaseClientRepository },
+      { supabaseFinancialRepository },
+      { supabaseCommercialRepository },
     ] = await Promise.all([
       import("./supabase-project-repository.js"),
       import("./supabase-auth-repository.js"),
@@ -32,6 +38,9 @@ export async function getRepositories() {
       import("./supabase-content-repository.js"),
       import("./supabase-settings-repository.js"),
       import("./supabase-activity-repository.js"),
+      import("./supabase-client-repository.js"),
+      import("./supabase-financial-repository.js"),
+      import("./supabase-commercial-repository.js"),
     ]);
 
     repositories = {
@@ -42,6 +51,9 @@ export async function getRepositories() {
       content: supabaseContentRepository,
       settings: supabaseSettingsRepository,
       activity: supabaseActivityRepository,
+      clients: supabaseClientRepository,
+      financial: supabaseFinancialRepository,
+      commercial: supabaseCommercialRepository,
     };
   } else {
     repositories = {
@@ -52,6 +64,9 @@ export async function getRepositories() {
       content: mockContentRepository,
       settings: mockSettingsRepository,
       activity: mockActivityRepository,
+      clients: mockClientRepository,
+      financial: mockFinancialRepository,
+      commercial: mockCommercialRepository,
     };
   }
 
@@ -84,4 +99,16 @@ export async function getContentRepository() {
 
 export async function getSettingsRepository() {
   return (await getRepositories()).settings;
+}
+
+export async function getClientRepository() {
+  return (await getRepositories()).clients;
+}
+
+export async function getFinancialRepository() {
+  return (await getRepositories()).financial;
+}
+
+export async function getCommercialRepository() {
+  return (await getRepositories()).commercial;
 }

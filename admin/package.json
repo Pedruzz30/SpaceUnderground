@@ -12,6 +12,7 @@
     "test:e2e:i18n": "node tests/e2e/admin-i18n.mjs",
     "test:e2e:supabase": "node --env-file-if-exists=.env.local tests/e2e/supabase-flow.mjs",
     "test:e2e:media": "node --env-file-if-exists=.env.local tests/e2e/supabase-media-flow.mjs",
+    "test:e2e:clients": "node --env-file-if-exists=.env --env-file-if-exists=.env.local tests/e2e/supabase-clients-flow.mjs",
     "dev:mock": "vite --mode mock --host 127.0.0.1"
   },
   "devDependencies": {
