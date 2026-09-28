@@ -647,7 +647,7 @@ try {
   await page.evaluate(() => window.__resetSpaceAdminMocks());
   const clientRows = () => page.locator("[data-client-row]");
   const clientMetric = (index) =>
-    page.locator("[data-client-metrics] .stat-card strong").nth(index).innerText();
+    page.locator("[data-client-metrics] .project-metric strong").nth(index).innerText();
 
   await page.goto(`${BASE_URL}/#/clients`);
   await page.waitForSelector("[data-client-row]");
@@ -749,7 +749,8 @@ try {
   await page.click("[data-link-project]");
   await page.waitForSelector('[data-client-project="002"]');
   await page.click('[data-tab="activity"]');
-  assert.match(await page.locator("[data-client-activity]").innerText(), /Project linked to client/, "link is logged on the client");
+  // The activity tab reads known events in the active locale (pt-BR here).
+  assert.match(await page.locator("[data-client-activity]").innerText(), /Projeto vinculado ao cliente/, "link is logged on the client");
 
   // Archive, filter, restore.
   await page.goto(`${BASE_URL}/#/clients`);
@@ -771,6 +772,108 @@ try {
   await settle();
   assert.ok(await page.locator("[data-client-row]", { hasText: "Orbital Foods" }).count(), "restored client returns as inactive");
   assert.equal(await clientRows().count(), 2, "nothing was deleted along the way");
+
+  /* ------------------------------------------- clients: the relationship */
+
+  await page.evaluate(() => window.__resetSpaceAdminMocks());
+  const localToday = await page.evaluate(() => {
+    const date = new Date();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  });
+
+  // The hub reaches people directly and reads as a call sheet. Reloaded so the
+  // filter left by the step above does not carry over.
+  await page.goto(`${BASE_URL}/#/clients`);
+  await page.reload();
+  await page.waitForSelector('[data-client-id="mock-client-002"]');
+  assert.equal(
+    await page.getAttribute('[data-client-id="mock-client-002"] .contact-link--whatsapp', "href"),
+    "https://wa.me/5521900000004",
+    "WhatsApp link from the stored phone",
+  );
+  await page.selectOption("[data-client-focus]", "stale");
+  await settle();
+  const quiet = await clientRows().count();
+  assert.ok(quiet >= 1, "clients with no recent contact are listed");
+  await page.selectOption("[data-client-focus]", "all");
+  await page.selectOption("[data-client-sort]", "name");
+  await settle();
+  const sortedNames = await page.$$eval("[data-client-row] .clients-row__name strong", (nodes) => nodes.map((node) => node.textContent));
+  assert.deepEqual(sortedNames, [...sortedNames].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })), "name sort");
+
+  // The record shows the money and deals around the client.
+  await page.goto(`${BASE_URL}/#/clients/mock-client-002`);
+  await page.waitForSelector("[data-client-editor]");
+  assert.equal(await page.locator(".page-heading h2").innerText(), "Lucas Souza", "the record is titled with the client");
+  assert.ok(await page.locator('[data-signal="neverContacted"]').count(), "a client never contacted is flagged");
+
+  // Recording a contact is refused over unsaved edits.
+  await page.click('[data-tab="general"]');
+  const phone = await page.inputValue("#field-phone");
+  await page.fill("#field-phone", "+55 21 90000-9999");
+  await page.click("[data-record-contact]");
+  await settle();
+  assert.equal(await page.locator("[data-contact-form]").count(), 0, "no contact dialog over unsaved edits");
+  await page.fill("#field-phone", phone);
+  await settle();
+
+  await page.click("[data-record-contact]");
+  await page.waitForSelector("[data-contact-form]");
+  await page.check('[data-contact-form] [name="channel"][value="WHATSAPP"]');
+  await page.fill("[data-contact-form] [name=note]", "Approved the E2E scope.");
+  await page.click("[data-modal-confirm]");
+  await page.waitForFunction(() => !document.querySelector("[data-contact-form]"));
+  await page.waitForSelector("[data-client-editor]");
+  assert.equal(await page.locator('[data-signal="neverContacted"]').count(), 0, "the contact clears the signal");
+  await page.click('[data-tab="general"]');
+  assert.equal(await page.inputValue("#field-lastContactAt"), localToday, "the contact moved the last contact date to today");
+  await page.click('[data-tab="activity"]');
+  assert.match(await page.locator("[data-client-activity]").innerText(), /Contato registrado[\s\S]*WHATSAPP: Approved the E2E scope\./, "the conversation is in the history");
+
+  // A deal started from the client lands in the pipeline pointed at them.
+  await page.click('[data-tab="commercial"]');
+  const dealsBefore = await page.locator("[data-client-deal]").count();
+  await page.click("[data-new-deal]");
+  await page.waitForSelector("[data-client-deal-form]");
+  await page.click("[data-modal-confirm]");
+  await settle();
+  assert.ok(await page.locator('[data-client-deal-form] [data-error-for="title"]:not([hidden])').count(), "a deal needs a title");
+  await page.fill("[data-client-deal-form] [name=title]", "E2E upsell");
+  await page.fill("[data-client-deal-form] [name=estimatedValue]", "1.200");
+  await page.click("[data-modal-confirm]");
+  await page.waitForFunction((count) => document.querySelectorAll("[data-client-deal]").length === count + 1, dealsBefore);
+  const storedDeal = await page.evaluate(() => JSON.parse(localStorage.getItem("space-admin:commercial:v1")).find((deal) => deal.title === "E2E upsell"));
+  assert.equal(storedDeal.clientId, "mock-client-002", "the deal points at the client");
+  assert.equal(storedDeal.estimatedValue, 1200);
+
+  // An entry started from the client, then settled from the same tab.
+  await page.click('[data-tab="financial"]');
+  const entriesBefore = await page.locator("[data-client-entry]").count();
+  await page.click("[data-new-entry]");
+  await page.waitForSelector("[data-client-entry-form]");
+  await page.fill("[data-client-entry-form] [name=description]", "E2E retainer fee");
+  await page.fill("[data-client-entry-form] [name=amount]", "800");
+  await page.click("[data-modal-confirm]");
+  await page.waitForFunction((count) => document.querySelectorAll("[data-client-entry]").length === count + 1, entriesBefore);
+  const fee = page.locator("[data-client-entry]", { hasText: "E2E retainer fee" });
+  await fee.locator("[data-settle-entry]").click();
+  await page.waitForFunction(() => {
+    const row = [...document.querySelectorAll("[data-client-entry]")].find((node) => node.textContent.includes("E2E retainer fee"));
+    return row && !row.querySelector("[data-settle-entry]");
+  });
+
+  // A new record that matches an existing one says so before it is saved.
+  await page.goto(`${BASE_URL}/#/clients/new`);
+  await page.waitForSelector('[data-client-editor][data-mode="create"]');
+  await page.fill("#field-email", "LUCAS@example.com");
+  await settle();
+  assert.match(await page.locator("[data-duplicate-warning]").innerText(), /Lucas Souza/, "duplicate email is flagged");
+  await page.evaluate(() => {
+    window.location.hash = "#/clients";
+  });
+  await page.waitForSelector("[data-modal-confirm]");
+  await page.click("[data-modal-confirm]");
+  await page.waitForSelector("[data-client-row]");
 
   /* ---------------------------------------------- financial v2 foundation */
 

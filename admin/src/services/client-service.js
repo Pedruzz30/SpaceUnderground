@@ -4,6 +4,8 @@ import { getActivity, logActivity } from "./activity-service.js";
 import { DataError, toDataError } from "./errors.js";
 import { normalizeClientCode, normalizeContactTimestamp } from "./mappers/client-mapper.js";
 import { getClientRepository, getProjectRepository } from "./repositories/index.js";
+import { CONTACT_CHANNELS, contactTimestampForDay } from "../utils/client-relationship.js";
+import { todayKey } from "../utils/financial-metrics.js";
 
 // Async contract used by the Client Hub and the Client Editor. Pages call these
 // functions and never learn whether the data came from localStorage or
@@ -189,6 +191,44 @@ export async function unlinkProjectFromClient(clientId, projectId) {
     return project;
   } catch (error) {
     throw toDataError(error, t("errors.data.linkProject"));
+  }
+}
+
+/* --------------------------------------------------------------- contact */
+
+const MAX_CONTACT_NOTE = 1000;
+
+// A real conversation with the client: it moves lastContactAt and leaves a
+// line in the client's activity, which is the contact history. Editing the
+// record never does this on its own.
+export async function recordContact(clientId, { channel = "OTHER", note = "", day = null } = {}) {
+  try {
+    const repository = await getClientRepository();
+    const client = await repository.getById(clientId);
+    if (!client) throw new DataError(t("errors.notFound"), { code: "not_found" });
+
+    const kind = String(channel).toUpperCase();
+    if (!CONTACT_CHANNELS.includes(kind)) throw new DataError(t("clientEditor.contact.channelValid"), { code: "validation", field: "channel" });
+    const text = String(note ?? "").trim();
+    if (text.length > MAX_CONTACT_NOTE) throw new DataError(t("clientEditor.contact.noteTooLong", { max: MAX_CONTACT_NOTE }), { code: "validation", field: "note" });
+
+    const chosen = day || todayKey();
+    const at = contactTimestampForDay(chosen);
+    if (!at) throw new DataError(t("clients.validation.lastContactValid"), { code: "validation", field: "day" });
+    if (new Date(at).getTime() > Date.now() + CONTACT_CLOCK_SKEW_MS) {
+      throw new DataError(t("clients.validation.lastContactFuture"), { code: "validation", field: "day" });
+    }
+
+    // Only moves forward: logging an older conversation keeps a newer date.
+    const newest = client.lastContactAt && new Date(client.lastContactAt).getTime() > new Date(at).getTime() ? client.lastContactAt : at;
+    const updated = newest === client.lastContactAt ? client : await repository.update(client.id, { lastContactAt: newest });
+    if (!updated) throw new DataError(t("errors.notFound"), { code: "not_found" });
+
+    const detail = `${kind}${text ? `: ${text}` : ""}`;
+    await logActivity("Contact recorded", `${label(updated)} · ${detail}`, clientMeta("client.contacted", updated));
+    return updated;
+  } catch (error) {
+    throw toDataError(error, t("clientEditor.contact.saveError"));
   }
 }
 
