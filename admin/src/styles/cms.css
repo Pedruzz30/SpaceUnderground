@@ -17,7 +17,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space-3);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent), var(--surface);
+  background: var(--surface);
 }
 
 .cms-status-grid article > span,
@@ -301,7 +301,7 @@
 
 .cms-section-button.is-active {
   border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
-  background: linear-gradient(90deg, rgba(198, 255, 0, 0.06), rgba(255, 255, 255, 0.015));
+  background: var(--surface-hover);
   color: var(--text-primary);
 }
 
@@ -391,7 +391,7 @@
   border-radius: 6px;
   padding: var(--space-4);
   background:
-    linear-gradient(180deg, rgba(198, 255, 0, 0.035), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 32%),
     rgba(255, 255, 255, 0.012);
 }
 
@@ -502,7 +502,7 @@
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: rgba(198, 255, 0, 0.055);
+  background: var(--accent-soft);
   color: var(--accent);
   font: 600 0.58rem/1 var(--mono);
   letter-spacing: 0.1em;

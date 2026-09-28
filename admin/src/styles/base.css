@@ -1,32 +1,38 @@
 :root {
   color-scheme: dark;
-  --bg: #070806;
-  --bg-soft: #0c0f0b;
-  --surface: #11150f;
-  --surface-strong: #171d14;
-  --surface-raised: #151a12;
-  --surface-hover: #1b2117;
-  --border: #273022;
-  --border-strong: #45533c;
-  --text-primary: #f4f7ef;
-  --text-muted: #9aa591;
-  --text-soft: #c4ccba;
+  /* Same neutrals as the public site (src/styles/base/tokens.css): the admin
+     is the studio's back office, so it shares the studio's surfaces. */
+  --bg: #080808;
+  --bg-soft: #0d0d0d;
+  --surface: #111111;
+  --surface-strong: #181818;
+  --surface-raised: #141414;
+  --surface-hover: #1c1c1c;
+  --border: #262626;
+  --border-strong: #3a3a3a;
+  --text-primary: #f2f2ee;
+  --text-muted: #929292;
+  --text-soft: #c2c2bd;
   --accent: #c6ff00;
-  --accent-soft: rgba(198, 255, 0, 0.12);
+  --accent-hover: #d8ff52;
+  --accent-soft: rgba(198, 255, 0, 0.1);
+  --ink: #080808;
   --success: #77d98b;
   --warning: #f4b24d;
   --danger: #ef6a64;
   --radius: 8px;
+  --radius-sm: 6px;
   --space-1: 0.5rem;
   --space-2: 0.75rem;
   --space-3: 1rem;
   --space-4: 1.5rem;
   --space-5: 2rem;
   --space-6: 3rem;
-  --shadow: 0 22px 70px rgba(0, 0, 0, 0.36);
-  --shadow-soft: 0 10px 34px rgba(0, 0, 0, 0.22);
+  --shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  --shadow-soft: 0 1px 0 rgba(255, 255, 255, 0.02);
   --mono: "DM Mono", "Cascadia Mono", Consolas, monospace;
-  --sans: Inter, Manrope, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --sans: Manrope, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: "Space Grotesk", Manrope, ui-sans-serif, system-ui, sans-serif;
 }
 
 *,
@@ -42,16 +48,19 @@ html {
 
 body {
   margin: 0;
-  background:
-    linear-gradient(rgba(198, 255, 0, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(198, 255, 0, 0.018) 1px, transparent 1px),
-    radial-gradient(circle at 82% -8%, rgba(198, 255, 0, 0.13), transparent 28%),
-    radial-gradient(circle at 0% 90%, rgba(119, 217, 139, 0.08), transparent 24%),
-    var(--bg);
-  background-size: 44px 44px, 44px 44px, auto, auto;
+  background: var(--bg);
   color: var(--text-primary);
   font-family: var(--sans);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 button,
@@ -96,9 +105,16 @@ img {
   outline-offset: 3px;
 }
 
+/* The router moves focus to the page container on navigation so screen
+   readers announce the new screen. That container is not a control, so it
+   gets no ring; real controls keep theirs. */
+[tabindex="-1"]:focus {
+  outline: none;
+}
+
 ::selection {
   background: var(--accent);
-  color: #070806;
+  color: var(--ink);
 }
 
 ::-webkit-scrollbar {
@@ -107,17 +123,17 @@ img {
 }
 
 ::-webkit-scrollbar-track {
-  background: #070806;
+  background: var(--bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  border: 3px solid #070806;
+  border: 3px solid var(--bg);
   border-radius: 999px;
-  background: #394430;
+  background: #2e2e2e;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #566449;
+  background: #444444;
 }
 
 /* Author styles beat the browser's [hidden] rule, so any element we give a
