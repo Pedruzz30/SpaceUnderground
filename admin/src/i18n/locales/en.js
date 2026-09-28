@@ -368,6 +368,7 @@ export default {
     actionViewPublic: "View public",
     actionOpenProject: "Open project",
     actionOpenDemo: "Open demo",
+    pendingChecks: "Pending",
   },
   projectHealth: {
     title: "Health",

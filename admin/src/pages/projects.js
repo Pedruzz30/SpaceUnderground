@@ -3,8 +3,9 @@ import { CATEGORIES, EDITORIAL_STATUSES } from "../data/projects.js";
 import { publicSiteUrl } from "../config/public-site.js";
 import { getProjects } from "../services/project-service.js";
 import { describeError } from "../services/errors.js";
+import { resolveImageUrl } from "../services/storage-service.js";
 import { onLocaleChange, statusLabel, t } from "../i18n/index.js";
-import { escapeAttribute, escapeHtml } from "../utils/html.js";
+import { escapeAttribute, escapeHtml, safeHexColor } from "../utils/html.js";
 import { contentCompleteness, liveDemoState, projectHealth } from "../utils/project-health.js";
 
 function formatUpdated(iso) {
@@ -53,21 +54,45 @@ function filterMarkup({ labelKey, name, options }) {
 
 function metricsMarkup(projects) {
   const enriched = projects.map((project) => ({ project, health: projectHealth(project), demo: liveDemoState(project) }));
+  const attention = enriched.filter((item) => ["attention", "incomplete"].includes(item.health.status)).length;
   const metrics = [
     ["projects.metricTotal", projects.length],
     ["projects.metricPublished", projects.filter((project) => project.editorialStatus === "PUBLISHED").length],
     ["projects.metricDraft", projects.filter((project) => project.editorialStatus === "DRAFT").length],
     ["projects.metricHidden", projects.filter((project) => project.visible === false).length],
     ["projects.metricWithDemo", enriched.filter((item) => item.demo === "live").length],
-    ["projects.metricAttention", enriched.filter((item) => ["attention", "incomplete"].includes(item.health.status)).length],
+    ["projects.metricAttention", attention],
   ];
 
   return metrics.map(([key, value]) => `
-    <div class="project-metric">
+    <div class="project-metric${key === "projects.metricAttention" && value > 0 ? " is-warn" : ""}">
       <strong>${escapeHtml(value)}</strong>
       <span>${escapeHtml(t(key))}</span>
     </div>
   `).join("");
+}
+
+function meterMarkup(label, percent) {
+  const value = Math.max(0, Math.min(100, Number(percent) || 0));
+  return `
+    <div class="content-meter${value < 100 ? " content-meter--partial" : ""}">
+      <span>${escapeHtml(label)}</span>
+      <i aria-hidden="true"><b style="width:${value}%"></b></i>
+      <em>${value}%</em>
+    </div>
+  `;
+}
+
+function pendingMarkup(health) {
+  const failing = health.checks.filter((check) => !check.ok);
+  if (!failing.length) return "";
+  const labels = failing.map((check) => t(`projectHealth.checks.${check.key}`)).join(" · ");
+  return `
+    <p class="pending-note pending-note--${health.status}">
+      <span>${escapeHtml(t("projects.pendingChecks"))}</span>
+      ${escapeHtml(labels)}
+    </p>
+  `;
 }
 
 function projectCard(project) {
@@ -79,23 +104,50 @@ function projectCard(project) {
   const publicHref = project.slug ? publicSiteUrl("#work") : "";
   const projectHref = project.projectUrl || "";
   const demoHref = demo === "live" ? project.previewUrl : "";
+  const editHref = `#/projects/${encodeURIComponent(project.id)}`;
+  const caseLabel = `CASE ${project.caseNumber || "—"}`;
+  const category = statusLabel(project.category || t("projects.uncategorised"));
+  const muted = project.editorialStatus === "ARCHIVED" || !project.visible;
+  const poster = String(project.poster || "").trim();
 
   return `
-    <article class="project-row" data-project-id="${escapeAttribute(project.id)}">
-      <span class="project-row__case">${escapeHtml(project.caseNumber)}</span>
-      <span class="project-row__project">
-        <strong>${escapeHtml(project.name || t("projects.untitled"))}</strong>
-        <small>${escapeHtml(project.slug || "—")}</small>
-      </span>
-      <span data-label="${t("common.client")}">${escapeHtml(project.client || t("projects.noClient"))}</span>
-      <span class="project-row__stack" data-label="${t("common.category")}">${escapeHtml(statusLabel(project.category || t("projects.uncategorised")))}<small>${escapeHtml(statusLabel(project.status))}</small></span>
-      <span class="project-row__stack" data-label="${t("projects.publication")}">${badge(project.editorialStatus, badgeType(project.editorialStatus))}<small>${escapeHtml(visibilityLabel(project))}</small></span>
-      <span data-label="${t("projectEditor.liveDemo")}">${plainBadge(demoLabel(demo), demo === "live" ? "success" : demo === "invalid" ? "warning" : "muted")}</span>
-      <span data-label="${t("projects.content")}">${escapeHtml(t("projectHealth.content.compact", { pt: completeness.pt.percent, en: completeness.en.percent }))}</span>
-      <span data-label="${t("projectHealth.title")}">${plainBadge(healthLabel(health.status), health.status === "healthy" ? "success" : health.status === "attention" ? "warning" : "muted")}</span>
-      <span data-label="${t("common.updated")}">${escapeHtml(formatUpdated(project.updatedAt))}</span>
-      <span class="project-row__actions">
-        <button class="button button--compact" type="button" data-project-open="${escapeAttribute(project.id)}">${t("projects.actionEdit")}</button>
+    <article class="project-card${muted ? " project-card--muted" : ""}" data-project-id="${escapeAttribute(project.id)}" style="--project-accent:${safeHexColor(project.accent)}">
+      <a class="project-card__poster" href="${escapeAttribute(editHref)}" tabindex="-1" aria-hidden="true">
+        ${poster ? `<img data-poster-src="${escapeAttribute(poster)}" alt="" loading="lazy">` : ""}
+        <span class="project-card__placeholder">
+          <strong>${escapeHtml(project.caseNumber || "—")}</strong>
+          ${poster ? "" : `<small>${escapeHtml(t("projectEditor.noPoster"))}</small>`}
+        </span>
+        <span class="project-card__case">${escapeHtml(caseLabel)}</span>
+        <span class="project-card__health">${plainBadge(healthLabel(health.status), health.status === "healthy" ? "success" : health.status === "attention" ? "warning" : "muted")}</span>
+      </a>
+
+      <div class="project-card__body">
+        <span class="project-card__eyebrow">${escapeHtml(category)} · ${escapeHtml(statusLabel(project.status))}</span>
+        <h3 class="project-card__name">${escapeHtml(project.name || t("projects.untitled"))}</h3>
+        <p class="project-card__meta">
+          <span>${escapeHtml(project.client || t("projects.noClient"))}</span>
+          <small>${escapeHtml(project.slug || "—")}</small>
+        </p>
+
+        <div class="project-card__badges">
+          ${badge(project.editorialStatus, badgeType(project.editorialStatus))}
+          ${plainBadge(visibilityLabel(project), project.visible ? "neutral" : "muted")}
+          ${plainBadge(`DEMO · ${demoLabel(demo)}`, demo === "live" ? "success" : demo === "invalid" ? "warning" : "muted")}
+        </div>
+
+        <div class="project-card__content">
+          <span>${escapeHtml(t("projects.content"))}</span>
+          ${meterMarkup("PT", completeness.pt.percent)}
+          ${meterMarkup("EN", completeness.en.percent)}
+        </div>
+
+        ${pendingMarkup(health)}
+      </div>
+
+      <footer class="project-card__actions">
+        <button class="button project-card__edit" type="button" data-project-open="${escapeAttribute(project.id)}">${t("projects.actionEdit")} <span aria-hidden="true">→</span></button>
+        <span class="project-card__updated" title="${escapeAttribute(t("common.updated"))}">${escapeHtml(formatUpdated(project.updatedAt))}</span>
         <span class="row-menu" data-row-menu>
           <button class="button button--compact row-menu__toggle" type="button" data-row-menu-toggle aria-expanded="false" aria-haspopup="true" aria-label="${escapeAttribute(t("projects.actions"))}">⋯</button>
           <span class="row-menu__panel" role="menu" hidden>
@@ -104,9 +156,24 @@ function projectCard(project) {
             <a role="menuitem" href="${escapeAttribute(demoHref || "#")}" target="_blank" rel="noreferrer" ${demoHref ? "" : 'aria-disabled="true"'}>${t("projects.actionOpenDemo")}</a>
           </span>
         </span>
-      </span>
+      </footer>
     </article>
   `;
+}
+
+// The last tile is a shortcut to create a case, so the grid never ends on a
+// dead edge.
+function newProjectTile() {
+  return `
+    <a class="project-card project-card--new" href="#/projects/new">
+      <span aria-hidden="true">+</span>
+      <strong>${escapeHtml(t("projects.newProject"))}</strong>
+    </a>
+  `;
+}
+
+function skeletonCards() {
+  return Array.from({ length: 3 }, () => `<div class="project-card project-card--skeleton skeleton-card"></div>`).join("");
 }
 
 function closeRowMenus(root = document) {
@@ -133,38 +200,31 @@ export const projectsPage = {
       </div>
     </section>
 
-    <section class="panel projects-panel">
-      <div class="project-metrics" data-project-metrics aria-live="polite"></div>
-      <div class="toolbar toolbar--filters">
-        <label class="search-field">
-          <span data-i18n="projects.searchProjects">${t("projects.searchProjects")}</span>
-          <input data-search-projects type="search" placeholder="${t("projects.searchPlaceholder")}" disabled>
-        </label>
-        <div class="toolbar__controls">
-          <label class="sort-field">
-            <span data-i18n="projects.sortBy">${t("projects.sortBy")}</span>
-            <select data-project-sort disabled>
-              <option value="updated">${t("projects.sortUpdated")}</option>
-              <option value="case">${t("projects.sortCase")}</option>
-              <option value="name">${t("projects.sortName")}</option>
-            </select>
-          </label>
-          ${filterMarkup({ labelKey: "common.category", name: "category", options: [["ALL", t("common.all")], ...CATEGORIES.map((item) => [item, statusLabel(item)])] })}
-          ${filterMarkup({ labelKey: "common.editorial", name: "editorial", options: [["ALL", t("common.all")], ...EDITORIAL_STATUSES.map((item) => [item, statusLabel(item)])] })}
-          ${filterMarkup({ labelKey: "common.visibility", name: "visibility", options: [["ALL", t("common.all")], ["VISIBLE", t("common.visible")], ["HIDDEN", t("common.hidden")]] })}
-          ${filterMarkup({ labelKey: "projectEditor.liveDemo", name: "demo", options: [["ALL", t("common.all")], ["LIVE", t("projectHealth.demo.live")], ["NONE", t("projectHealth.demo.none")]] })}
-          ${filterMarkup({ labelKey: "projectHealth.title", name: "health", options: [["ALL", t("common.all")], ["HEALTHY", t("projectHealth.status.healthy")], ["ATTENTION", t("projectHealth.status.attention")], ["INCOMPLETE", t("projectHealth.status.incomplete")]] })}
-        </div>
-      </div>
+    <div class="metric-strip" data-project-metrics aria-live="polite"></div>
 
-      <div class="projects-table-scroll">
-        <div class="project-table" data-project-list aria-live="polite" aria-busy="true">
-          <div class="project-row project-row--skeleton"></div>
-          <div class="project-row project-row--skeleton"></div>
-          <div class="project-row project-row--skeleton"></div>
-        </div>
-      </div>
-    </section>
+    <div class="project-filters">
+      <label class="search-field">
+        <span data-i18n="projects.searchProjects">${t("projects.searchProjects")}</span>
+        <input data-search-projects type="search" placeholder="${t("projects.searchPlaceholder")}" disabled>
+      </label>
+      <label class="sort-field project-filters__sort">
+        <span data-i18n="projects.sortBy">${t("projects.sortBy")}</span>
+        <select data-project-sort disabled>
+          <option value="updated">${t("projects.sortUpdated")}</option>
+          <option value="case">${t("projects.sortCase")}</option>
+          <option value="name">${t("projects.sortName")}</option>
+        </select>
+      </label>
+      ${filterMarkup({ labelKey: "common.category", name: "category", options: [["ALL", t("common.all")], ...CATEGORIES.map((item) => [item, statusLabel(item)])] })}
+      ${filterMarkup({ labelKey: "common.editorial", name: "editorial", options: [["ALL", t("common.all")], ...EDITORIAL_STATUSES.map((item) => [item, statusLabel(item)])] })}
+      ${filterMarkup({ labelKey: "common.visibility", name: "visibility", options: [["ALL", t("common.all")], ["VISIBLE", t("common.visible")], ["HIDDEN", t("common.hidden")]] })}
+      ${filterMarkup({ labelKey: "projectEditor.liveDemo", name: "demo", options: [["ALL", t("common.all")], ["LIVE", t("projectHealth.demo.live")], ["NONE", t("projectHealth.demo.none")]] })}
+      ${filterMarkup({ labelKey: "projectHealth.title", name: "health", options: [["ALL", t("common.all")], ["HEALTHY", t("projectHealth.status.healthy")], ["ATTENTION", t("projectHealth.status.attention")], ["INCOMPLETE", t("projectHealth.status.incomplete")]] })}
+    </div>
+
+    <div class="project-grid" data-project-list aria-live="polite" aria-busy="true">
+      ${skeletonCards()}
+    </div>
   `,
   afterRender: async () => {
     document.querySelector("[data-new-project]")?.addEventListener("click", () => {
@@ -184,6 +244,29 @@ export const projectsPage = {
     const metricRoot = document.querySelector("[data-project-metrics]");
     const filters = [...document.querySelectorAll("[data-project-filter]")];
     let projects = [];
+
+    // Storage posters resolve asynchronously (signed URLs in Supabase mode).
+    // One lookup per path for the life of the page, so typing in the search
+    // box does not re-request every image.
+    const posterUrls = new Map();
+    const hydratePosters = () => {
+      list.querySelectorAll("img[data-poster-src]").forEach((img) => {
+        const path = img.dataset.posterSrc;
+        if (!posterUrls.has(path)) posterUrls.set(path, resolveImageUrl(path).catch(() => ""));
+        posterUrls.get(path).then((src) => {
+          if (!src || !img.isConnected) return;
+          // Revealed by class, not by the hidden attribute: a lazy image that is
+          // display:none never enters layout, so the browser never fetches it.
+          img.addEventListener("load", () => {
+            img.closest(".project-card__poster")?.classList.add("has-image");
+          }, { once: true });
+          img.addEventListener("error", () => {
+            img.hidden = true;
+          }, { once: true });
+          img.src = src;
+        });
+      });
+    };
 
     const renderList = () => {
       const query = search.value.trim().toLowerCase();
@@ -212,12 +295,11 @@ export const projectsPage = {
 
       if (metricRoot) metricRoot.innerHTML = metricsMarkup(projects);
 
-      list.innerHTML = `
-        <div class="project-table__head" aria-hidden="true">
-          <span>CASE</span><span>${t("dashboard.project").toUpperCase()}</span><span>${t("common.client").toUpperCase()}</span><span>${t("common.category").toUpperCase()}</span><span>${t("projects.publication").toUpperCase()}</span><span>${t("projectEditor.liveDemo").toUpperCase()}</span><span>${t("projects.content").toUpperCase()}</span><span>${t("projectHealth.title").toUpperCase()}</span><span>${t("common.updated").toUpperCase()}</span><span>${t("projects.actions").toUpperCase()}</span>
-        </div>
-        ${visible.length ? visible.map(projectCard).join("") : `<p class="empty-inline">${emptyMessage}</p>`}
-      `;
+      list.innerHTML = visible.length
+        ? `${visible.map(projectCard).join("")}${newProjectTile()}`
+        : `<p class="empty-inline project-grid__empty">${emptyMessage}</p>${projects.length ? "" : newProjectTile()}`;
+
+      hydratePosters();
 
       list.querySelectorAll("[data-project-open]").forEach((button) => {
         button.addEventListener("click", () => {
@@ -225,8 +307,8 @@ export const projectsPage = {
         });
       });
 
-      // Secondary actions live behind a per-row overflow menu, so the table
-      // keeps one button per row instead of four.
+      // Secondary actions live behind a per-card overflow menu, so each card
+      // keeps one primary button instead of four.
       list.querySelectorAll("[data-row-menu-toggle]").forEach((toggle) => {
         toggle.addEventListener("click", (event) => {
           event.stopPropagation();
@@ -263,7 +345,7 @@ export const projectsPage = {
       renderList();
     } catch (error) {
       if (!list.isConnected) return;
-      list.innerHTML = `<p class="empty-inline">${escapeHtml(describeError(error, t("projects.loadError")))}</p>`;
+      list.innerHTML = `<p class="empty-inline project-grid__empty">${escapeHtml(describeError(error, t("projects.loadError")))}</p>`;
     } finally {
       list.removeAttribute("aria-busy");
     }
