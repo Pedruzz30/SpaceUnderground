@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { MIGRATIONS_DIR, migrationFiles, readMigration } from "./helpers/migration-files.mjs";
+import { ADMIN_ONLY, policyMatrix, tableGrants } from "./helpers/policy-matrix.mjs";
 import { ADMIN_ID, USER_ID, asRole as runAs, createSupabaseDb, failure as fails } from "./helpers/supabase-db.mjs";
 
 const COMMERCIAL = readMigration("commercial_opportunities");
@@ -185,6 +186,26 @@ describe("commercial row level security", () => {
       db.query("delete from public.commercial_opportunities where id = $1 returning id", [created.id]),
     );
     assert.equal(removed.rows.length, 1);
+  });
+});
+
+describe("commercial access matrix", () => {
+  it("is admin-only for every verb: anon is refused, a signed-in non-admin sees and touches nothing", async () => {
+    const matrix = await policyMatrix(db, {
+      table: "commercial_opportunities",
+      seed: async () => (await insertDeal({ title: "Matrix row" })).id,
+      insertSql: "insert into public.commercial_opportunities (title, company) values ('Matrix insert', 'Aurora') returning id",
+      updateSet: "title = 'Matrix edit'",
+    });
+    assert.deepEqual(matrix, ADMIN_ONLY);
+  });
+
+  it("grants the table to authenticated and service_role only", async () => {
+    assert.deepEqual(await tableGrants(db, "commercial_opportunities", "anon"), []);
+    for (const grantee of ["authenticated", "service_role"]) {
+      const grants = await tableGrants(db, "commercial_opportunities", grantee);
+      for (const verb of ["DELETE", "INSERT", "SELECT", "UPDATE"]) assert.ok(grants.includes(verb), `${grantee} lacks ${verb}`);
+    }
   });
 });
 
