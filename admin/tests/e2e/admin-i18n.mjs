@@ -90,7 +90,7 @@ try {
     ["#/content", ".page-heading h2", "Área editorial.", "Editorial workspace."],
     ["#/media", ".page-heading h2", "Arquivos dos projetos.", "Project assets."],
     ["#/logs", ".page-heading h2", "Registro administrativo.", "Administrative log."],
-    ["#/settings", ".page-heading h2", "Configuração pública.", "Public configuration."],
+    ["#/settings", ".page-heading h2", "Configurações.", "Settings."],
   ];
 
   await setLocale("pt-BR");

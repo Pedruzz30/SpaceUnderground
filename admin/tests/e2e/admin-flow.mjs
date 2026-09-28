@@ -10,6 +10,7 @@
 // mock store between runs and never touches a real backend.
 
 import { strict as assert } from "node:assert";
+import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
 
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:5173";
@@ -17,7 +18,7 @@ const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:5173";
 const browser = await chromium.launch();
 // Explicit locale: this test asserts Portuguese copy, so it must not inherit
 // whatever language Playwright's default context happens to use.
-const context = await browser.newContext({ locale: "pt-BR", viewport: { width: 1280, height: 900 } });
+const context = await browser.newContext({ locale: "pt-BR", viewport: { width: 1280, height: 900 }, acceptDownloads: true });
 const page = await context.newPage();
 
 const errors = [];
@@ -83,7 +84,7 @@ try {
   assert.equal(await page.locator(".page-heading h2").innerText(), "Financial control.", "financial switches to English");
   await page.goto(`${BASE_URL}/#/settings`);
   await page.waitForSelector("[data-settings-form]:not([aria-busy])");
-  assert.equal(await page.locator(".page-heading h2").innerText(), "Public configuration.", "settings switches to English");
+  assert.equal(await page.locator(".page-heading h2").innerText(), "Settings.", "settings switches to English");
   // Everything after this point asserts behaviour, not copy, and runs in the
   // context's pt-BR locale.
   await page.reload();
@@ -1045,6 +1046,96 @@ try {
     assert.ok(comLog.includes(action), `${action} is logged`);
   }
   assert.ok(comLog.includes("client.created") && comLog.includes("financial.installments_created"), "the win's side effects are logged too");
+
+  /* ---------------------------------------------------------- settings v2 */
+
+  await page.evaluate(() => localStorage.removeItem("space-admin:site-settings:v1"));
+  await page.goto(`${BASE_URL}/#/settings`);
+  await page.waitForSelector("[data-settings-form]:not([aria-busy])");
+  const saveState = () => page.getAttribute("[data-settings-state]", "data-kind");
+  const waitForSaved = () => page.waitForFunction(() => document.querySelector("[data-settings-state]")?.dataset.kind === "saved");
+  assert.equal(await saveState(), "saved", "settings open with nothing unsaved");
+
+  await page.fill("#settings-seoTitle", "Space Underground · estúdio");
+  assert.equal(await saveState(), "unsaved", "an edit is an unsaved change");
+  await page.fill("#settings-seoTitle", "Space Underground");
+  assert.equal(await saveState(), "saved", "reverting the edit is not a change");
+  assert.match(await page.innerText('[data-counter-for="seoTitle"]'), /^17\/60/, "the title counter follows the field");
+  assert.deepEqual(
+    await page.locator("#settings-locale option").evaluateAll((options) => options.map((option) => option.value)),
+    ["", "pt-BR", "en"],
+    "the site language is one the public site ships",
+  );
+
+  await page.fill("#settings-siteUrl", "spaceunderground");
+  await page.click("[data-settings-save]");
+  assert.equal(await saveState(), "invalid", "an invalid URL blocks the save");
+  assert.equal(await page.locator('[data-error-for="siteUrl"]').isVisible(), true);
+  await page.fill("#settings-siteUrl", "https://spaceunderground.dev");
+  assert.equal(await page.locator('[data-error-for="siteUrl"]').isHidden(), true, "a fixed field clears its message");
+
+  const svgImage = (width, height) =>
+    `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#222"/></svg>`)}`;
+  await page.fill("#settings-ogImagePath", svgImage(400, 400));
+  await page.waitForSelector(".settings-og-status.is-warning");
+  await page.fill("#settings-ogImagePath", svgImage(1200, 630));
+  await page.waitForSelector(".settings-og-status.is-ok");
+  assert.equal(await page.locator('[data-check-target="ogImage"]').count(), 0, "a 1200 × 630 image passes the checklist");
+
+  await page.click('[data-locale-edit="en"]');
+  await page.fill("#settings-seoDescription", "");
+  await page.click('[data-locale-edit="pt-BR"]');
+  await page.click('[data-check-target="english"]');
+  assert.equal(await page.getAttribute('[data-locale-edit="en"]', "aria-pressed"), "true", "the checklist opens the English copy");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "settings-seoDescription");
+
+  await page.click("[data-settings-discard]");
+  await page.click("[data-modal-confirm]");
+  await waitForSaved();
+  assert.equal(await page.inputValue("#settings-ogImagePath"), "", "discarding restores the saved values");
+  assert.equal(await page.getAttribute('[data-locale-edit="pt-BR"]', "aria-pressed"), "true");
+
+  await page.fill("#settings-contactEmail", "ola@spaceunderground.dev");
+  await page.click("[data-settings-save]");
+  await waitForSaved();
+  const storedSettings = await page.evaluate(() => JSON.parse(localStorage.getItem("space-admin:site-settings:v1")));
+  assert.equal(storedSettings.contactEmail, "ola@spaceunderground.dev", "the save persists");
+  assert.ok(storedSettings.updatedAt, "the save is timestamped");
+  assert.equal(storedSettings.translations.en.seo_description, "Digital studio for websites, systems, automation and AI.", "the English copy survives");
+  assert.match(await page.innerText("[data-settings-updated]"), /Última alteração/);
+  const settingsLog = await page.evaluate(() => JSON.parse(localStorage.getItem("space-admin:activity:v1") || "[]").map((entry) => entry.action));
+  assert.ok(settingsLog.includes("settings.updated"), "saving settings is logged");
+
+  await page.click('[data-tab="account"]');
+  await page.waitForSelector("[data-password-form]");
+  await page.fill("#settings-password", "admin2026lab");
+  await page.fill("#settings-passwordConfirm", "admin2026lab");
+  await page.click("[data-password-submit]");
+  assert.equal(await page.locator('[data-error-for="password"]').isVisible(), true, "a password holding the email is refused");
+  await page.fill("#settings-password", "Orbita-2026-lab");
+  await page.fill("#settings-passwordConfirm", "Orbita-2026-lab");
+  assert.equal(await page.locator("[data-password-rules] li.is-ok").count(), 4, "every password rule ticks");
+  await page.click("[data-password-submit]");
+  await page.waitForFunction(() => document.querySelector("#settings-password")?.value === "");
+  await page.waitForSelector(".settings-team__row.is-you");
+
+  await page.click('[data-tab="system"]');
+  await page.waitForFunction(() => document.querySelectorAll('[data-health-status="ok"]').length === 8);
+  assert.equal(await page.locator("[data-health-pending]").isHidden(), true, "no pending migration in mock mode");
+
+  await page.click('[data-tab="data"]');
+  await page.waitForSelector(".settings-counts__total");
+  const [backupDownload] = await Promise.all([page.waitForEvent("download"), page.click("[data-backup-export]")]);
+  assert.match(backupDownload.suggestedFilename(), /^space-underground-backup-\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
+  const backup = JSON.parse(await readFile(await backupDownload.path(), "utf8"));
+  assert.equal(backup.format, "space-underground-admin-backup");
+  assert.deepEqual(backup.missing, [], "every module is in the backup");
+  assert.equal(backup.data.settings.contactEmail, "ola@spaceunderground.dev", "the backup reads the saved settings");
+
+  await page.click("[data-mock-reset]");
+  await page.click("[data-modal-confirm]");
+  await page.waitForFunction(() => document.querySelector("[data-toast-region]")?.textContent.includes("Dados de exemplo restaurados."));
+  await page.evaluate(() => localStorage.removeItem("space-admin:site-settings:v1"));
 
   assert.deepEqual(errors, [], "no console or page errors");
   console.log("admin flow: all checks passed");

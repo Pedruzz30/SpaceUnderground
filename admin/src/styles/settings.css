@@ -1,0 +1,949 @@
+/* Settings: one shell, four tabs. The public site form keeps its save bar
+   pinned above both columns; Account, System and Data are read-mostly panels
+   in the same card language. Tabs come from editor.css, the summary strip from
+   hub.css and the avatar from clients.css. */
+
+.settings-source {
+  align-self: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  color: var(--text-muted);
+  font: 600 0.6rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.settings-source.is-live {
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border));
+  color: var(--success);
+}
+
+.settings-tabs {
+  margin-bottom: var(--space-4);
+}
+
+.settings-tabpanel[hidden] {
+  display: none;
+}
+
+/* Prefixed: .panel > p in components.css outranks a single class. */
+.settings-shell .settings-copy {
+  margin: 0 0 var(--space-3);
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.settings-shell .settings-note {
+  margin: var(--space-3) 0 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.settings-shell .settings-note--mock,
+.settings-shell .settings-note--warning {
+  border: 1px dashed color-mix(in srgb, var(--warning) 40%, var(--border));
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.75rem;
+  color: var(--text-soft);
+}
+
+.settings-shell .settings-note--warning {
+  margin: 0 0 var(--space-3);
+}
+
+.settings-panel--danger {
+  border-color: color-mix(in srgb, var(--danger) 28%, var(--border));
+}
+
+/* --- site: layout and save bar ------------------------------------------------ */
+
+.settings-grid {
+  grid-template-columns: minmax(0, 1.4fr) minmax(20rem, 0.6fr);
+}
+
+.settings-toolbar {
+  position: sticky;
+  z-index: 8;
+  top: 88px;
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.6rem 0.6rem 0.9rem;
+  background: rgba(8, 8, 8, 0.86);
+  backdrop-filter: blur(14px);
+}
+
+.settings-toolbar__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.settings-toolbar__status small {
+  color: var(--text-muted);
+  font: 500 0.66rem/1.3 var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.settings-toolbar__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.settings-aside {
+  top: 168px;
+}
+
+.settings-label-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+}
+
+.settings-panel textarea {
+  min-height: 5.6rem;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.settings-panel select {
+  min-height: 3.05rem;
+}
+
+.settings-counter {
+  color: var(--text-muted);
+  font: 500 0.62rem/1 var(--mono);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.settings-counter.is-ok {
+  color: var(--success);
+}
+
+.settings-counter.is-short,
+.settings-counter.is-long {
+  color: var(--warning);
+}
+
+.settings-og-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.45rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.settings-og-status::before {
+  flex: none;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.settings-og-status:empty {
+  display: none;
+}
+
+.settings-og-status.is-ok {
+  color: var(--success);
+}
+
+.settings-og-status.is-warning {
+  color: var(--warning);
+}
+
+.settings-og-status.is-pending::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
+/* --- site: previews ------------------------------------------------------------ */
+
+.settings-preview__block {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.settings-preview__block > small {
+  color: var(--text-muted);
+  font: 600 0.58rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Google's dark-theme result colours, so the preview reads like the page
+   people will actually see. */
+.settings-search-preview {
+  gap: 0.4rem;
+  background: #1f1f1f;
+  padding: 1rem 1.05rem;
+}
+
+.settings-serp__site {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.settings-serp__site i {
+  display: grid;
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border-radius: 50%;
+  background: #303134;
+  color: var(--accent);
+  font: 700 0.75rem/1 var(--display);
+  font-style: normal;
+}
+
+.settings-serp__site div {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.settings-serp__site b {
+  color: #dadce0;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.settings-search-preview .settings-serp__site span {
+  overflow: hidden;
+  color: #bdc1c6;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-search-preview > strong {
+  color: #8ab4f8;
+  font: 400 1.12rem/1.3 var(--sans);
+}
+
+.settings-search-preview > p {
+  color: #bdc1c6;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.settings-og-preview {
+  grid-template-columns: 1fr;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.settings-og-preview > span {
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.settings-og-preview > div {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.8rem 0.9rem 0.9rem;
+}
+
+.settings-og-preview em {
+  color: var(--text-muted);
+  font: 500 0.6rem/1 var(--mono);
+  font-style: normal;
+  letter-spacing: 0.08em;
+}
+
+.settings-og-preview strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-og-preview p {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.84rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* --- site: readiness -------------------------------------------------------------- */
+
+.settings-score {
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.4rem 0.6rem;
+  color: var(--text-soft);
+  font: 600 0.62rem/1 var(--mono);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.settings-score.is-complete {
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border));
+  color: var(--success);
+}
+
+.settings-score.is-blocked {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  color: var(--danger);
+}
+
+.settings-meter {
+  overflow: hidden;
+  height: 4px;
+  margin-bottom: var(--space-3);
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.settings-meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 220ms ease;
+}
+
+.settings-checks {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-check {
+  display: grid;
+  grid-template-columns: 0.9rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.4rem 0.35rem 0.65rem;
+  color: var(--text-primary);
+  font-size: 0.84rem;
+}
+
+.settings-check i {
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 50%;
+}
+
+.settings-check.is-ok {
+  color: var(--text-soft);
+}
+
+.settings-check.is-ok i {
+  border-color: var(--success);
+  background: var(--success);
+  box-shadow: inset 0 0 0 2px var(--surface);
+}
+
+.settings-check.is-required {
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--border));
+}
+
+.settings-check.is-required i {
+  border-color: var(--danger);
+}
+
+.settings-check.is-advice i {
+  border-color: var(--warning);
+}
+
+.settings-check.is-pending i {
+  border-style: dashed;
+}
+
+.settings-check > span {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.25rem 0;
+}
+
+.settings-check small {
+  font: 600 0.56rem/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-check.is-required small {
+  color: var(--danger);
+}
+
+.settings-check.is-advice small {
+  color: var(--warning);
+}
+
+.settings-check .text-link {
+  min-height: 1.8rem;
+  border-color: transparent;
+  background: transparent;
+  padding: 0 0.4rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.settings-check .text-link:hover,
+.settings-check .text-link:focus-visible {
+  color: var(--accent);
+}
+
+/* --- account ---------------------------------------------------------------------- */
+
+.settings-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.settings-stack {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.settings-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.settings-identity > div:last-child {
+  display: grid;
+  min-width: 0;
+  justify-items: start;
+  gap: 0.45rem;
+}
+
+.settings-identity strong {
+  color: var(--text-primary);
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.settings-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.settings-facts div {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.75rem;
+}
+
+.settings-facts dt,
+.settings-counts dt small {
+  color: var(--text-muted);
+  font: 600 0.58rem/1.3 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-facts dd {
+  margin: 0.4rem 0 0;
+  color: var(--text-primary);
+  font-size: 0.86rem;
+}
+
+.settings-password {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.settings-password .field {
+  margin: 0;
+}
+
+.settings-toggle {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.settings-toggle input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.settings-rules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-rules li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.settings-rules i {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.settings-rules li.is-ok {
+  color: var(--success);
+}
+
+.settings-rules li.is-ok i {
+  background: var(--success);
+}
+
+.settings-rules li.is-missing {
+  color: var(--text-soft);
+}
+
+.settings-rules li.is-missing i {
+  background: var(--warning);
+}
+
+.settings-password__actions {
+  display: flex;
+}
+
+.settings-shell .settings-password .settings-note {
+  margin: 0;
+}
+
+.settings-team {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-team__row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.7rem;
+}
+
+.settings-team__row.is-you {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.settings-team__row code {
+  color: var(--text-primary);
+  font: 500 0.78rem/1 var(--mono);
+}
+
+.settings-team__row small {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+/* --- system ------------------------------------------------------------------------- */
+
+.settings-health-strip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.settings-health-strip .project-metric strong {
+  font-size: 1.5rem;
+  white-space: nowrap;
+}
+
+.settings-health-strip .is-ok strong {
+  color: var(--success);
+}
+
+.settings-health-strip .is-danger strong {
+  color: var(--danger);
+}
+
+.settings-health__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.settings-health__actions small {
+  color: var(--text-muted);
+  font: 500 0.64rem/1 var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.settings-health {
+  display: grid;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0;
+  list-style: none;
+}
+
+.settings-health__row {
+  display: grid;
+  grid-template-columns: 0.55rem minmax(8rem, 1fr) 9.5rem 7.5rem minmax(8rem, 12rem);
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  border-top: 1px solid var(--border);
+  padding: 0.75rem 0.9rem;
+}
+
+.settings-health__row:first-child {
+  border-top: 0;
+}
+
+.settings-health__row > i {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.settings-health__row.is-ok > i {
+  background: var(--success);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 14%, transparent);
+}
+
+.settings-health__row.is-failing > i {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.settings-health__row[data-health-status="schema"] > i {
+  background: var(--warning);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--warning) 14%, transparent);
+}
+
+.settings-health__row.is-pending > i {
+  animation: settings-pulse 1.2s ease-in-out infinite;
+}
+
+.settings-health__row strong {
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.settings-health__count {
+  color: var(--text-soft);
+  font: 500 0.72rem/1 var(--mono);
+}
+
+.settings-health__latency {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.6rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-health__latency b {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 60%, transparent);
+}
+
+.settings-health__latency em {
+  color: var(--text-soft);
+  font: 500 0.7rem/1 var(--mono);
+  font-style: normal;
+  text-align: right;
+}
+
+.settings-health__row p {
+  grid-column: 2 / -1;
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.settings-health__row p code,
+.settings-pending code {
+  color: var(--warning);
+  font: 500 0.72rem/1.4 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.settings-pending {
+  margin-top: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--warning) 6%, transparent);
+  padding: var(--space-3) var(--space-4);
+}
+
+.settings-pending strong {
+  color: var(--warning);
+  font: 600 0.62rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.settings-pending p {
+  margin: 0.6rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.86rem;
+}
+
+.settings-pending ol {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.6rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--text-muted);
+}
+
+#settings-panel-system > .settings-panel + .settings-panel,
+#settings-panel-system > .settings-pending + .settings-panel {
+  margin-top: var(--space-3);
+}
+
+.settings-integration-grid {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+@keyframes settings-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-health__row.is-pending > i {
+    animation: none;
+  }
+}
+
+/* --- data --------------------------------------------------------------------------- */
+
+.settings-counts {
+  display: grid;
+  margin: 0;
+}
+
+.settings-counts div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  border-bottom: 1px dashed var(--border);
+  padding: 0.55rem 0;
+}
+
+.settings-counts dt {
+  color: var(--text-soft);
+  font-size: 0.86rem;
+}
+
+.settings-counts dd {
+  margin: 0;
+  color: var(--text-primary);
+  font: 500 0.82rem/1 var(--mono);
+}
+
+.settings-counts .is-missing dd {
+  color: var(--warning);
+}
+
+.settings-counts__total {
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 0 !important;
+  padding-top: 0.75rem !important;
+}
+
+.settings-counts__total dt,
+.settings-counts__total dd {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.settings-shell .settings-backup-result {
+  margin: var(--space-3) 0 0;
+  color: var(--success);
+  font-size: 0.84rem;
+}
+
+.settings-shell .settings-backup-result.is-partial {
+  color: var(--warning);
+}
+
+.settings-reset,
+.settings-shell #settings-panel-data > .settings-note {
+  margin-top: var(--space-3);
+}
+
+/* --- responsive ----------------------------------------------------------------------- */
+
+@media (max-width: 1180px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-aside {
+    position: static;
+  }
+
+  .settings-facts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  .settings-health__row {
+    grid-template-columns: 0.55rem minmax(0, 1fr) auto;
+  }
+
+  .settings-health__count {
+    grid-column: 2;
+  }
+
+  .settings-health__latency {
+    grid-column: 3;
+    min-width: 8rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .settings-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-toolbar {
+    top: 82px;
+  }
+}
+
+@media (max-width: 760px) {
+  .settings-source {
+    align-self: flex-start;
+  }
+
+  .settings-toolbar {
+    position: static;
+    padding: 0.6rem;
+  }
+
+  .settings-toolbar__actions {
+    flex: 1 1 100%;
+  }
+
+  .settings-toolbar__actions .button {
+    flex: 1;
+  }
+
+  .settings-health-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-health-strip .project-metric:nth-child(n) {
+    border-top: 0;
+    border-left: 1px solid var(--border);
+  }
+
+  .settings-health-strip .project-metric:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .settings-health-strip .project-metric:nth-child(n + 3) {
+    border-top: 1px solid var(--border);
+  }
+
+  .settings-health-strip .project-metric strong {
+    font-size: 1.2rem;
+  }
+
+  .settings-panel .panel__head {
+    flex-wrap: wrap;
+  }
+
+  .settings-health__row {
+    padding: 0.7rem;
+  }
+
+  /* Records and timing share the second line; the bar needs more room
+     than a phone row has. */
+  .settings-health__latency {
+    grid-column: 3;
+    min-width: 0;
+    grid-template-columns: auto;
+  }
+
+  .settings-health__latency b {
+    display: none;
+  }
+
+  /* Four short labels fit a phone, so they share the row instead of
+     scrolling like the longer editor tab lists. */
+  .settings-shell .settings-tabs [role="tab"] {
+    flex: 1 0 auto;
+    min-width: 0;
+    padding-inline: 0.6rem;
+  }
+
+  .settings-rules {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-team__row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .settings-team__row small {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+
+  .settings-password__actions .button,
+  [data-backup-export],
+  [data-mock-reset],
+  [data-sign-out-everywhere] {
+    width: 100%;
+  }
+}

@@ -7,8 +7,8 @@ export async function getActivityWithStatus(options) {
   try {
     const repository = await getActivityRepository();
     return { items: await repository.list(options), ok: true };
-  } catch {
-    return { items: [], ok: false };
+  } catch (error) {
+    return { items: [], ok: false, error };
   }
 }
 
