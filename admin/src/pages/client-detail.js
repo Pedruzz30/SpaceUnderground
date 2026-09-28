@@ -399,7 +399,7 @@ function commercialMarkup(state) {
   return `
     ${panelHeader(
       "clientEditor.dealsTitle",
-      `${archived ? "" : `<button type="button" class="button button--primary button--compact" data-new-deal>${escapeHtml(t("clientEditor.newDeal"))}</button>`}
+      `${archived ? "" : `<button type="button" class="button button--primary button--compact" data-new-deal data-requires="commercial.edit">${escapeHtml(t("clientEditor.newDeal"))}</button>`}
        <a class="button button--compact" href="#/commercial">${escapeHtml(t("clientEditor.openPipeline"))}</a>`,
     )}
     <div class="ops-figures">
@@ -447,7 +447,7 @@ function financialMarkup(state) {
   return `
     ${panelHeader(
       "clientEditor.entriesTitle",
-      `${archived ? "" : `<button type="button" class="button button--primary button--compact" data-new-entry>${escapeHtml(t("clientEditor.newEntry"))}</button>`}
+      `${archived ? "" : `<button type="button" class="button button--primary button--compact" data-new-entry data-requires="finance.edit">${escapeHtml(t("clientEditor.newEntry"))}</button>`}
        <a class="button button--compact" href="#/financial">${escapeHtml(t("clientEditor.openFinancial"))}</a>`,
     )}
     <div class="ops-figures">
@@ -563,7 +563,7 @@ function renderEditor(state) {
 
     <form class="editor-form client-editor-form" data-client-editor data-mode="${isCreate ? "create" : "edit"}" novalidate>
       <div class="editor-toolbar">
-        <button type="submit" class="button button--primary" data-client-save data-i18n="${isCreate ? "clientEditor.createClient" : "clientEditor.saveChanges"}">${escapeHtml(
+        <button type="submit" class="button button--primary" data-client-save data-requires="clients.edit" data-i18n="${isCreate ? "clientEditor.createClient" : "clientEditor.saveChanges"}">${escapeHtml(
           t(isCreate ? "clientEditor.createClient" : "clientEditor.saveChanges"),
         )}</button>
       </div>

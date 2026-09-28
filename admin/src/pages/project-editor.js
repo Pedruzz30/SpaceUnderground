@@ -277,7 +277,7 @@ function overviewMarkup(project) {
           <span>${escapeHtml(t("projectEditor.quickActions"))}</span>
           <div class="overview-actions">
             <button type="submit" class="button" data-editor-action data-action-overview-save>${t("common.save")}</button>
-            <button type="button" class="button button--primary" data-editor-action data-action-overview-publish>${t("projectEditor.publishChanges")}</button>
+            <button type="button" class="button button--primary" data-editor-action data-action-overview-publish data-requires="projects.publish">${t("projectEditor.publishChanges")}</button>
             <a class="button" href="${escapeAttribute(publicUrl || "#/projects")}" target="_blank" rel="noreferrer" ${publicUrl ? "" : "aria-disabled=\"true\""}>${t("projectEditor.viewPublic")}</a>
             <a class="button" data-action-open-project href="${escapeAttribute(project.projectUrl || "#")}" target="_blank" rel="noreferrer" ${project.projectUrl ? "" : "aria-disabled=\"true\""}>${t("projectEditor.openProject")}</a>
             <button type="button" class="button" data-editor-action data-action-demo ${demo === "live" ? "" : "disabled"}>${t("projectEditor.openDemo")}</button>
@@ -339,11 +339,11 @@ function renderEditor(project, isCreate) {
     <form class="editor-form" data-project-editor data-project-id="${escapeAttribute(project.id || "")}" data-mode="${isCreate ? "create" : "edit"}" novalidate>
       <div class="editor-toolbar">
         ${isCreate
-          ? `<button type="submit" class="button button--primary" data-editor-action data-action-create data-i18n="projectEditor.createProject">${t("projectEditor.createProject")}</button>`
+          ? `<button type="submit" class="button button--primary" data-editor-action data-action-create data-requires="projects.create" data-i18n="projectEditor.createProject">${t("projectEditor.createProject")}</button>`
           : `
             <button type="button" class="button" data-editor-action data-action-preview data-i18n="projectEditor.preview">${t("projectEditor.preview")}</button>
             <button type="submit" class="button" data-editor-action data-action-save data-i18n="projectEditor.saveChanges">${t("projectEditor.saveChanges")}</button>
-            <button type="button" class="button button--primary" data-editor-action data-action-publish data-i18n="projectEditor.publishChanges">${t("projectEditor.publishChanges")}</button>
+            <button type="button" class="button button--primary" data-editor-action data-action-publish data-requires="projects.publish" data-i18n="projectEditor.publishChanges">${t("projectEditor.publishChanges")}</button>
           `}
       </div>
 
@@ -498,8 +498,8 @@ function renderEditor(project, isCreate) {
         </header>
         <p data-i18n="projectEditor.dangerCopy">${t("projectEditor.dangerCopy")}</p>
         <div class="danger-zone__actions">
-          <button type="button" class="button" data-editor-action data-action-archive data-i18n="projectEditor.archiveProject">${t("projectEditor.archiveProject")}</button>
-          <button type="button" class="button button--danger" data-editor-action data-action-delete data-i18n="projectEditor.deleteProject">${t("projectEditor.deleteProject")}</button>
+          <button type="button" class="button" data-editor-action data-action-archive data-requires="projects.archive" data-i18n="projectEditor.archiveProject">${t("projectEditor.archiveProject")}</button>
+          <button type="button" class="button button--danger" data-editor-action data-action-delete data-requires="projects.delete" data-i18n="projectEditor.deleteProject">${t("projectEditor.deleteProject")}</button>
         </div>
       </section>
     `}

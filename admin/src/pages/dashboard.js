@@ -28,6 +28,11 @@ import {
   rankAttention,
 } from "../utils/dashboard-metrics.js";
 import { escapeHtml } from "../utils/html.js";
+import { hasPermission, isSecurityModelActive } from "../security/access.js";
+import { pendingApprovalCount } from "../services/approval-service.js";
+import { listAuditEntries } from "../services/audit-service.js";
+import { auditLine } from "./audit.js";
+import { memberDashboard } from "./dashboard-member.js";
 
 // The Dashboard mixes two origins and says so on screen:
 // Every panel is real: clients, projects, the commercial pipeline, the
@@ -330,9 +335,36 @@ function renderHealth({ projects, projectsOk, activityOk }) {
 
 /* ------------------------------------------------------------------- page */
 
-export const dashboardPage = {
-  title: () => t("dashboard.title"),
-  breadcrumb: () => t("dashboard.breadcrumb"),
+// A module the member cannot read is neither queried nor shown: its panel is
+// gated (data-requires) and its read is skipped, never sent to be refused.
+const SKIPPED = Symbol("skipped");
+const readIf = (permission, read) => (hasPermission(permission) ? read() : Promise.reject(SKIPPED));
+
+function securityPanel() {
+  if (!isSecurityModelActive() || !(hasPermission("approvals.read_all") || hasPermission("audit.read_all"))) return "";
+  return `
+      <article class="panel dash-panel--security" aria-labelledby="dash-security-title">
+        ${panelHead(t("security.dashboard.title"), t("security.dashboard.subtitle"), "dash-security-title", textLink("#/approvals", t("security.dashboard.openApprovals")))}
+        <div data-dash-security aria-busy="true"><p class="empty-inline">${t("common.loading")}...</p></div>
+      </article>`;
+}
+
+async function paintSecurityPanel() {
+  const node = document.querySelector("[data-dash-security]");
+  if (!node) return;
+  const [count, events] = await Promise.all([
+    hasPermission("approvals.read_all") ? pendingApprovalCount() : Promise.resolve(null),
+    hasPermission("audit.read_all") ? listAuditEntries({ limit: 5 }).catch(() => []) : Promise.resolve([]),
+  ]);
+  if (!node.isConnected) return;
+  node.removeAttribute("aria-busy");
+  node.innerHTML = `
+    ${count === null ? "" : `<p class="dash-security__count"><strong>${escapeHtml(String(count))}</strong> ${escapeHtml(t("security.dashboard.pending"))}</p>`}
+    ${events.length ? `<ol class="audit-list audit-list--compact">${events.map((entry) => auditLine(entry)).join("")}</ol>` : ""}
+  `;
+}
+
+const fullDashboard = {
   render: () => {
     ledgerEntries = [];
     ledgerOk = null;
@@ -375,11 +407,11 @@ export const dashboardPage = {
       <article class="panel dash-panel--actions" aria-labelledby="dash-actions-title">
         ${panelHead(t("dashboard.quickActions"), t("dashboard.jumpIntoWork"), "dash-actions-title")}
         <div class="dash-actions">
-          <a class="button button--primary" href="#/projects/new" data-i18n="dashboard.newProject">${t("dashboard.newProject")}</a>
-          <a class="button" href="#/clients" data-i18n="nav.clients">${t("nav.clients")}</a>
-          <a class="button" href="#/commercial" data-i18n="nav.commercial">${t("nav.commercial")}</a>
-          <a class="button" href="#/financial" data-i18n="nav.financial">${t("nav.financial")}</a>
-          <a class="button" href="#/cms">CMS</a>
+          <a class="button button--primary" href="#/projects/new" data-requires="projects.create" data-i18n="dashboard.newProject">${t("dashboard.newProject")}</a>
+          <a class="button" href="#/clients" data-requires="clients.read" data-i18n="nav.clients">${t("nav.clients")}</a>
+          <a class="button" href="#/commercial" data-requires="commercial.read" data-i18n="nav.commercial">${t("nav.commercial")}</a>
+          <a class="button" href="#/financial" data-requires="finance.read" data-i18n="nav.financial">${t("nav.financial")}</a>
+          <a class="button" href="#/cms" data-requires="cms.read">CMS</a>
         </div>
       </article>
 
@@ -392,24 +424,26 @@ export const dashboardPage = {
         </div>
       </article>
 
-      <article class="panel dash-panel--finance" aria-labelledby="dash-finance-title">
+      ${securityPanel()}
+
+      <article class="panel dash-panel--finance" aria-labelledby="dash-finance-title" data-requires="finance.read">
         ${panelHead(t("dashboard.financialSnapshot"), t("dashboard.revenueAgainstExpenses"), "dash-finance-title", textLink("#/financial", t("dashboard.openFinancial")))}
         <div data-finance>${renderFinancial(DEFAULT_PERIOD)}</div>
       </article>
 
-      <article class="panel dash-panel--commercial" aria-labelledby="dash-commercial-title">
+      <article class="panel dash-panel--commercial" aria-labelledby="dash-commercial-title" data-requires="commercial.read">
         ${panelHead(t("dashboard.commercialPipeline"), t("dashboard.opportunitiesByStage"), "dash-commercial-title", textLink("#/commercial", t("dashboard.openCommercial")))}
         <div data-pipeline>${renderPipeline()}</div>
       </article>
 
-      <article class="panel dash-panel--followups" aria-labelledby="dash-followups-title">
+      <article class="panel dash-panel--followups" aria-labelledby="dash-followups-title" data-requires="clients.read|commercial.read">
         ${panelHead(t("dashboard.followUps"), t("dashboard.peopleToContactNext"), "dash-followups-title")}
         <div data-followups aria-busy="true">
           <p class="empty-inline">${t("common.loading")}...</p>
         </div>
       </article>
 
-      <article class="panel dash-panel--activity" aria-labelledby="dash-activity-title">
+      <article class="panel dash-panel--activity" aria-labelledby="dash-activity-title" data-requires="logs.read">
         ${panelHead(t("dashboard.recentActivity"), t("dashboard.administrativeLog"), "dash-activity-title", textLink("#/logs", t("dashboard.viewAllLogs")))}
         <div class="activity-list" data-activity aria-busy="true">
           <p class="empty-inline">${t("common.loading")}...</p>
@@ -436,12 +470,13 @@ export const dashboardPage = {
 
     // One failing query must never blank the Dashboard: the demo-backed panels
     // are already on screen, and each real block resolves independently.
+    paintSecurityPanel();
     const [projectsResult, activityResult, clientsResult, ledgerResult, dealsResult] = await Promise.allSettled([
       getProjects(),
-      getActivityWithStatus({ limit: 6 }),
-      getClients(),
-      getTransactionsWithStatus(),
-      getOpportunitiesWithStatus(),
+      readIf("logs.read", () => getActivityWithStatus({ limit: 6 })),
+      readIf("clients.read", () => getClients()),
+      readIf("finance.read", () => getTransactionsWithStatus()),
+      readIf("commercial.read", () => getOpportunitiesWithStatus()),
     ]);
 
     const attentionEl = document.querySelector("[data-attention]");
@@ -465,11 +500,13 @@ export const dashboardPage = {
     const ledger = ledgerResult.status === "fulfilled" ? ledgerResult.value : { items: [], ok: false };
     const clientNames = new Map(clients.map((client) => [client.id, client.name]));
     ledgerEntries = ledger.items.map((entry) => ({ ...entry, clientName: clientNames.get(entry.clientId) ?? "" }));
-    ledgerOk = ledger.ok;
+    // A read skipped for lack of permission is not an outage: its panel is
+    // hidden, and no "unavailable" note is shown for it.
+    ledgerOk = ledgerResult.reason === SKIPPED ? null : ledger.ok;
 
     const deals = dealsResult.status === "fulfilled" ? dealsResult.value : { items: [], ok: false };
     dealEntries = deals.items.map((deal) => ({ ...deal, clientName: clientNames.get(deal.clientId) ?? "" }));
-    dealsOk = deals.ok;
+    dealsOk = dealsResult.reason === SKIPPED ? null : deals.ok;
     const pipelineEl = document.querySelector("[data-pipeline]");
 
     // An outage and an empty log are different facts: getActivityWithStatus()
@@ -488,7 +525,7 @@ export const dashboardPage = {
       });
       followUpsEl.innerHTML =
         renderQueue(followUps({ clients, opportunities: dealEntries }), t("dashboard.noFollowUps")) +
-        missingModulesNote([!clientsOk && t("nav.clients"), dealsOk === false && t("nav.commercial")]);
+        missingModulesNote([!clientsOk && clientsResult.reason !== SKIPPED && t("nav.clients"), dealsOk === false && t("nav.commercial")]);
       if (pipelineEl) pipelineEl.innerHTML = renderPipeline();
 
       if (projectsOk) {
@@ -538,4 +575,11 @@ export const dashboardPage = {
     healthEl?.removeAttribute("aria-busy");
     followUpsEl?.removeAttribute("aria-busy");
   },
+};
+
+export const dashboardPage = {
+  title: () => t("dashboard.title"),
+  breadcrumb: () => t("dashboard.breadcrumb"),
+  render: (params) => (hasPermission("projects.read") ? fullDashboard : memberDashboard).render(params),
+  afterRender: (params) => (hasPermission("projects.read") ? fullDashboard : memberDashboard).afterRender(params),
 };

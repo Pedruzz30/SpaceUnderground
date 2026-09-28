@@ -158,10 +158,10 @@ function clientRow(row, state, now) {
           label: t("clients.actions"),
           items: [
             { label: t("clients.actionOpen"), href },
-            ...(archived ? [] : [{ label: t("clientEditor.recordContact"), attrs: `data-client-contact="${escapeAttribute(client.id)}"` }]),
+            ...(archived ? [] : [{ label: t("clientEditor.recordContact"), attrs: `data-client-contact="${escapeAttribute(client.id)}" data-requires="clients.edit"` }]),
             archived
-              ? { label: t("clients.actionUnarchive"), attrs: `data-client-unarchive="${escapeAttribute(client.id)}"` }
-              : { label: t("clients.actionArchive"), attrs: `data-client-archive="${escapeAttribute(client.id)}"` },
+              ? { label: t("clients.actionUnarchive"), attrs: `data-client-unarchive="${escapeAttribute(client.id)}" data-requires="clients.archive"` }
+              : { label: t("clients.actionArchive"), attrs: `data-client-archive="${escapeAttribute(client.id)}" data-requires="clients.archive"` },
           ],
         })}
       </span>
@@ -210,8 +210,8 @@ export const clientsPage = {
         <p data-i18n="clients.intro">${t("clients.intro")}</p>
       </div>
       <div class="heading-actions">
-        <button class="button" type="button" data-client-export disabled data-i18n="clients.exportCsv">${t("clients.exportCsv")}</button>
-        <a class="button button--primary" href="#/clients/new" data-new-client data-i18n="clients.newClient">${t("clients.newClient")}</a>
+        <button class="button" type="button" data-client-export data-requires="data.export" disabled data-i18n="clients.exportCsv">${t("clients.exportCsv")}</button>
+        <a class="button button--primary" href="#/clients/new" data-new-client data-requires="clients.create" data-i18n="clients.newClient">${t("clients.newClient")}</a>
       </div>
     </section>
 

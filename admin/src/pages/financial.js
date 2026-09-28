@@ -660,8 +660,8 @@ export const financialPage = {
         <p data-i18n="financial.intro">${t("financial.intro")}</p>
       </div>
       <div class="heading-actions">
-        <button class="button" type="button" data-fin-export disabled data-i18n="financial.exportCsv">${t("financial.exportCsv")}</button>
-        <button class="button button--primary" type="button" data-fin-new disabled data-i18n="financial.newEntry">${t("financial.newEntry")}</button>
+        <button class="button" type="button" data-fin-export data-requires="data.export" disabled data-i18n="financial.exportCsv">${t("financial.exportCsv")}</button>
+        <button class="button button--primary" type="button" data-fin-new data-requires="finance.edit" disabled data-i18n="financial.newEntry">${t("financial.newEntry")}</button>
       </div>
     </section>
 
