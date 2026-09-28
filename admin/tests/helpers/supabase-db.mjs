@@ -1,9 +1,10 @@
 // A PGlite database shaped like a Supabase project: the three API roles, the
-// auth schema with Supabase's own auth.uid(), the default privileges Supabase
-// grants on every new object in public, and a minimal storage schema. Tests
-// that exercise a migration's grants and policies start from here, so a revoke
-// that production needs cannot pass just because the test database never
-// granted anything.
+// auth schema with Supabase's own auth.uid() and the Auth tables the security
+// migration reads (MFA factors, sessions and refresh tokens), the default
+// privileges Supabase grants on every new object in public, and a minimal
+// storage schema. Tests that exercise a migration's grants and policies start
+// from here, so a revoke that production needs cannot pass just because the
+// test database never granted anything.
 
 import { PGlite } from "@electric-sql/pglite";
 
@@ -18,7 +19,29 @@ export async function createSupabaseDb() {
     create role service_role;
     grant usage on schema public to anon, authenticated, service_role;
     create schema if not exists auth;
-    create table auth.users (id uuid primary key, email text);
+    create table auth.users (
+      id uuid primary key,
+      email text,
+      encrypted_password text not null default '',
+      banned_until timestamptz,
+      last_sign_in_at timestamptz,
+      raw_user_meta_data jsonb not null default '{}'::jsonb
+    );
+    create table auth.mfa_factors (
+      id uuid primary key default gen_random_uuid(),
+      user_id uuid not null references auth.users (id) on delete cascade,
+      factor_type text not null default 'totp',
+      status text not null default 'unverified'
+    );
+    create table auth.sessions (
+      id uuid primary key default gen_random_uuid(),
+      user_id uuid not null references auth.users (id) on delete cascade
+    );
+    create table auth.refresh_tokens (
+      id bigserial primary key,
+      session_id uuid references auth.sessions (id) on delete cascade,
+      token text not null default md5(random()::text)
+    );
     create or replace function auth.uid() returns uuid language sql stable as $$
       select coalesce(
         nullif(current_setting('request.jwt.claim.sub', true), ''),
@@ -41,6 +64,8 @@ export async function createSupabaseDb() {
     end
     $$;
     alter table storage.objects enable row level security;
+    -- Supabase grants the table itself; the policies decide.
+    grant select, insert, update, delete on storage.objects to anon, authenticated, service_role;
   `);
   await db.query("insert into auth.users (id, email) values ($1, $2), ($3, $4)", [
     ADMIN_ID,
@@ -53,9 +78,10 @@ export async function createSupabaseDb() {
 
 // Runs a callback the way PostgREST runs a request: as the given role, with
 // request.jwt.claims set. The claims are cleared afterwards, so SQL outside
-// runs with no JWT context at all, like a migration or the SQL editor.
-export async function asRole(db, role, uid, fn) {
-  const claims = JSON.stringify(uid ? { role, sub: uid } : { role });
+// runs with no JWT context at all, like a migration or the SQL editor. extra
+// adds claims Supabase Auth puts in a token: aal, amr, session_id.
+export async function asRole(db, role, uid, fn, extra = {}) {
+  const claims = JSON.stringify(uid ? { role, sub: uid, ...extra } : { role, ...extra });
   await db.query("select set_config('request.jwt.claims', $1, false)", [claims]);
   await db.exec(`set role ${role};`);
   try {
@@ -73,4 +99,18 @@ export async function failure(db, sql, params = []) {
   } catch (error) {
     return error;
   }
+}
+
+// Claims of a session that verified MFA `secondsAgo` seconds ago: aal2, with
+// the TOTP entry Supabase Auth adds to amr. Fresh enough for step-up by
+// default; pass more than the step-up window (600 s) for a stale one.
+export function mfaClaims(secondsAgo = 30) {
+  const now = Math.floor(Date.now() / 1000);
+  return {
+    aal: "aal2",
+    amr: [
+      { method: "password", timestamp: now - 3600 },
+      { method: "totp", timestamp: now - secondsAgo },
+    ],
+  };
 }

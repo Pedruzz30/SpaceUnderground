@@ -5,10 +5,9 @@
 //   npm test
 
 import { strict as assert } from "node:assert";
-import { readFileSync } from "node:fs";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
-import { MIGRATIONS_DIR, migrationFiles, readMigration } from "./helpers/migration-files.mjs";
+import { applyMigrations, readMigration } from "./helpers/migration-files.mjs";
 import { ADMIN_ONLY, policyMatrix, tableGrants } from "./helpers/policy-matrix.mjs";
 import { ADMIN_ID, USER_ID, asRole as runAs, createSupabaseDb, failure as fails } from "./helpers/supabase-db.mjs";
 
@@ -36,10 +35,9 @@ async function updateDeal(id, set, params = []) {
 
 before(async () => {
   db = await createSupabaseDb();
-  for (const name of migrationFiles()) {
-    await db.exec(readFileSync(`${MIGRATIONS_DIR}${name}`, "utf8"));
-  }
-  await db.query("insert into public.admins (user_id, role) values ($1, 'owner')", [ADMIN_ID]);
+  // The admin is one from before the security foundation, which makes them an
+  // OWNER, as it does in production.
+  await applyMigrations(db, { legacyAdmins: [ADMIN_ID] });
 });
 
 after(async () => {

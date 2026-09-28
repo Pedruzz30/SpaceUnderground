@@ -49,7 +49,7 @@ const HISTORICAL = [
 ];
 
 // Written after the recorded production history and not applied yet.
-const PENDING = [];
+const PENDING = ["security_rbac_approval_foundation"];
 
 function toDate(stamp) {
   const [, y, mo, d, h, mi, s] = stamp.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
@@ -192,6 +192,14 @@ describe("financial migrations", () => {
   });
 });
 
+describe("security migrations", () => {
+  it("comes after every module whose policies it replaces", () => {
+    for (const purpose of ["commercial_opportunities", "financial_foundation", "clients_post_review_hardening", "activity_log", "site_settings"]) {
+      assert.ok(version(migrationFile("security_rbac_approval_foundation")) > version(migrationFile(purpose)), `must follow ${purpose}`);
+    }
+  });
+});
+
 describe("commercial migrations", () => {
   it("comes after the clients migrations, whose table it links to", () => {
     assert.ok(version(migrationFile("commercial_opportunities")) > version(migrationFile("clients_post_review_hardening")));
@@ -210,7 +218,14 @@ describe("fresh database", () => {
   });
 
   it("re-applies the migrations that must be safe to run twice", async () => {
-    for (const purpose of ["automation_runs", "business_workflows", "clients_post_review_hardening", "financial_foundation", "commercial_opportunities"]) {
+    for (const purpose of [
+      "automation_runs",
+      "business_workflows",
+      "clients_post_review_hardening",
+      "financial_foundation",
+      "commercial_opportunities",
+      "security_rbac_approval_foundation",
+    ]) {
       const name = migrationFile(purpose);
       await assert.doesNotReject(() => db.exec(read(name)), `${name} is not idempotent`);
     }

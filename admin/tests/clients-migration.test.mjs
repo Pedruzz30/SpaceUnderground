@@ -8,10 +8,9 @@
 // No Docker, no Supabase project and no credentials required.
 
 import { strict as assert } from "node:assert";
-import { readFileSync } from "node:fs";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
-import { MIGRATIONS_DIR, migrationFile, migrationFiles, readMigration } from "./helpers/migration-files.mjs";
+import { applyMigrations, migrationFile, readMigration } from "./helpers/migration-files.mjs";
 
 // Found by purpose, never by version: business workflows must come before
 // clients foundation, which migration-chain.test.mjs checks by timestamp.
@@ -132,17 +131,19 @@ before(async () => {
   // The whole chain, in order, as production has it. Later migrations (the
   // post-review hardening grants every public project column) need tables and
   // columns from earlier ones, so a hand-picked subset would not apply.
-  for (const name of migrationFiles()) {
-    if (name === CLIENTS_FILE) {
-      // Rows that exist before clients foundation runs: one without a code and
-      // one already archived, the two shapes the backfill has to repair.
-      await db.query("insert into public.clients (name, status, created_at) values ('Legacy One', 'ACTIVE', now() - interval '2 days')");
-      await db.query("insert into public.clients (name, status, code, created_at) values ('Legacy Two', 'ARCHIVED', 'CLIENT-007', now() - interval '1 day')");
-    }
-    await db.exec(readFileSync(`${MIGRATIONS_DIR}${name}`, "utf8"));
-  }
-
-  await db.query("insert into public.admins (user_id, role) values ($1, 'owner')", [ADMIN_ID]);
+  // The admin is one from before the security foundation, which makes them an
+  // OWNER, as it does in production.
+  await applyMigrations(db, {
+    legacyAdmins: [ADMIN_ID],
+    before: {
+      [CLIENTS_FILE]: async () => {
+        // Rows that exist before clients foundation runs: one without a code and
+        // one already archived, the two shapes the backfill has to repair.
+        await db.query("insert into public.clients (name, status, created_at) values ('Legacy One', 'ACTIVE', now() - interval '2 days')");
+        await db.query("insert into public.clients (name, status, code, created_at) values ('Legacy Two', 'ARCHIVED', 'CLIENT-007', now() - interval '1 day')");
+      },
+    },
+  });
 });
 
 after(async () => {

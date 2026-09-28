@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
-import { MIGRATIONS_DIR, migrationFiles, readMigration } from "./helpers/migration-files.mjs";
+import { applyMigrations, readMigration } from "./helpers/migration-files.mjs";
 
 const ADMIN_ID = "11111111-1111-1111-1111-111111111111";
 const USER_ID = "22222222-2222-2222-2222-222222222222";
@@ -94,12 +94,10 @@ before(async () => {
     alter table storage.objects enable row level security;
   `);
 
-  for (const name of migrationFiles()) {
-    await db.exec(readFileSync(`${MIGRATIONS_DIR}${name}`, "utf8"));
-  }
-
+  // The admin is one from before the security foundation, which makes them an
+  // OWNER, as it does in production.
   await db.query("insert into auth.users (id, email) values ($1, 'admin@space.local'), ($2, 'someone@space.local')", [ADMIN_ID, USER_ID]);
-  await db.query("insert into public.admins (user_id, role) values ($1, 'owner')", [ADMIN_ID]);
+  await applyMigrations(db, { legacyAdmins: [ADMIN_ID] });
   const { rows } = await db.query("insert into public.clients (name, status) values ('Owner', 'ACTIVE') returning id");
   clientId = rows[0].id;
   await db.query(
