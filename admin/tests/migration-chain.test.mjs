@@ -30,6 +30,8 @@ const RECORDED_IN_PRODUCTION = [
   "20260927225426_normalize_plan_status.sql",
   "20260927225753_clients_foundation.sql",
   "20260928013040_clients_post_review_hardening.sql",
+  "20260928031922_financial_foundation.sql",
+  "20260928035023_commercial_opportunities.sql",
 ];
 
 // Schema production already had before the CLI recorded anything. Their
@@ -46,8 +48,8 @@ const HISTORICAL = [
   "activity_log",
 ];
 
-// Written after the recorded history and not applied anywhere yet.
-const PENDING = ["financial_foundation", "commercial_opportunities"];
+// Written after the recorded production history and not applied yet.
+const PENDING = [];
 
 function toDate(stamp) {
   const [, y, mo, d, h, mi, s] = stamp.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
