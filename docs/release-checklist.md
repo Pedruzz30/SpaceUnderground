@@ -31,6 +31,7 @@ Run everything from the repo root unless noted.
 - [ ] `npm run test:e2e:i18n`
 - [ ] `cd admin && npm run test:e2e` (needs `npm run dev:mock` running)
 - [ ] `cd admin && npm run test:e2e:i18n` (needs `npm run dev:mock` running)
+- [ ] `cd admin && npm run test:e2e:security` (needs `npm run dev:mock` running)
 - [ ] `cd admin && npm run test:e2e:clients` against the real project, only
       after the clients foundation migration is applied there (needs `npm run dev` with
       Supabase env and `ADMIN_EMAIL` / `ADMIN_PASSWORD`). It creates and then
@@ -71,6 +72,7 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       | `20260928013040` | `clients_post_review_hardening` | APPLIED |
       | `20260928031922` | `financial_foundation` | APPLIED |
       | `20260928035023` | `commercial_opportunities` | APPLIED |
+      | `20260928200000` | `security_rbac_approval_foundation` | PENDING |
 
       Recorded versions must never be renamed or repaired. After the normalize,
       production plans read `Max` = `ON_REQUEST`, `Plus` = `AVAILABLE`,
@@ -131,6 +133,16 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       `src/scripts/supabase-public.js` (`PROJECT_COLUMNS`, `PLAN_COLUMNS`).
 - [ ] Any new column has the value the feature expects on the existing rows —
       an additive `default` is not the same as a backfill.
+
+- [ ] `20260928200000_security_rbac_approval_foundation.sql` — **pending**.
+      Follow `docs/security-architecture.md` ("Applying the migration" and
+      "Verify after applying"): sign-ups off and TOTP on in Supabase Auth,
+      apply, deploy the `team-invite` Edge Function with its secrets, both
+      owners enable MFA within the 14-day grace, create the break-glass
+      account with `bootstrap_member`. Then, as `anon` with the publishable
+      key, `team_members?select=ru&limit=1` and
+      `security_audit_log?select=id&limit=1` are refused, and the public
+      project query still returns `200`.
 
 How to apply a migration: Supabase CLI `supabase db push`, or paste the file
 into the SQL editor in order. Never edit or rename an already applied migration;

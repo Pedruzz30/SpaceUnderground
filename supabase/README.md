@@ -32,6 +32,7 @@ so older notes and commits stay easy to follow.
 | `20260928013040` | `clients_post_review_hardening` | APPLIED (recorded) |
 | `20260928031922` | `financial_foundation` | APPLIED (recorded) |
 | `20260928035023` | `commercial_opportunities` | APPLIED (recorded) |
+| `20260928200000` | `security_rbac_approval_foundation` | **PENDING — not applied** |
 
 Every recorded version and name matches
 `select version, name from supabase_migrations.schema_migrations` exactly and
@@ -190,6 +191,26 @@ Plus:
 - `touch_updated_at()` trigger — the database owns `updated_at`.
 - `stamp_published_at()` trigger — stamps `published_at` on first publication and never resets it.
 
+`migrations/20260928200000_security_rbac_approval_foundation.sql` (pending)
+replaces the binary `is_admin()` model with identities, roles and
+permissions, project access, the account lifecycle, MFA and step-up, drafts
+with approvals, and an append-only security audit log. It is documented in
+[`docs/security-architecture.md`](../docs/security-architecture.md), which
+also lists how to apply and verify it.
+
+| Table | Purpose |
+| --- | --- |
+| `team_members` | One row per person with Admin access: RU (`SU-00001`), status, access window, MFA state. |
+| `roles`, `permissions`, `role_permissions`, `approval_routes` | The access catalog, seeded from `admin/src/security/catalog.js`. |
+| `user_roles`, `project_members` | Active and revoked grants; never deleted. |
+| `team_invitations` | Invitations sent through the `team-invite` Edge Function. |
+| `change_requests` | Drafts and their review; approval applies them atomically. |
+| `security_audit_log` | Append-only security events. |
+| `security_settings` | Step-up window, expiries, invitation budget. |
+
+It also adds `projects.version`, guards on publishing, archiving and the
+settings columns, and forces the author of `activity_log` rows.
+
 ### Identity: `id` vs `case_number`
 
 They are deliberately separate. `case_number` is editorial and shown to humans
@@ -213,6 +234,11 @@ and that conversion happens in one place:
 ## Row level security
 
 RLS is enabled on all CMS tables.
+
+> The table below is the model **before**
+> `security_rbac_approval_foundation`. That migration replaces every
+> `is_admin()` policy with a permission check; the full matrix after it is in
+> [`docs/security-architecture.md`](../docs/security-architecture.md#row-level-security).
 
 | Policy | Effect |
 | --- | --- |
@@ -273,6 +299,15 @@ BASE_URL=http://127.0.0.1:5173 npm run test:e2e:supabase
 
 Promotion is intentionally manual — the frontend can never grant admin access.
 
+**After `security_rbac_approval_foundation`** the steps below no longer apply:
+`public.admins` refuses new rows. Existing admins become OWNER when the
+migration runs; new people are invited from the Admin's Team module (through
+the `team-invite` Edge Function), and the one-off break-glass account is
+created with `public.bootstrap_member(email, role)` in the SQL editor. See
+[`docs/security-architecture.md`](../docs/security-architecture.md#bootstrap-and-break-glass).
+
+Before that migration:
+
 1. Create the user: Supabase dashboard → **Authentication → Users → Add user**
    (email + password), or have them sign up.
 2. Copy that user's UUID from the same screen.
@@ -288,6 +323,19 @@ Promotion is intentionally manual — the frontend can never grant admin access.
 
 A user who authenticates but is missing from `admins` reaches the
 **ACCESS DENIED** screen and every query they attempt returns nothing.
+
+## Edge Functions
+
+`functions/team-invite/` sends invitations: it asks the database, with the
+inviter's own JWT, whether the invitation is allowed (`prepare_invitation`),
+then Supabase Auth sends the email with the service role, and
+`complete_invitation` records the member. Its logic is `handler.js`, tested in
+`admin/tests/team-invite-function.test.mjs`. Deploying it is manual:
+
+```bash
+supabase secrets set ADMIN_ALLOWED_ORIGINS=https://<admin host> ADMIN_INVITE_REDIRECT_URL=https://<admin host>/
+supabase functions deploy team-invite
+```
 
 ## Controlled seeds
 
