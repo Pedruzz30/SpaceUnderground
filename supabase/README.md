@@ -30,8 +30,8 @@ so older notes and commits stay easy to follow.
 | `20260927225426` | `normalize_plan_status` | APPLIED (recorded) |
 | `20260927225753` | `clients_foundation` | APPLIED (recorded) |
 | `20260928013040` | `clients_post_review_hardening` | APPLIED (recorded) |
-| `20260928031922` | `financial_foundation` | **NOT APPLIED** |
-| `20260928035023` | `commercial_opportunities` | **NOT APPLIED** |
+| `20260928031922` | `financial_foundation` | APPLIED (recorded) |
+| `20260928035023` | `commercial_opportunities` | APPLIED (recorded) |
 
 Every recorded version and name matches
 `select version, name from supabase_migrations.schema_migrations` exactly and
@@ -141,7 +141,7 @@ not be edited either.
   talking to the client. The Dashboard's quiet-relationship follow-up reads it.
 
 `migrations/20260928031922_financial_foundation.sql` creates the Financial V2
-ledger. **This migration is not applied to production yet.**
+ledger. Applied in production.
 
 - `financial_transactions`: one row per amount the studio expects to receive or
   pay. `type` is `INCOME` or `EXPENSE` (there is no receivable type: "to
@@ -163,7 +163,7 @@ ledger. **This migration is not applied to production yet.**
   The public site never reads this table.
 
 `migrations/20260928035023_commercial_opportunities.sql` creates the Commercial
-V2 pipeline. **This migration is not applied to production yet.**
+V2 pipeline. Applied in production.
 
 - `commercial_opportunities`: one row per deal, `stage` `NEW` -> `CONTACTED` ->
   `PROPOSAL` -> `NEGOTIATION` -> `WON` | `LOST`, with `priority`, `source`,
