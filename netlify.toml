@@ -5,3 +5,25 @@
 
 [build.environment]
   NODE_VERSION = "22"
+
+# Security headers for the Admin. Every source below is one the Admin really
+# uses (docs/security-architecture.md, "HTTP security headers"):
+#   script-src   only the bundle Vite builds; no inline script, no eval
+#   style-src    the bundle, inline style attributes (accent swatches,
+#                progress bars) and the Google Fonts stylesheet
+#   font-src     Google Fonts files
+#   img-src      signed Supabase Storage URLs, https posters, data: and blob:
+#                previews of an image before it is uploaded
+#   connect-src  Supabase (REST, Auth, Storage, Edge Functions, Realtime)
+#   frame-src    the live preview of a project's own https site
+#   frame-ancestors 'none'  nobody may frame the Admin (clickjacking)
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=()"
+    Cross-Origin-Opener-Policy = "same-origin"
