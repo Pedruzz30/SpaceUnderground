@@ -59,6 +59,17 @@
   display: contents;
 }
 
+.client-contact-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.client-contact-field input {
+  flex: 1 1 10rem;
+}
+
 .editor-toolbar {
   position: sticky;
   z-index: 8;

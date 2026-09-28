@@ -52,6 +52,7 @@ function fromRow(row) {
   if (row.phone !== undefined) model.phone = row.phone ?? "";
   if (row.status !== undefined) model.status = row.status;
   if (row.notes !== undefined) model.notes = row.notes ?? "";
+  if (row.last_contact_at !== undefined) model.lastContactAt = row.last_contact_at;
   return model;
 }
 
@@ -68,6 +69,7 @@ function normalize(client) {
     createdAt: client.createdAt ?? null,
     updatedAt: client.updatedAt ?? null,
     archivedAt: client.archivedAt ?? null,
+    lastContactAt: client.lastContactAt ?? null,
   };
 }
 

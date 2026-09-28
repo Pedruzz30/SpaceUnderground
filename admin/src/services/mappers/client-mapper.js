@@ -18,6 +18,7 @@ export const CLIENT_COLUMNS = [
   "created_at",
   "updated_at",
   "archived_at",
+  "last_contact_at",
 ].join(",");
 
 export const CLIENT_CODE_PREFIX = "CLIENT-";
@@ -49,6 +50,16 @@ export function normalizeClientCode(value) {
   return String(value ?? "").trim().toUpperCase();
 }
 
+// Contact timestamps travel as ISO 8601 UTC strings ("2026-09-20T12:00:00.000Z")
+// whatever the database or a caller returned ("+00:00" offsets, Date objects).
+// Empty means never contacted; anything unparseable is kept as-is so the
+// service's validation can reject it instead of it silently becoming null.
+export function normalizeContactTimestamp(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const date = value instanceof Date ? value : new Date(String(value).trim());
+  return Number.isNaN(date.getTime()) ? String(value).trim() : date.toISOString();
+}
+
 export function mapClientFromDatabase(row) {
   if (!row) return null;
 
@@ -64,6 +75,7 @@ export function mapClientFromDatabase(row) {
     createdAt: row.created_at ?? null,
     updatedAt: row.updated_at ?? null,
     archivedAt: row.archived_at ?? null,
+    lastContactAt: normalizeContactTimestamp(row.last_contact_at),
   };
 }
 
@@ -88,6 +100,7 @@ export function mapClientToDatabase(model) {
   if (model.phone !== undefined) row.phone = optional(model.phone);
   if (model.status !== undefined) row.status = normalizeClientStatus(model.status);
   if (model.notes !== undefined) row.notes = optional(model.notes);
+  if (model.lastContactAt !== undefined) row.last_contact_at = normalizeContactTimestamp(model.lastContactAt);
 
   return row;
 }

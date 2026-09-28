@@ -25,7 +25,35 @@ import { projectSummary } from "../utils/client-metrics.js";
 import { formatFullDate, formatRelativeDay } from "../utils/format.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
-const FORM_FIELDS = ["code", "name", "company", "email", "phone", "status", "notes"];
+const FORM_FIELDS = ["code", "name", "company", "email", "phone", "status", "notes", "lastContactAt"];
+
+// The last contact is picked as a calendar day. It is stored at 12:00 UTC of
+// that day, which stays on the same date in every Brazilian time zone, and is
+// read back through its UTC date, so the day shown is always the day chosen.
+function contactDay(iso) {
+  return iso ? String(iso).slice(0, 10) : "";
+}
+
+function contactTimestamp(day, original) {
+  if (!day) return null;
+  // An untouched day keeps its original timestamp instead of being rewritten.
+  if (original && contactDay(original) === day) return original;
+  return `${day}T12:00:00.000Z`;
+}
+
+function lastContactField(value) {
+  return `
+    <div class="field" data-field="lastContactAt">
+      <label for="field-lastContactAt" data-i18n="clientEditor.lastContact">${escapeHtml(t("clientEditor.lastContact"))}</label>
+      <div class="client-contact-field">
+        <input id="field-lastContactAt" name="lastContactAt" type="date" value="${escapeAttribute(contactDay(value))}" max="${new Date().toISOString().slice(0, 10)}">
+        <button type="button" class="button button--compact" data-clear-last-contact data-i18n="clientEditor.clearLastContact">${escapeHtml(t("clientEditor.clearLastContact"))}</button>
+      </div>
+      <p class="field-hint" data-i18n="clientEditor.lastContactHint">${escapeHtml(t("clientEditor.lastContactHint"))}</p>
+      <p class="field-error" id="field-lastContactAt-error" hidden></p>
+    </div>
+  `;
+}
 
 function tabsFor(isCreate) {
   // Projects and activity hang off a saved record, so a new client starts on
@@ -125,6 +153,7 @@ function detailsGrid(client) {
       ${metaItem("clientEditor.company", client.company)}
       ${dateItem("clientEditor.clientSince", client.createdAt)}
       ${dateItem("clientEditor.lastUpdate", client.updatedAt)}
+      ${dateItem("clientEditor.lastContact", client.lastContactAt)}
       ${client.archivedAt ? dateItem("clientEditor.archivedOn", client.archivedAt) : ""}
     </div>
   `;
@@ -301,6 +330,7 @@ function renderEditor(state) {
             ${fieldMarkup({ labelKey: "clientEditor.email", name: "email", value: client.email, type: "email", attrs: 'autocomplete="off"' })}
             ${fieldMarkup({ labelKey: "clientEditor.phone", name: "phone", value: client.phone, type: "tel", attrs: 'autocomplete="off"' })}
             ${statusSelect(client.status)}
+            ${lastContactField(client.lastContactAt)}
           </div>
         `,
       )}
@@ -369,8 +399,12 @@ function mount(page, state, { tab } = {}) {
   bindTabs(form);
   if (tab) form.querySelector(`[data-tab="${tab}"]`)?.click();
 
-  const collect = () =>
-    Object.fromEntries(FORM_FIELDS.map((field) => [field, String(form.elements[field]?.value ?? "").trim()]));
+  const collect = () => ({
+    ...Object.fromEntries(
+      FORM_FIELDS.filter((field) => field !== "lastContactAt").map((field) => [field, String(form.elements[field]?.value ?? "").trim()]),
+    ),
+    lastContactAt: contactTimestamp(String(form.elements.lastContactAt?.value ?? "").trim(), state.client.lastContactAt),
+  });
 
   let savedSnapshot = JSON.stringify(collect());
   let dirty = false;
@@ -529,6 +563,11 @@ function mount(page, state, { tab } = {}) {
     save();
   });
   form.addEventListener("click", (event) => {
+    if (event.target.closest("[data-clear-last-contact]")) {
+      form.elements.lastContactAt.value = "";
+      markDirty();
+    }
+
     const lifecycle = event.target.closest("[data-client-lifecycle]");
     if (lifecycle) changeLifecycle(lifecycle.dataset.clientLifecycle === "archive");
 

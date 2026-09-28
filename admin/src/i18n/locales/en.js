@@ -588,6 +588,8 @@ export default {
       statusValid: "Choose a valid status.",
       emailValid: "Enter a valid email address.",
       codeFormat: "Use capital letters, numbers and hyphens, e.g. CLIENT-012.",
+      lastContactValid: "Enter a valid date for the last contact.",
+      lastContactFuture: "The last contact cannot be in the future.",
     },
   },
   clientEditor: {
@@ -623,6 +625,9 @@ export default {
     notesHint: "Visible only in the Admin.",
     clientSince: "Client since",
     lastUpdate: "Last update",
+    lastContact: "Last contact",
+    lastContactHint: "The day someone actually spoke with this client. Editing the record does not change it; leave it empty if there has been no contact yet.",
+    clearLastContact: "Clear",
     archivedOn: "Archived on",
     projectsSummary: "Projects",
     projectsActive: "Active",

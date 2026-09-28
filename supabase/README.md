@@ -28,7 +28,8 @@ so older notes and commits stay easy to follow.
 | `20260913211045` | `automation_runs` | APPLIED (recorded) |
 | `20260914025524` | `011_business_workflows` | APPLIED (recorded) |
 | `20260927225426` | `normalize_plan_status` | APPLIED (recorded) |
-| `20260927225753` | `clients_foundation` | **NOT APPLIED** |
+| `20260927225753` | `clients_foundation` | APPLIED (recorded) |
+| `20260928013040` | `clients_post_review_hardening` | **NOT APPLIED** |
 
 Every recorded version and name matches
 `select version, name from supabase_migrations.schema_migrations` exactly and
@@ -98,7 +99,7 @@ applied only after the compatible code is deployed and smoke tested (see
 
 `migrations/20260927225753_clients_foundation.sql` (Clients V2) builds on the
 `clients` table from `20260914025524_011_business_workflows` and refuses to run
-without it. **Not applied to production yet.**
+without it. Applied in production.
 
 - `clients.notes` and `clients.archived_at` (set and cleared by a trigger when
   `status` enters or leaves `ARCHIVED`);
@@ -120,6 +121,22 @@ without it. **Not applied to production yet.**
   links with a conditional `UPDATE ... where client_id is null` and unlinks
   with `where client_id = <expected client>`, so a stale tab is refused instead
   of moving or clearing a link someone else made.
+
+`migrations/20260928013040_clients_post_review_hardening.sql` follows the applied
+clients foundation, which is not edited. **This migration is not applied to
+production yet.**
+
+- Takes `projects.client_id` off the public surface. The foundation added it to
+  a table `anon` could read table-wide, so `projects?select=client_id` exposed
+  the owner of every published project. Now `anon` has column-level `SELECT`
+  on every public column except `client_id`, and `projects_public_read` applies
+  to `anon` only, so a signed-in non-admin (sign-up is open) matches no project
+  row at all. Admins keep full access through `projects_admin_all`. Column
+  grants do not cover columns added later: a new public column must be added
+  to the grant, which `tests/schema-contract.test.mjs` enforces.
+- Adds `clients.last_contact_at timestamptz`, null until someone records a real
+  contact in the Admin. No trigger maintains it: editing a record is not
+  talking to the client. The Dashboard's quiet-relationship follow-up reads it.
 
 Plus:
 

@@ -714,6 +714,28 @@ try {
   await page.click('[data-tab="general"]');
   assert.equal(await page.inputValue("#field-phone"), "+55 21 90000-0500", "client edit persisted");
 
+  // Last contact is set by hand, survives a reload and can be cleared.
+  assert.equal(await page.inputValue("#field-lastContactAt"), "", "a new client has no recorded contact");
+  await page.fill("#field-lastContactAt", "2026-09-01");
+  await page.click("[data-client-save]");
+  await page.waitForSelector("[data-save-state].is-saved");
+  await page.reload();
+  await page.waitForSelector("[data-client-editor]");
+  await page.click('[data-tab="general"]');
+  assert.equal(await page.inputValue("#field-lastContactAt"), "2026-09-01", "last contact persisted");
+  const storedContact = await page.evaluate((id) => {
+    const clients = JSON.parse(localStorage.getItem("space-admin:clients:v1"));
+    return clients.find((client) => client.id === id)?.lastContactAt;
+  }, decodeURIComponent(clientHash.split("/").pop()));
+  assert.equal(storedContact, "2026-09-01T12:00:00.000Z", "stored as an ISO UTC timestamp");
+  await page.click("[data-clear-last-contact]");
+  await page.click("[data-client-save]");
+  await page.waitForSelector("[data-save-state].is-saved");
+  await page.reload();
+  await page.waitForSelector("[data-client-editor]");
+  await page.click('[data-tab="general"]');
+  assert.equal(await page.inputValue("#field-lastContactAt"), "", "clearing the last contact persisted");
+
   // Link a project: unlink CASE 002 from its seed owner first so it is free.
   await page.goto(`${BASE_URL}/#/clients/mock-client-002`);
   await page.waitForSelector("[data-client-editor]");

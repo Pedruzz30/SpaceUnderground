@@ -67,7 +67,8 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       | `20260913211045` | `automation_runs` | APPLIED |
       | `20260914025524` | `011_business_workflows` | APPLIED |
       | `20260927225426` | `normalize_plan_status` | APPLIED |
-      | `20260927225753` | `clients_foundation` | NOT APPLIED |
+      | `20260927225753` | `clients_foundation` | APPLIED |
+      | `20260928013040` | `clients_post_review_hardening` | NOT APPLIED |
 
       Recorded versions must never be renamed or repaired. After the normalize,
       production plans read `Max` = `ON_REQUEST`, `Plus` = `AVAILABLE`,
@@ -88,13 +89,17 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       added each file (`003`..`007` share one commit and take consecutive
       seconds), not deploy times. Without the repair, `db push` would have tried
       to re-run the foundation migrations.
-- [ ] `20260927225753_clients_foundation.sql` raises an error unless
-      `20260914025524_011_business_workflows` (which creates `public.clients`)
-      is applied first. The Client Hub and the Dashboard's client figures read
-      `clients` and `projects.client_id`, so deploy the Admin only after
-      clients foundation is in: before that, the Client Hub shows a
-      "database is missing an update" message and the Dashboard reads "—" for
-      the client KPIs. The public site does not depend on either.
+- [x] `20260927225753_clients_foundation.sql` is applied (it requires
+      `20260914025524_011_business_workflows`, which creates `public.clients`).
+- [ ] Apply `20260928013040_clients_post_review_hardening.sql` **before**
+      deploying the Admin that reads `clients.last_contact_at`: until it is in,
+      the Client Hub shows "database is missing an update" and the Dashboard
+      reads "—" for the client KPIs. The public site does not depend on it.
+- [ ] Right after applying it, as `anon` with the publishable key:
+      the public project query above still returns `200`, and
+      `projects?select=client_id&limit=1` is refused (`401`/`42501`). A new
+      column the public site selects needs its own `grant select (...) on
+      public.projects to anon`.
 - [ ] The exact public query returns `200`, run against production with the
       publishable key:
 

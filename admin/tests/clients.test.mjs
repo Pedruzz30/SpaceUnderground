@@ -149,6 +149,7 @@ describe("client mapper", () => {
       created_at: "2026-09-01T00:00:00Z",
       updated_at: "2026-09-02T00:00:00Z",
       archived_at: null,
+      last_contact_at: "2026-09-20T12:00:00+00:00",
     });
     assert.deepEqual(model, {
       id: "6f1c9d0e-6d38-4b0f-8f0a-0b0f9a1b2c3d",
@@ -162,7 +163,20 @@ describe("client mapper", () => {
       createdAt: "2026-09-01T00:00:00Z",
       updatedAt: "2026-09-02T00:00:00Z",
       archivedAt: null,
+      lastContactAt: "2026-09-20T12:00:00.000Z",
     });
+  });
+
+  it("maps last_contact_at as ISO 8601 UTC in both directions", () => {
+    // PostgREST returns "+00:00"; other offsets are converted, not dropped.
+    assert.equal(mapClientFromDatabase({ last_contact_at: "2026-09-20T09:00:00-03:00" }).lastContactAt, "2026-09-20T12:00:00.000Z");
+    assert.equal(mapClientFromDatabase({ last_contact_at: null }).lastContactAt, null);
+    assert.equal(mapClientFromDatabase({}).lastContactAt, null, "a row from before the column existed reads as never contacted");
+
+    assert.deepEqual(mapClientToDatabase({ lastContactAt: "2026-09-20T12:00:00.000Z" }), { last_contact_at: "2026-09-20T12:00:00.000Z" });
+    assert.deepEqual(mapClientToDatabase({ lastContactAt: "" }), { last_contact_at: null }, "clearing writes null");
+    assert.deepEqual(mapClientToDatabase({ lastContactAt: null }), { last_contact_at: null });
+    assert.equal("last_contact_at" in mapClientToDatabase({ name: "X" }), false, "untouched unless sent");
   });
 
   it("maps the model back with blanks as null and only the fields given", () => {
@@ -353,6 +367,32 @@ describe("client service (mock repository)", () => {
       ["client.unarchived", "client.archived", "client.updated", "client.created"],
     );
     assert.ok(entries.every((entry) => entry.entityType === "client" && entry.entityId === created.id));
+  });
+
+  it("saves, keeps and clears the last contact the editor sends", async () => {
+    const created = await createClient({ name: "Contact", lastContactAt: "2026-09-20T12:00:00.000Z" });
+    assert.equal(created.lastContactAt, "2026-09-20T12:00:00.000Z");
+    assert.equal((await getClient(created.id)).lastContactAt, "2026-09-20T12:00:00.000Z");
+
+    const cleared = await updateClient(created.id, { lastContactAt: "" });
+    assert.equal(cleared.lastContactAt, null);
+  });
+
+  it("leaves the last contact alone when other fields are edited", async () => {
+    const created = await createClient({ name: "Quiet" });
+    assert.equal(created.lastContactAt, null, "never contacted is null, not the creation time");
+    const edited = await updateClient(created.id, { notes: "Edited, but nobody called." });
+    assert.equal(edited.lastContactAt, null, "editing the record is not a contact");
+
+    const contacted = await updateClient(created.id, { lastContactAt: "2026-09-01T12:00:00.000Z" });
+    const renamed = await updateClient(created.id, { company: "Quiet Ltda" });
+    assert.equal(renamed.lastContactAt, contacted.lastContactAt);
+  });
+
+  it("rejects an invalid or future last contact", async () => {
+    await assert.rejects(() => createClient({ name: "X", lastContactAt: "not a date" }), (error) => error.field === "lastContactAt");
+    const tomorrow = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+    await assert.rejects(() => createClient({ name: "X", lastContactAt: tomorrow }), (error) => error.field === "lastContactAt");
   });
 
   it("logs a status change to ARCHIVED from the editor as an archive", async () => {

@@ -2,7 +2,7 @@ import { t } from "../i18n/index.js";
 import { CLIENT_STATUSES, isClientStatus, isValidEmail, normalizeClientStatus } from "../utils/client-health.js";
 import { getActivity, logActivity } from "./activity-service.js";
 import { DataError, toDataError } from "./errors.js";
-import { normalizeClientCode } from "./mappers/client-mapper.js";
+import { normalizeClientCode, normalizeContactTimestamp } from "./mappers/client-mapper.js";
 import { getClientRepository, getProjectRepository } from "./repositories/index.js";
 
 // Async contract used by the Client Hub and the Client Editor. Pages call these
@@ -27,6 +27,10 @@ const CLIENT_DEFAULTS = {
 
 const EDITABLE_FIELDS = Object.keys(CLIENT_DEFAULTS);
 
+// A contact date a little ahead of the server clock is still "now"; anything
+// further is a typo, not a contact that already happened.
+const CONTACT_CLOCK_SKEW_MS = 5 * 60 * 1000;
+
 function clientMeta(action, client) {
   return { action, entityType: "client", entityId: client?.id ?? null };
 }
@@ -37,6 +41,8 @@ function label(client) {
 
 // Keeps only fields the editor may write, trimmed, with status and code in
 // their stored casing. id, timestamps and archived_at never pass through.
+// lastContactAt is set by a person: it is only ever what the caller sent,
+// never inferred from the edit itself.
 export function sanitizeClient(values = {}) {
   const clean = {};
   EDITABLE_FIELDS.forEach((field) => {
@@ -45,6 +51,7 @@ export function sanitizeClient(values = {}) {
   });
   if (clean.status !== undefined) clean.status = normalizeClientStatus(clean.status);
   if (clean.code !== undefined) clean.code = normalizeClientCode(clean.code);
+  if (values.lastContactAt !== undefined) clean.lastContactAt = normalizeContactTimestamp(values.lastContactAt);
   return clean;
 }
 
@@ -58,6 +65,12 @@ export function validateClient(values = {}) {
   if (email && !isValidEmail(email)) errors.email = t("clients.validation.emailValid");
   const code = normalizeClientCode(values.code);
   if (code && !CODE_PATTERN.test(code)) errors.code = t("clients.validation.codeFormat");
+  const contact = normalizeContactTimestamp(values.lastContactAt);
+  if (contact !== null) {
+    const time = new Date(contact).getTime();
+    if (Number.isNaN(time)) errors.lastContactAt = t("clients.validation.lastContactValid");
+    else if (time > Date.now() + CONTACT_CLOCK_SKEW_MS) errors.lastContactAt = t("clients.validation.lastContactFuture");
+  }
   return errors;
 }
 

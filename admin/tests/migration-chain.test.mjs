@@ -28,6 +28,7 @@ const RECORDED_IN_PRODUCTION = [
   "20260913211045_automation_runs.sql",
   "20260914025524_011_business_workflows.sql",
   "20260927225426_normalize_plan_status.sql",
+  "20260927225753_clients_foundation.sql",
 ];
 
 // Schema production already had before the CLI recorded anything. Their
@@ -45,7 +46,7 @@ const HISTORICAL = [
 ];
 
 // Written after the recorded history and not applied anywhere yet.
-const PENDING = ["clients_foundation"];
+const PENDING = ["clients_post_review_hardening"];
 
 function toDate(stamp) {
   const [, y, mo, d, h, mi, s] = stamp.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
@@ -158,13 +159,17 @@ describe("production history", () => {
   });
 });
 
-describe("clients foundation", () => {
+describe("clients migrations", () => {
   it("comes after business workflows, which creates the clients table", () => {
     assert.ok(version(migrationFile("clients_foundation")) > version(migrationFile("business_workflows")));
   });
 
   it("comes after the plan status normalization", () => {
     assert.ok(version(migrationFile("clients_foundation")) > version(migrationFile("normalize_plan_status")));
+  });
+
+  it("puts the post-review hardening after the applied clients foundation", () => {
+    assert.ok(version(migrationFile("clients_post_review_hardening")) > version(migrationFile("clients_foundation")));
   });
 });
 
@@ -175,8 +180,8 @@ describe("fresh database", () => {
     }
   });
 
-  it("re-applies the schema production created before it joined the chain", async () => {
-    for (const purpose of ["automation_runs", "business_workflows"]) {
+  it("re-applies the migrations that must be safe to run twice", async () => {
+    for (const purpose of ["automation_runs", "business_workflows", "clients_post_review_hardening"]) {
       const name = migrationFile(purpose);
       await assert.doesNotReject(() => db.exec(read(name)), `${name} is not idempotent`);
     }

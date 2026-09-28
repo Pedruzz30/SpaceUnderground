@@ -22,6 +22,7 @@ import {
   rankAttention,
   withinPeriod,
 } from "../src/utils/dashboard-metrics.js";
+import { mapClientFromDatabase } from "../src/services/mappers/client-mapper.js";
 
 const NOW = new Date("2026-09-20T12:00:00.000Z");
 const DAY = 24 * 60 * 60 * 1000;
@@ -285,5 +286,41 @@ describe("system health", () => {
     const status = adminDataStatus({ projectsOk: true, activityOk: false });
     assert.notEqual(status.label, "CONNECTED");
     assert.equal(status.tone, "warn");
+  });
+});
+
+// Clients as the repository returns them: straight from database rows, so the
+// rule is exercised on the real last_contact_at column, not on a demo field.
+describe("follow ups from a recorded last contact", () => {
+  const row = (name, status, lastContact) =>
+    mapClientFromDatabase({ id: name, code: "CLIENT-001", name, status, last_contact_at: lastContact });
+  const quiet = (items) => items.filter((item) => item.category === "CLIENT").map((item) => item.title);
+
+  it("surfaces an active client whose last recorded contact is old", () => {
+    const items = followUps({ clients: [row("Active Old", "ACTIVE", daysBefore(45))] }, NOW);
+    assert.deepEqual(quiet(items), ["Active Old"]);
+    assert.equal(items[0].detailParams.days, 45);
+  });
+
+  it("applies the same rule to an inactive client with an old contact", () => {
+    // The rule only leaves out leads and archived clients.
+    const items = followUps({ clients: [row("Inactive Old", "INACTIVE", daysBefore(60))] }, NOW);
+    assert.deepEqual(quiet(items), ["Inactive Old"]);
+  });
+
+  it("stays quiet about a recent contact", () => {
+    const items = followUps({ clients: [row("Recent", "ACTIVE", daysBefore(5))] }, NOW);
+    assert.deepEqual(quiet(items), []);
+  });
+
+  it("never invents a contact for a client with none recorded", () => {
+    const items = followUps({ clients: [row("Never", "ACTIVE", null)] }, NOW);
+    assert.deepEqual(quiet(items), []);
+  });
+
+  it("reads a timestamp with any offset as the same instant", () => {
+    const offset = new Date(new Date(daysBefore(40)).getTime()).toISOString().replace("Z", "+00:00");
+    const items = followUps({ clients: [row("Offset", "ACTIVE", offset)] }, NOW);
+    assert.equal(items[0].detailParams.days, 40);
   });
 });

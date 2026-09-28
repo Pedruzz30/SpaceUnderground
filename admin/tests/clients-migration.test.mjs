@@ -8,16 +8,15 @@
 // No Docker, no Supabase project and no credentials required.
 
 import { strict as assert } from "node:assert";
+import { readFileSync } from "node:fs";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
-import { readMigration } from "./helpers/migration-files.mjs";
+import { MIGRATIONS_DIR, migrationFile, migrationFiles, readMigration } from "./helpers/migration-files.mjs";
 
 // Found by purpose, never by version: business workflows must come before
 // clients foundation, which migration-chain.test.mjs checks by timestamp.
-const FOUNDATION = readMigration("admin_foundation");
-const PLANS = readMigration("plans_cms");
-const BUSINESS = readMigration("business_workflows");
 const CLIENTS = readMigration("clients_foundation");
+const CLIENTS_FILE = migrationFile("clients_foundation");
 
 const ADMIN_ID = "11111111-1111-1111-1111-111111111111";
 const USER_ID = "22222222-2222-2222-2222-222222222222";
@@ -109,6 +108,19 @@ before(async () => {
     alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
     alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
     alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+
+    create schema if not exists storage;
+    grant usage on schema storage to anon, authenticated;
+    create table storage.buckets (id text primary key, name text not null, public boolean not null default false, file_size_limit bigint, allowed_mime_types text[]);
+    create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets (id), name text not null, owner uuid);
+    create or replace function storage.foldername(name text) returns text[] language plpgsql immutable as $$
+    declare _parts text[];
+    begin
+      select string_to_array(name, '/') into _parts;
+      return _parts[1:array_length(_parts, 1) - 1];
+    end
+    $$;
+    alter table storage.objects enable row level security;
   `);
   await db.query("insert into auth.users (id, email) values ($1, $2), ($3, $4)", [
     ADMIN_ID,
@@ -117,16 +129,19 @@ before(async () => {
     "someone@space.local",
   ]);
 
-  await db.exec(FOUNDATION);
-  await db.exec(PLANS);
-  await db.exec(BUSINESS);
+  // The whole chain, in order, as production has it. Later migrations (the
+  // post-review hardening grants every public project column) need tables and
+  // columns from earlier ones, so a hand-picked subset would not apply.
+  for (const name of migrationFiles()) {
+    if (name === CLIENTS_FILE) {
+      // Rows that exist before clients foundation runs: one without a code and
+      // one already archived, the two shapes the backfill has to repair.
+      await db.query("insert into public.clients (name, status, created_at) values ('Legacy One', 'ACTIVE', now() - interval '2 days')");
+      await db.query("insert into public.clients (name, status, code, created_at) values ('Legacy Two', 'ARCHIVED', 'CLIENT-007', now() - interval '1 day')");
+    }
+    await db.exec(readFileSync(`${MIGRATIONS_DIR}${name}`, "utf8"));
+  }
 
-  // Rows that exist before clients foundation runs: one without a code and one already
-  // archived, the two shapes the backfill has to repair.
-  await db.query("insert into public.clients (name, status, created_at) values ('Legacy One', 'ACTIVE', now() - interval '2 days')");
-  await db.query("insert into public.clients (name, status, code, created_at) values ('Legacy Two', 'ARCHIVED', 'CLIENT-007', now() - interval '1 day')");
-
-  await db.exec(CLIENTS);
   await db.query("insert into public.admins (user_id, role) values ($1, 'owner')", [ADMIN_ID]);
 });
 

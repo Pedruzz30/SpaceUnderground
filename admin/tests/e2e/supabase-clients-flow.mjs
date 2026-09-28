@@ -1,6 +1,7 @@
 // End-to-end validation of Clients V2 against a REAL Supabase project.
 //
-// Requires the clients foundation migration to be applied to that project.
+// Requires the clients foundation and clients post-review hardening migrations
+// to be applied to that project.
 //
 //   npm run dev                                  # terminal 1, with admin/.env
 //   BASE_URL=http://127.0.0.1:5173 npm run test:e2e:clients
@@ -55,7 +56,7 @@ if (signInError) {
 }
 
 async function clientRow(id) {
-  const { data, error } = await api.from("clients").select("id,code,name,company,phone,notes,status,archived_at").eq("id", id).single();
+  const { data, error } = await api.from("clients").select("id,code,name,company,phone,notes,status,archived_at,last_contact_at").eq("id", id).single();
   if (error) throw error;
   return data;
 }
@@ -200,6 +201,24 @@ try {
     "edits persisted in Supabase",
   );
   check(edited.notes === "Edited by the Clients E2E run.", "notes edit persisted");
+  check(edited.last_contact_at === null, "editing the record did not invent a last contact");
+
+  // --- Last contact: set by hand, then cleared ------------------------------
+  await openClient(page, clientA, "general");
+  await page.fill("#field-lastContactAt", "2026-09-01");
+  await page.click("[data-client-save]");
+  await page.waitForSelector("[data-save-state].is-saved", { timeout: 20000 });
+  const contacted = await clientRow(clientA);
+  check(
+    new Date(contacted.last_contact_at).toISOString() === "2026-09-01T12:00:00.000Z",
+    "last contact stored as 12:00 UTC of the chosen day",
+    contacted.last_contact_at,
+  );
+  await openClient(page, clientA, "general");
+  await page.click("[data-clear-last-contact]");
+  await page.click("[data-client-save]");
+  await page.waitForSelector("[data-save-state].is-saved", { timeout: 20000 });
+  check((await clientRow(clientA)).last_contact_at === null, "clearing the last contact stored null");
 
   // --- Link, stale relink, unlink -------------------------------------------
   // A second tab opens client B while the project is still free.

@@ -588,6 +588,8 @@ export default {
       statusValid: "Escolha um status válido.",
       emailValid: "Informe um email válido.",
       codeFormat: "Use letras maiúsculas, números e hífens, por exemplo CLIENT-012.",
+      lastContactValid: "Informe uma data válida para o último contato.",
+      lastContactFuture: "O último contato não pode estar no futuro.",
     },
   },
   clientEditor: {
@@ -623,6 +625,9 @@ export default {
     notesHint: "Visíveis apenas no Admin.",
     clientSince: "Cliente desde",
     lastUpdate: "Última atualização",
+    lastContact: "Último contato",
+    lastContactHint: "O dia em que alguém de fato falou com este cliente. Editar o cadastro não altera esta data; deixe vazio se ainda não houve contato.",
+    clearLastContact: "Limpar",
     archivedOn: "Arquivado em",
     projectsSummary: "Projetos",
     projectsActive: "Ativos",
