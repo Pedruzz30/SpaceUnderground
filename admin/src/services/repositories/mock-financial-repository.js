@@ -45,6 +45,7 @@ function applyRow(current, row) {
     paid_at: "paid_at" in row ? row.paid_at : current.paidAt,
     client_id: "client_id" in row ? row.client_id : current.clientId,
     project_id: "project_id" in row ? row.project_id : current.projectId,
+    opportunity_id: "opportunity_id" in row ? row.opportunity_id : current.opportunityId ?? null,
     notes: "notes" in row ? row.notes : current.notes,
     created_at: current.createdAt,
     updated_at: current.updatedAt,
@@ -72,6 +73,13 @@ export const mockFinancialRepository = {
     return entry ? clone(entry) : null;
   },
 
+  async listByOpportunity(opportunityId) {
+    return readAll()
+      .filter((entry) => entry.opportunityId === opportunityId)
+      .map((entry) => clone(entry))
+      .sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)));
+  },
+
   async create(data) {
     const [created] = await this.createMany([data]);
     return created;
@@ -83,7 +91,10 @@ export const mockFinancialRepository = {
     const timestamp = nowIso();
     const created = list.map((data) => {
       const base = { id: `mock-tx-${crypto.randomUUID()}`, currency: "BRL", createdAt: timestamp, updatedAt: timestamp };
-      const model = applyRow({ ...base, status: "PENDING", category: "OTHER", clientId: null, projectId: null, notes: "", paidAt: null }, mapTransactionToDatabase(data));
+      const model = applyRow(
+        { ...base, status: "PENDING", category: "OTHER", clientId: null, projectId: null, opportunityId: null, notes: "", paidAt: null },
+        mapTransactionToDatabase(data),
+      );
       model.paidAt = stampPaidAt(null, model);
       model.createdAt = timestamp;
       model.updatedAt = timestamp;

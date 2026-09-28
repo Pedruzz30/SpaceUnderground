@@ -1,11 +1,12 @@
 import { t } from "../i18n/index.js";
 import { isValidEmail } from "../utils/client-health.js";
+import { findDuplicates } from "../utils/client-relationship.js";
 import { LOST_REASONS, OPEN_STAGES, PRIORITIES, SOURCES, STAGES } from "../utils/commercial-metrics.js";
 import { isDateKey, parseAmount, toDateKey, todayKey } from "../utils/financial-metrics.js";
 import { logActivity } from "./activity-service.js";
-import { createClient } from "./client-service.js";
+import { createClient, getClients } from "./client-service.js";
 import { DataError, toDataError } from "./errors.js";
-import { createTransaction } from "./financial-service.js";
+import { createTransaction, getTransactionsForOpportunity, updateTransaction } from "./financial-service.js";
 import { getCommercialRepository } from "./repositories/index.js";
 
 // Async contract used by the Commercial page. Pages call these functions and
@@ -201,10 +202,31 @@ export async function reorderOpportunity(id, position) {
   return updateOpportunity(id, { position });
 }
 
-// Winning can also turn the lead into a client and put the value in the
-// ledger as money to receive. The deal is closed first, so a failure in the
-// follow-up steps never leaves a won deal marked as open; those steps report
-// back as warnings instead.
+// The client a win would create, when it already exists: the one an earlier
+// attempt created before its link failed, or one recorded by hand. Email and
+// phone identify a person; a name alone only counts when the deal has neither,
+// which is exactly what an earlier attempt would have stored.
+function existingClientFor(opportunity, clients) {
+  const matches = findDuplicates(
+    { name: opportunity.contactName || opportunity.company || opportunity.title, email: opportunity.email, phone: opportunity.phone },
+    clients,
+  );
+  const strong = matches.find((match) => match.reasons.includes("email") || match.reasons.includes("phone"));
+  if (strong) return strong.client;
+  const identified = String(opportunity.email ?? "").trim() || String(opportunity.phone ?? "").trim();
+  return identified ? null : matches.find((match) => match.reasons.includes("name"))?.client ?? null;
+}
+
+// Winning can also turn the lead into a client and put the value in the ledger
+// as money to receive. Each step is its own write, so the deal is closed first:
+// a failure in a later step never leaves a won deal marked as open, and it
+// comes back as a warning.
+//
+// Calling this again on a won deal finishes what an earlier attempt left
+// undone, and never repeats what it already did: the deal is not closed twice,
+// an existing client is linked instead of created again, and the ledger keeps
+// the deal each receivable came from (opportunity_id), so a second set is
+// never written.
 export async function winOpportunity(id, { createClientRecord = false, receivable = null } = {}) {
   const opportunity = await getOpportunity(id);
   if (!opportunity) throw new DataError(t("errors.notFound"), { code: "not_found" });
@@ -212,28 +234,32 @@ export async function winOpportunity(id, { createClientRecord = false, receivabl
   const warnings = [];
   let clientId = opportunity.clientId;
   let client = null;
+  let clientReused = false;
 
-  // Closed before anything else is written: if the close fails nothing has
-  // been created, so a retry can never leave a second client behind.
-  let won = await updateOpportunity(id, { stage: "WON" });
+  // If closing fails nothing has been written, so the retry starts clean.
+  let won = opportunity.stage === "WON" ? opportunity : await updateOpportunity(id, { stage: "WON" });
 
   if (createClientRecord && !clientId) {
     try {
-      client = await createClient({
-        name: opportunity.contactName || opportunity.company || opportunity.title,
-        company: opportunity.company,
-        email: opportunity.email,
-        phone: opportunity.phone,
-        status: "ACTIVE",
-      });
-      clientId = client.id;
+      const existing = existingClientFor(opportunity, await getClients());
+      client =
+        existing ??
+        (await createClient({
+          name: opportunity.contactName || opportunity.company || opportunity.title,
+          company: opportunity.company,
+          email: opportunity.email,
+          phone: opportunity.phone,
+          status: "ACTIVE",
+        }));
+      clientReused = Boolean(existing);
     } catch (error) {
       warnings.push(toDataError(error, t("errors.data.createClient")).message);
     }
     if (client) {
       // Linking is part of the win already logged, not a separate edit.
       try {
-        won = (await (await getCommercialRepository()).update(id, sanitizeOpportunity({ clientId }))) ?? won;
+        won = (await (await getCommercialRepository()).update(id, sanitizeOpportunity({ clientId: client.id }))) ?? won;
+        clientId = client.id;
       } catch (error) {
         warnings.push(toDataError(error, t("errors.data.saveOpportunity")).message);
       }
@@ -241,27 +267,54 @@ export async function winOpportunity(id, { createClientRecord = false, receivabl
   }
 
   let transactions = [];
-  if (receivable) {
-    try {
-      transactions = await createTransaction(
-        {
-          type: "INCOME",
-          status: "PENDING",
-          description: label({ ...won, clientName: client?.name ?? receivable.clientName }),
-          category: receivable.category || "PROJECT",
-          amount: receivable.amount ?? won.estimatedValue ?? "",
-          dueDate: receivable.dueDate || todayKey(),
-          clientId: clientId ?? "",
-          notes: receivable.notes ?? "",
-        },
-        { installments: receivable.installments ?? 1 },
-      );
-    } catch (error) {
-      warnings.push(toDataError(error, t("errors.data.saveTransaction")).message);
+  let receivableExists = false;
+  // Read before writing. If the ledger cannot be read, nothing is written:
+  // a blind write is how a retry would store a second set.
+  let earlier = null;
+  try {
+    earlier = (await getTransactionsForOpportunity(id)).filter((entry) => entry.status !== "CANCELLED");
+  } catch (error) {
+    if (receivable) warnings.push(toDataError(error, t("errors.data.saveTransaction")).message);
+  }
+
+  if (earlier) {
+    // Receivables stored by an attempt whose client step failed get the client now.
+    if (clientId) {
+      for (const entry of earlier.filter((item) => !item.clientId)) {
+        try {
+          await updateTransaction(entry.id, { clientId });
+        } catch (error) {
+          warnings.push(toDataError(error, t("errors.data.saveTransaction")).message);
+          break;
+        }
+      }
+    }
+
+    if (receivable && earlier.length) {
+      receivableExists = true;
+    } else if (receivable) {
+      try {
+        transactions = await createTransaction(
+          {
+            type: "INCOME",
+            status: "PENDING",
+            description: label({ ...won, clientName: client?.name ?? receivable.clientName }),
+            category: receivable.category || "PROJECT",
+            amount: receivable.amount ?? won.estimatedValue ?? "",
+            dueDate: receivable.dueDate || todayKey(),
+            clientId: clientId ?? "",
+            opportunityId: id,
+            notes: receivable.notes ?? "",
+          },
+          { installments: receivable.installments ?? 1 },
+        );
+      } catch (error) {
+        warnings.push(toDataError(error, t("errors.data.saveTransaction")).message);
+      }
     }
   }
 
-  return { opportunity: won, client, transactions, warnings };
+  return { opportunity: won, client, clientReused, transactions, receivableExists, warnings };
 }
 
 export async function loseOpportunity(id, reason, note = "") {

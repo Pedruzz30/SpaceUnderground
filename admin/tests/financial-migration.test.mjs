@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { MIGRATIONS_DIR, migrationFiles, readMigration } from "./helpers/migration-files.mjs";
+import { ADMIN_ONLY, policyMatrix, tableGrants } from "./helpers/policy-matrix.mjs";
 import { ADMIN_ID, USER_ID, asRole as runAs, createSupabaseDb, failure as fails } from "./helpers/supabase-db.mjs";
 
 const FINANCIAL = readMigration("financial_foundation");
@@ -216,5 +217,54 @@ describe("financial row level security", () => {
       db.query("delete from public.financial_transactions where id = $1 returning id", [created.id]),
     );
     assert.equal(removed.rows.length, 1);
+  });
+});
+
+describe("financial access matrix", () => {
+  it("is admin-only for every verb: anon is refused, a signed-in non-admin sees and touches nothing", async () => {
+    const matrix = await policyMatrix(db, {
+      table: "financial_transactions",
+      seed: async () => (await insertEntry({ description: "Matrix row" })).id,
+      insertSql: "insert into public.financial_transactions (type, description, amount, due_date) values ('INCOME', 'Matrix insert', 10, '2026-09-01') returning id",
+      updateSet: "amount = 11",
+    });
+    assert.deepEqual(matrix, ADMIN_ONLY);
+  });
+
+  it("grants the table to authenticated and service_role only", async () => {
+    assert.deepEqual(await tableGrants(db, "financial_transactions", "anon"), []);
+    for (const grantee of ["authenticated", "service_role"]) {
+      const grants = await tableGrants(db, "financial_transactions", grantee);
+      for (const verb of ["DELETE", "INSERT", "SELECT", "UPDATE"]) assert.ok(grants.includes(verb), `${grantee} lacks ${verb}`);
+    }
+  });
+});
+
+describe("installments are stored whole or not at all", () => {
+  // The Supabase repository sends a set of installments as one multi-row
+  // INSERT (see supabase-repositories.test.mjs). This is what Postgres does
+  // with one: a single bad row rolls the whole statement back.
+  it("stores no installment when one of them is refused", async () => {
+    const before = await db.query("select count(*)::int as total from public.financial_transactions where description like 'Atomic %'");
+    const error = await failure(
+      `insert into public.financial_transactions (type, description, amount, due_date) values
+        ('INCOME', 'Atomic (1/3)', 100, '2026-10-10'),
+        ('INCOME', 'Atomic (2/3)', 100, '2026-11-10'),
+        ('INCOME', 'Atomic (3/3)', 0, '2026-12-10')`,
+    );
+    assert.equal(error?.code, "23514", "the third row breaks amount > 0");
+    const after = await db.query("select count(*)::int as total from public.financial_transactions where description like 'Atomic %'");
+    assert.equal(after.rows[0].total, before.rows[0].total, "the first two rows were not kept");
+  });
+
+  it("stores the whole set when every row is valid", async () => {
+    const { rows } = await asRole("authenticated", ADMIN_ID, () =>
+      db.query(
+        `insert into public.financial_transactions (type, description, amount, due_date) values
+          ('INCOME', 'Whole (1/2)', 50.01, '2026-10-10'),
+          ('INCOME', 'Whole (2/2)', 49.99, '2026-11-10') returning amount`,
+      ),
+    );
+    assert.deepEqual(rows.map((row) => Number(row.amount)), [50.01, 49.99]);
   });
 });

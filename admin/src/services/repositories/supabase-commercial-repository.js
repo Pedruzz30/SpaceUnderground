@@ -2,6 +2,7 @@ import { getSupabaseClient } from "../../lib/supabase.js";
 import { toDataError } from "../errors.js";
 import { mapOpportunityFromDatabase, mapOpportunityToDatabase, OPPORTUNITY_COLUMNS } from "../mappers/commercial-mapper.js";
 import { t } from "../../i18n/index.js";
+import { selectAll } from "./supabase-select-all.js";
 
 const TABLE = "commercial_opportunities";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -18,12 +19,17 @@ function isOpportunityId(id) {
 }
 
 export const supabaseCommercialRepository = {
+  // Paged, like the ledger: closed deals accumulate and feed the reports, so a
+  // response cut at PostgREST's row limit would skew them (supabase-select-all.js).
   async list() {
-    const result = await getSupabaseClient()
-      .from(TABLE)
-      .select(OPPORTUNITY_COLUMNS)
-      .order("position", { ascending: true })
-      .order("created_at", { ascending: false });
+    const result = await selectAll((withCount) =>
+      getSupabaseClient()
+        .from(TABLE)
+        .select(OPPORTUNITY_COLUMNS, withCount ? { count: "exact" } : undefined)
+        .order("position", { ascending: true })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true }),
+    );
     return unwrap(result, t("errors.data.loadOpportunities")).map(mapOpportunityFromDatabase);
   },
 

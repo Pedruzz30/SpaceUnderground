@@ -18,6 +18,7 @@ export const FINANCIAL_COLUMNS = [
   "paid_at",
   "client_id",
   "project_id",
+  "opportunity_id",
   "notes",
   "created_at",
   "updated_at",
@@ -48,6 +49,7 @@ export function mapTransactionFromDatabase(row) {
     paidAt: toDateKey(row.paid_at),
     clientId: row.client_id ?? null,
     projectId: row.project_id ?? null,
+    opportunityId: row.opportunity_id ?? null,
     notes: row.notes ?? "",
     createdAt: row.created_at ?? null,
     updatedAt: row.updated_at ?? null,
@@ -74,6 +76,7 @@ export function mapTransactionToDatabase(model) {
   if (model.paidAt !== undefined) row.paid_at = row.status === "PAID" || model.status === undefined ? toDateKey(model.paidAt) : null;
   if (model.clientId !== undefined) row.client_id = optional(model.clientId);
   if (model.projectId !== undefined) row.project_id = optional(model.projectId);
+  if (model.opportunityId !== undefined) row.opportunity_id = optional(model.opportunityId);
   if (model.notes !== undefined) row.notes = optional(model.notes);
 
   return row;

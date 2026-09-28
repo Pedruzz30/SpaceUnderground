@@ -68,9 +68,9 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       | `20260914025524` | `011_business_workflows` | APPLIED |
       | `20260927225426` | `normalize_plan_status` | APPLIED |
       | `20260927225753` | `clients_foundation` | APPLIED |
-      | `20260928013040` | `clients_post_review_hardening` | NOT APPLIED |
-      | `20260928031922` | `financial_foundation` | NOT APPLIED |
-      | `20260928035023` | `commercial_opportunities` | NOT APPLIED |
+      | `20260928013040` | `clients_post_review_hardening` | APPLIED |
+      | `20260928031922` | `financial_foundation` | APPLIED |
+      | `20260928035023` | `commercial_opportunities` | APPLIED |
 
       Recorded versions must never be renamed or repaired. After the normalize,
       production plans read `Max` = `ON_REQUEST`, `Plus` = `AVAILABLE`,
@@ -93,25 +93,29 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       to re-run the foundation migrations.
 - [x] `20260927225753_clients_foundation.sql` is applied (it requires
       `20260914025524_011_business_workflows`, which creates `public.clients`).
-- [ ] Apply `20260928013040_clients_post_review_hardening.sql` **before**
-      deploying the Admin that reads `clients.last_contact_at`: until it is in,
-      the Client Hub shows "database is missing an update" and the Dashboard
-      reads "—" for the client KPIs. The public site does not depend on it.
-- [ ] Apply `20260928031922_financial_foundation.sql` **before** deploying the
-      Admin that reads `public.financial_transactions`: until it is in, the
-      Financial page shows "database is missing an update" and the Dashboard's
-      financial panel reads as unavailable. It needs the clients migrations
-      first. The public site does not depend on it.
+- [x] `20260928013040_clients_post_review_hardening.sql` is applied (the
+      Admin reads `clients.last_contact_at`, and `anon` no longer reads
+      `projects.client_id`).
+- [x] `20260928031922_financial_foundation.sql` is applied before deploying the
+      Admin that reads `public.financial_transactions`. It needs the clients
+      migrations first. The public site does not depend on it.
 - [ ] Right after applying it, as `anon` with the publishable key,
       `financial_transactions?select=id&limit=1` is refused (`401`/`42501`).
-- [ ] Apply `20260928035023_commercial_opportunities.sql` **before** deploying
-      the Admin that reads `public.commercial_opportunities`: until it is in,
-      the Commercial page shows "database is missing an update" and the
-      Dashboard's pipeline panel reads as unavailable. It needs the clients
+- [x] `20260928035023_commercial_opportunities.sql` is applied before deploying
+      the Admin that reads `public.commercial_opportunities`. It needs the clients
       migrations first and leaves `commercial_proposals` untouched. The public
       site does not depend on it.
 - [ ] Right after applying it, as `anon` with the publishable key,
       `commercial_opportunities?select=id&limit=1` is refused (`401`/`42501`).
+- [x] Applied the two in version order, financial first: the commercial
+      migration adds the foreign key behind
+      `financial_transactions.opportunity_id`. Confirmed it exists:
+
+      select conname from pg_constraint
+      where conname = 'financial_transactions_opportunity_id_fkey';
+
+- [ ] Signed in as an admin, Settings → System reads every module as
+      responding and lists no pending migration.
 - [ ] Right after applying the clients hardening, as `anon` with the publishable key:
       the public project query above still returns `200`, and
       `projects?select=client_id&limit=1` is refused (`401`/`42501`). A new

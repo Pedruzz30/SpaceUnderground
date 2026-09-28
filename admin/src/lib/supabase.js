@@ -6,8 +6,16 @@ import { DataError } from "../services/errors.js";
 // by row level security in Postgres, never by this client.
 
 let client = null;
+let testClient = null;
+
+// Lets a unit test hand the repositories a fake client and read exactly what
+// they send. Never set by the app.
+export function setSupabaseClientForTests(fake) {
+  testClient = fake;
+}
 
 export function getSupabaseClient() {
+  if (testClient) return testClient;
   if (!isSupabaseConfigured()) {
     throw new DataError(
       "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, or run with VITE_ADMIN_DATA_SOURCE=mock.",

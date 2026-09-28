@@ -15,6 +15,10 @@
 --     unless the Admin supplies the real date), cleared when it leaves PAID.
 --   - client_id and project_id are optional links. Removing a client or a
 --     project keeps the entry and drops the link (on delete set null).
+--   - opportunity_id records the Commercial deal a receivable was created
+--     from, so a win that is retried finds what an earlier attempt already
+--     stored instead of writing a second set. Its foreign key is added by
+--     20260928035023_commercial_opportunities, which creates that table.
 --
 -- Admin-only. Nothing here is read by the public site, anon has no grant and
 -- every policy requires public.is_admin().
@@ -52,6 +56,7 @@ create table if not exists public.financial_transactions (
   paid_at date,
   client_id uuid references public.clients (id) on delete set null,
   project_id uuid references public.projects (id) on delete set null,
+  opportunity_id uuid,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -63,6 +68,8 @@ comment on column public.financial_transactions.amount is
   'Always positive. The sign is the type: INCOME adds, EXPENSE subtracts.';
 comment on column public.financial_transactions.paid_at is
   'Set by the database when status becomes PAID (today unless given), cleared when it leaves PAID.';
+comment on column public.financial_transactions.opportunity_id is
+  'The Commercial deal this entry was created from when it was won. Null for entries recorded by hand.';
 
 -- ---------------------------------------------------------------------------
 -- paid_at is owned by the database
@@ -126,6 +133,10 @@ create index if not exists financial_transactions_client_idx
 create index if not exists financial_transactions_project_idx
   on public.financial_transactions (project_id)
   where project_id is not null;
+
+create index if not exists financial_transactions_opportunity_idx
+  on public.financial_transactions (opportunity_id)
+  where opportunity_id is not null;
 
 -- ---------------------------------------------------------------------------
 -- Row level security

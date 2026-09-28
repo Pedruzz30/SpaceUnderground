@@ -85,15 +85,17 @@ function onBoard(deal, range) {
 
 /* ------------------------------------------------------------- metrics */
 
-function metricsMarkup(deals, range, now) {
+// A failed read is not an empty pipeline: every figure reads "—", never 0.
+function metricsMarkup(deals, range, now, { failed = false } = {}) {
   const summary = pipelineSummary(deals, range, now);
+  const figure = (value) => (failed ? "—" : value);
   const metrics = [
-    ["commercial.metricOpenValue", formatCurrency(summary.openValue), ""],
-    ["commercial.metricForecast", formatCurrency(summary.forecast), ""],
-    ["commercial.metricOpenCount", String(summary.openCount), ""],
-    ["commercial.metricWon", formatCurrency(summary.wonValue), ""],
-    ["commercial.metricConversion", percent(summary.conversion), ""],
-    ["commercial.metricOverdue", String(summary.overdueActions), summary.overdueActions ? "is-warn" : ""],
+    ["commercial.metricOpenValue", figure(formatCurrency(summary.openValue)), ""],
+    ["commercial.metricForecast", figure(formatCurrency(summary.forecast)), ""],
+    ["commercial.metricOpenCount", figure(String(summary.openCount)), ""],
+    ["commercial.metricWon", figure(formatCurrency(summary.wonValue)), ""],
+    ["commercial.metricConversion", figure(percent(summary.conversion)), ""],
+    ["commercial.metricOverdue", figure(String(summary.overdueActions)), !failed && summary.overdueActions ? "is-warn" : ""],
   ];
   return metrics
     .map(
@@ -156,7 +158,11 @@ function menuMarkup(deal) {
           open
             ? `<button type="button" role="menuitem" class="row-menu__success" data-com-action="win" data-id="${escapeAttribute(deal.id)}">${escapeHtml(t("commercial.markWon"))}</button>
                <button type="button" role="menuitem" data-com-action="lose" data-id="${escapeAttribute(deal.id)}">${escapeHtml(t("commercial.markLost"))}</button>`
-            : `<button type="button" role="menuitem" data-com-action="reopen" data-id="${escapeAttribute(deal.id)}">${escapeHtml(t("commercial.reopen"))}</button>`
+            : `${
+                deal.stage === "WON"
+                  ? `<button type="button" role="menuitem" data-com-action="complete" data-id="${escapeAttribute(deal.id)}">${escapeHtml(t("commercial.completeWin"))}</button>`
+                  : ""
+              }<button type="button" role="menuitem" data-com-action="reopen" data-id="${escapeAttribute(deal.id)}">${escapeHtml(t("commercial.reopen"))}</button>`
         }
         ${deal.clientId ? `<a role="menuitem" href="#/clients/${encodeURIComponent(deal.clientId)}">${escapeHtml(t("commercial.openClient"))}</a>` : ""}
         <button type="button" role="menuitem" class="row-menu__danger" data-com-action="delete" data-id="${escapeAttribute(deal.id)}">${escapeHtml(t("commercial.delete"))}</button>
@@ -527,7 +533,7 @@ export const commercialPage = {
       const range = periodRange(period.value, now);
       const query = search.value.trim().toLowerCase();
 
-      metricsRoot.innerHTML = metricsMarkup(deals, range, now);
+      metricsRoot.innerHTML = metricsMarkup(deals, range, now, { failed: loadFailed });
       if (loadFailed) {
         board.innerHTML = `<p class="empty-inline fin-error">${escapeHtml(t("commercial.loadError"))}</p>`;
         reports.innerHTML = "";
@@ -648,16 +654,33 @@ export const commercialPage = {
       bindFormBehaviour(document.querySelector("[data-com-form]"));
     }
 
-    function openWin(deal) {
+    // A win whose later steps failed says so in a dialog that stays until it is
+    // read, and points at the menu action that finishes it.
+    function showWinWarnings(warnings) {
+      openModal({
+        title: t("commercial.winPendingTitle"),
+        body: `
+          <p>${escapeHtml(t("commercial.winPendingBody"))}</p>
+          <ul class="com-warnings">${warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>
+          <p>${escapeHtml(t("commercial.winPendingHint"))}</p>
+        `,
+        actions: [{ label: t("common.close"), role: "confirm", variant: "primary" }],
+      });
+    }
+
+    // complete: the deal is already won and the dialog finishes what an
+    // earlier win left undone (winOpportunity never repeats a finished step).
+    function openWin(deal, { complete = false } = {}) {
       const name = deal.contactName || deal.company || deal.title;
       const hasValue = deal.estimatedValue !== null && deal.estimatedValue > 0;
       const amount = hasValue ? String(deal.estimatedValue).replace(".", getLocale() === "pt-BR" ? "," : ".") : "";
       openModal({
-        title: t("commercial.winTitle"),
+        title: t(complete ? "commercial.completeWinTitle" : "commercial.winTitle"),
         className: "modal--wide",
         body: `
           <form class="com-form" data-win-form novalidate>
             <p class="com-dialog__deal"><strong>${escapeHtml(deal.title)}</strong> · ${escapeHtml(displayName(deal))}</p>
+            ${complete ? `<p class="com-dialog__note">${escapeHtml(t("commercial.completeWinNote"))}</p>` : ""}
             ${
               deal.clientId
                 ? ""
@@ -686,7 +709,7 @@ export const commercialPage = {
         actions: [
           { label: t("common.cancel"), role: "cancel" },
           {
-            label: t("commercial.winConfirm"),
+            label: t(complete ? "commercial.completeWinConfirm" : "commercial.winConfirm"),
             role: "confirm",
             variant: "primary",
             onSelect: async () => {
@@ -719,11 +742,15 @@ export const commercialPage = {
                       }
                     : null,
                 });
-                const messages = [t("commercial.wonToast")];
-                if (result.client) messages.push(t("commercial.clientCreated", { name: result.client.name }));
+                const messages = [t(complete ? "commercial.completeWinToast" : "commercial.wonToast")];
+                if (result.client) {
+                  messages.push(t(result.clientReused ? "commercial.clientReused" : "commercial.clientCreated", { name: result.client.name }));
+                }
                 if (result.transactions.length) messages.push(plural("commercial.receivableCreated", result.transactions.length));
-                messages.push(...result.warnings);
+                if (result.receivableExists) messages.push(t("commercial.receivableExists"));
                 showToast(messages.join(" "));
+                // After this dialog has closed, or closing it would close the warning too.
+                if (result.warnings.length) setTimeout(() => showWinWarnings(result.warnings), 0);
               } catch (error) {
                 showToast(describeError(error, t("errors.data.saveOpportunity")));
                 return false;
@@ -804,6 +831,9 @@ export const commercialPage = {
           break;
         case "win":
           openWin(deal);
+          break;
+        case "complete":
+          openWin(deal, { complete: true });
           break;
         case "lose":
           openLose(deal);

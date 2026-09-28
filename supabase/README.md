@@ -29,9 +29,9 @@ so older notes and commits stay easy to follow.
 | `20260914025524` | `011_business_workflows` | APPLIED (recorded) |
 | `20260927225426` | `normalize_plan_status` | APPLIED (recorded) |
 | `20260927225753` | `clients_foundation` | APPLIED (recorded) |
-| `20260928013040` | `clients_post_review_hardening` | **NOT APPLIED** |
-| `20260928031922` | `financial_foundation` | **NOT APPLIED** |
-| `20260928035023` | `commercial_opportunities` | **NOT APPLIED** |
+| `20260928013040` | `clients_post_review_hardening` | APPLIED (recorded) |
+| `20260928031922` | `financial_foundation` | APPLIED (recorded) |
+| `20260928035023` | `commercial_opportunities` | APPLIED (recorded) |
 
 Every recorded version and name matches
 `select version, name from supabase_migrations.schema_migrations` exactly and
@@ -125,8 +125,8 @@ without it. Applied in production.
   of moving or clearing a link someone else made.
 
 `migrations/20260928013040_clients_post_review_hardening.sql` follows the applied
-clients foundation, which is not edited. **This migration is not applied to
-production yet.**
+clients foundation, which is not edited. It is applied to production and must
+not be edited either.
 
 - Takes `projects.client_id` off the public surface. The foundation added it to
   a table `anon` could read table-wide, so `projects?select=client_id` exposed
@@ -141,7 +141,7 @@ production yet.**
   talking to the client. The Dashboard's quiet-relationship follow-up reads it.
 
 `migrations/20260928031922_financial_foundation.sql` creates the Financial V2
-ledger. **This migration is not applied to production yet.**
+ledger. Applied in production.
 
 - `financial_transactions`: one row per amount the studio expects to receive or
   pay. `type` is `INCOME` or `EXPENSE` (there is no receivable type: "to
@@ -154,11 +154,16 @@ ledger. **This migration is not applied to production yet.**
   leaves `PAID`. A check constraint makes a paid row without a date impossible.
 - Optional `client_id` and `project_id`, both `on delete set null`: removing a
   client or a project keeps the ledger entry.
+- Optional `opportunity_id`: the Commercial deal a receivable was created from
+  when the deal was won. A retried win reads it to find what an earlier
+  attempt already stored, so it never writes a second set of receivables. Its
+  foreign key (`on delete set null`) is added by the commercial migration,
+  which creates the table it points at.
 - Admin-only: `anon` has no grant, and the four policies require `is_admin()`.
   The public site never reads this table.
 
 `migrations/20260928035023_commercial_opportunities.sql` creates the Commercial
-V2 pipeline. **This migration is not applied to production yet.**
+V2 pipeline. Applied in production.
 
 - `commercial_opportunities`: one row per deal, `stage` `NEW` -> `CONTACTED` ->
   `PROPOSAL` -> `NEGOTIATION` -> `WON` | `LOST`, with `priority`, `source`,
@@ -174,6 +179,9 @@ V2 pipeline. **This migration is not applied to production yet.**
 - `commercial_proposals` is not touched: it still requires a client and a plan
   and stays the contract the automation service reads on
   `commercial.proposal.accepted`.
+- Adds `financial_transactions_opportunity_id_fkey` (`on delete set null`):
+  deleting a deal keeps its receivables and drops the link. It needs
+  `financial_foundation` first, which the version order guarantees.
 - Admin-only: `anon` has no grant, and the four policies require `is_admin()`.
 
 Plus:

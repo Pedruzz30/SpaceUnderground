@@ -1137,6 +1137,133 @@ try {
   await page.waitForFunction(() => document.querySelector("[data-toast-region]")?.textContent.includes("Dados de exemplo restaurados."));
   await page.evaluate(() => localStorage.removeItem("space-admin:site-settings:v1"));
 
+  /* ----------------------------------------- one module down at a time */
+
+  // The mock repositories read localStorage on every call, so making one key
+  // throw is an outage of exactly that module: the rest keeps working, as it
+  // must when one migration is missing in production.
+  await page.evaluate(() => window.__resetSpaceAdminMocks());
+  const FINANCIAL_KEY = "space-admin:financial:v1";
+  const COMMERCIAL_KEY = "space-admin:commercial:v1";
+  const CLIENTS_KEY = "space-admin:clients:v1";
+  const failStorage = (keys) =>
+    page.evaluate((list) => {
+      const proto = Storage.prototype;
+      if (!proto.__realGetItem) {
+        proto.__realGetItem = proto.getItem;
+        proto.getItem = function (key) {
+          if (window.__failStorageKeys?.has(key)) throw new Error(`simulated outage: ${key}`);
+          return proto.__realGetItem.call(this, key);
+        };
+      }
+      window.__failStorageKeys = new Set(list);
+    }, keys);
+  // Same-document navigation, so the simulated outage survives the route change.
+  const routeTo = async (target, selector) => {
+    await page.evaluate((next) => {
+      window.location.hash = next;
+    }, target);
+    await page.waitForSelector(selector);
+    await settle();
+  };
+  const clientKpis = () => page.locator(".client-kpis .project-metric strong").allInnerTexts();
+
+  // Client record, ledger down: only the money and the Financial tab go dark.
+  await routeTo("#/dashboard", "[data-dash-kpis]");
+  await failStorage([FINANCIAL_KEY]);
+  await routeTo("#/clients/mock-client-003", "[data-client-record]");
+  let kpis = await clientKpis();
+  assert.deepEqual(kpis.slice(0, 3), ["—", "—", "—"], "money reads — while the ledger is down");
+  assert.notEqual(kpis[3], "—", "the pipeline still reads");
+  assert.equal(await page.locator("[data-signals-partial]").count(), 1, "the signals say which module is missing");
+  await page.click('[data-tab="financial"]');
+  assert.equal(await page.locator('[data-related-error="financial"]').count(), 1, "the Financial tab reports the outage");
+  await page.click('[data-tab="commercial"]');
+  assert.equal(await page.locator('[data-related-error="commercial"]').count(), 0, "the Commercial tab is unaffected");
+  assert.ok(await page.locator(".client-deals .ops-row").count(), "the client's deals still render");
+
+  // The client itself stays editable.
+  await page.click('[data-tab="general"]');
+  await page.fill("#field-name", "Academia X Centro");
+  await page.click("[data-client-save]");
+  await page.waitForFunction(() => document.querySelector("[data-save-state]")?.classList.contains("is-saved"));
+  const renamed = await page.evaluate((key) => JSON.parse(Storage.prototype.__realGetItem.call(localStorage, key)).find((client) => client.id === "mock-client-003")?.name, CLIENTS_KEY);
+  assert.equal(renamed, "Academia X Centro", "saving the client works while the ledger is down");
+
+  // Client record, pipeline down: the other way round.
+  await failStorage([COMMERCIAL_KEY]);
+  await routeTo("#/dashboard", "[data-dash-kpis]");
+  await routeTo("#/clients/mock-client-003", "[data-client-record]");
+  kpis = await clientKpis();
+  assert.notEqual(kpis[0], "—", "money still reads");
+  assert.equal(kpis[3], "—", "the pipeline reads — while it is down");
+  await page.click('[data-tab="commercial"]');
+  assert.equal(await page.locator('[data-related-error="commercial"]').count(), 1);
+  await page.click('[data-tab="financial"]');
+  assert.equal(await page.locator('[data-related-error="financial"]').count(), 0);
+
+  // A failed read is never shown as zero on the module pages.
+  await failStorage([FINANCIAL_KEY]);
+  await routeTo("#/financial", "[data-fin-list] .fin-error");
+  assert.deepEqual(
+    [...new Set(await page.locator("[data-fin-metrics] .project-metric strong").allInnerTexts())],
+    ["—"],
+    "every financial figure reads — instead of R$ 0",
+  );
+  await failStorage([COMMERCIAL_KEY]);
+  await routeTo("#/commercial", "[data-com-board] .fin-error");
+  assert.deepEqual(
+    [...new Set(await page.locator("[data-com-metrics] .project-metric strong").allInnerTexts())],
+    ["—"],
+    "every commercial figure reads — instead of 0",
+  );
+
+  // Dashboard with both down: the two cards read —, the panels say why and
+  // the queues do not claim to be clear.
+  await failStorage([FINANCIAL_KEY, COMMERCIAL_KEY]);
+  await routeTo("#/dashboard", "[data-dash-kpis] .stat-card");
+  await page.waitForSelector("[data-checks-partial]");
+  const dashCards = await page.locator("[data-dash-kpis] .stat-card strong").allInnerTexts();
+  assert.deepEqual(dashCards.slice(2), ["—", "—"], "open deals and to receive read —");
+  assert.notEqual(dashCards[0], "—", "projects still read");
+  assert.equal(await page.locator('[data-i18n="dashboard.financialUnavailable"]').count(), 1);
+  assert.equal(await page.locator('[data-i18n="dashboard.commercialUnavailable"]').count(), 1);
+  await failStorage([]);
+
+  // A win whose client step fails: the deal is won, the warning stays on
+  // screen, and "Finish closing" completes it without a second receivable.
+  await routeTo("#/commercial", "[data-com-board]:not([aria-busy]) [data-opportunity-id]");
+  const winDeal = "mock-opp-002";
+  await page.locator(`[data-opportunity-id="${winDeal}"] [data-row-menu-toggle]`).click();
+  await page.click(`[data-opportunity-id="${winDeal}"] [data-com-action="win"]`);
+  await page.waitForSelector("[data-win-form]");
+  await failStorage([CLIENTS_KEY]);
+  await page.click("[data-modal-confirm]");
+  await page.waitForSelector(".com-warnings li");
+  assert.match(await page.locator(".modal h2").innerText(), /NEGÓCIO GANHO, COM PENDÊNCIAS/);
+  await page.click("[data-modal-confirm]");
+  await failStorage([]);
+  await page.waitForFunction((id) => document.querySelector(`[data-opportunity-id="${id}"]`)?.dataset.stage === "WON", winDeal);
+  const dealEntries = () =>
+    page.evaluate(
+      ({ key, id }) => JSON.parse(localStorage.getItem(key) || "[]").filter((entry) => entry.opportunityId === id),
+      { key: FINANCIAL_KEY, id: winDeal },
+    );
+  assert.equal((await dealEntries()).length, 1, "the receivable did not wait for the client");
+
+  await page.locator(`[data-opportunity-id="${winDeal}"] [data-row-menu-toggle]`).click();
+  await page.click(`[data-opportunity-id="${winDeal}"] [data-com-action="complete"]`);
+  await page.waitForSelector("[data-win-form]");
+  await page.click("[data-modal-confirm]");
+  await page.waitForFunction(() => !document.querySelector("[data-win-form]"));
+  await settle();
+  const marina = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)).filter((client) => client.name === "Marina Costa"), CLIENTS_KEY);
+  assert.equal(marina.length, 1, "finishing the win creates the client once");
+  const finished = await dealEntries();
+  assert.equal(finished.length, 1, "no second receivable");
+  assert.equal(finished[0].clientId, marina[0].id, "the receivable now points at the client");
+  await page.evaluate(() => window.__resetSpaceAdminMocks());
+
   assert.deepEqual(errors, [], "no console or page errors");
   console.log("admin flow: all checks passed");
 } finally {

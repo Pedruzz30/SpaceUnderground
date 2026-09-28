@@ -129,6 +129,14 @@ function renderQueue(items, emptyMessage) {
   return `<div class="dash-queue">${items.map(queueItem).join("")}</div>`;
 }
 
+// A queue built without a module is incomplete, not clear: "nothing needs
+// attention" would be a claim the Dashboard cannot make while that read failed.
+function missingModulesNote(labels) {
+  const missing = labels.filter(Boolean);
+  if (!missing.length) return "";
+  return `<p class="dash-inline-note dash-inline-note--warn" data-checks-partial>${escapeHtml(t("dashboard.checksMissingModules", { modules: missing.join(", ") }))}</p>`;
+}
+
 // The operational half is local, so it paints immediately; the project checks
 // arrive with the repository query and are merged in afterwards.
 function renderAttention(projectItems, { projectsFailed = false, pending = false } = {}) {
@@ -143,7 +151,8 @@ function renderAttention(projectItems, { projectsFailed = false, pending = false
       ? `<p class="dash-inline-note dash-inline-note--warn" data-i18n="dashboard.projectChecksUnavailable">${t("dashboard.projectChecksUnavailable")}</p>`
       : "";
 
-  return `${renderQueue(items, t("dashboard.nothingNeedsAttention"))}${note}`;
+  const partial = missingModulesNote([ledgerOk === false && t("nav.financial"), dealsOk === false && t("nav.commercial")]);
+  return `${renderQueue(items, t("dashboard.nothingNeedsAttention"))}${note}${partial}`;
 }
 
 /* ---------------------------------------------------------- project pulse */
@@ -477,7 +486,9 @@ export const dashboardPage = {
         engagements: projectsOk ? activeEngagements(projects) : "—",
         clients: clientsOk ? activeClients(clients) : "—",
       });
-      followUpsEl.innerHTML = renderQueue(followUps({ clients, opportunities: dealEntries }), t("dashboard.noFollowUps"));
+      followUpsEl.innerHTML =
+        renderQueue(followUps({ clients, opportunities: dealEntries }), t("dashboard.noFollowUps")) +
+        missingModulesNote([!clientsOk && t("nav.clients"), dealsOk === false && t("nav.commercial")]);
       if (pipelineEl) pipelineEl.innerHTML = renderPipeline();
 
       if (projectsOk) {

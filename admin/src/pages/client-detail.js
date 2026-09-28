@@ -33,6 +33,7 @@ import {
   contactTimestampForDay,
   findDuplicates,
   initials,
+  relatedState,
   relationshipSignals,
 } from "../utils/client-relationship.js";
 import { isActionOverdue, OPEN_STAGES, sortForBoard } from "../utils/commercial-metrics.js";
@@ -183,12 +184,14 @@ function kpiStrip(state) {
   const finance = clientFinance(state.entries);
   const pipeline = clientPipeline(state.deals);
   const activeProjects = state.projects.filter(isActiveProject).length;
-  const money = (value) => (state.relatedOk ? formatCurrency(value) : "—");
+  // Each figure answers to the module it comes from: a failed ledger blanks the
+  // money, never the pipeline, and the other way round.
+  const money = (value) => (state.financialOk ? formatCurrency(value) : "—");
   const items = [
     ["clientEditor.kpiReceived", money(finance.received), ""],
     ["clientEditor.kpiToReceive", money(finance.toReceive), ""],
-    ["clientEditor.kpiOverdue", money(finance.overdue), finance.overdue ? "is-danger" : ""],
-    ["clientEditor.kpiPipeline", money(pipeline.openValue), ""],
+    ["clientEditor.kpiOverdue", money(finance.overdue), state.financialOk && finance.overdue ? "is-danger" : ""],
+    ["clientEditor.kpiPipeline", state.commercialOk ? formatCurrency(pipeline.openValue) : "—", ""],
     ["clientEditor.kpiProjects", state.projectsOk ? String(activeProjects) : "—", ""],
   ];
   return `
@@ -224,10 +227,21 @@ function signalText(signal) {
 }
 
 function signalsMarkup(state) {
-  if (!state.relatedOk) return `<p class="empty-inline">${escapeHtml(t("clientEditor.relatedLoadError"))}</p>`;
-  const signals = relationshipSignals({ client: state.client, entries: state.entries, deals: state.deals, projects: state.projects });
-  if (!signals.length) return `<p class="client-signals__empty">${escapeHtml(t("clientEditor.signalsEmpty"))}</p>`;
-  return `
+  if (!state.financialOk && !state.commercialOk) return `<p class="empty-inline">${escapeHtml(t("clientEditor.relatedLoadError"))}</p>`;
+  const signals = relationshipSignals({
+    client: state.client,
+    entries: state.entries,
+    deals: state.deals,
+    projects: state.projects,
+    financialOk: state.financialOk,
+    commercialOk: state.commercialOk,
+  });
+  const missing = [!state.financialOk && t("nav.financial"), !state.commercialOk && t("nav.commercial")].filter(Boolean);
+  const note = missing.length
+    ? `<p class="dash-inline-note dash-inline-note--warn" data-signals-partial>${escapeHtml(t("clientEditor.signalsPartial", { modules: missing.join(", ") }))}</p>`
+    : "";
+  if (!signals.length) return `<p class="client-signals__empty">${escapeHtml(t("clientEditor.signalsEmpty"))}</p>${note}`;
+  return `${note}
     <ul class="client-signals">
       ${signals
         .map((signal) => {
@@ -377,7 +391,7 @@ function dealRow(deal) {
 }
 
 function commercialMarkup(state) {
-  if (!state.relatedOk) return `<p class="empty-inline">${escapeHtml(t("clientEditor.relatedLoadError"))}</p>`;
+  if (!state.commercialOk) return `<p class="empty-inline" data-related-error="commercial">${escapeHtml(t("clientEditor.commercialLoadError"))}</p>`;
   const pipeline = clientPipeline(state.deals);
   const archived = state.client.status === "ARCHIVED";
   const open = sortForBoard(state.deals.filter((deal) => OPEN_STAGES.includes(deal.stage)));
@@ -427,7 +441,7 @@ function entryRow(entry) {
 }
 
 function financialMarkup(state) {
-  if (!state.relatedOk) return `<p class="empty-inline">${escapeHtml(t("clientEditor.relatedLoadError"))}</p>`;
+  if (!state.financialOk) return `<p class="empty-inline" data-related-error="financial">${escapeHtml(t("clientEditor.financialLoadError"))}</p>`;
   const finance = clientFinance(state.entries);
   const archived = state.client.status === "ARCHIVED";
   return `
@@ -804,7 +818,8 @@ async function loadState(id) {
       activity: [],
       entries: [],
       deals: [],
-      relatedOk: true,
+      financialOk: true,
+      commercialOk: true,
       allClients: all,
     };
   }
@@ -823,7 +838,7 @@ async function loadState(id) {
     getClients(),
   ]);
   const projectsOk = linked.status === "fulfilled";
-  const relatedOk = entries.status === "fulfilled" && deals.status === "fulfilled";
+  const related = relatedState(entries, deals, client);
 
   return {
     client,
@@ -835,9 +850,10 @@ async function loadState(id) {
     // project away from another client.
     linkCandidates: all.status === "fulfilled" ? all.value.filter((project) => !project.clientId) : [],
     activity: activity.status === "fulfilled" ? activity.value : [],
-    entries: entries.status === "fulfilled" ? entries.value.filter((entry) => entry.clientId === client.id) : [],
-    deals: deals.status === "fulfilled" ? deals.value.filter((deal) => deal.clientId === client.id).map((deal) => ({ ...deal, clientName: client.name })) : [],
-    relatedOk,
+    entries: related.entries,
+    deals: related.deals,
+    financialOk: related.financialOk,
+    commercialOk: related.commercialOk,
     allClients: clients.status === "fulfilled" ? clients.value : [],
   };
 }
@@ -1007,7 +1023,8 @@ function mount(page, state, { tab } = {}) {
       activity: fresh.activity,
       entries: fresh.entries,
       deals: fresh.deals,
-      relatedOk: fresh.relatedOk,
+      financialOk: fresh.financialOk,
+      commercialOk: fresh.commercialOk,
     });
     paintPanels();
   }
