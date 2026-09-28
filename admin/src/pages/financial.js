@@ -138,16 +138,18 @@ function stateNote(entry, now) {
 
 /* ------------------------------------------------------------ metrics */
 
-function metricsMarkup(entries, range, now) {
+// A failed read is not an empty ledger: every figure reads "—", never R$ 0.
+function metricsMarkup(entries, range, now, { failed = false } = {}) {
   const scoped = financialSummary(entries.filter((entry) => withinRange(entry, range)), now);
   const open = financialSummary(entries, now);
+  const figure = (value) => (failed ? "—" : value);
   const metrics = [
-    ["financial.metricRevenue", formatCurrency(scoped.revenue), ""],
-    ["financial.metricExpenses", formatCurrency(scoped.expenses), ""],
-    ["financial.metricResult", formatSignedCurrency(scoped.result), scoped.result < 0 ? "is-negative" : ""],
-    ["financial.metricToReceive", formatCurrency(open.toReceive), ""],
-    ["financial.metricToPay", formatCurrency(open.toPay), ""],
-    ["financial.metricOverdue", formatCurrency(open.overdueReceivable + open.overduePayable), open.overdueCount ? "is-warn" : ""],
+    ["financial.metricRevenue", figure(formatCurrency(scoped.revenue)), ""],
+    ["financial.metricExpenses", figure(formatCurrency(scoped.expenses)), ""],
+    ["financial.metricResult", figure(formatSignedCurrency(scoped.result)), !failed && scoped.result < 0 ? "is-negative" : ""],
+    ["financial.metricToReceive", figure(formatCurrency(open.toReceive)), ""],
+    ["financial.metricToPay", figure(formatCurrency(open.toPay)), ""],
+    ["financial.metricOverdue", figure(formatCurrency(open.overdueReceivable + open.overduePayable)), !failed && open.overdueCount ? "is-warn" : ""],
   ];
   return metrics
     .map(
@@ -747,7 +749,7 @@ export const financialPage = {
       const range = periodRange(period.value, now);
       const query = search.value.trim().toLowerCase();
 
-      metricsRoot.innerHTML = metricsMarkup(entries, range, now);
+      metricsRoot.innerHTML = metricsMarkup(entries, range, now, { failed: loadFailed });
 
       if (loadFailed) {
         list.innerHTML = `<p class="empty-inline fin-error">${escapeHtml(t("financial.loadError"))}</p>`;

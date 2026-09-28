@@ -85,15 +85,17 @@ function onBoard(deal, range) {
 
 /* ------------------------------------------------------------- metrics */
 
-function metricsMarkup(deals, range, now) {
+// A failed read is not an empty pipeline: every figure reads "—", never 0.
+function metricsMarkup(deals, range, now, { failed = false } = {}) {
   const summary = pipelineSummary(deals, range, now);
+  const figure = (value) => (failed ? "—" : value);
   const metrics = [
-    ["commercial.metricOpenValue", formatCurrency(summary.openValue), ""],
-    ["commercial.metricForecast", formatCurrency(summary.forecast), ""],
-    ["commercial.metricOpenCount", String(summary.openCount), ""],
-    ["commercial.metricWon", formatCurrency(summary.wonValue), ""],
-    ["commercial.metricConversion", percent(summary.conversion), ""],
-    ["commercial.metricOverdue", String(summary.overdueActions), summary.overdueActions ? "is-warn" : ""],
+    ["commercial.metricOpenValue", figure(formatCurrency(summary.openValue)), ""],
+    ["commercial.metricForecast", figure(formatCurrency(summary.forecast)), ""],
+    ["commercial.metricOpenCount", figure(String(summary.openCount)), ""],
+    ["commercial.metricWon", figure(formatCurrency(summary.wonValue)), ""],
+    ["commercial.metricConversion", figure(percent(summary.conversion)), ""],
+    ["commercial.metricOverdue", figure(String(summary.overdueActions)), !failed && summary.overdueActions ? "is-warn" : ""],
   ];
   return metrics
     .map(
@@ -531,7 +533,7 @@ export const commercialPage = {
       const range = periodRange(period.value, now);
       const query = search.value.trim().toLowerCase();
 
-      metricsRoot.innerHTML = metricsMarkup(deals, range, now);
+      metricsRoot.innerHTML = metricsMarkup(deals, range, now, { failed: loadFailed });
       if (loadFailed) {
         board.innerHTML = `<p class="empty-inline fin-error">${escapeHtml(t("commercial.loadError"))}</p>`;
         reports.innerHTML = "";

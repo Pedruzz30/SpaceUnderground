@@ -325,6 +325,7 @@ export default {
     openCms: "Abrir CMS",
     checkingProjects: "Verificando projetos...",
     projectChecksUnavailable: "Checagens de projetos indisponíveis.",
+    checksMissingModules: "Sem dados de {modules}: as pendências desse módulo não aparecem aqui.",
     nothingNeedsAttention: "Nada precisa de atenção agora.",
     noProjectsYet: "Nenhum projeto ainda. Crie o primeiro case para iniciar o portfólio.",
     case: "CASE",

@@ -325,6 +325,7 @@ export default {
     openCms: "Open CMS",
     checkingProjects: "Checking project records...",
     projectChecksUnavailable: "Project checks unavailable.",
+    checksMissingModules: "No data from {modules}: that module's items are missing here.",
     nothingNeedsAttention: "Nothing needs attention right now.",
     noProjectsYet: "No projects yet. Create the first case to start the portfolio.",
     case: "CASE",
