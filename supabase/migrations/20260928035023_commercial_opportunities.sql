@@ -13,6 +13,9 @@
 -- automation service reads when a proposal is accepted. Nothing here writes
 -- to it.
 --
+-- The one change outside this table is the foreign key behind
+-- financial_transactions.opportunity_id (see "receivables created by a win").
+--
 -- The database owns three facts:
 --   stage_changed_at  when the deal entered its current stage ("days in stage")
 --   closed_at         when it was won or lost, cleared if it is reopened
@@ -152,6 +155,26 @@ create index if not exists commercial_opportunities_closed_idx
 create index if not exists commercial_opportunities_client_idx
   on public.commercial_opportunities (client_id)
   where client_id is not null;
+
+-- ---------------------------------------------------------------------------
+-- receivables created by a win
+-- ---------------------------------------------------------------------------
+-- 20260928031922_financial_foundation gives every ledger entry an optional
+-- opportunity_id, the deal a win created it from; this table did not exist
+-- yet, so the link is enforced here. Deleting a deal keeps its receivables
+-- and drops the link, like a removed client or project.
+
+do $$
+begin
+  if to_regclass('public.financial_transactions') is not null and not exists (
+    select 1 from pg_constraint
+    where conname = 'financial_transactions_opportunity_id_fkey'
+      and conrelid = 'public.financial_transactions'::regclass
+  ) then
+    alter table public.financial_transactions add constraint financial_transactions_opportunity_id_fkey
+      foreign key (opportunity_id) references public.commercial_opportunities (id) on delete set null;
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- Row level security

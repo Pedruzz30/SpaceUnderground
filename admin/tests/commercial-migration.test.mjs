@@ -187,3 +187,31 @@ describe("commercial row level security", () => {
     assert.equal(removed.rows.length, 1);
   });
 });
+
+describe("receivables created by a win", () => {
+  it("links a ledger entry to the deal it came from, and keeps the entry when the deal is deleted", async () => {
+    const deal = await insertDeal({ title: "Won deal" });
+    const { rows: [entry] } = await db.query(
+      "insert into public.financial_transactions (type, description, amount, due_date, opportunity_id) values ('INCOME', 'From the deal', 500, '2026-10-10', $1) returning id",
+      [deal.id],
+    );
+    await db.query("delete from public.commercial_opportunities where id = $1", [deal.id]);
+    const { rows: [kept] } = await db.query("select opportunity_id from public.financial_transactions where id = $1", [entry.id]);
+    assert.equal(kept.opportunity_id, null);
+  });
+
+  it("refuses a link to a deal that does not exist", async () => {
+    const error = await failure(
+      "insert into public.financial_transactions (type, description, amount, due_date, opportunity_id) values ('INCOME', 'Ghost', 1, '2026-10-10', '44444444-4444-4444-4444-444444444444')",
+    );
+    assert.equal(error?.code, "23503");
+  });
+
+  it("adds the foreign key once, even when the migration runs again", async () => {
+    await db.exec(COMMERCIAL);
+    const { rows } = await db.query(
+      "select confdeltype from pg_constraint where conname = 'financial_transactions_opportunity_id_fkey'",
+    );
+    assert.deepEqual(rows, [{ confdeltype: "n" }], "one constraint, on delete set null");
+  });
+});

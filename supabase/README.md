@@ -154,6 +154,11 @@ ledger. **This migration is not applied to production yet.**
   leaves `PAID`. A check constraint makes a paid row without a date impossible.
 - Optional `client_id` and `project_id`, both `on delete set null`: removing a
   client or a project keeps the ledger entry.
+- Optional `opportunity_id`: the Commercial deal a receivable was created from
+  when the deal was won. A retried win reads it to find what an earlier
+  attempt already stored, so it never writes a second set of receivables. Its
+  foreign key (`on delete set null`) is added by the commercial migration,
+  which creates the table it points at.
 - Admin-only: `anon` has no grant, and the four policies require `is_admin()`.
   The public site never reads this table.
 
@@ -174,6 +179,9 @@ V2 pipeline. **This migration is not applied to production yet.**
 - `commercial_proposals` is not touched: it still requires a client and a plan
   and stays the contract the automation service reads on
   `commercial.proposal.accepted`.
+- Adds `financial_transactions_opportunity_id_fkey` (`on delete set null`):
+  deleting a deal keeps its receivables and drops the link. It needs
+  `financial_foundation` first, which the version order guarantees.
 - Admin-only: `anon` has no grant, and the four policies require `is_admin()`.
 
 Plus:

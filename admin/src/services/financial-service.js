@@ -31,6 +31,8 @@ const DEFAULTS = {
   paidAt: "",
   clientId: "",
   projectId: "",
+  // Set only by a won deal; the ledger form never shows or edits it.
+  opportunityId: "",
   notes: "",
 };
 
@@ -65,6 +67,7 @@ export function sanitizeTransaction(values = {}) {
   if (clean.paidAt !== undefined) clean.paidAt = clean.paidAt ? toDateKey(clean.paidAt) ?? clean.paidAt : null;
   if (clean.clientId !== undefined) clean.clientId = clean.clientId || null;
   if (clean.projectId !== undefined) clean.projectId = clean.projectId || null;
+  if (clean.opportunityId !== undefined) clean.opportunityId = clean.opportunityId || null;
   // Only a paid entry carries a payment date.
   if (clean.status !== undefined && clean.status !== "PAID") clean.paidAt = null;
   return clean;
@@ -124,6 +127,17 @@ export async function getTransactionsWithStatus() {
     return { items: await getTransactions(), ok: true };
   } catch {
     return { items: [], ok: false };
+  }
+}
+
+// The entries a won deal created (see winOpportunity). Throws, unlike the
+// Dashboard read: the caller must not mistake an outage for "nothing yet".
+export async function getTransactionsForOpportunity(opportunityId) {
+  if (!opportunityId) return [];
+  try {
+    return await (await getFinancialRepository()).listByOpportunity(opportunityId);
+  } catch (error) {
+    throw toDataError(error, t("errors.data.loadTransactions"));
   }
 }
 

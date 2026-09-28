@@ -111,6 +111,15 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       site does not depend on it.
 - [ ] Right after applying it, as `anon` with the publishable key,
       `commercial_opportunities?select=id&limit=1` is refused (`401`/`42501`).
+- [ ] Apply the two in version order, financial first: the commercial
+      migration adds the foreign key behind
+      `financial_transactions.opportunity_id`. Then confirm it exists:
+
+      select conname from pg_constraint
+      where conname = 'financial_transactions_opportunity_id_fkey';
+
+- [ ] Signed in as an admin, Settings → System reads every module as
+      responding and lists no pending migration.
 - [ ] Right after applying the clients hardening, as `anon` with the publishable key:
       the public project query above still returns `200`, and
       `projects?select=client_id&limit=1` is refused (`401`/`42501`). A new

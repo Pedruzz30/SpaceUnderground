@@ -27,6 +27,17 @@ export const supabaseFinancialRepository = {
     return unwrap(result, t("errors.data.loadTransactions")).map(mapTransactionFromDatabase);
   },
 
+  // The entries a won deal created, so a retried win sees what is already there.
+  async listByOpportunity(opportunityId) {
+    if (!isTransactionId(opportunityId)) return [];
+    const result = await getSupabaseClient()
+      .from(TABLE)
+      .select(FINANCIAL_COLUMNS)
+      .eq("opportunity_id", opportunityId)
+      .order("due_date", { ascending: true });
+    return unwrap(result, t("errors.data.loadTransactions")).map(mapTransactionFromDatabase);
+  },
+
   async getById(id) {
     if (!isTransactionId(id)) return null;
     const result = await getSupabaseClient().from(TABLE).select(FINANCIAL_COLUMNS).eq("id", id).maybeSingle();
