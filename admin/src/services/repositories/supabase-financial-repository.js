@@ -2,6 +2,7 @@ import { getSupabaseClient } from "../../lib/supabase.js";
 import { toDataError } from "../errors.js";
 import { FINANCIAL_COLUMNS, mapTransactionFromDatabase, mapTransactionToDatabase } from "../mappers/financial-mapper.js";
 import { t } from "../../i18n/index.js";
+import { selectAll } from "./supabase-select-all.js";
 
 const TABLE = "financial_transactions";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -18,12 +19,17 @@ function isTransactionId(id) {
 }
 
 export const supabaseFinancialRepository = {
+  // Paged: the whole ledger is summed on screen, and a response cut at
+  // PostgREST's row limit would print wrong totals (supabase-select-all.js).
   async list() {
-    const result = await getSupabaseClient()
-      .from(TABLE)
-      .select(FINANCIAL_COLUMNS)
-      .order("due_date", { ascending: false })
-      .order("created_at", { ascending: false });
+    const result = await selectAll((withCount) =>
+      getSupabaseClient()
+        .from(TABLE)
+        .select(FINANCIAL_COLUMNS, withCount ? { count: "exact" } : undefined)
+        .order("due_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true }),
+    );
     return unwrap(result, t("errors.data.loadTransactions")).map(mapTransactionFromDatabase);
   },
 
