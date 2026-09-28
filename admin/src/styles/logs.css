@@ -1,0 +1,371 @@
+/* Logs: a day-grouped timeline. Each event is a native <details>, so it opens
+   with keyboard and screen readers for free; the summary line is what you scan,
+   the body holds the raw record for debugging. The summary strip comes from
+   hub.css. */
+
+/* --- filters ------------------------------------------------------------------ */
+
+.log-filters {
+  display: grid;
+  grid-template-columns: minmax(14rem, 2fr) repeat(2, minmax(10rem, 1fr));
+  align-items: end;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.log-filters .sort-field {
+  min-width: 0;
+}
+
+.log-metrics {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+/* Channel tabs carry their own count, so the filter doubles as a breakdown. */
+.log-channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: var(--space-3);
+}
+
+.log-channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  padding: 0 0.5rem 0 0.85rem;
+  color: var(--text-muted);
+  font: 500 0.64rem/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.log-channel b {
+  min-width: 1.6rem;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  padding: 0.3rem 0.45rem;
+  color: var(--text-soft);
+  font-weight: 500;
+  text-align: center;
+}
+
+.log-channel:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.log-channel.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.log-channel.is-active b {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.log-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.log-status .ops-count {
+  margin: 0;
+}
+
+.log-status__clear {
+  min-height: 2rem;
+  border-color: transparent;
+  background: transparent;
+  padding: 0 0.6rem;
+  color: var(--text-soft);
+}
+
+/* --- timeline --------------------------------------------------------------- */
+
+.log-timeline {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.log-timeline__error {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  color: var(--danger);
+}
+
+.log-day__head {
+  position: sticky;
+  z-index: 2;
+  top: 76px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  padding: 0.6rem 0;
+}
+
+.log-day__head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* Only the first letter: "sáb., 26 de set." must not become "De Set.". */
+.log-day__head h3::first-letter {
+  text-transform: uppercase;
+}
+
+.log-day__head span {
+  color: var(--text-muted);
+  font: 500 0.6rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.log-day__entries {
+  display: grid;
+  gap: 0.35rem;
+}
+
+/* --- entry -------------------------------------------------------------------- */
+
+.log-entry {
+  --log-tone: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  transition: border-color 140ms ease;
+}
+
+.log-entry--system {
+  --log-tone: var(--warning);
+}
+
+.log-entry--security {
+  --log-tone: var(--danger);
+}
+
+.log-entry:hover,
+.log-entry[open] {
+  border-color: var(--border-strong);
+}
+
+.log-entry summary {
+  display: grid;
+  grid-template-columns: 3.2rem 0.6rem minmax(0, 1fr) auto 1rem;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.log-entry summary::-webkit-details-marker {
+  display: none;
+}
+
+.log-entry summary:focus-visible {
+  border-radius: var(--radius-sm);
+}
+
+.log-entry__time {
+  color: var(--text-soft);
+  font: 500 0.72rem/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.log-entry__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--log-tone);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--log-tone) 14%, transparent);
+}
+
+.log-entry--activity .log-entry__dot {
+  background: var(--success);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 14%, transparent);
+}
+
+.log-entry__main {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.log-entry__main strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-entry__main > span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-entry[open] .log-entry__main strong,
+.log-entry[open] .log-entry__main > span {
+  white-space: normal;
+}
+
+.log-entry__tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.log-tag {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.5rem;
+  color: var(--text-muted);
+  font: 500 0.56rem/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.log-tag--system {
+  border-color: color-mix(in srgb, var(--warning) 40%, var(--border));
+  color: var(--warning);
+}
+
+.log-tag--security {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  color: var(--danger);
+}
+
+.log-entry__chevron {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  text-align: center;
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.log-entry[open] .log-entry__chevron {
+  color: var(--accent);
+  transform: rotate(90deg);
+}
+
+.log-entry__details {
+  display: grid;
+  gap: var(--space-3);
+  border-top: 1px solid var(--border);
+  padding: var(--space-3) 0.9rem var(--space-3) calc(0.9rem + 3.2rem + 0.6rem + 1.7rem);
+}
+
+.log-entry__stored {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.86rem;
+}
+
+.log-entry__stored span,
+.log-entry__details dt {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--text-muted);
+  font: 500 0.56rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.log-entry__details dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+.log-entry__details dd {
+  margin: 0;
+  color: var(--text-primary);
+  font: 500 0.74rem/1.4 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.log-entry__details .button {
+  justify-self: start;
+}
+
+.log-more {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
+.log-more .button[hidden] {
+  display: none;
+}
+
+/* --- responsive ------------------------------------------------------------------ */
+
+@media (max-width: 1180px) {
+  .log-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .log-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .log-filters .search-field {
+    grid-column: 1 / -1;
+  }
+
+  .log-entry summary {
+    grid-template-columns: 0.6rem auto minmax(0, 1fr) 1rem;
+    grid-template-areas:
+      "dot main main chevron"
+      ". time tags tags";
+    gap: 0.5rem 0.7rem;
+    padding: 0.75rem;
+  }
+
+  .log-entry__time {
+    grid-area: time;
+  }
+
+  .log-entry__dot {
+    grid-area: dot;
+  }
+
+  .log-entry__main {
+    grid-area: main;
+  }
+
+  .log-entry__tags {
+    grid-area: tags;
+    justify-content: flex-start;
+  }
+
+  .log-entry__chevron {
+    grid-area: chevron;
+  }
+
+  .log-entry__details {
+    padding: var(--space-3) 0.75rem;
+  }
+}
