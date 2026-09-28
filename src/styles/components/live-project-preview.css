@@ -19,9 +19,6 @@
   /* Branco das bordas puxado para o accent do case que esta no frame agora.
      Cada regra abaixo mantem o alpha que ja tinha: muda o tom, nao o peso. */
   --frame-line: color-mix(in srgb, var(--accent) 26%, #ffffff);
-  --preview-scale: 0.56;
-  --preview-site-scale: 0.62;
-  --preview-detail-scale: 0.7;
   --preview-perspective: 1300px;
   --preview-rest-transform: perspective(var(--preview-perspective)) rotateX(4deg) rotateY(-8deg) rotateZ(-1.5deg);
   --preview-hover-transform: perspective(var(--preview-perspective)) rotateX(1deg) rotateY(-3deg) rotateZ(0deg) scale(1.025);
@@ -477,15 +474,19 @@
   transition: opacity 420ms ease;
 }
 
+/* The embed is laid out at one desktop size (preview-geometry.js sets
+   --render-width/--render-height and --website-scale) and only scaled: its
+   size never animates, so the client's site is never re-laid out mid-motion.
+   No will-change: a layer kept at one raster scale goes soft when a mode
+   zooms in. */
 .signal-ui__website-surface {
-  --website-scale: var(--preview-scale);
-  width: calc(100% / var(--website-scale));
-  height: calc(100% / var(--website-scale));
+  --website-scale: 0.576;
+  width: var(--render-width, 1464px);
+  height: var(--render-height, 900px);
   opacity: 0;
   transform: scale(var(--website-scale));
   transform-origin: top left;
-  transition: opacity 420ms ease, transform 560ms var(--ease), width 560ms var(--ease), height 560ms var(--ease);
-  will-change: transform;
+  transition: opacity 420ms ease, transform 560ms var(--ease);
 }
 
 .signal-ui__website-surface iframe {
@@ -499,9 +500,61 @@
 
 .signal-ui.is-preview-loading .signal-ui__poster,
 .signal-ui.is-preview-sleeping .signal-ui__poster,
+.signal-ui.is-preview-still .signal-ui__poster,
 .signal-ui.is-preview-fallback .signal-ui__poster,
 .signal-ui.is-preview-unavailable .signal-ui__poster {
   opacity: 1;
+}
+
+/* A project with no image yet: its case, name and accent instead of a black
+   frame. Hidden as soon as the live site is on screen. */
+.signal-ui__placeholder {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: none;
+  align-content: center;
+  justify-items: start;
+  gap: clamp(0.3rem, 0.8vw, 0.65rem);
+  padding: clamp(1rem, 4vw, 3.5rem);
+  background:
+    radial-gradient(circle at 78% 30%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 42%),
+    linear-gradient(color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 6%, transparent) 1px, transparent 1px) 0 0 / 40px 40px,
+    #0b0c0b;
+  color: #eceee7;
+  pointer-events: none;
+}
+
+.signal-ui__placeholder > span,
+.signal-ui__placeholder > small {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: clamp(0.5rem, 0.8vw, 0.72rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.signal-ui__placeholder > strong {
+  max-width: 14ch;
+  font-family: var(--display);
+  font-size: clamp(1.2rem, 3.4vw, 3.2rem);
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+}
+
+.signal-ui__placeholder > small {
+  color: color-mix(in srgb, #eceee7 60%, transparent);
+}
+
+.signal-ui.is-poster-missing .signal-ui__placeholder {
+  display: grid;
+}
+
+.signal-ui.is-poster-missing .signal-ui__poster,
+.signal-ui.is-preview-live .signal-ui__placeholder {
+  display: none;
 }
 
 .signal-ui.is-preview-live .signal-ui__browser {
@@ -751,17 +804,9 @@
   opacity: 0.55;
 }
 
-.signal-ui.is-view-site .signal-ui__website-surface {
-  --website-scale: var(--preview-site-scale);
-}
-
 .signal-ui.is-view-site .signal-ui__browser {
   border-color: color-mix(in srgb, var(--accent) 26%, transparent);
   transform: translateZ(8px);
-}
-
-.signal-ui.is-view-detail .signal-ui__website-surface {
-  --website-scale: var(--preview-detail-scale);
 }
 
 .signal-ui.is-view-detail .signal-ui__editorial {
@@ -789,6 +834,26 @@
   transform: var(--preview-hover-transform);
 }
 
+/* Settled: on screen, the frame lies flat and nothing in it is 3D, so the
+   live site, the copy and the 1px lines render at full resolution. The tilt
+   is only how it arrives (signal-frame.js, SETTLE_RATIO). */
+.signal-ui.is-settled,
+.project__visual:hover .signal-ui.is-settled {
+  transform: none;
+  transform-style: flat;
+}
+
+.signal-ui.is-settled .signal-ui__case {
+  transform-style: flat;
+}
+
+.signal-ui.is-settled .signal-ui__browser,
+.signal-ui.is-settled.is-view-site .signal-ui__browser,
+.signal-ui.is-settled.is-view-detail .signal-ui__browser {
+  transform: none;
+  transform-style: flat;
+}
+
 .project__visual--signal:has(.signal-ui__module:hover) .signal-ui__website-viewport,
 .project__visual--signal:has(.signal-ui__module:focus-visible) .signal-ui__website-viewport {
   border-color: color-mix(in srgb, var(--accent) 22%, transparent);
@@ -803,22 +868,6 @@
 
 .project__visual--signal:hover .project__hover-mark {
   transform: translate(var(--view-x), var(--view-y)) scale(1);
-}
-
-@media (max-width: 1180px) {
-  .signal-ui {
-    --preview-scale: 0.56;
-    --preview-site-scale: 0.61;
-    --preview-detail-scale: 0.68;
-  }
-}
-
-@media (max-width: 980px) {
-  .signal-ui {
-    --preview-scale: 0.48;
-    --preview-site-scale: 0.54;
-    --preview-detail-scale: 0.6;
-  }
 }
 
 @media (max-width: 760px) {
@@ -891,28 +940,6 @@
 
   .signal-ui__signature > strong {
     font-size: clamp(0.78rem, 3.1vw, 0.96rem);
-  }
-
-  .signal-ui {
-    --preview-scale: 0.4;
-    --preview-site-scale: 0.44;
-    --preview-detail-scale: 0.5;
-  }
-}
-
-@media (max-width: 520px) {
-  .signal-ui {
-    --preview-scale: 0.34;
-    --preview-site-scale: 0.38;
-    --preview-detail-scale: 0.42;
-  }
-}
-
-@media (max-width: 440px) {
-  .signal-ui {
-    --preview-scale: 0.3;
-    --preview-site-scale: 0.34;
-    --preview-detail-scale: 0.38;
   }
 }
 

@@ -5,6 +5,7 @@ import { projects } from "./project-registry.js";
 import { getLocale, subscribeLocaleChange, t } from "./i18n/index.js";
 import { fetchPublishedProjects, isConfigured, signPaths } from "./supabase-public.js";
 import { getActiveProjectKey, refreshProjectViewerSlots, showProject } from "./signal-frame.js";
+import { resolvePoster } from "./project-posters.js";
 
 const SOURCE_ATTRIBUTE = "data-projects-source";
 let subscribedToLocale = false;
@@ -13,8 +14,6 @@ let subscribedToLocale = false;
 // that are still valid.
 let lastRows = null;
 let lastSigned = new Map();
-const PLACEHOLDER_POSTER =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900'%3E%3Crect width='1440' height='900' fill='%23050605'/%3E%3Cpath d='M120 450h1200' stroke='%23c6ff00' stroke-opacity='.22'/%3E%3Ccircle cx='720' cy='450' r='120' fill='none' stroke='%23c6ff00' stroke-opacity='.18'/%3E%3C/svg%3E";
 
 const isStoragePath = (value) => Boolean(value) && !/^(https?:|data:|blob:|\/|\.{1,2}\/)/i.test(value);
 const text = (value) => (typeof value === "string" ? value.trim() : "");
@@ -87,7 +86,7 @@ function approvedPreviewUrl(row) {
 
 function projectFromRow(row, signed) {
   const key = keyFor(row);
-  const posterPath = text(row.poster_url);
+  const { poster, posterFallback } = resolvePoster(row, signed);
   const previewUrl = approvedPreviewUrl(row);
   const gallery = Array.isArray(row.project_gallery)
     ? [...row.project_gallery]
@@ -125,7 +124,8 @@ function projectFromRow(row, signed) {
       url: text(row.project_url),
       previewUrl,
       hasLivePreview: Boolean(previewUrl),
-      poster: isStoragePath(posterPath) ? signed.get(posterPath) || PLACEHOLDER_POSTER : posterPath || PLACEHOLDER_POSTER,
+      poster,
+      posterFallback,
       accent: text(row.accent) || "#c6ff00",
       system: localized(row, "presentation_system"),
       label: localized(row, "presentation_label"),

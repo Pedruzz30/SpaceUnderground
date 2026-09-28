@@ -80,6 +80,7 @@ export default {
       loading: "PRÉVIA / INICIALIZANDO",
       live: "● PRÉVIA AO VIVO",
       sleeping: "PRÉVIA / EM ESPERA",
+      still: "PRÉVIA / IMAGEM",
       fallback: "PRÉVIA / ALTERNATIVA",
       unavailable: "PRÉVIA / INDISPONÍVEL",
     },
@@ -141,6 +142,7 @@ export default {
     labelPending: "AGUARDANDO",
     yearPending: "ANO — --",
     namePending: "Projetos Selecionados",
+    posterPending: "Prévia em preparação",
   },
   jarvis: {
     productAria: "JARVIS — laboratório experimental de IA da Space Underground",

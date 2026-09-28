@@ -90,6 +90,31 @@ const fixture = [
     project_gallery: [],
     project_modules: [],
   },
+  {
+    case_number: 4,
+    name: "Projeto Sem Capa",
+    slug: "projeto-sem-capa",
+    client: "Estúdio Novo",
+    category: "Website",
+    description: "Projeto ainda sem imagem de capa.",
+    status: "Live",
+    year: 2026,
+    accent: "#ff7a45",
+    tech_stack: ["HTML"],
+    presentation_system: "SISTEMA DE EXPERIÊNCIA / 04",
+    presentation_label: "SITE",
+    presentation_address: "ESTÚDIO NOVO / PRODUÇÃO",
+    presentation_type: "SITE INSTITUCIONAL",
+    origin: "RJ / BR",
+    coordinates: ["22°54'S", "43°12'W"],
+    poster_url: "",
+    project_url: "https://example.com/novo",
+    preview_url: null,
+    live_preview_enabled: false,
+    translations: { en: { description: "Project with no cover image yet.", presentation_type: "COMPANY WEBSITE" } },
+    project_gallery: [],
+    project_modules: [],
+  },
 ];
 
 async function openFixturePage({ width = 1440, height = 1000, locale = "pt-BR" } = {}) {
@@ -215,6 +240,84 @@ try {
     check((await page.textContent("[data-viewer-name]"))?.trim() === "INK Tattoo", "i18n keeps the same project");
     check(await page.evaluate(() => document.querySelector("[data-project-viewer]")?.classList.contains("is-view-site")), "i18n keeps SITE mode");
     check((await page.getAttribute("[data-project-viewer] iframe", "src")) === srcBefore, "i18n keeps the iframe src", String(srcBefore));
+    await context.close();
+  }
+  // Quality: the embed is laid out at one desktop size, the frame settles flat
+  // on screen, and every project shows an image or its placeholder.
+  for (const width of [1024, 1440]) {
+    const { context, page } = await openFixturePage({ width, height: 900 });
+    await page.locator("#work").scrollIntoViewIfNeeded();
+    await page.locator("[data-project-viewer]").scrollIntoViewIfNeeded();
+    await page.waitForFunction((url) => document.querySelector("[data-project-viewer] iframe")?.getAttribute("src") === url, INK_PREVIEW);
+    await page.waitForTimeout(1100);
+    const geometry = await page.evaluate(() => {
+      const frame = document.querySelector("[data-project-viewer]");
+      const viewport = frame.querySelector(".signal-ui__website-viewport");
+      const iframe = frame.querySelector("iframe");
+      const surface = frame.querySelector(".signal-ui__website-surface");
+      return {
+        width: iframe.offsetWidth,
+        height: iframe.offsetHeight,
+        scale: Number(getComputedStyle(surface).getPropertyValue("--website-scale")),
+        viewportWidth: viewport.clientWidth,
+        settled: frame.classList.contains("is-settled"),
+        transform: getComputedStyle(frame).transform,
+      };
+    });
+    check(geometry.width === 1464 && geometry.height === 900, `${width}px: the embed is laid out at 1440x900 plus a clipped scrollbar`, `${geometry.width}x${geometry.height}`);
+    check(Math.abs(geometry.scale - geometry.viewportWidth / 1440) < 0.002, `${width}px: the scale fits the desktop layout to the frame`, String(geometry.scale));
+    check(geometry.settled && geometry.transform === "none", `${width}px: the frame lies flat once on screen`, geometry.transform);
+
+    await page.click('[data-project-viewer] [data-signal-mode="detail"]');
+    await page.waitForTimeout(700);
+    const detail = await page.evaluate(() => {
+      const frame = document.querySelector("[data-project-viewer]");
+      return {
+        width: frame.querySelector("iframe").offsetWidth,
+        scale: Number(getComputedStyle(frame.querySelector(".signal-ui__website-surface")).getPropertyValue("--website-scale")),
+      };
+    });
+    check(detail.width === 1464, `${width}px: a mode change never re-lays out the embed`, String(detail.width));
+    check(detail.scale > geometry.scale, `${width}px: detail mode zooms in by scale alone`, `${geometry.scale} -> ${detail.scale}`);
+    await context.close();
+  }
+
+  {
+    const { context, page } = await openFixturePage();
+    await page.locator("#work").scrollIntoViewIfNeeded();
+    await page.waitForFunction(() => document.querySelector(".signal-ui__poster")?.getAttribute("src")?.includes("tattoo-preview-poster"));
+    check(true, "a project with no uploaded poster shows the artwork shipped with the site");
+    await page.click('[data-project-slot="case-003"]');
+    await page.waitForFunction(() => document.querySelector(".signal-ui__poster")?.getAttribute("src") === "./jarvis-preview-poster-pt.svg");
+    check(true, "JARVIS AI gets its own shipped poster");
+    await page.click('[data-project-slot="case-004"]');
+    await page.waitForFunction(() => document.querySelector("[data-project-viewer]")?.classList.contains("is-poster-missing"));
+    const placeholder = await page.evaluate(() => {
+      const node = document.querySelector(".signal-ui__placeholder");
+      return {
+        visible: getComputedStyle(node).display !== "none",
+        name: node.querySelector("[data-placeholder-name]").textContent.trim(),
+        caseLabel: node.querySelector("[data-placeholder-case]").textContent.trim(),
+        poster: document.querySelector(".signal-ui__poster").getAttribute("src"),
+      };
+    });
+    check(placeholder.visible && placeholder.name === "Projeto Sem Capa" && placeholder.caseLabel === "CASE / 004", "a project with no image at all shows its placeholder, not a black frame", JSON.stringify(placeholder));
+    check(placeholder.poster === null, "the previous project's poster does not linger", String(placeholder.poster));
+    await page.click('[data-project-slot="case-001"]');
+    await page.waitForFunction(() => !document.querySelector("[data-project-viewer]")?.classList.contains("is-poster-missing"));
+    check(true, "switching back to a project with a poster hides the placeholder");
+    await context.close();
+  }
+
+  {
+    const { context, page } = await openFixturePage({ width: 390, height: 900 });
+    await page.locator("#work").scrollIntoViewIfNeeded();
+    await page.waitForTimeout(600);
+    const phone = await page.evaluate(() => {
+      const frame = document.querySelector("[data-project-viewer]");
+      return { state: frame.dataset.previewState, status: frame.querySelector("[data-preview-status]").textContent.trim() };
+    });
+    check(phone.state === "still" && phone.status === "PRÉVIA / IMAGEM", "on a phone the status says it is a still image, not standby", JSON.stringify(phone));
     await context.close();
   }
 } finally {
