@@ -217,6 +217,46 @@ try {
     check((await page.getAttribute("[data-project-viewer] iframe", "src")) === srcBefore, "i18n keeps the iframe src", String(srcBefore));
     await context.close();
   }
+  // Quality: the embed is laid out at one desktop size, the frame settles flat
+  // on screen, and every project shows an image or its placeholder.
+  for (const width of [1024, 1440]) {
+    const { context, page } = await openFixturePage({ width, height: 900 });
+    await page.locator("#work").scrollIntoViewIfNeeded();
+    await page.locator("[data-project-viewer]").scrollIntoViewIfNeeded();
+    await page.waitForFunction((url) => document.querySelector("[data-project-viewer] iframe")?.getAttribute("src") === url, INK_PREVIEW);
+    await page.waitForTimeout(1100);
+    const geometry = await page.evaluate(() => {
+      const frame = document.querySelector("[data-project-viewer]");
+      const viewport = frame.querySelector(".signal-ui__website-viewport");
+      const iframe = frame.querySelector("iframe");
+      const surface = frame.querySelector(".signal-ui__website-surface");
+      return {
+        width: iframe.offsetWidth,
+        height: iframe.offsetHeight,
+        scale: Number(getComputedStyle(surface).getPropertyValue("--website-scale")),
+        viewportWidth: viewport.clientWidth,
+        settled: frame.classList.contains("is-settled"),
+        transform: getComputedStyle(frame).transform,
+      };
+    });
+    check(geometry.width === 1464 && geometry.height === 900, `${width}px: the embed is laid out at 1440x900 plus a clipped scrollbar`, `${geometry.width}x${geometry.height}`);
+    check(Math.abs(geometry.scale - geometry.viewportWidth / 1440) < 0.002, `${width}px: the scale fits the desktop layout to the frame`, String(geometry.scale));
+    check(geometry.settled && geometry.transform === "none", `${width}px: the frame lies flat once on screen`, geometry.transform);
+
+    await page.click('[data-project-viewer] [data-signal-mode="detail"]');
+    await page.waitForTimeout(700);
+    const detail = await page.evaluate(() => {
+      const frame = document.querySelector("[data-project-viewer]");
+      return {
+        width: frame.querySelector("iframe").offsetWidth,
+        scale: Number(getComputedStyle(frame.querySelector(".signal-ui__website-surface")).getPropertyValue("--website-scale")),
+      };
+    });
+    check(detail.width === 1464, `${width}px: a mode change never re-lays out the embed`, String(detail.width));
+    check(detail.scale > geometry.scale, `${width}px: detail mode zooms in by scale alone`, `${geometry.scale} -> ${detail.scale}`);
+    await context.close();
+  }
+
 } finally {
   await browser.close();
 }

@@ -1,5 +1,6 @@
 import { projects, defaultProjectKey } from "./project-registry.js";
 import { subscribeLocaleChange, t } from "./i18n/index.js";
+import { previewScale, RENDER_HEIGHT, RENDER_WIDTH, SCROLLBAR_ALLOWANCE } from "./preview-geometry.js";
 
 const LIVE_PREVIEW_SELECTOR = "[data-live-project]";
 const MOBILE_QUERY = "(max-width: 759px)";
@@ -7,6 +8,10 @@ const FINE_POINTER_QUERY = "(hover: hover) and (pointer: fine)";
 const SLEEP_DELAY = 10000;
 const LOAD_TIMEOUT = 8000;
 const PRELOAD_MARGIN = "800px 0px";
+// How much of the frame must be on screen before it settles flat. Tilted, the
+// browser resamples the whole frame, live site included, and every line and
+// letter goes soft; flat, it renders at full resolution.
+const SETTLE_RATIO = 0.35;
 const STATE_CLASS_NAMES = ["is-preview-loading", "is-preview-live", "is-preview-sleeping", "is-preview-fallback", "is-preview-unavailable"];
 const VIEW_CLASS_NAMES = ["is-view-site", "is-view-detail", "is-view-origin"];
 
@@ -123,6 +128,8 @@ function createLivePreview(frame, mobileMedia) {
   const visual = frame.closest(".project__visual");
   const hoverMark = visual?.querySelector(".project__hover-mark");
   const iframe = frame.querySelector("iframe");
+  const viewport = frame.querySelector(".signal-ui__website-viewport");
+  const surface = frame.querySelector(".signal-ui__website-surface");
   const poster = frame.querySelector(".signal-ui__poster");
   const posterSources = new Map(
     [...frame.querySelectorAll("[data-poster-source]")].map((node) => [node.dataset.posterSource, node]),
@@ -176,6 +183,21 @@ function createLivePreview(frame, mobileMedia) {
     if (activePreview === frame) activePreview = null;
     setPreviewState(frame, hasLivePreview ? "sleeping" : "unavailable");
   };
+
+  // The embed is laid out once, at the desktop size, plus room for a
+  // scrollbar that the frame clips. Only its scale follows the frame and the
+  // mode, so resizing or switching modes never re-lays out the client's site.
+  const updateScale = () => {
+    if (!viewport || !surface) return;
+    const scale = previewScale({ width: viewport.clientWidth, height: viewport.clientHeight }, currentMode);
+    if (scale) surface.style.setProperty("--website-scale", scale.toFixed(4));
+  };
+
+  if (surface) {
+    surface.style.setProperty("--render-width", `${RENDER_WIDTH + SCROLLBAR_ALLOWANCE}px`);
+    surface.style.setProperty("--render-height", `${RENDER_HEIGHT}px`);
+  }
+  if (viewport && typeof ResizeObserver === "function") new ResizeObserver(updateScale).observe(viewport);
 
   const updateLiveControls = () => {
     const unavailableLabel = t("work.liveDemoUnavailable");
@@ -303,6 +325,7 @@ function createLivePreview(frame, mobileMedia) {
       event.stopPropagation();
       const nextMode = setMode(frame, button.dataset.signalMode || "overview", modeButtons);
       currentMode = nextMode;
+      updateScale();
       calibrate();
 
       if (nextMode === "site" && !mobileMedia.matches) load();
@@ -355,6 +378,15 @@ function createLivePreview(frame, mobileMedia) {
     });
   }, { rootMargin: PRELOAD_MARGIN });
 
+  // Tilted while it arrives, flat while it is being looked at; it tilts again
+  // only once it has left the screen completely.
+  const settleObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.intersectionRatio >= SETTLE_RATIO) frame.classList.add("is-settled");
+      else if (!entry.isIntersecting) frame.classList.remove("is-settled");
+    });
+  }, { threshold: [0, SETTLE_RATIO] });
+
   mobileMedia.addEventListener("change", (event) => {
     if (event.matches) unload();
   });
@@ -363,14 +395,17 @@ function createLivePreview(frame, mobileMedia) {
   applyPoster(posterUrl);
   updateLiveControls();
   setPreviewState(frame, hasLivePreview ? "sleeping" : "unavailable");
+  updateScale();
   preloadObserver.observe(frame);
   activeObserver.observe(frame);
+  settleObserver.observe(frame);
 
   return {
     setSource,
     calibrate,
     setMode: (mode) => {
       currentMode = setMode(frame, mode, modeButtons);
+      updateScale();
       return currentMode;
     },
     getMode: () => currentMode,
