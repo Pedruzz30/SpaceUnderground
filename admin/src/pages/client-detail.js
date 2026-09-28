@@ -492,18 +492,24 @@ function mount(page, state, { tab } = {}) {
     }
   }
 
+  // Keep whatever the user typed in the form: only the side panels reload.
+  async function refreshPanels() {
+    const fresh = await loadState(state.client.id);
+    if (!fresh || !form.isConnected) return;
+    Object.assign(state, { projects: fresh.projects, projectsOk: fresh.projectsOk, projectsError: fresh.projectsError, linkCandidates: fresh.linkCandidates, activity: fresh.activity });
+    paintPanels();
+  }
+
   async function changeLink(projectId, link) {
     try {
       if (link) await linkProjectToClient(state.client.id, projectId);
       else await unlinkProjectFromClient(state.client.id, projectId);
       showToast(link ? t("clientEditor.projectLinked") : t("clientEditor.projectUnlinked"));
-      // Keep whatever the user typed in the form: only the side panels reload.
-      const fresh = await loadState(state.client.id);
-      if (!fresh || !form.isConnected) return;
-      Object.assign(state, { projects: fresh.projects, projectsOk: fresh.projectsOk, projectsError: fresh.projectsError, linkCandidates: fresh.linkCandidates, activity: fresh.activity });
-      paintPanels();
+      await refreshPanels();
     } catch (error) {
       showToast(describeError(error, t("clientEditor.linkError")));
+      // Another tab changed the link first: show what is true now.
+      if (error?.code === "conflict") await refreshPanels().catch(() => {});
     }
   }
 

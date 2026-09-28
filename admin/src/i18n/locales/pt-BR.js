@@ -640,6 +640,8 @@ export default {
     projectLinked: "Projeto vinculado.",
     projectUnlinked: "Projeto desvinculado.",
     linkError: "Não foi possível atualizar o vínculo do projeto.",
+    projectAlreadyLinked: "Este projeto já pertence a um cliente. A lista foi atualizada com o vínculo atual.",
+    projectLinkChanged: "Este projeto não está mais vinculado a este cliente. A lista foi atualizada com o vínculo atual.",
     projectsLoadError: "Não foi possível carregar os projetos deste cliente.",
     noActivity: "Nenhuma atividade registrada para este cliente ainda.",
     clientCreated: "Cliente criado.",

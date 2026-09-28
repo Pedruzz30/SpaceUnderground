@@ -150,18 +150,14 @@ export async function getClientProjects(clientId) {
   }
 }
 
-async function setProjectClient(projectId, clientId) {
-  const repository = await getProjectRepository();
-  const updated = await repository.update(projectId, { clientId });
-  if (!updated) throw new DataError(t("errors.notFound"), { code: "not_found" });
-  return updated;
-}
-
 export async function linkProjectToClient(clientId, projectId) {
   try {
     const client = await getClient(clientId);
     if (!client) throw new DataError(t("errors.notFound"), { code: "not_found" });
-    const project = await setProjectClient(projectId, client.id);
+    // Conditional in the repository: refused if the project already has a
+    // client, even one assigned by another tab a moment ago.
+    const project = await (await getProjectRepository()).assignClient(projectId, client.id);
+    if (!project) throw new DataError(t("errors.notFound"), { code: "not_found" });
     await logActivity("Project linked to client", `CASE ${project.caseNumber} linked to ${label(client)}`, clientMeta("client.project_linked", client));
     return project;
   } catch (error) {
@@ -173,7 +169,9 @@ export async function unlinkProjectFromClient(clientId, projectId) {
   try {
     const client = await getClient(clientId);
     if (!client) throw new DataError(t("errors.notFound"), { code: "not_found" });
-    const project = await setProjectClient(projectId, null);
+    // Refused unless the project still belongs to this client.
+    const project = await (await getProjectRepository()).releaseClient(projectId, client.id);
+    if (!project) throw new DataError(t("errors.notFound"), { code: "not_found" });
     await logActivity("Project unlinked from client", `CASE ${project.caseNumber} unlinked from ${label(client)}`, clientMeta("client.project_unlinked", client));
     return project;
   } catch (error) {

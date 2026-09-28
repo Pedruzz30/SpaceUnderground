@@ -1,6 +1,7 @@
 import { seedProjects } from "../../data/projects.js";
 import { DataError } from "../errors.js";
 import { formatCaseNumber } from "../mappers/project-mapper.js";
+import { t } from "../../i18n/index.js";
 
 // localStorage-backed repository. Same persistence the admin has always used,
 // now behind the async repository contract so it can be swapped for Supabase.
@@ -77,6 +78,16 @@ function nextNumber(projects) {
   return formatCaseNumber(highest + 1);
 }
 
+function setClientIf(id, allowed, clientId, conflictKey) {
+  const projects = readAll();
+  const index = projects.findIndex((project) => project.id === id);
+  if (index < 0) return null;
+  if (!allowed(projects[index])) throw new DataError(t(conflictKey), { code: "conflict" });
+  projects[index] = { ...projects[index], clientId, updatedAt: nowIso() };
+  writeAll(projects);
+  return normalizeGallery(projects[index]);
+}
+
 export const mockProjectRepository = {
   async list() {
     return readAll().map(normalizeGallery);
@@ -86,6 +97,17 @@ export const mockProjectRepository = {
     return readAll()
       .filter((project) => clientId && project.clientId === clientId)
       .map(normalizeGallery);
+  },
+
+  // Same conditional contract as the Supabase repository: link only an
+  // unowned project, unlink only from the expected client. Read, check and
+  // write happen in one synchronous step, so no other call can interleave.
+  async assignClient(id, clientId) {
+    return setClientIf(id, (current) => !current.clientId, clientId, "clientEditor.projectAlreadyLinked");
+  },
+
+  async releaseClient(id, clientId) {
+    return setClientIf(id, (current) => current.clientId === clientId, null, "clientEditor.projectLinkChanged");
   },
 
   async getById(id) {

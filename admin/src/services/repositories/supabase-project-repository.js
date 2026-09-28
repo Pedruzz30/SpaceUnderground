@@ -1,5 +1,5 @@
 import { getSupabaseClient } from "../../lib/supabase.js";
-import { toDataError } from "../errors.js";
+import { DataError, toDataError } from "../errors.js";
 import { formatCaseNumber, mapProjectFromDatabase, mapProjectToDatabase, parseCaseNumber } from "../mappers/project-mapper.js";
 import { supabaseMediaRepository } from "./supabase-media-repository.js";
 import { t } from "../../i18n/index.js";
@@ -164,6 +164,45 @@ export const supabaseProjectRepository = {
       .eq("client_id", clientId)
       .order("case_number", { ascending: true });
     return unwrap(result, t("errors.data.loadProjects")).map(mapProjectFromDatabase);
+  },
+
+  // Links a project to a client only if it has none. The condition lives in
+  // the UPDATE itself (`client_id is null`), so two tabs racing for the same
+  // project cannot both win: the second one matches no row and is refused
+  // instead of silently moving the project.
+  async assignClient(id, clientId) {
+    const existing = await findRow(id, "id");
+    if (!existing) return null;
+    const rows = unwrap(
+      await getSupabaseClient()
+        .from(TABLE)
+        .update({ client_id: clientId })
+        .eq("id", existing.id)
+        .is("client_id", null)
+        .select("id"),
+      t("errors.data.linkProject"),
+    );
+    if (!rows.length) throw new DataError(t("clientEditor.projectAlreadyLinked"), { code: "conflict" });
+    return this.getById(existing.id);
+  },
+
+  // Unlinks only while the project still belongs to the client the caller
+  // expects (`client_id = clientId`), so a stale tab cannot clear a link that
+  // another context made afterwards.
+  async releaseClient(id, clientId) {
+    const existing = await findRow(id, "id");
+    if (!existing) return null;
+    const rows = unwrap(
+      await getSupabaseClient()
+        .from(TABLE)
+        .update({ client_id: null })
+        .eq("id", existing.id)
+        .eq("client_id", clientId)
+        .select("id"),
+      t("errors.data.linkProject"),
+    );
+    if (!rows.length) throw new DataError(t("clientEditor.projectLinkChanged"), { code: "conflict" });
+    return this.getById(existing.id);
   },
 
   async getById(id) {

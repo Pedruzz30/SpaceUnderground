@@ -61,17 +61,20 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
 
       | Version | Name | State |
       | --- | --- | --- |
+      | `20260909062014` .. `20260910225035` | `001` .. `007` | APPLIED (history repair) |
       | `20260912202425` | `editorial_i18n` | APPLIED |
       | `20260913031225` | `project_live_preview` | APPLIED |
       | `20260913211045` | `automation_runs` | APPLIED |
       | `20260914025524` | `011_business_workflows` | APPLIED |
-      | `20260927225426` | `normalize_plan_status` | NOT APPLIED |
+      | `20260927225426` | `normalize_plan_status` | APPLIED |
       | `20260927225753` | `clients_foundation` | NOT APPLIED |
 
-      The four recorded versions must never be renamed or repaired.
-- [ ] Repair the history for the schema production has but the CLI never
-      recorded, before the first `supabase db push`. These seven versions have
-      to be marked `applied` (their schema is already there); nothing else:
+      Recorded versions must never be renamed or repaired. After the normalize,
+      production plans read `Max` = `ON_REQUEST`, `Plus` = `AVAILABLE`,
+      `Pro` = `AVAILABLE`.
+- [x] History repair for the schema production had but the CLI never
+      recorded (done; kept here for the record). These seven versions were
+      marked `applied`, their SQL was not re-run, and nothing else was repaired:
 
       20260909062014  001_admin_foundation
       20260910011630  002_project_media_storage
@@ -83,8 +86,8 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
 
       They are reconciliation identifiers derived from the commit that first
       added each file (`003`..`007` share one commit and take consecutive
-      seconds), not deploy times. Skipping this makes `db push` try to re-run
-      the foundation migrations.
+      seconds), not deploy times. Without the repair, `db push` would have tried
+      to re-run the foundation migrations.
 - [ ] `20260927225753_clients_foundation.sql` raises an error unless
       `20260914025524_011_business_workflows` (which creates `public.clients`)
       is applied first. The Client Hub and the Dashboard's client figures read

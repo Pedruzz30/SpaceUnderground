@@ -71,6 +71,17 @@ end $$;
 
 -- SECURITY DEFINER so the uniqueness probe sees every row regardless of the
 -- caller's policies, and so callers need no direct grant on the sequence.
+--
+-- EXECUTE stays granted to authenticated because an admin's insert evaluates
+-- the column default as authenticated. Public sign-up is open, though, so any
+-- signed-in visitor would otherwise reach this through /rpc and burn numbers.
+-- The caller is therefore checked here, before nextval(): a sequence is not
+-- transactional, so a number drawn before an error would stay consumed.
+--
+-- Allowed: an admin (is_admin()), the service role, or no request JWT at all
+-- (migrations and SQL run directly against the database). PostgREST always
+-- sets request.jwt.claims, even to '{}' for an anonymous request, so an API
+-- call can never pass as "no JWT context".
 create or replace function public.next_client_code()
 returns text
 language plpgsql
@@ -81,7 +92,19 @@ as $$
 declare
   n bigint;
   candidate text;
+  raw_claims text := nullif(current_setting('request.jwt.claims', true), '');
+  legacy_role text := nullif(current_setting('request.jwt.claim.role', true), '');
+  legacy_sub text := nullif(current_setting('request.jwt.claim.sub', true), '');
+  jwt_role text;
 begin
+  if raw_claims is not null or legacy_role is not null or legacy_sub is not null then
+    jwt_role := coalesce(raw_claims::jsonb ->> 'role', legacy_role);
+    if jwt_role is distinct from 'service_role' and not public.is_admin() then
+      raise exception 'not authorized to generate client codes'
+        using errcode = '42501';
+    end if;
+  end if;
+
   loop
     n := nextval('public.clients_code_seq');
     -- lpad truncates longer input, so the width grows past 999 instead.

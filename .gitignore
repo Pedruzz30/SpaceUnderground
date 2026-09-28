@@ -8,3 +8,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Supabase CLI local state (linked project, cached versions)
+supabase/.temp/

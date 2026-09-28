@@ -22,15 +22,15 @@ so older notes and commits stay easy to follow.
 
 | Version | Migration | State |
 | --- | --- | --- |
-| `20260909062014` .. `20260910225035` | `001` .. `007` (admin foundation to activity log) | Schema present in production, **not recorded** in the CLI history |
+| `20260909062014` .. `20260910225035` | `001` .. `007` (admin foundation to activity log) | APPLIED (recorded by history repair) |
 | `20260912202425` | `editorial_i18n` | APPLIED (recorded) |
 | `20260913031225` | `project_live_preview` | APPLIED (recorded) |
 | `20260913211045` | `automation_runs` | APPLIED (recorded) |
 | `20260914025524` | `011_business_workflows` | APPLIED (recorded) |
-| `20260927225426` | `normalize_plan_status` | **NOT APPLIED** |
+| `20260927225426` | `normalize_plan_status` | APPLIED (recorded) |
 | `20260927225753` | `clients_foundation` | **NOT APPLIED** |
 
-The four recorded versions and names match
+Every recorded version and name matches
 `select version, name from supabase_migrations.schema_migrations` exactly and
 must never be renamed. `011_business_workflows` keeps its old ordinal in the
 name because that is the name production recorded.
@@ -39,8 +39,8 @@ The versions of `001`..`007` are reconciliation identifiers, not deploy
 times: each is the UTC time of the commit that first added the file.
 `003`..`007` were added in the same commit (`3ee8c2f`, 2026-09-10 22:50:31
 UTC), so they take consecutive seconds from `225031` to keep their order.
-Before any `supabase db push`, the CLI history must be repaired to mark these
-seven versions as applied; they are listed in `docs/release-checklist.md`.
+Their schema already existed in production, so the CLI history was repaired to
+mark these seven versions as applied (their SQL was not re-run).
 
 ### What each migration creates
 
@@ -93,7 +93,8 @@ unchanged and idempotent.
 `migrations/20260927225426_normalize_plan_status.sql` is a data-only normalization of
 `plans.status` to the canonical values (`AVAILABLE`, `ON_REQUEST`, ...). It is
 applied only after the compatible code is deployed and smoke tested (see
-`docs/release-checklist.md`). Not applied yet.
+`docs/release-checklist.md`). Applied: production plans read `Max` =
+`ON_REQUEST`, `Plus` = `AVAILABLE`, `Pro` = `AVAILABLE`.
 
 `migrations/20260927225753_clients_foundation.sql` (Clients V2) builds on the
 `clients` table from `20260914025524_011_business_workflows` and refuses to run
@@ -107,11 +108,18 @@ without it. **Not applied to production yet.**
   `count(*)`. Existing rows without a code are backfilled in creation order;
 - `next_client_code()` is revoked from `anon`, and `clients_code_seq` from every
   API role: Supabase's default privileges would otherwise let visitors burn
-  numbers through `/rpc`. The function is `security definer`, so admins still
-  get a code on insert;
+  numbers through `/rpc`. `authenticated` keeps `EXECUTE` because an admin's
+  insert evaluates the column default, but the function itself only serves an
+  admin (`is_admin()`), the service role, or SQL with no request JWT
+  (migrations, SQL editor). Public sign-up is open, so any other signed-in
+  user is refused with `42501` before `nextval()`, and a refused call never
+  consumes a number;
 - `projects.client_id`, an optional foreign key (`on delete set null`). Existing
   projects keep working without a client, and `projects.client` (the public
-  label) is untouched. The public site does not select `client_id`.
+  label) is untouched. The public site does not select `client_id`. The Admin
+  links with a conditional `UPDATE ... where client_id is null` and unlinks
+  with `where client_id = <expected client>`, so a stale tab is refused instead
+  of moving or clearing a link someone else made.
 
 Plus:
 

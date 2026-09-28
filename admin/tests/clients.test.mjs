@@ -385,6 +385,51 @@ describe("client service (mock repository)", () => {
   });
 });
 
+// Two tabs looking at the same project: each opened the page while the link
+// was in one state, and another context changed it before they acted.
+describe("project links under stale state (mock repository)", () => {
+  beforeEach(reset);
+
+  const conflict = (error) => error.code === "conflict";
+
+  it("links an unassigned project", async () => {
+    await unlinkProjectFromClient("mock-client-002", "002");
+    await linkProjectToClient("mock-client-003", "002");
+    assert.equal((await getProjectById("002")).clientId, "mock-client-003");
+  });
+
+  it("rejects linking a project that already has a client", async () => {
+    await assert.rejects(() => linkProjectToClient("mock-client-003", "001"), conflict);
+    assert.equal((await getProjectById("001")).clientId, "mock-client-001", "the existing link is untouched");
+  });
+
+  it("does not let a stale link move a project between clients", async () => {
+    // Tab A saw 002 as free. Before it clicked, tab B freed and took it.
+    await unlinkProjectFromClient("mock-client-002", "002");
+    await linkProjectToClient("mock-client-004", "002");
+    await assert.rejects(() => linkProjectToClient("mock-client-003", "002"), conflict);
+    assert.equal((await getProjectById("002")).clientId, "mock-client-004");
+  });
+
+  it("unlinks from the client that owns the project", async () => {
+    await unlinkProjectFromClient("mock-client-001", "001");
+    assert.equal((await getProjectById("001")).clientId, null);
+  });
+
+  it("does not let a stale unlink clear another client's link", async () => {
+    // Tab A still shows 002 under client 002; meanwhile it moved to client 004.
+    await unlinkProjectFromClient("mock-client-002", "002");
+    await linkProjectToClient("mock-client-004", "002");
+    await assert.rejects(() => unlinkProjectFromClient("mock-client-002", "002"), conflict);
+    assert.equal((await getProjectById("002")).clientId, "mock-client-004");
+  });
+
+  it("logs nothing for a refused change", async () => {
+    await assert.rejects(() => linkProjectToClient("mock-client-003", "001"), conflict);
+    assert.deepEqual(await getClientActivity("mock-client-003"), []);
+  });
+});
+
 describe("mock client repository", () => {
   beforeEach(reset);
 

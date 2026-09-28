@@ -27,10 +27,13 @@ const RECORDED_IN_PRODUCTION = [
   "20260913031225_project_live_preview.sql",
   "20260913211045_automation_runs.sql",
   "20260914025524_011_business_workflows.sql",
+  "20260927225426_normalize_plan_status.sql",
 ];
 
-// Schema production has but the CLI history does not record. Their versions
-// come from the commit that first added each file.
+// Schema production already had before the CLI recorded anything. Their
+// versions come from the commit that first added each file, and the history
+// was repaired to mark them applied; they must stay before the first version
+// the CLI recorded on its own.
 const HISTORICAL = [
   "admin_foundation",
   "project_media_storage",
@@ -42,7 +45,7 @@ const HISTORICAL = [
 ];
 
 // Written after the recorded history and not applied anywhere yet.
-const PENDING = ["normalize_plan_status", "clients_foundation"];
+const PENDING = ["clients_foundation"];
 
 function toDate(stamp) {
   const [, y, mo, d, h, mi, s] = stamp.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
@@ -160,7 +163,7 @@ describe("clients foundation", () => {
     assert.ok(version(migrationFile("clients_foundation")) > version(migrationFile("business_workflows")));
   });
 
-  it("comes after the pending plan status normalization", () => {
+  it("comes after the plan status normalization", () => {
     assert.ok(version(migrationFile("clients_foundation")) > version(migrationFile("normalize_plan_status")));
   });
 });

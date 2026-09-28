@@ -640,6 +640,8 @@ export default {
     projectLinked: "Project linked.",
     projectUnlinked: "Project unlinked.",
     linkError: "Unable to update the project link.",
+    projectAlreadyLinked: "This project already belongs to a client. The list was refreshed with its current link.",
+    projectLinkChanged: "This project is no longer linked to this client. The list was refreshed with its current link.",
     projectsLoadError: "Unable to load this client's projects.",
     noActivity: "No activity recorded for this client yet.",
     clientCreated: "Client created.",

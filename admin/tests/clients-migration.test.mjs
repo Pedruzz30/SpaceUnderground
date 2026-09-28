@@ -30,14 +30,25 @@ const { CLIENT_COLUMNS } = await import("../src/services/mappers/client-mapper.j
 let db;
 let caseNumber = 100;
 
+// Runs a callback the way PostgREST runs a request: as the given role, with
+// request.jwt.claims set ({"role": ..., "sub": ...}). The claims are cleared
+// afterwards, so SQL outside asRole runs with no JWT context at all, like a
+// migration or the SQL editor.
 async function asRole(role, uid, fn) {
+  const claims = JSON.stringify(uid ? { role, sub: uid } : { role });
+  await db.query("select set_config('request.jwt.claims', $1, false)", [claims]);
   await db.exec(`set role ${role};`);
-  await db.query("select set_config('request.jwt.claim.sub', $1, false)", [uid ?? ""]);
   try {
     return await fn();
   } finally {
     await db.exec("reset role;");
+    await db.query("select set_config('request.jwt.claims', '', false)");
   }
+}
+
+async function sequenceValue() {
+  const { rows } = await db.query("select last_value from public.clients_code_seq");
+  return Number(rows[0].last_value);
 }
 
 async function failure(sql, params = []) {
@@ -85,8 +96,12 @@ before(async () => {
     grant usage on schema public to anon, authenticated, service_role;
     create schema if not exists auth;
     create table auth.users (id uuid primary key, email text);
+    -- Supabase's own definition: the legacy claim first, then the claims JSON.
     create or replace function auth.uid() returns uuid language sql stable as $$
-      select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
+      select coalesce(
+        nullif(current_setting('request.jwt.claim.sub', true), ''),
+        (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')
+      )::uuid;
     $$;
     -- Supabase grants every new table, sequence and function in public to the
     -- API roles by default. Without this the test would pass on grants that
@@ -345,6 +360,68 @@ describe("clients row level security", () => {
     for (const role of ["anon", "authenticated"]) {
       const error = await asRole(role, null, () => failure("select nextval('public.clients_code_seq')"));
       assert.equal(error?.code, "42501", role);
+    }
+  });
+
+  it("does not let authenticated users read or advance the sequence directly", async () => {
+    for (const sql of [
+      "select last_value from public.clients_code_seq",
+      "select nextval('public.clients_code_seq')",
+      "select setval('public.clients_code_seq', 1)",
+    ]) {
+      const error = await asRole("authenticated", ADMIN_ID, () => failure(sql));
+      assert.equal(error?.code, "42501", sql);
+    }
+  });
+});
+
+describe("client code generator authorization", () => {
+  it("rejects anonymous visitors", async () => {
+    const before = await sequenceValue();
+    const error = await asRole("anon", null, () => failure("select public.next_client_code()"));
+    assert.equal(error?.code, "42501");
+    assert.equal(await sequenceValue(), before);
+  });
+
+  it("rejects a signed-in user who is not an admin before drawing a number", async () => {
+    const before = await sequenceValue();
+    const error = await asRole("authenticated", USER_ID, () => failure("select public.next_client_code()"));
+    assert.equal(error?.code, "42501");
+    assert.match(error.message, /not authorized to generate client codes/);
+    assert.equal(await sequenceValue(), before, "a denied call must not consume a number");
+  });
+
+  it("does not burn a number when a non-admin insert is refused", async () => {
+    const before = await sequenceValue();
+    const error = await asRole("authenticated", USER_ID, () => failure("insert into public.clients (name) values ('Sneaky')"));
+    assert.equal(error?.code, "42501");
+    assert.equal(await sequenceValue(), before);
+  });
+
+  it("serves an admin", async () => {
+    const { rows } = await asRole("authenticated", ADMIN_ID, () => db.query("select public.next_client_code() as code"));
+    assert.match(rows[0].code, /^CLIENT-\d{3,}$/);
+  });
+
+  it("serves the service role", async () => {
+    const { rows } = await asRole("service_role", null, () => db.query("select public.next_client_code() as code"));
+    assert.match(rows[0].code, /^CLIENT-\d{3,}$/);
+  });
+
+  it("serves direct SQL with no JWT context (migrations, SQL editor)", async () => {
+    const { rows } = await db.query("select public.next_client_code() as code");
+    assert.match(rows[0].code, /^CLIENT-\d{3,}$/);
+    const client = await insertClient({ name: "Direct SQL" });
+    assert.match(client.code, /^CLIENT-\d{3,}$/);
+  });
+
+  it("treats an empty claims object as an API request, not as direct SQL", async () => {
+    await db.query("select set_config('request.jwt.claims', '{}', false)");
+    try {
+      const error = await failure("select public.next_client_code()");
+      assert.equal(error?.code, "42501");
+    } finally {
+      await db.query("select set_config('request.jwt.claims', '', false)");
     }
   });
 

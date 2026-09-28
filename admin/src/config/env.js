@@ -1,7 +1,15 @@
 // Central place for build-time configuration. Nothing secret lives here:
 // only the public anon key and the data source selector are ever exposed.
 
-const env = import.meta.env ?? {};
+// Vite replaces `import.meta.env` at build time; under node, where the unit
+// tests run, it is undefined. The fallback is the seam those tests use to
+// exercise configurations the bundle would otherwise freeze at build time. In
+// a browser bundle `import.meta.env` always wins, so it is never consulted.
+function readEnv() {
+  return import.meta.env ?? globalThis.__SPACE_ADMIN_ENV__ ?? {};
+}
+
+const env = readEnv();
 
 const VALID_DATA_SOURCES = new Set(["mock", "supabase"]);
 const RAW_DATA_SOURCE = String(env.VITE_ADMIN_DATA_SOURCE ?? "").trim().toLowerCase();
