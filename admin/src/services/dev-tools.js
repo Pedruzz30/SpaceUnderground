@@ -1,6 +1,7 @@
 import { DATA_SOURCE } from "../config/env.js";
 import { resetMockActivity } from "./repositories/mock-activity-repository.js";
 import { resetMockClients } from "./repositories/mock-client-repository.js";
+import { resetMockFinancial } from "./repositories/mock-financial-repository.js";
 import { resetMockPlans } from "./repositories/mock-plan-repository.js";
 import { resetMockProjects } from "./repositories/mock-project-repository.js";
 
@@ -10,6 +11,7 @@ export function resetMockData() {
   resetMockProjects();
   resetMockPlans();
   resetMockClients();
+  resetMockFinancial();
   resetMockActivity();
 }
 

@@ -772,6 +772,90 @@ try {
   assert.ok(await page.locator("[data-client-row]", { hasText: "Orbital Foods" }).count(), "restored client returns as inactive");
   assert.equal(await clientRows().count(), 2, "nothing was deleted along the way");
 
+  /* ---------------------------------------------- financial v2 foundation */
+
+  await page.evaluate(() => window.__resetSpaceAdminMocks());
+  // A small ledger with a known shape: one late receivable, one paid income,
+  // one pending bill.
+  const isoDay = (offset) => {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  };
+  const FIN_FIXTURE = [
+    { id: "fin-late", type: "INCOME", status: "PENDING", description: "Late invoice", category: "PROJECT", amount: 1000, currency: "BRL", dueDate: isoDay(-5), paidAt: null, clientId: "mock-client-002", projectId: null, notes: "", createdAt: null, updatedAt: null },
+    { id: "fin-paid", type: "INCOME", status: "PAID", description: "Paid invoice", category: "PROJECT", amount: 2500, currency: "BRL", dueDate: isoDay(0), paidAt: isoDay(0), clientId: null, projectId: null, notes: "", createdAt: null, updatedAt: null },
+    { id: "fin-bill", type: "EXPENSE", status: "PENDING", description: "Hosting bill", category: "INFRASTRUCTURE", amount: 90, currency: "BRL", dueDate: isoDay(3), paidAt: null, clientId: null, projectId: null, notes: "", createdAt: null, updatedAt: null },
+  ];
+  await page.evaluate((fixture) => localStorage.setItem("space-admin:financial:v1", JSON.stringify(fixture)), FIN_FIXTURE);
+  await page.goto(`${BASE_URL}/#/financial`);
+  await page.waitForSelector("[data-fin-list]:not([aria-busy]) [data-transaction-id]");
+
+  const finRows = () => page.locator("[data-fin-list] [data-transaction-id]");
+  // Intl puts a no-break space after "R$"; the assertions compare plain text.
+  const finMetric = async (index) =>
+    (await page.locator("[data-fin-metrics] .project-metric strong").nth(index).innerText()).replace(/ /g, " ");
+  await page.selectOption("[data-fin-period]", "all");
+  await settle();
+  assert.equal(await finRows().count(), 3, "seeded ledger entries");
+  assert.equal(await finMetric(3), "R$ 1.000", "to receive is the pending income only");
+  assert.equal(await finMetric(4), "R$ 90", "to pay is the pending bill");
+
+  await page.click('[data-fin-view="overdue"]');
+  await settle();
+  assert.equal(await finRows().count(), 1, "overdue view keeps the late receivable");
+  assert.ok(await page.locator('[data-transaction-id="fin-late"]').count(), "the late invoice is overdue");
+  await page.click('[data-fin-view="all"]');
+
+  // The form refuses an empty entry and stays open.
+  await page.click("[data-fin-new]");
+  await page.waitForSelector("[data-fin-form]");
+  await page.click("[data-modal-confirm]");
+  await settle();
+  assert.ok(await page.locator("[data-fin-form]").count(), "an invalid entry keeps the form open");
+  assert.ok(await page.locator('[data-error-for="description"]:not([hidden])').count(), "missing description is flagged");
+  assert.ok(await page.locator('[data-error-for="amount"]:not([hidden])').count(), "missing amount is flagged");
+
+  // Three installments of a pt-BR amount.
+  await page.fill("[data-fin-form] [name=description]", "E2E retainer");
+  await page.fill("[data-fin-form] [name=amount]", "1.500,00");
+  await page.fill("[data-fin-form] [name=installments]", "3");
+  await page.click("[data-modal-confirm]");
+  await page.waitForFunction(() => !document.querySelector("[data-fin-form]"));
+  await page.waitForFunction(() => document.querySelectorAll("[data-fin-list] [data-transaction-id]").length === 6);
+  assert.equal(await page.locator("[data-fin-list] [data-transaction-id]", { hasText: "E2E retainer" }).count(), 3, "three installments created");
+  assert.equal(await finMetric(3), "R$ 2.500", "installments join what is to receive");
+
+  // Settling the late invoice moves it into revenue.
+  await page.locator('[data-transaction-id="fin-late"] [data-fin-action="pay"]').click();
+  await page.waitForFunction(() => !document.querySelector('[data-transaction-id="fin-late"] [data-fin-action="pay"]'));
+  assert.equal(await finMetric(0), "R$ 3.500", "revenue includes the settled invoice");
+  assert.equal(await finMetric(5), "R$ 0", "nothing is overdue any more");
+
+  // Cancelling keeps the entry but drops it from the totals.
+  await page.locator('[data-transaction-id="fin-bill"] [data-row-menu-toggle]').click();
+  await page.locator('[data-transaction-id="fin-bill"] [data-fin-action="cancel"]').click();
+  await page.waitForFunction(() => document.querySelector('[data-transaction-id="fin-bill"]')?.classList.contains("fin-entry--cancelled"));
+  assert.equal(await finMetric(4), "R$ 0", "a cancelled bill is not to pay");
+
+  // Deleting asks first and then removes it for good.
+  await page.locator('[data-transaction-id="fin-bill"] [data-row-menu-toggle]').click();
+  await page.locator('[data-transaction-id="fin-bill"] [data-fin-action="delete"]').click();
+  await page.click("[data-modal-confirm]");
+  await page.waitForFunction(() => !document.querySelector('[data-transaction-id="fin-bill"]'));
+
+  // The reports tab renders a chart with a table fallback.
+  await page.click("#financial-tab-reports");
+  await settle();
+  assert.equal(await page.locator(".fin-chart__bar--income").count(), 6, "six months of income columns");
+  assert.ok(await page.locator(".fin-table table").count(), "the chart has a table view");
+
+  // Every step reached the activity log under the financial domain.
+  const finLog = await page.evaluate(() => JSON.parse(localStorage.getItem("space-admin:activity:v1") || "[]").map((entry) => entry.action));
+  for (const action of ["financial.installments_created", "financial.paid", "financial.cancelled", "financial.deleted"]) {
+    assert.ok(finLog.includes(action), `${action} is logged`);
+  }
+
   assert.deepEqual(errors, [], "no console or page errors");
   console.log("admin flow: all checks passed");
 } finally {

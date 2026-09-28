@@ -3,6 +3,7 @@ import { mockActivityRepository } from "./mock-activity-repository.js";
 import { mockAuthRepository } from "./mock-auth-repository.js";
 import { mockClientRepository } from "./mock-client-repository.js";
 import { mockContentRepository } from "./mock-content-repository.js";
+import { mockFinancialRepository } from "./mock-financial-repository.js";
 import { mockMediaRepository } from "./mock-media-repository.js";
 import { mockPlanRepository } from "./mock-plan-repository.js";
 import { mockProjectRepository } from "./mock-project-repository.js";
@@ -26,6 +27,7 @@ export async function getRepositories() {
       { supabaseSettingsRepository },
       { supabaseActivityRepository },
       { supabaseClientRepository },
+      { supabaseFinancialRepository },
     ] = await Promise.all([
       import("./supabase-project-repository.js"),
       import("./supabase-auth-repository.js"),
@@ -35,6 +37,7 @@ export async function getRepositories() {
       import("./supabase-settings-repository.js"),
       import("./supabase-activity-repository.js"),
       import("./supabase-client-repository.js"),
+      import("./supabase-financial-repository.js"),
     ]);
 
     repositories = {
@@ -46,6 +49,7 @@ export async function getRepositories() {
       settings: supabaseSettingsRepository,
       activity: supabaseActivityRepository,
       clients: supabaseClientRepository,
+      financial: supabaseFinancialRepository,
     };
   } else {
     repositories = {
@@ -57,6 +61,7 @@ export async function getRepositories() {
       settings: mockSettingsRepository,
       activity: mockActivityRepository,
       clients: mockClientRepository,
+      financial: mockFinancialRepository,
     };
   }
 
@@ -93,4 +98,8 @@ export async function getSettingsRepository() {
 
 export async function getClientRepository() {
   return (await getRepositories()).clients;
+}
+
+export async function getFinancialRepository() {
+  return (await getRepositories()).financial;
 }

@@ -69,6 +69,7 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       | `20260927225426` | `normalize_plan_status` | APPLIED |
       | `20260927225753` | `clients_foundation` | APPLIED |
       | `20260928013040` | `clients_post_review_hardening` | NOT APPLIED |
+      | `20260928031922` | `financial_foundation` | NOT APPLIED |
 
       Recorded versions must never be renamed or repaired. After the normalize,
       production plans read `Max` = `ON_REQUEST`, `Plus` = `AVAILABLE`,
@@ -95,7 +96,14 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       deploying the Admin that reads `clients.last_contact_at`: until it is in,
       the Client Hub shows "database is missing an update" and the Dashboard
       reads "—" for the client KPIs. The public site does not depend on it.
-- [ ] Right after applying it, as `anon` with the publishable key:
+- [ ] Apply `20260928031922_financial_foundation.sql` **before** deploying the
+      Admin that reads `public.financial_transactions`: until it is in, the
+      Financial page shows "database is missing an update" and the Dashboard's
+      financial panel reads as unavailable. It needs the clients migrations
+      first. The public site does not depend on it.
+- [ ] Right after applying it, as `anon` with the publishable key,
+      `financial_transactions?select=id&limit=1` is refused (`401`/`42501`).
+- [ ] Right after applying the clients hardening, as `anon` with the publishable key:
       the public project query above still returns `200`, and
       `projects?select=client_id&limit=1` is refused (`401`/`42501`). A new
       column the public site selects needs its own `grant select (...) on

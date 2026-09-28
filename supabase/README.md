@@ -30,6 +30,7 @@ so older notes and commits stay easy to follow.
 | `20260927225426` | `normalize_plan_status` | APPLIED (recorded) |
 | `20260927225753` | `clients_foundation` | APPLIED (recorded) |
 | `20260928013040` | `clients_post_review_hardening` | **NOT APPLIED** |
+| `20260928031922` | `financial_foundation` | **NOT APPLIED** |
 
 Every recorded version and name matches
 `select version, name from supabase_migrations.schema_migrations` exactly and
@@ -137,6 +138,23 @@ production yet.**
 - Adds `clients.last_contact_at timestamptz`, null until someone records a real
   contact in the Admin. No trigger maintains it: editing a record is not
   talking to the client. The Dashboard's quiet-relationship follow-up reads it.
+
+`migrations/20260928031922_financial_foundation.sql` creates the Financial V2
+ledger. **This migration is not applied to production yet.**
+
+- `financial_transactions`: one row per amount the studio expects to receive or
+  pay. `type` is `INCOME` or `EXPENSE` (there is no receivable type: "to
+  receive" is pending income), `status` is `PENDING`, `PAID` or `CANCELLED`,
+  and `amount numeric(12,2)` is always positive, the sign coming from `type`.
+  Only `PAID` counts toward revenue and expenses.
+- `due_date` is when the money is expected; `paid_at` is owned by the database
+  (`stamp_financial_paid_at()`): stamped when an entry becomes `PAID` (today
+  unless the Admin sends the real date), kept on later edits, cleared when it
+  leaves `PAID`. A check constraint makes a paid row without a date impossible.
+- Optional `client_id` and `project_id`, both `on delete set null`: removing a
+  client or a project keeps the ledger entry.
+- Admin-only: `anon` has no grant, and the four policies require `is_admin()`.
+  The public site never reads this table.
 
 Plus:
 
