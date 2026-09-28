@@ -350,12 +350,6 @@ textarea {
     3.2rem minmax(8rem, 1.2fr) minmax(5.2rem, 0.8fr) 5.4rem 6.4rem 5.2rem 5.6rem 5.8rem 4rem 6.4rem;
 }
 
-.service-table__head,
-.service-row {
-  grid-template-columns:
-    minmax(9rem, 1.25fr) minmax(7rem, 0.85fr) minmax(6rem, 0.75fr) 6.4rem 5.4rem 6rem 5.6rem 6rem 4.8rem 6.4rem;
-}
-
 .project-table__head {
   display: grid;
   gap: 0.85rem;

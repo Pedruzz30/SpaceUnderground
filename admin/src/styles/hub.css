@@ -1,0 +1,137 @@
+/* Hub primitives shared by the Services and Projects grids: the summary
+   strip, the per-locale content meter and the pending-checks note. */
+
+/* --- summary strip ------------------------------------------------------ */
+
+.metric-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.metric-strip .project-metric {
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  padding: var(--space-3) var(--space-4);
+}
+
+.metric-strip .project-metric:first-child {
+  border-left: 0;
+}
+
+.metric-strip .project-metric strong {
+  font-size: 1.75rem;
+}
+
+.metric-strip .project-metric span {
+  margin-top: 0.45rem;
+}
+
+.metric-strip .is-warn strong {
+  color: var(--warning);
+}
+
+/* --- content meter ------------------------------------------------------ */
+
+.content-meter {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr) 2.6rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.content-meter span,
+.content-meter em {
+  color: var(--text-soft);
+  font: 500 0.66rem/1 var(--mono);
+  font-style: normal;
+}
+
+.content-meter em {
+  text-align: right;
+}
+
+.content-meter i {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-hover);
+}
+
+.content-meter b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success);
+}
+
+.content-meter--partial b {
+  background: var(--warning);
+}
+
+.content-meter--partial em {
+  color: var(--warning);
+}
+
+/* --- pending checks ----------------------------------------------------- */
+
+.pending-note {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--warning) 28%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning) 7%, transparent);
+  padding: 0.6rem 0.7rem;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.pending-note span {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--warning);
+  font: 600 0.58rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pending-note--incomplete {
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+}
+
+.pending-note--incomplete span {
+  color: var(--danger);
+}
+
+/* --- responsive ----------------------------------------------------------- */
+
+@media (max-width: 1180px) {
+  .metric-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .metric-strip .project-metric:nth-child(4) {
+    border-left: 0;
+  }
+
+  .metric-strip .project-metric:nth-child(n + 4) {
+    border-top: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 760px) {
+  .metric-strip .project-metric {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .metric-strip .project-metric strong {
+    font-size: 1.4rem;
+  }
+}

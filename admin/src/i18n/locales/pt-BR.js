@@ -898,6 +898,8 @@ export default {
     },
     plan: "Plano",
     untitledPlan: "Plano sem título",
+    pendingChecks: "Pendências",
+    noUpdateDate: "Sem data",
     noPublicDescription: "Sem descrição pública ainda.",
     rangePending: "Faixa pendente",
     timelinePending: "Prazo pendente",

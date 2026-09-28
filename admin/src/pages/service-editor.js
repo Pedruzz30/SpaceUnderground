@@ -18,7 +18,7 @@ import {
   updatePlan,
 } from "../services/plan-service.js";
 import { contentCompleteness, serviceHealth, serviceReadiness } from "../utils/service-health.js";
-import { escapeAttribute, escapeHtml } from "../utils/html.js";
+import { escapeAttribute, escapeHtml, safeHexColor } from "../utils/html.js";
 
 const SCOPE = "service-editor";
 
@@ -154,7 +154,7 @@ function featureMarkup(feature, index, total) {
 function previewMarkup(plan) {
   const featureItems = (plan.features || []).filter((feature) => feature.text.trim()).slice(0, 5);
   return `
-    <aside class="service-preview" data-service-preview style="--preview-accent:${escapeAttribute(plan.accent || "#c6ff00")}">
+    <aside class="service-preview" data-service-preview style="--preview-accent:${safeHexColor(plan.accent)}">
       <div class="plan-card">
         <div class="plan-card__top"><span>${escapeHtml(statusLabel(plan.status))}</span><strong>${escapeHtml(plan.monogram || (plan.name || "SU").slice(0, 2).toUpperCase())}</strong></div>
         <div class="plan-card__body">

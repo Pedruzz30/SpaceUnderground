@@ -898,6 +898,8 @@ export default {
     },
     plan: "Plan",
     untitledPlan: "Untitled plan",
+    pendingChecks: "Pending",
+    noUpdateDate: "No date",
     noPublicDescription: "No public description yet.",
     rangePending: "Range pending",
     timelinePending: "Timeline pending",
