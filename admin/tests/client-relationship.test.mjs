@@ -33,6 +33,7 @@ const {
   initials,
   mailtoLink,
   matchesFocus,
+  relatedState,
   relationshipSignals,
   sortClients,
   telLink,
@@ -114,6 +115,39 @@ describe("relationship signals", () => {
 
   it("does not chase an inactive client with nothing open", () => {
     assert.deepEqual(relationshipSignals({ client: { status: "INACTIVE" }, now: NOW }), []);
+  });
+});
+
+describe("financial and commercial are read independently", () => {
+  const client = { id: "c1", name: "Aurora", status: "LEAD" };
+  const ledger = { status: "fulfilled", value: [{ clientId: "c1", type: "INCOME", status: "PENDING", amount: 500, dueDate: "2026-09-10" }, { clientId: "other", amount: 1 }] };
+  const pipeline = { status: "fulfilled", value: [{ clientId: "c1", title: "Site", stage: "PROPOSAL", estimatedValue: 4000 }, { clientId: "other", title: "X" }] };
+  const failed = { status: "rejected", reason: new Error("offline") };
+
+  it("keeps the pipeline when only the ledger failed", () => {
+    const state = relatedState(failed, pipeline, client);
+    assert.deepEqual([state.financialOk, state.commercialOk], [false, true]);
+    assert.deepEqual(state.entries, []);
+    assert.deepEqual(state.deals.map((deal) => [deal.title, deal.clientName]), [["Site", "Aurora"]]);
+  });
+
+  it("keeps the ledger when only the pipeline failed", () => {
+    const state = relatedState(ledger, failed, client);
+    assert.deepEqual([state.financialOk, state.commercialOk], [true, false]);
+    assert.equal(state.entries.length, 1, "only this client's entries");
+    assert.deepEqual(state.deals, []);
+  });
+
+  it("reads both, filtered to the client, when both answered", () => {
+    const state = relatedState(ledger, pipeline, client);
+    assert.deepEqual([state.financialOk, state.commercialOk, state.entries.length, state.deals.length], [true, true, 1, 1]);
+  });
+
+  it("gives no signal from a module that failed, never a false one", () => {
+    const signals = (options) => relationshipSignals({ client, now: NOW, entries: ledger.value.slice(0, 1), deals: [], ...options }).map((signal) => signal.key);
+    assert.ok(signals({}).includes("overdue") && signals({}).includes("leadNoDeal"), "both read: overdue money, and a lead with no deal");
+    assert.ok(!signals({ commercialOk: false }).includes("leadNoDeal"), "a failed pipeline is not an empty one");
+    assert.ok(!signals({ financialOk: false }).includes("overdue"), "a failed ledger is not a clean one");
   });
 });
 

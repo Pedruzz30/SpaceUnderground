@@ -92,26 +92,55 @@ export function contactState(client, now = new Date()) {
 
 // What asks for action on this client, most urgent first. Each signal is a
 // key and parameters; the page words them.
-export function relationshipSignals({ client = {}, entries = [], deals = [], projects = [], now = new Date() } = {}) {
+// financialOk / commercialOk: whether that module could be read. A module that
+// failed gives no signal at all; its empty list must not read as "no overdue
+// money" or, worse, as "a lead with no deal".
+export function relationshipSignals({
+  client = {},
+  entries = [],
+  deals = [],
+  projects = [],
+  now = new Date(),
+  financialOk = true,
+  commercialOk = true,
+} = {}) {
   if (client.status === "ARCHIVED") return [];
   const signals = [];
-  const finance = clientFinance(entries, now);
-  const pipeline = clientPipeline(deals, now);
+  const finance = clientFinance(financialOk ? entries : [], now);
+  const pipeline = clientPipeline(commercialOk ? deals : [], now);
 
-  if (finance.overdue > 0) signals.push({ key: "overdue", tone: "danger", params: { amount: finance.overdue, count: finance.overdueCount } });
-  if (pipeline.overdueActions > 0) signals.push({ key: "dealAction", tone: "danger", params: { count: pipeline.overdueActions } });
+  if (financialOk && finance.overdue > 0) signals.push({ key: "overdue", tone: "danger", params: { amount: finance.overdue, count: finance.overdueCount } });
+  if (commercialOk && pipeline.overdueActions > 0) signals.push({ key: "dealAction", tone: "danger", params: { count: pipeline.overdueActions } });
 
   const contact = contactState(client, now);
   const engaged = client.status === "ACTIVE" || client.status === "LEAD" || pipeline.openCount > 0 || projects.some(isActiveProject);
   if (engaged && contact === "stale") signals.push({ key: "stale", tone: "warning", params: { days: daysSinceContact(client, now) } });
   if (engaged && contact === "never") signals.push({ key: "neverContacted", tone: "warning", params: {} });
 
-  const stalled = deals.map(normalizeOpportunity).filter((deal) => isOpen(deal) && (daysInStage(deal, now) ?? 0) >= 14);
-  if (stalled.length) signals.push({ key: "stalledDeal", tone: "warning", params: { count: stalled.length } });
+  if (commercialOk) {
+    const stalled = deals.map(normalizeOpportunity).filter((deal) => isOpen(deal) && (daysInStage(deal, now) ?? 0) >= 14);
+    if (stalled.length) signals.push({ key: "stalledDeal", tone: "warning", params: { count: stalled.length } });
 
-  if (client.status === "LEAD" && pipeline.openCount === 0 && pipeline.wonCount === 0) signals.push({ key: "leadNoDeal", tone: "neutral", params: {} });
+    if (client.status === "LEAD" && pipeline.openCount === 0 && pipeline.wonCount === 0) signals.push({ key: "leadNoDeal", tone: "neutral", params: {} });
+  }
 
   return signals;
+}
+
+// The client record's Financial and Commercial data, from the two settled
+// reads, each on its own: one failing never blanks the other, and neither
+// touches the client itself, its projects or its activity.
+export function relatedState(entriesResult, dealsResult, client = {}) {
+  const financialOk = entriesResult?.status === "fulfilled";
+  const commercialOk = dealsResult?.status === "fulfilled";
+  return {
+    financialOk,
+    commercialOk,
+    entries: financialOk ? entriesResult.value.filter((entry) => entry.clientId === client.id) : [],
+    deals: commercialOk
+      ? dealsResult.value.filter((deal) => deal.clientId === client.id).map((deal) => ({ ...deal, clientName: client.name }))
+      : [],
+  };
 }
 
 // "João" and "joao", "Ops@Aurora.com" and "ops@aurora.com" are one person.
