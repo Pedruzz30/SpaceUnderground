@@ -491,11 +491,10 @@ function accessMarkup(access) {
 }
 
 function mfaStatusMarkup(access, factor) {
-  const state = factor ? "enabled" : mfaState({ roles: (access?.roles ?? []).map((role) => role.key), mfaEnrolledAt: null, mfaGraceUntil: access?.mfa.graceUntil });
-  const tone = { enabled: "success", grace: "warning", required: "danger", optional: "neutral" }[state];
+  const state = factor ? "enabled" : mfaState({ roles: (access?.roles ?? []).map((role) => role.key), mfaEnrolledAt: null });
+  const tone = { enabled: "success", required: "danger", optional: "neutral" }[state];
   return `
-    <p class="mfa-status"><span class="badge badge--${tone}">${escapeHtml(t(`security.mfaState.${state}`))}</span>
-    ${state === "grace" ? `<small>${escapeHtml(t("security.mfa.graceUntil", { date: formatFullDate(access.mfa.graceUntil) }))}</small>` : ""}</p>
+    <p class="mfa-status"><span class="badge badge--${tone}">${escapeHtml(t(`security.mfaState.${state}`))}</span></p>
     <p class="settings-copy">${escapeHtml(t(factor ? "security.mfa.enabledCopy" : state === "optional" ? "security.mfa.optionalCopy" : "security.mfa.requiredCopy"))}</p>
     ${
       factor

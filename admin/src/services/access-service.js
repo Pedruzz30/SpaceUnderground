@@ -4,9 +4,13 @@ import { clearAccess, getAccess, legacyAccess, normalizeAccess, setAccess } from
 import { toDataError } from "./errors.js";
 import { getAccessRepository } from "./repositories/index.js";
 
-// Asks the database what the signed-in member may do, once per session and
-// again whenever something changes it (MFA, activation). The answer only
-// shapes the interface; every query is authorized again by the database.
+// Asks the database what the signed-in member may do, and asks again when
+// the answer is older than ACCESS_TTL (on the next navigation), when
+// something changes it (MFA, activation) or when a request says the session
+// was ended. The answer only shapes the interface; every query is authorized
+// again by the database.
+
+const ACCESS_TTL = 15_000;
 
 let pending = null;
 
@@ -18,17 +22,18 @@ const NOT_MEMBER = (session) => ({
   permissions: new Set(),
   projects: [],
   approvalRoutes: [],
-  mfa: { required: false, enrolled: false, aal: "aal1", graceUntil: null, stepUp: false },
+  mfa: { required: false, enrolled: false, aal: "aal1", stepUp: false },
   settings: { stepUpMaxAgeSeconds: 600, approvalExpiryDays: 14, invitationExpiryDays: 7 },
 });
 
-export async function loadAccess(session, { force = false } = {}) {
+export async function loadAccess(session, { force = false, maxAge = ACCESS_TTL } = {}) {
   if (!session) {
     clearAccess();
     return null;
   }
   const current = getAccess();
-  if (!force && current && current.member?.userId === session.user?.id) return current;
+  const fresh = current && current.member?.userId === session.user?.id && Date.now() - (current.loadedAt ?? 0) < maxAge;
+  if (!force && fresh) return current;
   if (pending && !force) return pending;
 
   pending = (async () => {
@@ -36,6 +41,7 @@ export async function loadAccess(session, { force = false } = {}) {
       const raw = await (await getAccessRepository()).myAccess();
       // Before the security migration: the legacy admins table still decides.
       const access = raw?.legacy ? legacyAccess(session) ?? NOT_MEMBER(session) : normalizeAccess(raw, isSupabaseMode() ? "rbac" : "mock") ?? NOT_MEMBER(session);
+      access.loadedAt = Date.now();
       setAccess(access);
       return access;
     } catch (error) {
@@ -64,6 +70,10 @@ export const activateMembership = () => call("activate", "security.welcome.activ
 export const recordSignIn = () => call("recordSignIn", "errors.generic").catch(() => null);
 export const recordMfaState = () => call("recordMfaState", "errors.generic").catch(() => null);
 export const expireStaleAccess = () => call("expireStale", "errors.generic").catch(() => null);
+// Ends every token of the member, the current one included (Settings, "sign
+// out everywhere"). Best effort: before the migration the function does not
+// exist, and signing out still revokes the refresh tokens.
+export const revokeMySessions = () => call("revokeMySessions", "errors.generic").catch(() => null);
 
 // Names and RUs for the ids on requests and audit lines, cached per id.
 const directory = new Map();

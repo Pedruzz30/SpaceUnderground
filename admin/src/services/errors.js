@@ -48,6 +48,7 @@ const SECURITY_CODES = {
   SU010: ["errors.notFound", "not_found"],
   SU011: ["errors.security.expired", "expired"],
   SU012: ["errors.security.requesterInactive", "requester_inactive"],
+  SU013: ["errors.security.sessionRevoked", "session_revoked"],
   function_unavailable: ["errors.security.functionUnavailable", "function_unavailable"],
   invite_failed: ["errors.security.inviteFailed", "invite_failed"],
   resend_failed: ["errors.security.resendFailed", "resend_failed"],
@@ -77,6 +78,12 @@ export function toDataError(error, fallbackMessage) {
 
   if (SECURITY_CODES[code]) {
     const [key, stable] = SECURITY_CODES[code];
+    // The session was ended elsewhere (revoked, suspended, offboarded): the
+    // router re-reads the member's access and shows why, instead of leaving
+    // the page to fail request by request.
+    if (stable === "session_revoked" && typeof globalThis.window?.dispatchEvent === "function" && typeof CustomEvent === "function") {
+      globalThis.window.dispatchEvent(new CustomEvent("space-admin:session-ended"));
+    }
     return new DataError(t(key), { code: stable, cause: error });
   }
 

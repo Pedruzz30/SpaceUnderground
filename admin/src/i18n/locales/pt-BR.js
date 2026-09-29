@@ -1955,6 +1955,7 @@ export default {
       inviteFailed: "O convite não pôde ser enviado. Confira se o e-mail já tem uma conta.",
       resendFailed: "Não foi possível reenviar: a pessoa talvez já tenha confirmado o e-mail. Peça que use “Esqueci minha senha”.",
       invalidCode: "Código inválido ou expirado.",
+      sessionRevoked: "Esta sessão foi encerrada. Entre novamente.",
     },
   },
   security: {
@@ -2032,7 +2033,6 @@ export default {
     mfaState: {
       enabled: "MFA ativo",
       required: "MFA pendente",
-      grace: "MFA em carência",
       optional: "MFA opcional",
     },
     requestStatus: {
@@ -2147,6 +2147,10 @@ export default {
       mfaChallengeCopy: "Esta conta usa verificação em duas etapas. Digite o código de 6 dígitos do seu aplicativo.",
       accessErrorHeading: "NÃO FOI POSSÍVEL VERIFICAR O ACESSO",
       retry: "Tentar de novo",
+      sessionRevokedTitle: "ADMIN / SESSÃO ENCERRADA",
+      sessionRevokedHeading: "SESSÃO ENCERRADA",
+      sessionRevokedCopy: "Esta sessão foi encerrada (sessões revogadas, conta suspensa ou saída de todos os dispositivos). Entre novamente para continuar.",
+      signInAgain: "Entrar novamente",
     },
     welcome: {
       title: "ADMIN / BOAS-VINDAS",
@@ -2201,7 +2205,6 @@ export default {
       removeBody: "A conta volta a entrar só com a senha.",
       removeRequiredBody: "Seu papel exige MFA: sem ele, o Admin fica bloqueado até você configurar um novo autenticador.",
       factor: "Autenticador",
-      graceUntil: "Ative até {date}.",
       enabledCopy: "Cada entrada pede o código do seu aplicativo, e ações críticas pedem de novo.",
       optionalCopy: "Seu papel não exige MFA, mas ele protege a sua conta se a senha vazar.",
       requiredCopy: "Seu papel exige MFA. Configure o autenticador para manter o acesso.",
@@ -2280,6 +2283,7 @@ export default {
       validity: "Validade",
       projectsCount: "Projetos",
       inviteExpires: "Convite vale até",
+      sessionsEnded: "Sessões encerradas em",
       requests: "Solicitações",
       history: "Histórico",
       noRequests: "Nenhuma solicitação.",
@@ -2453,8 +2457,8 @@ export default {
       breadcrumb: "SISTEMA / AUDITORIA",
       eyebrow: "SEGURANÇA",
       heading: "Trilha de auditoria",
-      introAll: "Cada entrada, convite, mudança de acesso, aprovação e publicação. Registrado pelo banco e impossível de editar ou apagar.",
-      introOwn: "Os eventos de que você participou. Registrados pelo banco e impossíveis de editar ou apagar.",
+      introAll: "Cada entrada, convite, mudança de acesso, aprovação e publicação. Registrado pelo banco; nenhum papel da aplicação pode editar ou apagar uma linha.",
+      introOwn: "Os eventos de que você participou. Registrados pelo banco; nenhum papel da aplicação pode editar ou apagar uma linha.",
       filterAction: "Evento",
       more: "Carregar mais",
       empty: "Nenhum evento registrado.",
@@ -2464,6 +2468,7 @@ export default {
         suspension: "pela suspensão",
         offboarding: "pelo encerramento",
         manual: "manualmente",
+        self: "pela própria pessoa",
       },
     },
     dashboard: {

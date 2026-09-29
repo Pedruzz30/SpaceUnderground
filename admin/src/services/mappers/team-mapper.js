@@ -31,7 +31,7 @@ export function mapMember(row, roleRows = [], projectRows = []) {
     accessStartsAt: iso(row.access_starts_at),
     accessExpiresAt: iso(row.access_expires_at),
     mfaEnrolledAt: iso(row.mfa_enrolled_at),
-    mfaGraceUntil: iso(row.mfa_grace_until),
+    sessionsValidAfter: iso(row.sessions_valid_after),
     invitedBy: row.invited_by ?? null,
     invitedAt: iso(row.invited_at),
     inviteExpiresAt: iso(row.invite_expires_at),

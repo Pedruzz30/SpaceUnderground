@@ -28,7 +28,7 @@ import { approvalsPage, myChangesPage } from "../pages/approvals.js";
 import { approvalReviewPage } from "../pages/approval-review.js";
 import { auditPage } from "../pages/audit.js";
 import { getCachedSession, getSession, hasResolvedSession, logout } from "../services/auth-service.js";
-import { loadAccess } from "../services/access-service.js";
+import { forgetAccess, loadAccess } from "../services/access-service.js";
 import { pendingApprovalCount } from "../services/approval-service.js";
 import { confirmModal } from "../components/modal.js";
 import { adminConfigurationErrorMessage, hasAdminConfigurationError } from "../config/env.js";
@@ -321,6 +321,12 @@ export function initRouter(root) {
   };
 
   window.addEventListener("hashchange", () => {
+    render();
+  });
+  // A request answered that this session was ended (SU013): ask the database
+  // again at once, and let the access screen say what happened.
+  window.addEventListener("space-admin:session-ended", () => {
+    forgetAccess();
     render();
   });
   window.addEventListener("localechange", refreshRouteChrome);

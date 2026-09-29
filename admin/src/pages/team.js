@@ -19,7 +19,7 @@ import { MEMBER_FILTERS, canManage, countByStatus, filterMembers, isExpiringSoon
 // allowed to take on each (the database re-checks every one).
 
 const STATUS_TONE = { ACTIVE: "success", INVITED: "warning", SUSPENDED: "danger", EXPIRED: "muted", OFFBOARDED: "muted" };
-const MFA_TONE = { enabled: "success", grace: "warning", required: "danger", optional: "neutral" };
+const MFA_TONE = { enabled: "success", required: "danger", optional: "neutral" };
 
 export const memberStatusBadge = (status) =>
   `<span class="badge badge--${STATUS_TONE[status] ?? "neutral"}" data-i18n="security.status.${String(status).toLowerCase()}">${escapeHtml(t(`security.status.${String(status).toLowerCase()}`))}</span>`;
@@ -162,7 +162,7 @@ function filterChips(counts, active) {
 
 function metricsMarkup(members) {
   const counts = countByStatus(members);
-  const mfaPending = members.filter((member) => member.effectiveStatus === "ACTIVE" && ["required", "grace"].includes(mfaState(member))).length;
+  const mfaPending = members.filter((member) => member.effectiveStatus === "ACTIVE" && mfaState(member) === "required").length;
   return [
     ["security.team.metricActive", counts.ACTIVE, ""],
     ["security.team.metricInvited", counts.INVITED, ""],

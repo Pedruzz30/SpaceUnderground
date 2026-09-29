@@ -8,9 +8,9 @@ import { formatFullDate } from "../utils/format.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 
 // The security audit trail. The database writes every line (sign-ins, MFA,
-// invitations, access changes, lifecycle, approvals, publications) and nobody
-// can edit or delete one; this page only reads. Members see the events they
-// took part in; audit.read_all sees everything.
+// invitations, access changes, lifecycle, approvals, publications); no
+// application role can edit or delete one, and this page only reads. Members
+// see the events they took part in; audit.read_all sees everything.
 
 export const AUDIT_ACTIONS = [
   "LOGIN_SUCCESS",

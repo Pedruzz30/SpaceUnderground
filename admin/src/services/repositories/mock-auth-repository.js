@@ -44,6 +44,8 @@ export const mockAuthRepository = {
       profile: key,
       // Profiles with MFA sign in having verified it, as Supabase would ask.
       mfaVerifiedAt: seed.mfa ? now : null,
+      // The mock token's iat: a session ended after it no longer authorizes.
+      issuedAt: now,
       expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     };
     writeSession(session);

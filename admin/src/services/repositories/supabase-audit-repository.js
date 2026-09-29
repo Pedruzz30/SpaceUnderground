@@ -2,7 +2,8 @@ import { getSupabaseClient } from "../../lib/supabase.js";
 import { mapAuditEntry } from "../mappers/team-mapper.js";
 
 // The security audit log, read-only. RLS shows your own events with
-// audit.read and everything with audit.read_all; nobody can change a line.
+// audit.read and everything with audit.read_all; no application role can
+// change a line.
 
 // The member filter is written into a PostgREST expression, so only a real
 // uuid gets there; RLS would still hold, but a crafted id must not even shape

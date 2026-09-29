@@ -164,6 +164,26 @@ try {
   assert.match(await page.textContent("[data-access-screen]"), /CONTA SUSPENSA/, "a suspended member sees why, and nothing else");
   assert.equal(await page.$(".admin-shell"), null);
 
+  /* ------------------------------------------------ ended sessions */
+
+  // Someone ends this member's sessions from another browser: the mock
+  // store's cutoff moves past the session this page holds. The next action
+  // is refused, the Admin says why, and a new sign-in works.
+  await signInToShell("manager");
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem("space-admin:security:v1"));
+    state.members.find((member) => member.userId === "mock-manager").sessionsValidAfter = new Date().toISOString();
+    localStorage.setItem("space-admin:security:v1", JSON.stringify(state));
+  });
+  await go("#/team");
+  await page.waitForSelector("[data-access-screen]");
+  assert.match(await page.textContent("[data-access-screen]"), /SESSÃO ENCERRADA/, "the Admin says the session was ended");
+  await page.click("[data-gate-sign-out]");
+  await page.waitForSelector("[data-login-form]");
+  await signInToShell("manager");
+  await go("#/team", "[data-member-row]");
+  assert.equal(await page.$("[data-access-screen]"), null, "signing in again works");
+
   /* ------------------------------------------------ phone widths */
 
   // The new screens' content stays inside the viewport. (At 320px the

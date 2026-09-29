@@ -95,6 +95,7 @@ function securityMarkup(member) {
       ${fact("security.member.lastSignIn", member.lastSignInAt ? formatRelativeDay(member.lastSignInAt) : t("security.team.never"))}
       ${fact("security.member.validity", validityLabel(member))}
       ${member.inviteExpiresAt && member.effectiveStatus === "INVITED" ? fact("security.member.inviteExpires", formatFullDate(member.inviteExpiresAt)) : ""}
+      ${member.sessionsValidAfter ? fact("security.member.sessionsEnded", formatFullDate(member.sessionsValidAfter)) : ""}
     </dl>
   `;
 }

@@ -34,14 +34,12 @@ export function countByStatus(members = []) {
 
 const requiresMfa = (roles = []) => roles.some((key) => ROLES.find((role) => role.key === key)?.requiresMfa);
 
-// enabled: a verified factor on record; grace: privileged, inside the grace a
-// migrated account gets; required: privileged without MFA (blocked until they
-// enable it); optional: MFA is not required for these roles.
-export function mfaState(member, now = Date.now()) {
+// enabled: a verified factor on record; required: privileged without MFA
+// (they hold nothing until they enable it, migrated accounts included);
+// optional: MFA is not required for these roles.
+export function mfaState(member) {
   if (member.mfaEnrolledAt) return "enabled";
-  if (!requiresMfa(member.roles)) return "optional";
-  if (member.mfaGraceUntil && new Date(member.mfaGraceUntil).getTime() > now) return "grace";
-  return "required";
+  return requiresMfa(member.roles) ? "required" : "optional";
 }
 
 export function memberRank(member) {

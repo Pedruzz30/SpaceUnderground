@@ -15,8 +15,8 @@ export const RISK_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
 // rank orders roles for anti-escalation: nobody grants, changes, suspends or
 // offboards a member whose highest rank is equal to or above their own.
-// requiresMfa: every permission of the role needs an aal2 session (after the
-// grace period a migrated account gets).
+// requiresMfa: every permission of the role needs an aal2 session, from the
+// first use (migrated accounts included; there is no grace period).
 export const ROLES = [
   { key: "ABSOLUTE_ADMIN", rank: 100, requiresMfa: true },
   { key: "OWNER", rank: 80, requiresMfa: true },

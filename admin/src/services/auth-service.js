@@ -1,6 +1,6 @@
 import { DataError, toDataError } from "./errors.js";
 import { getAuthRepository } from "./repositories/index.js";
-import { forgetAccess, forgetDirectory, loadAccess, recordSignIn } from "./access-service.js";
+import { forgetAccess, forgetDirectory, loadAccess, recordSignIn, revokeMySessions } from "./access-service.js";
 import { invalidatePendingCount } from "./approval-service.js";
 import { t } from "../i18n/index.js";
 import { PASSWORD_MIN, validateNewPassword } from "../utils/settings-checks.js";
@@ -111,8 +111,12 @@ export async function changePassword(password, confirmation) {
   }
 }
 
+// Every device: the database first refuses every token issued so far (an
+// access token would otherwise live until it expires), then Supabase Auth
+// revokes the refresh tokens.
 export async function signOutEverywhere() {
   try {
+    await revokeMySessions();
     await (await getAuthRepository()).signOutEverywhere();
   } finally {
     forgetSession();

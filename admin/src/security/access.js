@@ -47,7 +47,6 @@ export function normalizeAccess(raw, source = "rbac") {
       required: Boolean(raw.mfa?.required),
       enrolled: Boolean(raw.mfa?.enrolled),
       aal: raw.mfa?.aal ?? "aal1",
-      graceUntil: iso(raw.mfa?.grace_until),
       stepUp: Boolean(raw.mfa?.step_up),
     },
     settings: {
@@ -84,7 +83,7 @@ export function legacyAccess(session) {
     permissions: new Set(keys),
     projects: [],
     approvalRoutes: [],
-    mfa: { required: false, enrolled: false, aal: "aal1", graceUntil: null, stepUp: false },
+    mfa: { required: false, enrolled: false, aal: "aal1", stepUp: false },
     settings: { stepUpMaxAgeSeconds: 600, approvalExpiryDays: 14, invitationExpiryDays: 7 },
   };
 }

@@ -1955,6 +1955,7 @@ export default {
       inviteFailed: "The invitation could not be sent. Check whether the email already has an account.",
       resendFailed: "Could not resend: the person may have confirmed their email already. Ask them to use “Forgot password”.",
       invalidCode: "Invalid or expired code.",
+      sessionRevoked: "This session was ended. Sign in again.",
     },
   },
   security: {
@@ -2032,7 +2033,6 @@ export default {
     mfaState: {
       enabled: "MFA on",
       required: "MFA required",
-      grace: "MFA grace period",
       optional: "MFA optional",
     },
     requestStatus: {
@@ -2147,6 +2147,10 @@ export default {
       mfaChallengeCopy: "This account uses two-step verification. Enter the 6-digit code from your app.",
       accessErrorHeading: "COULD NOT CHECK ACCESS",
       retry: "Try again",
+      sessionRevokedTitle: "ADMIN / SESSION ENDED",
+      sessionRevokedHeading: "SESSION ENDED",
+      sessionRevokedCopy: "This session was ended (sessions revoked, account suspended, or signed out everywhere). Sign in again to continue.",
+      signInAgain: "Sign in again",
     },
     welcome: {
       title: "ADMIN / WELCOME",
@@ -2201,7 +2205,6 @@ export default {
       removeBody: "The account goes back to signing in with the password only.",
       removeRequiredBody: "Your role requires MFA: without it the Admin stays locked until you set up a new authenticator.",
       factor: "Authenticator",
-      graceUntil: "Enable it by {date}.",
       enabledCopy: "Every sign-in asks for your app's code, and critical actions ask again.",
       optionalCopy: "Your role does not require MFA, but it protects your account if the password leaks.",
       requiredCopy: "Your role requires MFA. Set up the authenticator to keep your access.",
@@ -2280,6 +2283,7 @@ export default {
       validity: "Validity",
       projectsCount: "Projects",
       inviteExpires: "Invitation valid until",
+      sessionsEnded: "Sessions ended on",
       requests: "Requests",
       history: "History",
       noRequests: "No requests.",
@@ -2453,8 +2457,8 @@ export default {
       breadcrumb: "SYSTEM / AUDIT",
       eyebrow: "SECURITY",
       heading: "Audit trail",
-      introAll: "Every sign-in, invitation, access change, approval and publication. Written by the database and impossible to edit or delete.",
-      introOwn: "The events you took part in. Written by the database and impossible to edit or delete.",
+      introAll: "Every sign-in, invitation, access change, approval and publication. Written by the database; no application role can edit or delete a line.",
+      introOwn: "The events you took part in. Written by the database; no application role can edit or delete a line.",
       filterAction: "Event",
       more: "Load more",
       empty: "No events recorded.",
@@ -2464,6 +2468,7 @@ export default {
         suspension: "on suspension",
         offboarding: "on offboarding",
         manual: "manually",
+        self: "by the person themselves",
       },
     },
     dashboard: {

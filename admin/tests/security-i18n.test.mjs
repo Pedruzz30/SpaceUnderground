@@ -29,7 +29,7 @@ describe("security i18n", () => {
     assert.deepEqual(missing(MEMBER_STATUSES.map((status) => `security.status.${status.toLowerCase()}`)), []);
     assert.deepEqual(missing(REQUEST_STATUSES.map((status) => `security.requestStatus.${status.toLowerCase()}`)), []);
     assert.deepEqual(missing(RISK_LEVELS.map((risk) => `security.risk.${risk.toLowerCase()}`)), []);
-    assert.deepEqual(missing(["enabled", "required", "grace", "optional"].map((state) => `security.mfaState.${state}`)), []);
+    assert.deepEqual(missing(["enabled", "required", "optional"].map((state) => `security.mfaState.${state}`)), []);
   });
 
   it("names every draft field and every module a permission belongs to", () => {

@@ -45,7 +45,7 @@ function raw(roles, { projects = [], blocked = null, stepUp = false, userId = "u
       { permission: "projects.edit", via: "projects.draft" },
       { permission: "projects.publish", via: "projects.draft" },
     ],
-    mfa: { required: true, enrolled: true, aal: "aal2", grace_until: null, step_up: stepUp },
+    mfa: { required: true, enrolled: true, aal: "aal2", step_up: stepUp },
     settings: { step_up_max_age_seconds: 600, approval_expiry_days: 14, invitation_expiry_days: 7 },
   };
 }
@@ -155,7 +155,7 @@ describe("team helpers", () => {
   const members = [
     { userId: "a", displayName: "José Álvares", email: "jose@x.dev", ru: "SU-00001", roles: ["OWNER"], effectiveStatus: "ACTIVE", mfaEnrolledAt: "2026-01-01" },
     { userId: "b", displayName: "Bia", email: "bia@x.dev", ru: "SU-00002", roles: ["COLLABORATOR"], effectiveStatus: "SUSPENDED" },
-    { userId: "c", displayName: "Caio", email: "caio@x.dev", ru: "SU-00003", roles: ["SEO"], effectiveStatus: "ACTIVE", mfaGraceUntil: "2999-01-01" },
+    { userId: "c", displayName: "Caio", email: "caio@x.dev", ru: "SU-00003", roles: ["SEO"], effectiveStatus: "ACTIVE" },
   ];
 
   it("filters by status and by a search that ignores accents", () => {
@@ -165,10 +165,10 @@ describe("team helpers", () => {
     assert.equal(countByStatus(members).ACTIVE, 2);
   });
 
-  it("reads the MFA state a row shows", () => {
+  it("reads the MFA state a row shows, with no grace state", () => {
     assert.equal(mfaState(members[0]), "enabled");
     assert.equal(mfaState(members[1]), "optional");
-    assert.equal(mfaState(members[2]), "grace");
+    assert.equal(mfaState(members[2]), "required", "a privileged member without MFA is simply blocked");
     assert.equal(mfaState({ roles: ["MANAGER"] }), "required");
   });
 
@@ -212,6 +212,7 @@ describe("links from Supabase Auth emails", () => {
 describe("security error codes", () => {
   it("maps each database refusal to a stable code the pages act on", () => {
     assert.equal(toDataError({ code: "SU005" }, "x").code, "step_up_required");
+    assert.equal(toDataError({ code: "SU013" }, "x").code, "session_revoked");
     assert.equal(toDataError({ code: "SU006" }, "x").code, "mfa_required");
     assert.equal(toDataError({ code: "SU001" }, "x").code, "version_conflict");
     assert.equal(toDataError({ code: "SU002" }, "x").code, "self_approval");
@@ -258,6 +259,34 @@ describe("mock workflow", () => {
     await as("collaborator");
     await assert.rejects(approvals.saveDraft("002", { name: "Nope" }), (error) => error.code === "unauthorized");
     await assert.rejects(approvals.saveDraft("001", { slug: "nope" }), (error) => error.code === "invalid_input");
+    await logout();
+  });
+
+  it("ends the member's own session everywhere, until they sign in again", async () => {
+    await as("seo");
+    const { revokeMySessions, loadAccess } = await import("../src/services/access-service.js");
+    const { getSession } = await import("../src/services/auth-service.js");
+    await revokeMySessions();
+    const access = await loadAccess(await getSession(), { force: true });
+    assert.equal(access.blockedReason, "SESSION_REVOKED");
+    assert.equal(access.permissions.size, 0);
+    await assert.rejects(team.listMembers(), (error) => error.code === "session_revoked");
+    await logout();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await as("seo");
+    assert.equal(getAccess().blockedReason, null, "a new sign-in works");
+    await logout();
+  });
+
+  it("re-reads the access snapshot once it is older than its time to live", async () => {
+    await as("collaborator");
+    const { loadAccess } = await import("../src/services/access-service.js");
+    const { getSession } = await import("../src/services/auth-service.js");
+    const session = await getSession();
+    const first = await loadAccess(session);
+    assert.equal(await loadAccess(session), first, "fresh: the same snapshot");
+    const reread = await loadAccess(session, { maxAge: 0 });
+    assert.notEqual(reread, first, "stale: asked again");
     await logout();
   });
 

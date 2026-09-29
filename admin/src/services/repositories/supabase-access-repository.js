@@ -34,6 +34,15 @@ export const supabaseAccessRepository = {
   recordMfaState: () => rpc("record_mfa_state"),
   expireStale: () => rpc("expire_stale_access"),
 
+  async revokeMySessions() {
+    const { data, error } = await getSupabaseClient().rpc("revoke_my_sessions");
+    if (error) {
+      if (isMissingFunction(error)) return null;
+      throw error;
+    }
+    return data;
+  },
+
   async directory(ids) {
     const unique = [...new Set((ids ?? []).filter(Boolean))];
     if (!unique.length) return [];

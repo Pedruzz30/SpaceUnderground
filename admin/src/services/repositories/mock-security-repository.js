@@ -45,7 +45,7 @@ function seedState() {
     accessStartsAt: null,
     accessExpiresAt: null,
     mfaEnrolledAt: seed.mfa ? created : null,
-    mfaGraceUntil: null,
+    sessionsValidAfter: null,
     invitedBy: seed.profile === "owner" ? null : "mock-owner",
     invitedAt: created,
     inviteExpiresAt: seed.status === "INVITED" ? new Date(Date.now() + 7 * DAY).toISOString() : null,
@@ -89,8 +89,28 @@ function active(member) {
   return Boolean(member) && effectiveStatus(member) === "ACTIVE";
 }
 
+// The mock session plays the token: one issued before the member's sessions
+// were ended authorizes nothing, like the database's iat check.
+function tokenCurrent(member) {
+  if (!member?.sessionsValidAfter) return true;
+  return (Date.parse(currentMockSession()?.issuedAt ?? "") || 0) >= Date.parse(member.sessionsValidAfter);
+}
+
+// Always the signed-in member's own permissions (the current session decides).
 function permissionsOf(member) {
-  return active(member) ? new Set(permissionsForRoles(member.roles)) : new Set();
+  return active(member) && tokenCurrent(member) ? new Set(permissionsForRoles(member.roles)) : new Set();
+}
+
+function endSessions(member) {
+  member.sessionsValidAfter = nowIso();
+}
+
+// The signed-in member, refusing a session that was ended (SU013), as the
+// database does before looking at any permission.
+function currentMember(state) {
+  const member = me(state);
+  if (member && !tokenCurrent(member)) fail("SU013", "this session was ended; sign in again");
+  return member;
 }
 
 const rankOf = (member) => Math.max(0, ...(member?.roles ?? []).map(roleRank));
@@ -103,6 +123,7 @@ function mfaMethods() {
 
 function requirePermission(state, permission) {
   const member = me(state);
+  if (member && !tokenCurrent(member)) fail("SU013", "this session was ended; sign in again");
   if (!permissionsOf(member).has(permission)) fail("42501", `not allowed: ${permission}`);
   if (permissionRisk(permission) === "CRITICAL" && !stepUpFresh(mfaMethods(), STEP_UP_SECONDS)) fail("SU005", "step-up required");
   return member;
@@ -150,7 +171,8 @@ export const mockAccessRepository = {
     const member = me(state);
     if (!member) return { member: null, blocked_reason: currentMockSession() ? "NOT_MEMBER" : "UNAUTHENTICATED" };
     const status = effectiveStatus(member);
-    const blocked = { OFFBOARDED: "OFFBOARDED", SUSPENDED: "SUSPENDED", EXPIRED: "EXPIRED", INVITED: "INVITED" }[status] ?? null;
+    const blocked =
+      { OFFBOARDED: "OFFBOARDED", SUSPENDED: "SUSPENDED", EXPIRED: "EXPIRED" }[status] ?? (!tokenCurrent(member) ? "SESSION_REVOKED" : status === "INVITED" ? "INVITED" : null);
     const granted = permissionsOf(member);
     return {
       member: {
@@ -174,7 +196,6 @@ export const mockAccessRepository = {
         required: requiresMfa(member),
         enrolled: Boolean(member.mfaEnrolledAt),
         aal: mfaMethods().length ? "aal2" : "aal1",
-        grace_until: member.mfaGraceUntil,
         step_up: stepUpFresh(mfaMethods(), STEP_UP_SECONDS),
       },
       settings: { step_up_max_age_seconds: STEP_UP_SECONDS, approval_expiry_days: 14, invitation_expiry_days: 7 },
@@ -204,6 +225,16 @@ export const mockAccessRepository = {
 
   async recordMfaState() {
     return this.myAccess();
+  },
+
+  async revokeMySessions() {
+    const state = read();
+    const member = me(state);
+    if (!member || !tokenCurrent(member)) return { sessions_revoked: 0 };
+    endSessions(member);
+    audit(state, "SESSION_REVOKED", { resourceType: "team_member", resourceId: member.userId, target: member.userId, metadata: { cause: "self" } });
+    write(state);
+    return { sessions_revoked: 1 };
   },
 
   async expireStale() {
@@ -334,7 +365,7 @@ export const mockTeamRepository = {
       accessStartsAt: null,
       accessExpiresAt: payload.accessExpiresAt || null,
       mfaEnrolledAt: null,
-      mfaGraceUntil: null,
+      sessionsValidAfter: null,
       invitedBy: actor.userId,
       invitedAt: nowIso(),
       inviteExpiresAt: new Date(Date.now() + 7 * DAY).toISOString(),
@@ -390,6 +421,7 @@ export const mockTeamRepository = {
     if (!reason?.trim()) fail("SU004", "a reason is required");
     if (!["ACTIVE", "INVITED", "EXPIRED"].includes(member.status)) fail("SU008", `member is ${member.status}`);
     Object.assign(member, { status: "SUSPENDED", suspendedAt: nowIso(), statusReason: reason.trim() });
+    endSessions(member);
     audit(state, "USER_SUSPENDED", { resourceType: "team_member", resourceId: userId, target: userId, metadata: { reason: reason.trim() } });
     audit(state, "SESSION_REVOKED", { resourceType: "team_member", resourceId: userId, target: userId, metadata: { cause: "suspension" } });
     write(state);
@@ -415,6 +447,7 @@ export const mockTeamRepository = {
     if (!reason?.trim()) fail("SU004", "a reason is required");
     if (member.status === "OFFBOARDED") fail("SU008", "already offboarded");
     Object.assign(member, { status: "OFFBOARDED", offboardedAt: nowIso(), statusReason: reason.trim(), roles: [], projects: [] });
+    endSessions(member);
     let cancelled = 0;
     state.requests.forEach((request) => {
       if (request.requesterId === userId && ["DRAFT", "PENDING"].includes(request.status)) {
@@ -431,7 +464,7 @@ export const mockTeamRepository = {
   async revokeSessions(userId) {
     const state = read();
     requirePermission(state, "sessions.revoke");
-    manageable(state, userId);
+    endSessions(manageable(state, userId));
     audit(state, "SESSION_REVOKED", { resourceType: "team_member", resourceId: userId, target: userId, metadata: { cause: "manual" } });
     write(state);
     return { user_id: userId, sessions_revoked: 1 };
@@ -443,7 +476,10 @@ export const mockTeamRepository = {
     const invitation = state.invitations.find((item) => item.id === invitationId) ?? fail("SU010", "invitation not found");
     invitation.status = "CANCELLED";
     const member = state.members.find((item) => item.userId === invitation.userId && item.status === "INVITED");
-    if (member) Object.assign(member, { status: "OFFBOARDED", offboardedAt: nowIso(), roles: [], projects: [], statusReason: "invitation cancelled" });
+    if (member) {
+      Object.assign(member, { status: "OFFBOARDED", offboardedAt: nowIso(), roles: [], projects: [], statusReason: "invitation cancelled" });
+      endSessions(member);
+    }
     audit(state, "INVITATION_CANCELLED", { resourceType: "team_invitation", resourceId: invitationId, target: invitation.userId });
     write(state);
   },
@@ -509,7 +545,7 @@ export const mockApprovalRepository = {
 
   async saveDraft(resourceId, fields, { publish = false, message = null } = {}) {
     const state = read();
-    const member = me(state);
+    const member = currentMember(state);
     if (!canDraft(member, resourceId)) fail("42501", "no draft access to this project");
     const unknown = Object.keys(fields ?? {}).filter((field) => !DRAFT_FIELDS.includes(field));
     if (unknown.length) fail("SU004", `field ${unknown[0]} cannot be changed by a draft`);
@@ -537,7 +573,7 @@ export const mockApprovalRepository = {
 
   async submit(id, message = null) {
     const state = read();
-    const member = me(state);
+    const member = currentMember(state);
     if (!permissionsOf(member).has("approvals.request")) fail("42501");
     const request = state.requests.find((item) => item.id === id && item.requesterId === member.userId) ?? fail("SU010", "request not found");
     if (request.status !== "DRAFT") fail("SU003", `request is ${request.status}`);
@@ -549,7 +585,7 @@ export const mockApprovalRepository = {
 
   async cancel(id) {
     const state = read();
-    const member = me(state);
+    const member = currentMember(state);
     const request = state.requests.find((item) => item.id === id && item.requesterId === member?.userId) ?? fail("SU010", "request not found");
     if (!["DRAFT", "PENDING"].includes(request.status)) fail("SU003", `request is ${request.status}`);
     Object.assign(request, { status: "CANCELLED", updatedAt: nowIso() });
@@ -560,7 +596,7 @@ export const mockApprovalRepository = {
 
   async rebase(id) {
     const state = read();
-    const member = me(state);
+    const member = currentMember(state);
     const request = state.requests.find((item) => item.id === id && item.requesterId === member?.userId) ?? fail("SU010", "request not found");
     if (!["DRAFT", "PENDING"].includes(request.status)) fail("SU003", `request is ${request.status}`);
     const project = (await mockProjectRepository.getById(request.resourceId)) ?? fail("SU010", "project not found");

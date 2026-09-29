@@ -102,6 +102,12 @@ const SCREENS = {
     tone: "danger",
   }),
   OFFBOARDED: () => ({ title: t("security.states.offboardedTitle"), heading: t("security.states.offboardedHeading"), copy: t("security.states.offboardedCopy"), tone: "danger" }),
+  SESSION_REVOKED: () => ({
+    title: t("security.states.sessionRevokedTitle"),
+    heading: t("security.states.sessionRevokedHeading"),
+    copy: t("security.states.sessionRevokedCopy"),
+    signInAgain: true,
+  }),
   NOT_STARTED: (access) => ({
     title: t("security.states.notStartedTitle"),
     heading: t("security.states.notStartedHeading"),
@@ -195,8 +201,11 @@ export function blockedScreen(access, rerender) {
     };
   }
 
-  const screen = (SCREENS[reason] ?? SCREENS.NOT_MEMBER)(access);
-  return { html: accessScreen({ ...screen, action: signOutButton() }), bind: () => {} };
+  const { signInAgain, ...screen } = (SCREENS[reason] ?? SCREENS.NOT_MEMBER)(access);
+  const action = signInAgain
+    ? `<button class="button button--primary" type="button" data-gate-sign-out data-i18n="security.states.signInAgain">${escapeHtml(t("security.states.signInAgain"))}</button>`
+    : signOutButton();
+  return { html: accessScreen({ ...screen, action }), bind: () => {} };
 }
 
 export function bindGateSignOut(root) {
