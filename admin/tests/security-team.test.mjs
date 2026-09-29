@@ -7,7 +7,7 @@
 import { strict as assert } from "node:assert";
 import { after, before, describe, it } from "node:test";
 import { IDS, PROJECTS, as, code, createSecurityDb, defaultStrength, one, outcome, sessionClaims } from "./helpers/security-fixture.mjs";
-import { issuedNow } from "./helpers/supabase-db.mjs";
+import { addVerifiedFactor, issuedNow } from "./helpers/supabase-db.mjs";
 
 let db;
 
@@ -110,6 +110,7 @@ describe("permissions and MFA", () => {
 
   it("gives a migrated owner nothing without MFA, from the first use", async () => {
     // No grace period: the legacy admin became an OWNER with no factor.
+    await db.query("delete from auth.mfa_factors where user_id = $1", [IDS.owner]);
     const columns = await db.query("select column_name from information_schema.columns where table_name = 'team_members' and column_name ~ 'grace'");
     assert.deepEqual(columns.rows, [], "no grace column left");
     assert.equal(await outcome(as(db, "owner", "select id from public.projects where id = $1", [PROJECTS.assigned], "aal1")), "none");
@@ -120,8 +121,10 @@ describe("permissions and MFA", () => {
     assert.deepEqual([blocked.mfa.required, blocked.mfa.enrolled], [true, false]);
     assert.equal("grace_until" in blocked.mfa, false);
 
-    // Enrolling goes through Supabase Auth; once the session is aal2 the
-    // owner's access is back, with nothing else to unlock.
+    // Enrolling goes through Supabase Auth; once the factor is verified and
+    // the session is aal2 the owner's access is back, with nothing else to
+    // unlock.
+    await addVerifiedFactor(db, IDS.owner);
     assert.equal(await outcome(as(db, "owner", "select id from public.projects where id = $1", [PROJECTS.assigned], "mfa")), "ok");
     assert.equal((await access("owner", "mfa")).blocked_reason, null);
   });

@@ -100,6 +100,9 @@ before(async () => {
     grant usage on schema public to anon, authenticated, service_role;
     create schema if not exists auth;
     create table auth.users (id uuid primary key, email text);
+    -- The factors Supabase Auth keeps; the security foundation reads them on
+    -- every permission check.
+    create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id), status text not null default 'unverified');
     -- Supabase's own definition: the legacy claim first, then the claims JSON.
     create or replace function auth.uid() returns uuid language sql stable as $$
       select coalesce(
@@ -150,6 +153,8 @@ before(async () => {
       },
     },
   });
+  // The TOTP factor an OWNER needs from the first use.
+  await db.query("insert into auth.mfa_factors (user_id, status) values ($1, 'verified')", [ADMIN_ID]);
 });
 
 after(async () => {

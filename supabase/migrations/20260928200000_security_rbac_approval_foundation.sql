@@ -27,10 +27,14 @@
 --                   issued before it (JWT iat) is refused from then on, even
 --                   after a reactivation. Only a new sign-in works again.
 --   project access  public.project_members for roles without projects.read.
---   MFA             every permission of a privileged role needs an aal2
---                   session from its first use, with no grace period;
---                   CRITICAL permissions need an MFA verification younger
---                   than the step-up window, read from the JWT's amr claim.
+--   MFA             every permission of a privileged role needs a verified
+--                   factor (auth.mfa_factors, read on every check) and an
+--                   aal2 session, from its first use, with no grace period;
+--                   CRITICAL permissions also need an MFA verification
+--                   younger than the step-up window, read from the JWT's amr
+--                   claim. A token's aal2 and amr outlive a removed factor
+--                   until the session is refreshed, so the token alone never
+--                   counts as MFA.
 --   approvals       public.change_requests: a draft never touches the live
 --                   project; only approve_change_request() applies it, in one
 --                   transaction, against the version it was based on.
@@ -657,9 +661,12 @@ as $$
   select coalesce(public.request_claims() ->> 'aal', 'aal1');
 $$;
 
--- An MFA verification younger than the step-up window. aal2 alone is not
--- enough for CRITICAL actions: a session that verified MFA hours ago must
--- verify again (supabase.auth.mfa.challengeAndVerify), which refreshes amr.
+-- An MFA verification younger than the step-up window, by a caller who still
+-- has a verified factor. aal2 alone is not enough for CRITICAL actions: a
+-- session that verified MFA hours ago must verify again
+-- (supabase.auth.mfa.challengeAndVerify), which refreshes amr. And the amr
+-- entry is not enough either: it stays in the token after the factor is
+-- removed, until the session is refreshed.
 create or replace function public.step_up_satisfied()
 returns boolean
 language plpgsql
@@ -672,6 +679,9 @@ declare
   max_age integer;
 begin
   if coalesce(claims ->> 'aal', 'aal1') <> 'aal2' or jsonb_typeof(claims -> 'amr') is distinct from 'array' then
+    return false;
+  end if;
+  if not public.user_has_verified_factor(auth.uid()) then
     return false;
   end if;
   select step_up_max_age_seconds into max_age from public.security_settings where key = 'global';
@@ -819,13 +829,17 @@ as $$
   );
 $$;
 
--- The MFA part of every permission check.
---   CRITICAL                  -> a fresh MFA verification (step-up)
---   aal2 session              -> allowed
---   verified factor, aal1     -> denied: an enrolled person must finish MFA
---   privileged, no factor     -> denied: roles with approval powers need MFA
---                                from their first use, migrated accounts too
---   not privileged, no factor -> allowed
+-- The MFA part of every permission check. It reads both the factors the
+-- member has now (auth.mfa_factors) and what the token says, because a token
+-- keeps aal2 and its amr entries after the factor behind them is removed,
+-- until the session is refreshed:
+--   privileged, no verified factor -> denied, whatever the token says: roles
+--                                     with approval powers need MFA from their
+--                                     first use, migrated accounts too
+--   CRITICAL                       -> a verified factor and a fresh MFA
+--                                     verification (step-up)
+--   verified factor                -> the session must be aal2
+--   not privileged, no factor      -> allowed
 -- Enrolling a factor goes through Supabase Auth, not through a permission,
 -- so a privileged member without MFA is never locked out of enabling it.
 create or replace function public.mfa_gate(p_user uuid, p_risk text)
@@ -835,17 +849,19 @@ stable
 security definer
 set search_path = public, pg_temp
 as $$
+declare
+  has_factor boolean := coalesce(public.user_has_verified_factor(p_user), false);
 begin
-  if p_risk = 'CRITICAL' then
-    return public.step_up_satisfied();
-  end if;
-  if public.jwt_aal() = 'aal2' then
-    return true;
-  end if;
-  if public.user_has_verified_factor(p_user) then
+  if not has_factor and public.member_requires_mfa(p_user) then
     return false;
   end if;
-  return not public.member_requires_mfa(p_user);
+  if p_risk = 'CRITICAL' then
+    return has_factor and public.step_up_satisfied();
+  end if;
+  if has_factor then
+    return public.jwt_aal() = 'aal2';
+  end if;
+  return true;
 end;
 $$;
 
@@ -895,10 +911,12 @@ $$;
 -- Raises instead of returning false, with the reason the Admin shows:
 --   SU013  this token was issued before the member's sessions were revoked:
 --          sign in again
---   SU006  the roles grant it, but this session has not completed MFA (enrol
---          a factor, or verify the one enrolled)
---   SU005  the roles grant it, the session has MFA, and the action is
---          CRITICAL: verify again (step-up)
+--   SU006  the roles grant it, but MFA is not complete: no verified factor
+--          (enrol one; an aal2 token left over from a removed factor does
+--          not count), or a factor this session has not verified
+--   SU005  the roles grant it, the member has a verified factor, the
+--          session is aal2, and the action is CRITICAL: verify again
+--          (step-up)
 --   42501  not granted at all
 create or replace function public.require_permission(p_permission text)
 returns void
@@ -915,7 +933,7 @@ begin
     raise exception 'this session was ended; sign in again' using errcode = 'SU013';
   end if;
   if auth.uid() is not null and public.role_grants_permission(auth.uid(), p_permission) then
-    if public.jwt_aal() = 'aal2' then
+    if public.jwt_aal() = 'aal2' and public.user_has_verified_factor(auth.uid()) then
       raise exception 'this action needs a recent MFA verification (%)', p_permission using errcode = 'SU005';
     end if;
     raise exception 'this account must complete MFA first (%)', p_permission using errcode = 'SU006';
@@ -1655,7 +1673,11 @@ $$;
 -- 13. the caller's own access (drives the Admin's interface)
 -- ---------------------------------------------------------------------------
 -- Answers for the caller only. The Admin uses it to choose what to show; the
--- database still checks every query on its own.
+-- database still checks every query on its own. A token issued before the
+-- member's last session revocation gets only that reason: no identity,
+-- roles, projects or settings (its own rows are closed to it by RLS too).
+-- The MFA state comes from the factors the member has now, not from the
+-- token alone: an aal2 token left over from a removed factor is not MFA.
 create or replace function public.my_access()
 returns jsonb
 language plpgsql
@@ -1679,18 +1701,27 @@ begin
   if not found then
     return jsonb_build_object('member', null, 'blocked_reason', 'NOT_MEMBER');
   end if;
+  if not public.caller_token_current() then
+    return jsonb_build_object(
+      'member', null,
+      'blocked_reason', 'SESSION_REVOKED',
+      'roles', '[]'::jsonb,
+      'permissions', '[]'::jsonb,
+      'projects', '[]'::jsonb,
+      'approval_routes', '[]'::jsonb
+    );
+  end if;
 
-  enrolled := public.user_has_verified_factor(uid);
+  enrolled := coalesce(public.user_has_verified_factor(uid), false);
   requires := public.member_requires_mfa(uid);
   blocked := case
     when m.status = 'OFFBOARDED' then 'OFFBOARDED'
     when m.status = 'SUSPENDED' then 'SUSPENDED'
     when public.member_effective_status(m) = 'EXPIRED' then 'EXPIRED'
-    when not public.caller_token_current() then 'SESSION_REVOKED'
     when m.status = 'INVITED' then 'INVITED'
     when m.access_starts_at is not null and m.access_starts_at > now() then 'NOT_STARTED'
+    when requires and not enrolled then 'MFA_ENROLL_REQUIRED'
     when enrolled and aal <> 'aal2' then 'MFA_CHALLENGE_REQUIRED'
-    when requires and not enrolled and aal <> 'aal2' then 'MFA_ENROLL_REQUIRED'
     else null
   end;
 
@@ -1698,7 +1729,6 @@ begin
     into granted
   from public.permissions p
   where public.member_row_active(m)
-    and public.caller_token_current()
     and p.key in (select rp.permission_key from public.role_permissions rp where rp.role_key in (select public.member_roles(uid)));
 
   return jsonb_build_object(
@@ -1733,7 +1763,7 @@ begin
       'required', requires,
       'enrolled', enrolled,
       'aal', aal,
-      'step_up', public.step_up_satisfied()
+      'step_up', enrolled and public.step_up_satisfied()
     ),
     'settings', (
       select jsonb_build_object('step_up_max_age_seconds', s.step_up_max_age_seconds, 'approval_expiry_days', s.approval_expiry_days, 'invitation_expiry_days', s.invitation_expiry_days)

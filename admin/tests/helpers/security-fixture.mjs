@@ -2,7 +2,9 @@
 // member of every kind the access model distinguishes, for the security tests.
 //
 //   owner          a row of public.admins before the security foundation, so
-//                  an OWNER without a factor (no grace period: it needs MFA)
+//                  an OWNER; it enabled TOTP at its first sign-in, as it must
+//                  (no grace period). Tests about an OWNER without a factor
+//                  remove it first.
 //   partner        OWNER with a verified TOTP factor
 //   absolute       ABSOLUTE_ADMIN with a verified factor (break-glass)
 //   seo, manager   SEO / MANAGER with a verified factor
@@ -18,7 +20,7 @@
 // editor; everything the tests then do goes through the API roles.
 
 import { applyMigrations } from "./migration-files.mjs";
-import { ADMIN_ID, USER_ID, asRole, createSupabaseDb, issuedNow, mfaClaims } from "./supabase-db.mjs";
+import { ADMIN_ID, USER_ID, addVerifiedFactor, asRole, createSupabaseDb, issuedNow, mfaClaims } from "./supabase-db.mjs";
 
 const id = (n) => `a0000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
@@ -62,6 +64,7 @@ export async function createSecurityDb() {
   }
   await db.query("update auth.users set encrypted_password = 'hash' where id = $1", [IDS.owner]);
   await applyMigrations(db, { legacyAdmins: [IDS.owner] });
+  await addVerifiedFactor(db, IDS.owner);
 
   await db.query(
     `insert into public.projects (id, case_number, name, slug, editorial_status, visible, description)
@@ -89,9 +92,7 @@ export async function createSecurityDb() {
     for (const [project, level] of member.projects ?? []) {
       await db.query("insert into public.project_members (user_id, project_id, access_level) values ($1, $2, $3)", [uid, PROJECTS[project], level]);
     }
-    if (member.factor) {
-      await db.query("insert into auth.mfa_factors (user_id, status) values ($1, 'verified')", [uid]);
-    }
+    if (member.factor) await addVerifiedFactor(db, uid);
   }
   return db;
 }

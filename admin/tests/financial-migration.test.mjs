@@ -11,7 +11,7 @@ import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { applyMigrations, readMigration } from "./helpers/migration-files.mjs";
 import { ADMIN_ONLY, policyMatrix, tableGrants } from "./helpers/policy-matrix.mjs";
-import { ADMIN_ID, USER_ID, asRole as runAs, createSupabaseDb, failure as fails } from "./helpers/supabase-db.mjs";
+import { ADMIN_ID, USER_ID, addVerifiedFactor, asRole as runAs, createSupabaseDb, failure as fails } from "./helpers/supabase-db.mjs";
 
 const FINANCIAL = readMigration("financial_foundation");
 const { FINANCIAL_COLUMNS } = await import("../src/services/mappers/financial-mapper.js");
@@ -42,8 +42,9 @@ const dayOf = (value) => (value instanceof Date ? value.toISOString().slice(0, 1
 before(async () => {
   db = await createSupabaseDb();
   // The admin is one from before the security foundation, which makes them an
-  // OWNER, as it does in production.
+  // OWNER, as it does in production, with the TOTP factor an OWNER needs.
   await applyMigrations(db, { legacyAdmins: [ADMIN_ID] });
+  await addVerifiedFactor(db, ADMIN_ID);
 });
 
 after(async () => {

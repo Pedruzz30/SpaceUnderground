@@ -113,6 +113,13 @@ export function issuedNow() {
   return Math.floor(Date.now() / 1000) + 1;
 }
 
+// A verified TOTP factor, as Supabase Auth records one once its first code
+// is accepted. A token only reaches aal2 through one, so a member acting with
+// mfaClaims needs one too: the database checks the factor on every request.
+export async function addVerifiedFactor(db, uid) {
+  await db.query("insert into auth.mfa_factors (user_id, status) values ($1, 'verified')", [uid]);
+}
+
 // Claims of a session that verified MFA `secondsAgo` seconds ago: aal2, with
 // the TOTP entry Supabase Auth adds to amr. Fresh enough for step-up by
 // default; pass more than the step-up window (600 s) for a stale one.

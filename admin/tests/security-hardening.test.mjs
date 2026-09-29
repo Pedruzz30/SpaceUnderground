@@ -1,6 +1,7 @@
 // The post-review hardening, each piece tried the way it is used:
 //   - client codes come from inserting a client, never from an RPC
-//   - privileged members, migrated owners included, need MFA from the start
+//   - privileged members, migrated owners included, need a verified factor
+//     and an aal2 session from the start
 //   - every function from earlier migrations runs with a pinned search_path,
 //     and the triggers and policies built on them still work
 //   - the old is_admin() is reachable by no API role
@@ -12,6 +13,7 @@
 import { strict as assert } from "node:assert";
 import { after, before, describe, it } from "node:test";
 import { IDS, PROJECTS, as, code, createSecurityDb, one, outcome } from "./helpers/security-fixture.mjs";
+import { addVerifiedFactor } from "./helpers/supabase-db.mjs";
 
 let db;
 
@@ -83,12 +85,24 @@ describe("client codes", () => {
 });
 
 describe("MFA from the first use", () => {
-  it("denies a migrated OWNER every administrative permission on aal1, and allows it on aal2", async () => {
+  it("denies a migrated OWNER without a factor everything, on any token, and allows it once a factor is verified and the session is aal2", async () => {
     const decide = async (strength) => (await one(as(db, "owner", "select public.has_permission('team.invite') as ok", [], strength))).ok;
-    assert.equal(await decide("aal1"), false);
-    assert.equal(await code(as(db, "owner", "select public.require_permission('clients.edit')", [], "aal1")), "SU006", "MFA required");
-    assert.equal((await one(as(db, "owner", "select public.my_access() as access", [], "aal1"))).access.blocked_reason, "MFA_ENROLL_REQUIRED");
+    const reason = async (strength) => (await one(as(db, "owner", "select public.my_access() as access", [], strength))).access.blocked_reason;
+    await db.query("delete from auth.mfa_factors where user_id = $1", [IDS.owner]);
+    try {
+      assert.equal(await decide("aal1"), false);
+      assert.equal(await code(as(db, "owner", "select public.require_permission('clients.edit')", [], "aal1")), "SU006", "MFA required");
+      assert.equal(await reason("aal1"), "MFA_ENROLL_REQUIRED");
+      // An aal2 token is not MFA without a factor behind it.
+      assert.equal(await decide("mfa"), false);
+      assert.equal(await reason("mfa"), "MFA_ENROLL_REQUIRED");
+    } finally {
+      await addVerifiedFactor(db, IDS.owner);
+    }
+    assert.equal(await decide("aal1"), false, "enrolled, but this session has not verified it");
+    assert.equal(await reason("aal1"), "MFA_CHALLENGE_REQUIRED");
     assert.equal(await decide("mfa"), true);
+    assert.equal(await reason("mfa"), null);
   });
 
   it("applies the same rule to every role that requires MFA", async () => {
@@ -98,6 +112,9 @@ describe("MFA from the first use", () => {
     await db.query("insert into public.user_roles (user_id, role_key) values ($1, 'MANAGER')", [userId]);
     const { asRole } = await import("./helpers/supabase-db.mjs");
     const read = (aal) => asRole(db, "authenticated", userId, () => db.query("select id from public.projects where id = $1", [PROJECTS.assigned]), { aal, amr: [] });
+    assert.equal(await outcome(read("aal1")), "none");
+    assert.equal(await outcome(read("aal2")), "none", "no factor: an aal2 claim alone is not MFA");
+    await addVerifiedFactor(db, userId);
     assert.equal(await outcome(read("aal1")), "none");
     assert.equal(await outcome(read("aal2")), "ok");
   });
