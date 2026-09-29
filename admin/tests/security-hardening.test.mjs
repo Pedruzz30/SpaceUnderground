@@ -1,7 +1,7 @@
 // The post-review hardening, each piece tried the way it is used:
 //   - client codes come from inserting a client, never from an RPC
 //   - privileged members, migrated owners included, need a verified factor
-//     and an aal2 session from the start
+//     and a live aal2 session bound to it from the start
 //   - every function from earlier migrations runs with a pinned search_path,
 //     and the triggers and policies built on them still work
 //   - the old is_admin() is reachable by no API role
@@ -110,15 +110,17 @@ describe("MFA from the first use", () => {
     await db.query("insert into auth.users (id, email, encrypted_password) values ($1, 'new-manager@space.local', 'hash')", [userId]);
     await db.query("insert into public.team_members (user_id, display_name, email, status) values ($1, 'New manager', 'new-manager@space.local', 'ACTIVE')", [userId]);
     await db.query("insert into public.user_roles (user_id, role_key) values ($1, 'MANAGER')", [userId]);
-    const { asRole, mfaClaims } = await import("./helpers/supabase-db.mjs");
+    const { asRole, mfaClaims, mfaSession } = await import("./helpers/supabase-db.mjs");
     const read = (claims) => asRole(db, "authenticated", userId, () => db.query("select id from public.projects where id = $1", [PROJECTS.assigned]), claims);
     const aal1 = { aal: "aal1", amr: [] };
     assert.equal(await outcome(read(aal1)), "none");
     assert.equal(await outcome(read(mfaClaims())), "none", "no factor: an aal2 token alone is not MFA");
-    await addVerifiedFactor(db, userId);
+    const factor = await addVerifiedFactor(db, userId);
     assert.equal(await outcome(read(aal1)), "none");
     assert.equal(await outcome(read({ aal: "aal2", amr: [] })), "none", "aal2 with no MFA entry in amr proves nothing");
-    assert.equal(await outcome(read(mfaClaims())), "ok");
+    assert.equal(await outcome(read(mfaClaims())), "none", "aal2 claims with no live session behind them prove nothing");
+    const { claims } = await mfaSession(db, userId, { factorId: factor.id });
+    assert.equal(await outcome(read(claims)), "ok", "a session that verified the factor");
   });
 
   it("does not ask MFA of roles that do not require it", async () => {

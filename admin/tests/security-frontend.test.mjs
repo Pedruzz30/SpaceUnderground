@@ -121,6 +121,11 @@ describe("decision policy", () => {
     assert.equal(stepUpFresh([{ method: "totp", timestamp: at(3600) }], 600, now), false);
     assert.equal(stepUpFresh([{ method: "password", timestamp: at(1) }], 600, now), false);
     assert.equal(stepUpFresh([], 600, now), false);
+    // Supabase Auth's names for phone and WebAuthn verifications.
+    assert.equal(stepUpFresh([{ method: "mfa/phone", timestamp: at(30) }], 600, now), true);
+    assert.equal(stepUpFresh([{ method: "mfa/webauthn", timestamp: at(30) }], 600, now), true);
+    assert.equal(stepUpFresh([{ method: "phone", timestamp: at(30) }], 600, now), false, "not a name Supabase Auth records");
+    assert.equal(stepUpFresh([{ method: "webauthn", timestamp: at(30) }], 600, now), false);
   });
 });
 
@@ -323,6 +328,28 @@ describe("mock workflow", () => {
     assert.equal(stale.blockedReason, "MFA_CHALLENGE_REQUIRED", "T1 verified A, not B");
     await assert.rejects(team.listMembers(), (error) => error.code === "mfa_required");
     sessionStorage.setItem(KEY, t2);
+    await logout();
+  });
+
+  it("does not accept a session whose factor was removed, though another factor remains", async () => {
+    await as("owner");
+    const mfa = await import("../src/services/mfa-service.js");
+    const { loadAccess } = await import("../src/services/access-service.js");
+    const { getSession } = await import("../src/services/auth-service.js");
+    const repository = await (await import("../src/services/repositories/index.js")).getAccessRepository();
+    // Factor B joins factor A; then this session verifies A again (T1).
+    const [factorA] = await mfa.listFactors();
+    const factorB = await mfa.enrollTotp("B");
+    await mfa.verifyTotp(factorB.id, "123456");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await mfa.verifyTotp(factorA.id, "123456");
+    assert.equal((await loadAccess(await getSession(), { force: true })).blockedReason, null, "T1 works");
+
+    await repository.unenroll(factorA.id);
+    assert.ok((await mfa.listFactors()).some((factor) => factor.id === factorB.id && factor.status === "verified"), "B remains");
+    const access = await loadAccess(await getSession(), { force: true });
+    assert.equal(access.blockedReason, "MFA_CHALLENGE_REQUIRED", "T1's session is aal1 now: verify B");
+    await assert.rejects(team.listMembers(), (error) => error.code === "mfa_required");
     await logout();
   });
 

@@ -8,7 +8,7 @@
 import { MOCK_MEMBER_SEED, mockEmail, mockUserId } from "../../data/team.js";
 import { APPROVAL_ROUTES, DRAFT_FIELDS, PERMISSIONS, ROLES, permissionRisk, permissionsForRoles, roleRank } from "../../security/catalog.js";
 import { stepUpFresh } from "../../security/policy.js";
-import { currentMockSession, forgetMockMfaVerification, markMockMfaVerified } from "./mock-auth-repository.js";
+import { currentMockSession, downgradeMockSessions, liveMockSession, markMockMfaVerified, refreshMockSession } from "./mock-auth-repository.js";
 import { mockProjectRepository } from "./mock-project-repository.js";
 import { effectiveStatus } from "../mappers/team-mapper.js";
 import { projectColumns } from "../../utils/change-diff.js";
@@ -131,26 +131,23 @@ function factorsOf(state, member) {
   return state.factors[member?.userId] ?? (member?.mfaEnrolledAt ? [{ id: `factor-${member.userId}`, type: "totp", status: "verified", name: "Mock", createdAt: member.mfaEnrolledAt }] : []);
 }
 
-// Since when the member's current factors exist: the earliest verification
-// among them (mfa_enrolment_since in the database); null without one, and a
-// time it cannot read counts as never (it only refuses).
-function enrolmentSince(member) {
-  const times = factorsOf(read(), member)
-    .filter((factor) => factor.status === "verified")
-    .map((factor) => Date.parse(factor.updatedAt ?? factor.createdAt ?? ""));
-  return times.length ? Math.min(...times.map((time) => (Number.isNaN(time) ? Infinity : time))) : null;
-}
+const hasVerifiedFactor = (member) => factorsOf(read(), member).some((factor) => factor.status === "verified");
 
-const hasVerifiedFactor = (member) => enrolmentSince(member) !== null;
-
-// The session's MFA counts only if it verified the member's current factors.
-// The mock session keeps its verification after a removal, as a Supabase
-// token keeps aal2 until it is refreshed; one from before the factors
-// enrolled since does not count, even once there is a factor again.
+// The session's MFA counts only while its live session backs it, as the
+// database's caller_mfa_verified_at() decides: aal2, bound to a factor the
+// member holds verified now, and the token carrying that session's latest
+// verification. The mock token keeps its verification after a removal, as a
+// Supabase token keeps aal2 until it is refreshed; it counts for nothing once
+// its session was downgraded, and stays refused after that session verifies
+// another factor.
 function sessionVerified(member) {
-  const since = enrolmentSince(member);
-  const verifiedAt = Date.parse(currentMockSession()?.mfaVerifiedAt ?? "");
-  return Number.isFinite(since) && Number.isFinite(verifiedAt) && verifiedAt >= since;
+  const token = currentMockSession();
+  const live = liveMockSession(token?.sessionId);
+  if (!live || live.userId !== member?.userId || live.aal !== "aal2" || !live.factorId) return false;
+  const bound = factorsOf(read(), member).some((factor) => factor.id === live.factorId && factor.status === "verified");
+  const verifiedAt = Date.parse(token?.mfaVerifiedAt ?? "");
+  const proof = Date.parse(live.mfaAt ?? "");
+  return bound && Number.isFinite(verifiedAt) && Number.isFinite(proof) && verifiedAt >= proof;
 }
 
 const stepUpSatisfied = (member) => sessionVerified(member) && stepUpFresh(mfaMethods(), STEP_UP_SECONDS);
@@ -340,7 +337,7 @@ export const mockAccessRepository = {
       audit(state, "MFA_ENROLLED", { resourceType: "team_member", resourceId: member.userId, target: member.userId });
     }
     write(state);
-    markMockMfaVerified();
+    markMockMfaVerified(factorId);
   },
 
   async unenroll(factorId) {
@@ -352,13 +349,13 @@ export const mockAccessRepository = {
       audit(state, "MFA_REMOVED", { resourceType: "team_member", resourceId: member.userId, target: member.userId });
     }
     write(state);
+    downgradeMockSessions(factorId);
   },
 
-  // Supabase Auth downgrades a session once its factor is gone; the refreshed
-  // token no longer carries the verification.
+  // The refreshed token says what its live session says now: aal1 once the
+  // factor behind it is gone.
   async refreshSession() {
-    const member = me(read());
-    if (member && !hasVerifiedFactor(member)) forgetMockMfaVerification();
+    refreshMockSession();
   },
 
   async assurance() {

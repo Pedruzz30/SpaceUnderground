@@ -166,7 +166,7 @@ flowchart TD
   P -- no --> C{risk CRITICAL?}
   C -- yes --> SU006
   C -- no --> A[allow]
-  F -- yes --> Q{aal2 token whose MFA is no<br/>older than the current factors?}
+  F -- yes --> Q{token's live session aal2, bound to<br/>a verified factor of the caller, and the<br/>token carrying its latest proof?}
   Q -- no --> SU006b[refuse SU006: verify MFA]
   Q -- yes --> K{risk CRITICAL?}
   K -- no --> A
@@ -331,30 +331,38 @@ is deleted. So ending sessions is not only deleting them:
   a factor the Admin refreshes the session (`auth.refreshSession()`) to get
   the `aal1` token at once and shows the enrolment screen, but nothing
   depends on that: the database refuses the old token by itself.
-- **A factor enrolled later does not revive an old token**: `aal2` and `amr`
-  say that MFA happened, not with which factor. So the token's MFA time (its
-  latest `totp` / `phone` / `webauthn` entry in `amr`) must be no older than
-  the member's current factors: `mfa_enrolment_since()`, the earliest
-  verification among their verified factors
-  (`greatest(created_at, updated_at)` in `auth.mfa_factors`; Supabase Auth
-  stamps `updated_at` when it verifies a factor), compared by the second.
-  A token that verified factor A is refused once A is removed and stays
-  refused after factor B is enrolled (`MFA_CHALLENGE_REQUIRED`: verify B);
-  the token from verifying B works. This is read from Supabase Auth's own
-  table on every request, so it holds however the factors changed: through
-  the Admin, the Auth API directly or the dashboard. That bound only moves
-  forward (removing a factor can raise it; a factor verified from now on
-  cannot lower it), so a token refused once is refused for good. Adding a
-  second factor logs nobody out. `team_members.mfa_enrolled_at` is only a
-  record for the Team list; no decision reads it.
+- **MFA is bound to the live session**: `aal2` and `amr` say that MFA
+  happened, not with which factor, and they outlive the factor. So
+  `caller_mfa_verified_at()` reads Supabase Auth's own session state on
+  every request, and fails closed unless all of it holds:
+  - the token says `aal2` and its `session_id` is a uuid;
+  - that session (`auth.sessions`) exists, is the caller's and is `aal2`
+    now;
+  - it is bound (`factor_id`) to a factor that is the caller's and verified
+    now;
+  - the token's `amr` entry for that factor's method (`totp`, `mfa/phone` or
+    `mfa/webauthn`) is no older, by the second, than the session's current
+    proof of it (`auth.mfa_amr_claims.updated_at`).
+
+  When a factor is removed, Supabase Auth drops the sessions bound to it to
+  `aal1` with no factor, so a token that verified factor A is refused even
+  while factor B remains; where it would not, the factor lookup refuses. When
+  that same session later verifies B, its proof moves to that moment, so the
+  old token stays refused and only the token issued by that verification
+  works (`MFA_CHALLENGE_REQUIRED` until then: verify B). A token superseded by
+  a later verification of its own session is refused as well. This holds
+  however the factors changed: through the Admin, the Auth API directly or
+  the dashboard. Adding a second factor changes no session, so it logs
+  nobody out. `team_members.mfa_enrolled_at` is only a record for the Team
+  list; no decision reads it.
 - **No lockout**: enrolling goes through Supabase Auth (`mfa.enroll`,
   `mfa.challengeAndVerify`), which needs no permission of ours, so the
   enrolment screen always works. A person who loses their authenticator is
   recovered by an operator deleting the factor in the Supabase dashboard
   (Authentication → Users); they enrol again at the next sign-in.
 - **Enrolled means enforced**: an account with a verified factor, on an
-  `aal1` session or a token whose MFA predates its current factors, holds
-  nothing until it verifies the code, whatever its role.
+  `aal1` session or a token its live session no longer backs, holds nothing
+  until it verifies the code, whatever its role.
 - **Step-up**: CRITICAL permissions need an MFA verification younger than
   `security_settings.step_up_max_age_seconds` (600 s), read from the token's
   `amr` claim (Supabase updates the timestamp on every verification). The
@@ -735,14 +743,23 @@ it belongs to Supabase's platform limits.
           has_schema_privilege('postgres', 'auth', 'usage');
    ```
 
-   And that `auth.mfa_factors` has the columns the MFA check reads
-   (**blocking**: `created_at` and `updated_at`, `timestamp with time zone`,
-   not null, and `status`):
+   And that it can read the session state the MFA check reads, with the
+   columns it reads (**blocking**: three `true`, then `auth.mfa_amr_claims`
+   `authentication_method`, `session_id`, `updated_at`; `auth.mfa_factors`
+   `factor_type`, `id`, `status`, `user_id`; `auth.sessions` `aal`,
+   `factor_id`, `id`, `user_id`):
 
    ```sql
-   select column_name, data_type, is_nullable from information_schema.columns
-   where table_schema = 'auth' and table_name = 'mfa_factors'
-     and column_name in ('status', 'created_at', 'updated_at') order by 1;
+   select has_table_privilege('postgres', 'auth.sessions', 'select'),
+          has_table_privilege('postgres', 'auth.mfa_amr_claims', 'select'),
+          has_table_privilege('postgres', 'auth.mfa_factors', 'select');
+   select table_name, column_name, data_type from information_schema.columns
+   where table_schema = 'auth'
+     and (table_name, column_name) in (
+       ('sessions', 'id'), ('sessions', 'user_id'), ('sessions', 'aal'), ('sessions', 'factor_id'),
+       ('mfa_factors', 'id'), ('mfa_factors', 'user_id'), ('mfa_factors', 'status'), ('mfa_factors', 'factor_type'),
+       ('mfa_amr_claims', 'session_id'), ('mfa_amr_claims', 'authentication_method'), ('mfa_amr_claims', 'updated_at'))
+   order by 1, 2;
    ```
 
 3. In Supabase Auth settings (all **blocking**, see the release checklist):
@@ -796,8 +813,15 @@ Each of these is REQUIRES VERIFICATION until run against production:
       request made with the access token they held before the removal is
       refused (`SU006`).
 - [ ] Rotating MFA retires old tokens: with a token copied before the
-      removal, enrol and verify a new factor; that old token is still
-      refused (`SU006`), and the Admin works with the new session.
+      removal, enrol and verify a new factor in the same browser; that old
+      token is still refused (`SU006`), and the Admin works with the new one.
+- [ ] Supabase Auth keeps the session state the check reads: right after
+      verifying TOTP, for the `session_id` in the access token,
+      `select aal, factor_id from auth.sessions where id = '<session_id>';`
+      is `aal2` and the factor, and
+      `select authentication_method, updated_at from auth.mfa_amr_claims where session_id = '<session_id>';`
+      has a `totp` row at that verification. After removing the factor, the
+      session is `aal1` with no factor.
 - [ ] As `anon` with the publishable key, `team_members?select=ru&limit=1`
       and `security_audit_log?select=id&limit=1` are refused.
 - [ ] The public site still loads published projects (`projects` anon policy
@@ -829,12 +853,19 @@ Each of these is REQUIRES VERIFICATION until run against production:
   outlives its factor authorizes nothing a factor was needed for, CRITICAL
   included. `require_permission` answers `SU006` (enrol) rather than `SU005`
   (step-up) when there is no factor to step up with.
-- **MFA rotation** (final review): a token's MFA must be no older than the
-  member's current factors (`caller_mfa_current()`, used by `mfa_gate()`,
-  `step_up_satisfied()`, `require_permission()` and `my_access()`), so
-  enrolling factor B after removing A never revives a token that verified
-  A. Malformed MFA claims (no `amr`, no MFA entry, a timestamp that is not
-  a number) are refused.
+- **MFA bound to the live session** (final review): a token's MFA counts
+  only while Supabase Auth's session state backs it
+  (`caller_mfa_verified_at()`, behind `caller_mfa_current()`, `mfa_gate()`,
+  `step_up_satisfied()`, `require_permission()` and `my_access()`): its
+  session aal2 and bound to a verified factor of the caller, and its amr
+  entry for that factor's method the session's latest proof. Removing
+  factor A refuses the tokens that verified A even while factor B remains,
+  and neither enrolling B nor verifying B in the same session revives them.
+  The amr method names are Supabase Auth's (`totp`, `mfa/phone`,
+  `mfa/webauthn`). A missing, malformed, unknown or foreign `session_id`,
+  and malformed MFA claims, are refused. (This replaces the rule of the
+  previous round, which compared the token with the oldest current factor
+  and let a token through while any older factor remained.)
 - **An ended session's `my_access()`** returns only
   `blocked_reason: SESSION_REVOKED` with empty lists: no member, roles,
   projects, MFA state or settings.
@@ -858,15 +889,20 @@ Each of these is REQUIRES VERIFICATION until run against production:
 - **Session cutoff precision**: `iat` has whole seconds, so a new sign-in in
   the same second as a revocation is refused too (sign in again). The check
   assumes Supabase Auth's and Postgres's clocks agree within a second.
-- **MFA time precision**: `amr` has whole seconds, compared with the second
-  of the current factor's verification (the token issued by that
-  verification carries the same second). Only a token whose MFA happened in
-  that very second passes without having verified it: factor A verified,
-  removed, and factor B enrolled and verified, all within one second.
-- **Supabase Auth's timestamps** (REQUIRES VERIFICATION, blocking in the
-  release checklist): the rule relies on `updated_at` being set when a
-  factor is verified. Were it left at the enrolment time, a factor enrolled
-  before a token and verified after that token's factor was removed could
-  revive it. If Supabase Auth also moves `updated_at` on other changes
-  (renaming, a challenge), that only refuses more: the member's other
-  sessions verify their code again.
+- **MFA proof precision**: `amr` has whole seconds, compared with the second
+  of the session's latest proof (the token issued by that verification
+  carries the same second). Only a token of the same session whose MFA
+  happened in that very second passes without having been issued by it:
+  factor A verified, removed, and factor B verified in that session, all
+  within one second.
+- **A step-up supersedes the session's earlier tokens**: after a
+  verification, a request still carrying the session's previous access
+  token is refused (`SU006`) and the Admin asks for the code again. The
+  Admin replaces its token as soon as the verification returns, so this
+  only touches a request already in flight at that moment.
+- **Supabase Auth's session state** (REQUIRES VERIFICATION, blocking in the
+  release checklist): the check relies on Supabase Auth binding a session to
+  the factor it verified (`auth.sessions.factor_id`, `aal`) and moving the
+  session's `auth.mfa_amr_claims` row on every verification. Were it not to,
+  the check refuses (every privileged member would be asked to verify
+  again), it never lets a token through.

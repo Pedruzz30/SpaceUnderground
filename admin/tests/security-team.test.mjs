@@ -6,7 +6,7 @@
 
 import { strict as assert } from "node:assert";
 import { after, before, describe, it } from "node:test";
-import { IDS, PROJECTS, as, code, createSecurityDb, defaultStrength, one, outcome, sessionClaims } from "./helpers/security-fixture.mjs";
+import { IDS, PROJECTS, as, code, createSecurityDb, defaultStrength, memberSession, one, outcome, sessionClaims } from "./helpers/security-fixture.mjs";
 import { addVerifiedFactor, issuedNow } from "./helpers/supabase-db.mjs";
 
 let db;
@@ -134,9 +134,10 @@ describe("permissions and MFA", () => {
       assert.equal(await code(as(db, who, "select public.is_admin()")), "42501", who);
     }
     // What it would still answer a caller inside the database (run here as
-    // the table owner with a member's claims).
+    // the table owner with a member's claims, from their signed-in session).
     const internal = async (who, strength) => {
-      await db.query("select set_config('request.jwt.claims', $1, false)", [JSON.stringify({ role: "authenticated", sub: IDS[who], ...sessionClaims(strength), iat: issuedNow() })]);
+      const claims = { role: "authenticated", sub: IDS[who], ...sessionClaims(strength), iat: issuedNow(), session_id: await memberSession(db, IDS[who]) };
+      await db.query("select set_config('request.jwt.claims', $1, false)", [JSON.stringify(claims)]);
       try {
         return (await one(db.query("select public.is_admin() as value"))).value;
       } finally {
@@ -383,7 +384,7 @@ describe("account lifecycle", () => {
     await as(db, "seo", "select public.record_sign_in()", [], "mfa");
     const rows = await audit("LOGIN_SUCCESS", IDS.seo);
     assert.equal(rows.length, 1);
-    assert.equal(rows[0].metadata.session_id, "s-seo");
+    assert.equal(rows[0].metadata.session_id, await memberSession(db, IDS.seo));
     assert.equal(rows[0].aal, "aal2");
   });
 

@@ -14,12 +14,14 @@ import { getAccess, getRiskLevel, hasPermission, hasProjectAccess, requiresAppro
 
 export const OUTCOMES = ["execute", "confirm", "step_up", "request_approval", "deny"];
 
+// The amr methods Supabase Auth records for an MFA verification: TOTP, phone
+// and WebAuthn factors.
+export const MFA_METHODS = ["totp", "mfa/phone", "mfa/webauthn"];
+
 // A fresh MFA verification, read from the amr entries of the current session
 // (Supabase Auth: [{ method, timestamp }]).
 export function stepUpFresh(methods = [], maxAgeSeconds = 600, now = Date.now()) {
-  return methods.some(
-    (entry) => ["totp", "phone", "webauthn"].includes(entry?.method) && now / 1000 - Number(entry.timestamp) <= maxAgeSeconds,
-  );
+  return methods.some((entry) => MFA_METHODS.includes(entry?.method) && now / 1000 - Number(entry.timestamp) <= maxAgeSeconds);
 }
 
 export function decide(permission, { projectId = null, access = getAccess(), methods = null, now = Date.now() } = {}) {

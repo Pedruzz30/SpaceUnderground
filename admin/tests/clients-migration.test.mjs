@@ -12,6 +12,7 @@ import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { MIGRATIONS_DIR, applyMigrations, migrationFile, migrationFiles, readMigration } from "./helpers/migration-files.mjs";
+import { addVerifiedFactor, mfaSession } from "./helpers/supabase-db.mjs";
 
 // Found by purpose, never by version: business workflows must come before
 // clients foundation, which migration-chain.test.mjs checks by timestamp.
@@ -28,17 +29,20 @@ const { CLIENT_COLUMNS } = await import("../src/services/mappers/client-mapper.j
 
 let db;
 let caseNumber = 100;
+// The admin's signed-in session, which completed MFA (see before()).
+let adminSession = null;
 
 // Runs a callback the way PostgREST runs a request: as the given role, with
 // request.jwt.claims set ({"role": ..., "sub": ...}). The claims are cleared
 // afterwards, so SQL outside asRole runs with no JWT context at all, like a
 // migration or the SQL editor.
 // A signed-in request carries what Supabase puts in a token after an MFA
-// sign-in (aal2, a TOTP entry in amr, iat): the admin here is a migrated
-// OWNER, and privileged members hold nothing without MFA.
+// sign-in (aal2, a TOTP entry in amr, iat, and for the admin the session
+// that verified it): the admin here is a migrated OWNER, and privileged
+// members hold nothing without MFA.
 async function asRole(role, uid, fn) {
   const now = Math.floor(Date.now() / 1000);
-  const session = { aal: "aal2", amr: [{ method: "totp", timestamp: now - 30 }], iat: now + 1 };
+  const session = { aal: "aal2", amr: [{ method: "totp", timestamp: now - 30 }], iat: now + 1, ...(uid === ADMIN_ID ? { session_id: adminSession } : {}) };
   const claims = JSON.stringify(uid ? { role, sub: uid, ...session } : { role });
   await db.query("select set_config('request.jwt.claims', $1, false)", [claims]);
   await db.exec(`set role ${role};`);
@@ -100,9 +104,11 @@ before(async () => {
     grant usage on schema public to anon, authenticated, service_role;
     create schema if not exists auth;
     create table auth.users (id uuid primary key, email text);
-    -- The factors Supabase Auth keeps; the security foundation reads them on
-    -- every permission check.
-    create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id), status text not null default 'unverified', created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+    -- The factors and sessions Supabase Auth keeps; the security foundation
+    -- reads them on every permission check.
+    create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id), factor_type text not null default 'totp', status text not null default 'unverified', created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+    create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id), aal text, factor_id uuid, created_at timestamptz not null default now());
+    create table auth.mfa_amr_claims (id uuid primary key default gen_random_uuid(), session_id uuid not null references auth.sessions (id) on delete cascade, authentication_method text not null, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique (session_id, authentication_method));
     -- Supabase's own definition: the legacy claim first, then the claims JSON.
     create or replace function auth.uid() returns uuid language sql stable as $$
       select coalesce(
@@ -153,9 +159,10 @@ before(async () => {
       },
     },
   });
-  // The TOTP factor an OWNER needs from the first use, verified before the
-  // sessions the tests sign in with.
-  await db.query("insert into auth.mfa_factors (user_id, status, created_at, updated_at) values ($1, 'verified', now() - interval '1 day', now() - interval '1 day')", [ADMIN_ID]);
+  // The TOTP factor an OWNER needs from the first use, and the session that
+  // verified it two hours ago.
+  const factor = await addVerifiedFactor(db, ADMIN_ID);
+  adminSession = (await mfaSession(db, ADMIN_ID, { factorId: factor.id, at: new Date(Date.now() - 2 * 3600_000) })).sessionId;
 });
 
 after(async () => {

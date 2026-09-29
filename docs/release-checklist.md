@@ -54,19 +54,20 @@ migration applied. Details: `docs/security-architecture.md`, "Authentication".
       Protection / Passwords). The Security Advisor reports it disabled today.
 - [ ] **JWT and session configuration reviewed**: JWT expiry 3600 s or less,
       refresh token rotation on.
-- [ ] **The database can read the MFA factors**: in the SQL editor,
-      `select has_table_privilege('postgres', 'auth.mfa_factors', 'select');`
-      is `true`. Every permission check reads them (a token's `aal2` alone
-      is not MFA), so without it no check can answer.
-- [ ] **`auth.mfa_factors` has `created_at` and `updated_at`**
-      (`timestamp with time zone`, not null): the query is in
-      `docs/security-architecture.md`, "Applying the migration", step 2.
-- [ ] **Supabase Auth stamps a factor's verification**: with a throwaway
-      test account, enrol TOTP, wait a minute, then verify the code;
-      `select created_at, updated_at from auth.mfa_factors where user_id = '<test user>';`
-      shows `updated_at` at the verification, not at the enrolment. The
-      rule that keeps an old token from coming back after a factor
-      rotation relies on it. Delete the test account afterwards.
+- [ ] **The database can read Supabase Auth's MFA and session state**: in
+      the SQL editor, `postgres` can `select` from `auth.mfa_factors`,
+      `auth.sessions` and `auth.mfa_amr_claims`, and they have the columns
+      the check reads. Both queries are in `docs/security-architecture.md`,
+      "Applying the migration", step 2. Every privileged permission check
+      reads them (a token's `aal2` alone is not MFA), so without them no
+      check can answer.
+- [ ] **Supabase Auth binds a session to the factor it verified**: with a
+      throwaway test account, enrol and verify TOTP, then, for the
+      `session_id` in its access token, `auth.sessions` shows `aal2` and the
+      factor's id in `factor_id`, and `auth.mfa_amr_claims` a `totp` row at
+      the verification; remove the factor and the session is `aal1` with no
+      factor. The check that keeps a token from outliving its factor reads
+      exactly this. Delete the test account afterwards.
 - [ ] **Deploy order**: the new Admin is deployed **before** the migration is
       applied. After the migration, owners need MFA at their first sign-in and
       only the new Admin has the enrolment screen; before it, the new Admin

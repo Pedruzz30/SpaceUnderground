@@ -133,11 +133,16 @@ try {
   await page.waitForFunction(() => document.querySelector("[data-member-heading]")?.textContent.includes("Suspenso"));
 
   // Step-up: granting an administrative role asks for a fresh MFA code once
-  // the last verification is older than the window.
+  // the last verification is older than the window. The session verified an
+  // hour ago, and its token carries that verification.
   await page.evaluate(() => {
+    const hourAgo = new Date(Date.now() - 3600_000).toISOString();
     const session = JSON.parse(sessionStorage.getItem("space-admin:session:v1"));
-    session.mfaVerifiedAt = new Date(Date.now() - 3600_000).toISOString();
+    session.mfaVerifiedAt = hourAgo;
     sessionStorage.setItem("space-admin:session:v1", JSON.stringify(session));
+    const live = JSON.parse(localStorage.getItem("space-admin:auth-sessions:v1"));
+    live[session.sessionId].mfaAt = hourAgo;
+    localStorage.setItem("space-admin:auth-sessions:v1", JSON.stringify(live));
   });
   await go("#/team/mock-collaborator", "[data-member-access]");
   await page.check('[data-member-access] input[name="role"][value="MANAGER"]');

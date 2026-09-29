@@ -11,7 +11,7 @@ import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { applyMigrations, readMigration } from "./helpers/migration-files.mjs";
 import { ADMIN_ONLY, policyMatrix, tableGrants } from "./helpers/policy-matrix.mjs";
-import { ADMIN_ID, USER_ID, addVerifiedFactor, asRole as runAs, createSupabaseDb, failure as fails } from "./helpers/supabase-db.mjs";
+import { ADMIN_ID, USER_ID, addVerifiedFactor, asRole as runAs, createSupabaseDb, failure as fails, mfaSession } from "./helpers/supabase-db.mjs";
 
 const FINANCIAL = readMigration("financial_foundation");
 const { FINANCIAL_COLUMNS } = await import("../src/services/mappers/financial-mapper.js");
@@ -19,7 +19,9 @@ const { FINANCIAL_COLUMNS } = await import("../src/services/mappers/financial-ma
 let db;
 let caseNumber = 500;
 
-const asRole = (role, uid, fn) => runAs(db, role, uid, fn);
+// The admin's tokens come from a session that completed MFA (see before()).
+let adminSession = null;
+const asRole = (role, uid, fn) => runAs(db, role, uid, fn, uid === ADMIN_ID ? { session_id: adminSession } : {});
 const failure = (sql, params) => fails(db, sql, params);
 
 async function insertEntry(values = {}) {
@@ -42,9 +44,11 @@ const dayOf = (value) => (value instanceof Date ? value.toISOString().slice(0, 1
 before(async () => {
   db = await createSupabaseDb();
   // The admin is one from before the security foundation, which makes them an
-  // OWNER, as it does in production, with the TOTP factor an OWNER needs.
+  // OWNER, as it does in production, with the TOTP factor an OWNER needs and
+  // a session that verified it two hours ago.
   await applyMigrations(db, { legacyAdmins: [ADMIN_ID] });
-  await addVerifiedFactor(db, ADMIN_ID);
+  const factor = await addVerifiedFactor(db, ADMIN_ID);
+  adminSession = (await mfaSession(db, ADMIN_ID, { factorId: factor.id, at: new Date(Date.now() - 2 * 3600_000) })).sessionId;
 });
 
 after(async () => {
@@ -226,6 +230,7 @@ describe("financial access matrix", () => {
       seed: async () => (await insertEntry({ description: "Matrix row" })).id,
       insertSql: "insert into public.financial_transactions (type, description, amount, due_date) values ('INCOME', 'Matrix insert', 10, '2026-09-01') returning id",
       updateSet: "amount = 11",
+      adminClaims: { session_id: adminSession },
     });
     assert.deepEqual(matrix, ADMIN_ONLY);
   });

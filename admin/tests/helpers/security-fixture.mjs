@@ -18,9 +18,13 @@
 //
 // Members are seeded with plain SQL and no JWT, like someone running the SQL
 // editor; everything the tests then do goes through the API roles.
+//
+// A member with a verified factor acts from a signed-in session that
+// completed MFA with it (memberSession); one without acts with a token whose
+// session proves no MFA.
 
 import { applyMigrations } from "./migration-files.mjs";
-import { ADMIN_ID, USER_ID, addVerifiedFactor, asRole, createSupabaseDb, issuedNow, mfaClaims } from "./supabase-db.mjs";
+import { ADMIN_ID, USER_ID, addVerifiedFactor, asRole, createSupabaseDb, issuedNow, mfaClaims, mfaSession } from "./supabase-db.mjs";
 
 const id = (n) => `a0000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
@@ -114,15 +118,47 @@ const PRIVILEGED = new Set(["owner", "partner", "absolute", "seo", "manager"]);
 
 export const defaultStrength = (who) => (PRIVILEGED.has(who) ? "mfa" : "aal1");
 
+const signedIn = new WeakMap();
+
+// The session a member's tokens come from, when they hold a verified factor:
+// a sign-in that completed MFA with one of their factors two hours ago, so
+// that any strength a test asks for ("mfa" 30 s ago, "stale" an hour ago) is
+// no older than the session's proof. When that session was ended (revoked,
+// suspended) or lost its factor, this is a new sign-in. null for a member
+// without a factor. Tests about one particular session pass its session_id.
+export async function memberSession(db, uid) {
+  const sessions = signedIn.get(db) ?? new Map();
+  signedIn.set(db, sessions);
+  const { rows } = await db.query(
+    `select f.id as factor_id,
+            exists (
+              select 1 from auth.sessions s join auth.mfa_factors bound on bound.id = s.factor_id
+              where s.id = $2 and s.user_id = $1 and s.aal = 'aal2' and bound.user_id = $1 and bound.status = 'verified'
+            ) as live
+     from auth.mfa_factors f
+     where f.user_id = $1 and f.status = 'verified'
+     order by f.updated_at
+     limit 1`,
+    [uid, sessions.get(uid) ?? null],
+  );
+  if (!rows.length) return null;
+  if (rows[0].live) return sessions.get(uid);
+  const { sessionId } = await mfaSession(db, uid, { factorId: rows[0].factor_id, at: new Date(Date.now() - 2 * 3600_000) });
+  sessions.set(uid, sessionId);
+  return sessionId;
+}
+
 // Runs one statement as a signed-in member (or anon when who is "anon"), with
-// a token issued just now; extra.iat stands for an older token.
-export function as(db, who, sql, params = [], strength = defaultStrength(who), extra = {}) {
+// a token issued just now from the member's session; extra.iat stands for an
+// older token, extra.session_id for another session.
+export async function as(db, who, sql, params = [], strength = defaultStrength(who), extra = {}) {
   if (who === "anon") return asRole(db, "anon", null, () => db.query(sql, params));
   if (who === "service") return asRole(db, "service_role", null, () => db.query(sql, params));
+  const session = await memberSession(db, IDS[who]);
   return asRole(db, "authenticated", IDS[who], () => db.query(sql, params), {
     ...sessionClaims(strength),
     iat: issuedNow(),
-    session_id: `s-${who}`,
+    session_id: session ?? `s-${who}`,
     ...extra,
   });
 }

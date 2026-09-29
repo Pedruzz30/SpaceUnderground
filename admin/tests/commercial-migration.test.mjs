@@ -9,13 +9,15 @@ import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { applyMigrations, readMigration } from "./helpers/migration-files.mjs";
 import { ADMIN_ONLY, policyMatrix, tableGrants } from "./helpers/policy-matrix.mjs";
-import { ADMIN_ID, USER_ID, addVerifiedFactor, asRole as runAs, createSupabaseDb, failure as fails } from "./helpers/supabase-db.mjs";
+import { ADMIN_ID, USER_ID, addVerifiedFactor, asRole as runAs, createSupabaseDb, failure as fails, mfaSession } from "./helpers/supabase-db.mjs";
 
 const COMMERCIAL = readMigration("commercial_opportunities");
 const { OPPORTUNITY_COLUMNS } = await import("../src/services/mappers/commercial-mapper.js");
 
 let db;
-const asRole = (role, uid, fn) => runAs(db, role, uid, fn);
+// The admin's tokens come from a session that completed MFA (see before()).
+let adminSession = null;
+const asRole = (role, uid, fn) => runAs(db, role, uid, fn, uid === ADMIN_ID ? { session_id: adminSession } : {});
 const failure = (sql, params) => fails(db, sql, params);
 
 async function insertDeal(values = {}) {
@@ -36,9 +38,11 @@ async function updateDeal(id, set, params = []) {
 before(async () => {
   db = await createSupabaseDb();
   // The admin is one from before the security foundation, which makes them an
-  // OWNER, as it does in production, with the TOTP factor an OWNER needs.
+  // OWNER, as it does in production, with the TOTP factor an OWNER needs and
+  // a session that verified it two hours ago.
   await applyMigrations(db, { legacyAdmins: [ADMIN_ID] });
-  await addVerifiedFactor(db, ADMIN_ID);
+  const factor = await addVerifiedFactor(db, ADMIN_ID);
+  adminSession = (await mfaSession(db, ADMIN_ID, { factorId: factor.id, at: new Date(Date.now() - 2 * 3600_000) })).sessionId;
 });
 
 after(async () => {
@@ -195,6 +199,7 @@ describe("commercial access matrix", () => {
       seed: async () => (await insertDeal({ title: "Matrix row" })).id,
       insertSql: "insert into public.commercial_opportunities (title, company) values ('Matrix insert', 'Aurora') returning id",
       updateSet: "title = 'Matrix edit'",
+      adminClaims: { session_id: adminSession },
     });
     assert.deepEqual(matrix, ADMIN_ONLY);
   });
