@@ -270,11 +270,52 @@ describe("mock workflow", () => {
     const access = await loadAccess(await getSession(), { force: true });
     assert.equal(access.blockedReason, "SESSION_REVOKED");
     assert.equal(access.permissions.size, 0);
+    assert.deepEqual([access.member, access.roles, access.projects], [null, [], []], "nothing about the member");
     await assert.rejects(team.listMembers(), (error) => error.code === "session_revoked");
     await logout();
     await new Promise((resolve) => setTimeout(resolve, 5));
     await as("seo");
     assert.equal(getAccess().blockedReason, null, "a new sign-in works");
+    await logout();
+  });
+
+  it("treats a removed factor as no MFA, on the very session that removed it", async () => {
+    await as("owner");
+    const mfa = await import("../src/services/mfa-service.js");
+    const { loadAccess } = await import("../src/services/access-service.js");
+    const { getSession } = await import("../src/services/auth-service.js");
+    const repository = await (await import("../src/services/repositories/index.js")).getAccessRepository();
+    const [factor] = await mfa.listFactors();
+    assert.equal(factor.status, "verified");
+
+    // The removal alone: the session still carries its verification, as a
+    // Supabase token keeps aal2 until it is refreshed.
+    await repository.unenroll(factor.id);
+    assert.equal((await repository.assurance()).currentLevel, "aal2");
+    const access = await loadAccess(await getSession(), { force: true });
+    assert.equal(access.blockedReason, "MFA_ENROLL_REQUIRED");
+    assert.deepEqual([access.mfa.enrolled, access.mfa.stepUp], [false, false]);
+    assert.equal(hasPermission("team.read"), false);
+    assert.equal(await mfa.hasFreshStepUp(), false);
+    await assert.rejects(team.listMembers(), (error) => error.code === "mfa_required");
+    await logout();
+  });
+
+  it("refreshes the session as soon as a factor is removed, and enrolling again restores access", async () => {
+    await as("owner");
+    const mfa = await import("../src/services/mfa-service.js");
+    const { loadAccess } = await import("../src/services/access-service.js");
+    const { getSession } = await import("../src/services/auth-service.js");
+    const repository = await (await import("../src/services/repositories/index.js")).getAccessRepository();
+    const [factor] = await mfa.listFactors();
+    await mfa.removeFactor(factor.id);
+    assert.equal((await repository.assurance()).currentLevel, "aal1", "the refreshed session is aal1");
+    assert.equal((await loadAccess(await getSession(), { force: true })).blockedReason, "MFA_ENROLL_REQUIRED");
+
+    const enrolment = await mfa.enrollTotp("Again");
+    await mfa.verifyTotp(enrolment.id, "123456");
+    assert.equal((await loadAccess(await getSession(), { force: true })).blockedReason, null);
+    assert.equal(hasPermission("team.read"), true);
     await logout();
   });
 
@@ -295,6 +336,9 @@ describe("mock workflow", () => {
     await team.suspendMember("mock-collaborator", "Paused");
     await assert.rejects(team.suspendMember("mock-owner", "self"), (error) => error.code === "rank");
     await logout();
+    // A sign-in after the suspension (one from the same instant counts as
+    // ended, as the database counts one from the same second).
+    await new Promise((resolve) => setTimeout(resolve, 5));
     await as("collaborator");
     assert.equal(getAccess().blockedReason, "SUSPENDED");
     await logout();

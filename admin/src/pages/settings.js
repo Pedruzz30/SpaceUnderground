@@ -1078,6 +1078,12 @@ export const settingsPage = {
           await recordMfaState();
           await loadAccess(getCachedSession(), { force: true }).catch(() => null);
           showToast(t("security.mfa.removed"));
+          // A role that requires MFA holds nothing without it: the Admin
+          // shows the enrolment screen straight away.
+          if (getAccess()?.blockedReason) {
+            window.dispatchEvent(new CustomEvent("space-admin:access-changed"));
+            return;
+          }
           await paintMfa();
         } catch (error) {
           showToast(describeError(error, t("security.mfa.removeError")));

@@ -27,7 +27,15 @@ async function call(method, fallbackKey, ...args) {
 export const listFactors = () => call("listFactors", "security.mfa.loadError");
 export const enrollTotp = (name) => call("enrollTotp", "security.mfa.enrollError", name);
 export const verifyTotp = (factorId, code) => call("verifyFactor", "security.mfa.verifyError", factorId, String(code ?? "").trim());
-export const removeFactor = (factorId) => call("unenroll", "security.mfa.removeError", factorId);
+// Supabase Auth leaves the current access token at aal2, with its TOTP entry,
+// after the factor behind it is removed, until the session is refreshed; so
+// the session is refreshed at once. Security does not depend on it: the
+// database reads the member's factors on every request and refuses that
+// token anyway. A refresh that fails is left to the next automatic one.
+export async function removeFactor(factorId) {
+  await call("unenroll", "security.mfa.removeError", factorId);
+  await (await repo()).refreshSession().catch(() => null);
+}
 export const getAssurance = () => call("assurance", "security.mfa.loadError");
 
 export async function verifiedTotp() {
@@ -35,8 +43,10 @@ export async function verifiedTotp() {
 }
 
 // Whether the current session verified MFA recently enough for a CRITICAL
-// action. The database checks the same thing itself.
+// action. The database checks the same thing itself. The token's amr outlives
+// a removed factor, so without a verified factor on record it is never fresh.
 export async function hasFreshStepUp() {
+  if (!getAccess()?.mfa.enrolled) return false;
   try {
     const { methods } = await getAssurance();
     return stepUpFresh(methods, getAccess()?.settings.stepUpMaxAgeSeconds ?? 600);

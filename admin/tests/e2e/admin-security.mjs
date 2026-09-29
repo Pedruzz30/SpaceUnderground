@@ -184,6 +184,27 @@ try {
   await go("#/team", "[data-member-row]");
   assert.equal(await page.$("[data-access-screen]"), null, "signing in again works");
 
+  /* ------------------------------------------------ removing your own MFA */
+
+  // A privileged member removes their only factor in Settings. The session
+  // is refreshed down to aal1, and even before that the database answers
+  // MFA_ENROLL_REQUIRED: the enrolment screen replaces the Admin at once.
+  // Enrolling again brings it back.
+  await signInToShell("seo");
+  await go("#/settings", '.settings-tabs [role="tab"][data-tab="account"]');
+  await page.click('.settings-tabs [role="tab"][data-tab="account"]');
+  await page.waitForSelector("[data-mfa-remove]");
+  await page.click("[data-mfa-remove]");
+  await page.click("[data-modal-confirm]");
+  await page.waitForSelector("[data-access-screen] [data-mfa-start]");
+  assert.match(await page.textContent("[data-access-screen]"), /ATIVE O MFA PARA CONTINUAR/, "the Admin asks for MFA again");
+  assert.equal(await page.$(".admin-shell"), null, "nothing else is reachable");
+  assert.equal(await page.evaluate(() => JSON.parse(sessionStorage.getItem("space-admin:session:v1")).mfaVerifiedAt), null, "the session was refreshed to aal1");
+  await page.click("[data-mfa-start]");
+  await page.fill("#mfa-enroll-code", "123456");
+  await page.click("[data-mfa-verify] button[type=submit]");
+  await page.waitForSelector(".admin-shell");
+
   /* ------------------------------------------------ phone widths */
 
   // The new screens' content stays inside the viewport. (At 320px the

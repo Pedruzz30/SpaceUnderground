@@ -32,6 +32,13 @@ export function markMockMfaVerified() {
   writeSession({ ...session, mfaVerifiedAt: new Date().toISOString() });
 }
 
+// A refreshed mock session after its factor was removed: aal1 again.
+export function forgetMockMfaVerification() {
+  const session = readSession();
+  if (!session) return;
+  writeSession({ ...session, mfaVerifiedAt: null });
+}
+
 export const mockAuthRepository = {
   async signIn({ email, profile }) {
     const key = MOCK_PROFILES.includes(profile) ? profile : "owner";

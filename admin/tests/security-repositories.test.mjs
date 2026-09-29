@@ -53,6 +53,18 @@ function fakeClient(responses = {}) {
       calls.push({ kind: "rpc", name, args });
       return responses.rpc?.[name] ?? { data: null, error: null };
     },
+    auth: {
+      mfa: {
+        unenroll: async ({ factorId }) => {
+          calls.push({ kind: "auth", name: "mfa.unenroll", factorId });
+          return responses.auth?.unenroll ?? { data: {}, error: null };
+        },
+      },
+      refreshSession: async () => {
+        calls.push({ kind: "auth", name: "refreshSession" });
+        return responses.auth?.refreshSession ?? { data: {}, error: null };
+      },
+    },
     functions: {
       invoke: async (name, options) => {
         calls.push({ kind: "invoke", name, body: options?.body });
@@ -82,6 +94,24 @@ describe("access repository", () => {
   it("reports any other refusal instead of guessing", async () => {
     setSupabaseClientForTests(fakeClient({ rpc: { my_access: { data: null, error: { code: "42501" } } } }).client);
     await assert.rejects(supabaseAccessRepository.myAccess(), (error) => error.code === "42501");
+  });
+});
+
+describe("MFA through Supabase Auth", () => {
+  it("removes a factor and refreshes the session with Supabase Auth's own calls", async () => {
+    const fake = fakeClient();
+    setSupabaseClientForTests(fake.client);
+    await supabaseAccessRepository.unenroll("factor-1");
+    await supabaseAccessRepository.refreshSession();
+    assert.deepEqual(fake.calls, [
+      { kind: "auth", name: "mfa.unenroll", factorId: "factor-1" },
+      { kind: "auth", name: "refreshSession" },
+    ]);
+  });
+
+  it("reports a refresh Supabase Auth refused", async () => {
+    setSupabaseClientForTests(fakeClient({ auth: { refreshSession: { data: null, error: { message: "Refresh Token Not Found" } } } }).client);
+    await assert.rejects(supabaseAccessRepository.refreshSession(), (error) => error.message === "Refresh Token Not Found");
   });
 });
 

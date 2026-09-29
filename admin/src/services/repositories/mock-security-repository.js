@@ -8,7 +8,7 @@
 import { MOCK_MEMBER_SEED, mockEmail, mockUserId } from "../../data/team.js";
 import { APPROVAL_ROUTES, DRAFT_FIELDS, PERMISSIONS, ROLES, permissionRisk, permissionsForRoles, roleRank } from "../../security/catalog.js";
 import { stepUpFresh } from "../../security/policy.js";
-import { currentMockSession, markMockMfaVerified } from "./mock-auth-repository.js";
+import { currentMockSession, forgetMockMfaVerification, markMockMfaVerified } from "./mock-auth-repository.js";
 import { mockProjectRepository } from "./mock-project-repository.js";
 import { effectiveStatus } from "../mappers/team-mapper.js";
 import { projectColumns } from "../../utils/change-diff.js";
@@ -90,15 +90,19 @@ function active(member) {
 }
 
 // The mock session plays the token: one issued before the member's sessions
-// were ended authorizes nothing, like the database's iat check.
+// were ended authorizes nothing, like the database's iat check. One from the
+// same instant is refused too, as the database refuses one from the same
+// second (fail closed).
 function tokenCurrent(member) {
   if (!member?.sessionsValidAfter) return true;
-  return (Date.parse(currentMockSession()?.issuedAt ?? "") || 0) >= Date.parse(member.sessionsValidAfter);
+  return (Date.parse(currentMockSession()?.issuedAt ?? "") || 0) > Date.parse(member.sessionsValidAfter);
 }
 
-// Always the signed-in member's own permissions (the current session decides).
+// Always the signed-in member's own permissions (the current session decides),
+// once the MFA the roles need is satisfied; CRITICAL ones also need a step-up,
+// checked where they are used.
 function permissionsOf(member) {
-  return active(member) && tokenCurrent(member) ? new Set(permissionsForRoles(member.roles)) : new Set();
+  return active(member) && tokenCurrent(member) && mfaSatisfied(member) ? new Set(permissionsForRoles(member.roles)) : new Set();
 }
 
 function endSessions(member) {
@@ -121,11 +125,39 @@ function mfaMethods() {
   return verifiedAt ? [{ method: "totp", timestamp: Math.floor(new Date(verifiedAt).getTime() / 1000) }] : [];
 }
 
+// The factors a member holds now (auth.mfa_factors in Supabase). Seeded
+// members with MFA have one until they remove it.
+function factorsOf(state, member) {
+  return state.factors[member?.userId] ?? (member?.mfaEnrolledAt ? [{ id: `factor-${member.userId}`, type: "totp", status: "verified", name: "Mock", createdAt: member.mfaEnrolledAt }] : []);
+}
+
+const hasVerifiedFactor = (member) => factorsOf(read(), member).some((factor) => factor.status === "verified");
+
+// The session's MFA only counts while the member still has a factor: the
+// mock session keeps its verification after a removal, as a Supabase token
+// keeps aal2 until it is refreshed.
+const sessionVerified = (member) => hasVerifiedFactor(member) && mfaMethods().length > 0;
+const stepUpSatisfied = (member) => hasVerifiedFactor(member) && stepUpFresh(mfaMethods(), STEP_UP_SECONDS);
+
+// The database's mfa_gate: privileged roles need a verified factor, whatever
+// the session says; a member with a factor needs a session that verified it;
+// CRITICAL needs a recent verification of it.
+function mfaSatisfied(member, risk = "LOW") {
+  const factor = hasVerifiedFactor(member);
+  if (!factor && requiresMfa(member)) return false;
+  if (risk === "CRITICAL") return stepUpSatisfied(member);
+  return factor ? sessionVerified(member) : true;
+}
+
 function requirePermission(state, permission) {
   const member = me(state);
   if (member && !tokenCurrent(member)) fail("SU013", "this session was ended; sign in again");
-  if (!permissionsOf(member).has(permission)) fail("42501", `not allowed: ${permission}`);
-  if (permissionRisk(permission) === "CRITICAL" && !stepUpFresh(mfaMethods(), STEP_UP_SECONDS)) fail("SU005", "step-up required");
+  if (!permissionsOf(member).has(permission)) {
+    // Granted by the roles, refused for MFA: enrol or verify first.
+    if (active(member) && permissionsForRoles(member.roles).includes(permission)) fail("SU006", "MFA required");
+    fail("42501", `not allowed: ${permission}`);
+  }
+  if (!mfaSatisfied(member, permissionRisk(permission))) fail(sessionVerified(member) ? "SU005" : "SU006", "step-up required");
   return member;
 }
 
@@ -152,7 +184,7 @@ function manageable(state, targetId) {
   if (targetId === actor?.userId) fail("SU009", "you cannot change your own access");
   const target = state.members.find((member) => member.userId === targetId) ?? fail("SU010", "member not found");
   if (rankOf(target) >= rankOf(actor) && !actor.roles.includes("ABSOLUTE_ADMIN")) fail("SU009", "ranked at or above you");
-  if (requiresMfa(target) && !stepUpFresh(mfaMethods(), STEP_UP_SECONDS)) fail("SU005", "step-up required");
+  if (requiresMfa(target) && !stepUpSatisfied(actor)) fail("SU005", "step-up required");
   return target;
 }
 
@@ -160,7 +192,7 @@ function grantable(state, role) {
   const actor = me(state);
   if (!ROLES.some((item) => item.key === role)) fail("SU004", `unknown role ${role}`);
   if (roleRank(role) >= rankOf(actor) && !actor.roles.includes("ABSOLUTE_ADMIN")) fail("SU009", `cannot grant ${role}`);
-  if (ROLES.find((item) => item.key === role)?.requiresMfa && !stepUpFresh(mfaMethods(), STEP_UP_SECONDS)) fail("SU005", "step-up required");
+  if (ROLES.find((item) => item.key === role)?.requiresMfa && !stepUpSatisfied(actor)) fail("SU005", "step-up required");
 }
 
 /* ------------------------------------------------------------------ access */
@@ -170,10 +202,14 @@ export const mockAccessRepository = {
     const state = read();
     const member = me(state);
     if (!member) return { member: null, blocked_reason: currentMockSession() ? "NOT_MEMBER" : "UNAUTHENTICATED" };
+    // An ended session learns that, and nothing about the member.
+    if (!tokenCurrent(member)) return { member: null, blocked_reason: "SESSION_REVOKED", roles: [], permissions: [], projects: [], approval_routes: [] };
     const status = effectiveStatus(member);
+    const enrolled = hasVerifiedFactor(member);
     const blocked =
-      { OFFBOARDED: "OFFBOARDED", SUSPENDED: "SUSPENDED", EXPIRED: "EXPIRED" }[status] ?? (!tokenCurrent(member) ? "SESSION_REVOKED" : status === "INVITED" ? "INVITED" : null);
-    const granted = permissionsOf(member);
+      { OFFBOARDED: "OFFBOARDED", SUSPENDED: "SUSPENDED", EXPIRED: "EXPIRED", INVITED: "INVITED" }[status] ??
+      (requiresMfa(member) && !enrolled ? "MFA_ENROLL_REQUIRED" : enrolled && !sessionVerified(member) ? "MFA_CHALLENGE_REQUIRED" : null);
+    const granted = active(member) ? new Set(permissionsForRoles(member.roles)) : new Set();
     return {
       member: {
         user_id: member.userId,
@@ -194,9 +230,9 @@ export const mockAccessRepository = {
       approval_routes: APPROVAL_ROUTES.map((route) => ({ permission: route.permission, via: route.via })),
       mfa: {
         required: requiresMfa(member),
-        enrolled: Boolean(member.mfaEnrolledAt),
+        enrolled,
         aal: mfaMethods().length ? "aal2" : "aal1",
-        step_up: stepUpFresh(mfaMethods(), STEP_UP_SECONDS),
+        step_up: stepUpSatisfied(member),
       },
       settings: { step_up_max_age_seconds: STEP_UP_SECONDS, approval_expiry_days: 14, invitation_expiry_days: 7 },
     };
@@ -260,9 +296,7 @@ export const mockAccessRepository = {
 
   async listFactors() {
     const state = read();
-    const member = me(state);
-    const stored = state.factors[member?.userId] ?? (member?.mfaEnrolledAt ? [{ id: `factor-${member.userId}`, type: "totp", status: "verified", name: "Mock", createdAt: member.mfaEnrolledAt }] : []);
-    return stored;
+    return factorsOf(state, me(state));
   },
 
   // A mock TOTP: any six digits verify. The QR code encodes nothing real.
@@ -301,6 +335,13 @@ export const mockAccessRepository = {
       audit(state, "MFA_REMOVED", { resourceType: "team_member", resourceId: member.userId, target: member.userId });
     }
     write(state);
+  },
+
+  // Supabase Auth downgrades a session once its factor is gone; the refreshed
+  // token no longer carries the verification.
+  async refreshSession() {
+    const member = me(read());
+    if (member && !hasVerifiedFactor(member)) forgetMockMfaVerification();
   },
 
   async assurance() {

@@ -79,6 +79,13 @@ export const supabaseAccessRepository = {
     if (error) throw error;
   },
 
+  // A new access token for the same session, as Supabase Auth now describes
+  // it: after a factor is removed, aal1.
+  async refreshSession() {
+    const { error } = await getSupabaseClient().auth.refreshSession();
+    if (error) throw error;
+  },
+
   async assurance() {
     const { data, error } = await getSupabaseClient().auth.mfa.getAuthenticatorAssuranceLevel();
     if (error) throw error;

@@ -329,6 +329,12 @@ export function initRouter(root) {
     forgetAccess();
     render();
   });
+  // This session changed what the member may do (removing its own MFA
+  // factor, say): render again from the database's current answer.
+  window.addEventListener("space-admin:access-changed", () => {
+    forgetAccess();
+    render();
+  });
   window.addEventListener("localechange", refreshRouteChrome);
   render();
 }
