@@ -160,17 +160,19 @@ flowchart TD
   M -- no --> D
   M -- yes --> G{an active, unexpired role<br/>grants the permission?}
   G -- no --> D
-  G -- yes --> K{risk}
-  K -- CRITICAL --> S{MFA verified in the<br/>last 10 minutes?}
-  S -- no --> SU005[refuse SU005: step-up]
-  S -- yes --> A[allow]
-  K -- LOW / MEDIUM / HIGH --> Q{aal2 session?}
-  Q -- yes --> A
-  Q -- no --> F{verified factor?}
-  F -- yes --> SU006[refuse SU006: finish MFA]
+  G -- yes --> F{verified factor now?<br/>auth.mfa_factors, not the token}
   F -- no --> P{role requires MFA?}
-  P -- no --> A
-  P -- yes --> SU006
+  P -- yes --> SU006[refuse SU006: enrol MFA]
+  P -- no --> C{risk CRITICAL?}
+  C -- yes --> SU006
+  C -- no --> A[allow]
+  F -- yes --> Q{aal2 session?}
+  Q -- no --> SU006b[refuse SU006: verify MFA]
+  Q -- yes --> K{risk CRITICAL?}
+  K -- no --> A
+  K -- yes --> S{MFA verified in the<br/>last 10 minutes?}
+  S -- no --> SU005[refuse SU005: step-up]
+  S -- yes --> A
 ```
 
 That is `public.has_permission(key)`: `SECURITY DEFINER`, `search_path`
@@ -296,7 +298,11 @@ is deleted. So ending sessions is not only deleting them:
   `require_permission`, `my_access`, the own-row policies) checks the token's
   `iat` against the cutoff (`caller_token_current()`). A token issued before
   it authorizes nothing from the next request on; `require_permission` says
-  `SU013` and `my_access()` answers `blocked_reason: SESSION_REVOKED`.
+  `SU013` and `my_access()` answers `blocked_reason: SESSION_REVOKED` and
+  nothing else: no identity, roles, projects, MFA state or settings (its own
+  rows are closed to it by RLS as well). A suspended or offboarded member's
+  old token gets that same answer; only a current token learns of the
+  suspension.
 - Reactivating a suspended member does **not** move the cutoff back: an old
   token never authorizes again. Only a new sign-in (a new `iat`) works.
 - The auth sessions are also deleted, so no old token can be refreshed.
@@ -312,8 +318,19 @@ is deleted. So ending sessions is not only deleting them:
 
 - **Required** for `ABSOLUTE_ADMIN`, `OWNER`, `SEO` and `MANAGER` (every role
   with approval powers), **from the first use**: there is no grace period,
-  migrated owners included. Without a verified factor on an `aal2` session
+  migrated owners included. Without a verified factor and an `aal2` session
   their permissions resolve to nothing; the Admin shows the enrolment screen.
+- **The factors, not the token**: Supabase Auth keeps `aal2` and the TOTP
+  entry of `amr` in an access token after its factor is removed
+  (`mfa.unenroll`), until the session is refreshed. So every check reads
+  `auth.mfa_factors` as well as the token: a privileged member without a
+  verified factor holds nothing whatever the token says, a member with one
+  needs an `aal2` session, and step-up (`step_up_satisfied()`) needs a
+  verified factor besides a recent `amr` entry. `my_access()` reports
+  `MFA_ENROLL_REQUIRED` in that case, and `mfa.step_up` false. After removing
+  a factor the Admin refreshes the session (`auth.refreshSession()`) to get
+  the `aal1` token at once and shows the enrolment screen, but nothing
+  depends on that: the database refuses the old token by itself.
 - **No lockout**: enrolling goes through Supabase Auth (`mfa.enroll`,
   `mfa.challengeAndVerify`), which needs no permission of ours, so the
   enrolment screen always works. A person who loses their authenticator is
@@ -327,6 +344,10 @@ is deleted. So ending sessions is not only deleting them:
   Admin asks for the code when the database answers `SU005` and retries once.
 - The TOTP secret lives in Supabase Auth only. The Admin shows the QR code and
   the key once, during enrolment, and never stores or sends them anywhere.
+- The database must be able to read `auth.mfa_factors` (the functions run as
+  the migration's owner, `postgres`). If it cannot, every permission check
+  fails with an error instead of an answer; that is checked before applying
+  (see [Applying the migration](#applying-the-migration)).
 - The Team list shows each member's state: MFA on, required, or optional
   (from `team_members.mfa_enrolled_at`, recorded by
   `record_mfa_state()` from what Supabase Auth holds, not from the browser).
@@ -568,7 +589,9 @@ it belongs to Supabase's platform limits.
   cutoff. Revoking the member's sessions (or suspending or offboarding them)
   makes every token issued so far worthless at once, and a reactivation does
   not bring it back. CRITICAL actions need an `amr` entry younger than 10
-  minutes. The refresh token dies with the session.
+  minutes and a factor the member still has: a stolen `aal2` token used to
+  remove the factor loses every privileged permission with it. The refresh
+  token dies with the session.
 - **Residual risk:** until someone revokes the sessions (or the token
   expires), a stolen token works with that member's current permissions.
 
@@ -686,6 +709,14 @@ it belongs to Supabase's platform limits.
    select a.user_id, a.role, u.email from public.admins a join auth.users u on u.id = a.user_id;
    ```
 
+   And that the database can read the MFA factors every permission check
+   reads (**blocking**: both must be `true`):
+
+   ```sql
+   select has_table_privilege('postgres', 'auth.mfa_factors', 'select'),
+          has_schema_privilege('postgres', 'auth', 'usage');
+   ```
+
 3. In Supabase Auth settings (all **blocking**, see the release checklist):
    sign-ups **off**; TOTP enabled; the Admin URL in Redirect URLs; leaked
    password protection **on**; JWT expiry and session settings reviewed.
@@ -730,8 +761,12 @@ Each of these is REQUIRES VERIFICATION until run against production:
 - [ ] An authorized member creates a client without a code and gets a
       `CLIENT-…` code; `select public.next_client_code()` through the API is
       refused.
-- [ ] `postgres` can read `auth.mfa_factors`:
-      `select count(*) from auth.mfa_factors;` in the SQL editor.
+- [ ] `postgres` can read `auth.mfa_factors` (checked before applying, once
+      more here): `select count(*) from auth.mfa_factors;` in the SQL editor.
+- [ ] Removing MFA takes effect at once: a privileged test member removes
+      their factor in Settings and the Admin shows the enrolment screen; a
+      request made with the access token they held before the removal is
+      refused (`SU006`).
 - [ ] As `anon` with the publishable key, `team_members?select=ru&limit=1`
       and `security_audit_log?select=id&limit=1` are refused.
 - [ ] The public site still loads published projects (`projects` anon policy
@@ -757,6 +792,15 @@ Each of these is REQUIRES VERIFICATION until run against production:
   null. A null would have skipped every guard written as
   `not is_trusted_backend()` for claims without a role.
 - **`is_admin()`** has no caller left and no API role may execute it.
+- **MFA after a factor is removed** (second review): `mfa_gate()` reads the
+  member's verified factors before the token's `aal`, and
+  `step_up_satisfied()` needs a verified factor too, so an `aal2` token that
+  outlives its factor authorizes nothing a factor was needed for, CRITICAL
+  included. `require_permission` answers `SU006` (enrol) rather than `SU005`
+  (step-up) when there is no factor to step up with.
+- **An ended session's `my_access()`** returns only
+  `blocked_reason: SESSION_REVOKED` with empty lists: no member, roles,
+  projects, MFA state or settings.
 
 ## Known limitations
 
@@ -777,3 +821,7 @@ Each of these is REQUIRES VERIFICATION until run against production:
 - **Session cutoff precision**: `iat` has whole seconds, so a new sign-in in
   the same second as a revocation is refused too (sign in again). The check
   assumes Supabase Auth's and Postgres's clocks agree within a second.
+- **Which factor a token verified** is not in the token: `amr` names the
+  method, not the factor. A token from before a factor was removed counts
+  again once the member verifies a new factor. The member holds MFA in both
+  cases; ending their sessions retires such tokens.

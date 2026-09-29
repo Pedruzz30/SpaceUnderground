@@ -54,6 +54,10 @@ migration applied. Details: `docs/security-architecture.md`, "Authentication".
       Protection / Passwords). The Security Advisor reports it disabled today.
 - [ ] **JWT and session configuration reviewed**: JWT expiry 3600 s or less,
       refresh token rotation on.
+- [ ] **The database can read the MFA factors**: in the SQL editor,
+      `select has_table_privilege('postgres', 'auth.mfa_factors', 'select');`
+      is `true`. Every permission check reads them (a token's `aal2` alone
+      is not MFA), so without it no check can answer.
 - [ ] **Deploy order**: the new Admin is deployed **before** the migration is
       applied. After the migration, owners need MFA at their first sign-in and
       only the new Admin has the enrolment screen; before it, the new Admin
