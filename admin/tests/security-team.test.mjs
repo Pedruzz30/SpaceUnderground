@@ -6,7 +6,8 @@
 
 import { strict as assert } from "node:assert";
 import { after, before, describe, it } from "node:test";
-import { IDS, PROJECTS, as, code, createSecurityDb, one, outcome } from "./helpers/security-fixture.mjs";
+import { IDS, PROJECTS, as, code, createSecurityDb, defaultStrength, one, outcome, sessionClaims } from "./helpers/security-fixture.mjs";
+import { issuedNow } from "./helpers/supabase-db.mjs";
 
 let db;
 
@@ -23,7 +24,7 @@ const activeRoles = async (id) =>
   (await db.query("select role_key from public.user_roles where user_id = $1 and revoked_at is null order by role_key", [id])).rows.map((row) => row.role_key);
 const audit = async (action, target) =>
   (await db.query("select * from public.security_audit_log where action = $1 and target_user_id = $2 order by id", [action, target])).rows;
-const access = async (who, strength = "aal1") => (await one(as(db, who, "select public.my_access() as access", [], strength))).access;
+const access = async (who, strength = defaultStrength(who)) => (await one(as(db, who, "select public.my_access() as access", [], strength))).access;
 
 let serial = 0;
 // A fresh Supabase Auth user, as Supabase Auth creates it for an invitation:
@@ -36,7 +37,7 @@ async function authUser(email, password = "") {
 }
 
 // The whole invitation, as the team-invite Edge Function runs it.
-async function invite(who, { email, roles = ["COLLABORATOR"], projects = [], expires = null, strength = "aal1" }) {
+async function invite(who, { email, roles = ["COLLABORATOR"], projects = [], expires = null, strength = defaultStrength(who) }) {
   const prepared = (await one(as(db, who, "select public.prepare_invitation($1, 'New person', $2, $3::jsonb, null, $4) as result", [email, roles, JSON.stringify(projects), expires], strength))).result;
   const userId = await authUser(email);
   await as(db, "service", "select public.complete_invitation($1, $2)", [prepared.invitation_id, userId]);
@@ -49,11 +50,12 @@ async function asUser(userId, sql, params = [], extra = {}) {
 }
 
 describe("identity", () => {
-  it("turns each legacy admin into an OWNER with the first RU and a grace period for MFA", async () => {
+  it("turns each legacy admin into an OWNER with the first RU, and no MFA grace period", async () => {
     const owner = await member(IDS.owner);
     assert.equal(owner.ru, "SU-00001");
     assert.equal(owner.status, "ACTIVE");
-    assert.ok(owner.mfa_grace_until > new Date(Date.now() + 13 * 86400_000));
+    assert.equal("mfa_grace_until" in owner, false);
+    assert.equal(owner.sessions_valid_after, null, "no session was ended yet");
     assert.deepEqual(await activeRoles(IDS.owner), ["OWNER"]);
     const [grant] = await audit("BOOTSTRAP_GRANT", IDS.owner);
     assert.equal(grant.metadata.source, "public.admins");
@@ -65,7 +67,7 @@ describe("identity", () => {
     assert.equal(new Set(rows.map((row) => row.ru)).size, rows.length);
   });
 
-  it("keeps the RU and the user id immutable, even for the database owner", async () => {
+  it("keeps the RU and the user id immutable, even against a plain UPDATE by the table owner", async () => {
     assert.equal(await code(db.query("update public.team_members set ru = 'SU-99999' where user_id = $1", [IDS.seo])), "42501");
     assert.equal(await code(db.query("update public.team_members set user_id = $2 where user_id = $1", [IDS.seo, IDS.outsider])), "42501");
   });
@@ -106,25 +108,43 @@ describe("permissions and MFA", () => {
     assert.equal(blocked.mfa.required, true);
   });
 
-  it("lets a migrated owner work without MFA only until the grace period ends", async () => {
-    assert.equal(await outcome(as(db, "owner", "select id from public.projects where id = $1", [PROJECTS.assigned])), "ok");
-    await db.query("update public.team_members set mfa_grace_until = now() - interval '1 minute' where user_id = $1", [IDS.owner]);
-    try {
-      assert.equal(await outcome(as(db, "owner", "select id from public.projects where id = $1", [PROJECTS.assigned])), "none");
-      assert.equal((await access("owner")).blocked_reason, "MFA_ENROLL_REQUIRED");
-    } finally {
-      await db.query("update public.team_members set mfa_grace_until = now() + interval '14 days' where user_id = $1", [IDS.owner]);
-    }
+  it("gives a migrated owner nothing without MFA, from the first use", async () => {
+    // No grace period: the legacy admin became an OWNER with no factor.
+    const columns = await db.query("select column_name from information_schema.columns where table_name = 'team_members' and column_name ~ 'grace'");
+    assert.deepEqual(columns.rows, [], "no grace column left");
+    assert.equal(await outcome(as(db, "owner", "select id from public.projects where id = $1", [PROJECTS.assigned], "aal1")), "none");
+    assert.equal(await outcome(as(db, "owner", "select id from public.financial_transactions", [], "aal1")), "none");
+    assert.equal(await code(as(db, "owner", "select public.prepare_invitation('first-use@space.local', 'X', array['VIEWER'])", [], "aal1")), "SU006");
+    const blocked = await access("owner", "aal1");
+    assert.equal(blocked.blocked_reason, "MFA_ENROLL_REQUIRED", "the Admin opens the enrolment screen");
+    assert.deepEqual([blocked.mfa.required, blocked.mfa.enrolled], [true, false]);
+    assert.equal("grace_until" in blocked.mfa, false);
+
+    // Enrolling goes through Supabase Auth; once the session is aal2 the
+    // owner's access is back, with nothing else to unlock.
+    assert.equal(await outcome(as(db, "owner", "select id from public.projects where id = $1", [PROJECTS.assigned], "mfa")), "ok");
+    assert.equal((await access("owner", "mfa")).blocked_reason, null);
   });
 
-  it("answers is_admin() only for active owners and absolute admins with MFA in order", async () => {
-    const isAdmin = async (who, strength) => (await one(as(db, who, "select public.is_admin() as value", [], strength))).value;
-    assert.equal(await isAdmin("owner", "aal1"), true);
-    assert.equal(await isAdmin("partner", "mfa"), true);
-    assert.equal(await isAdmin("partner", "aal1"), false);
-    assert.equal(await isAdmin("seo", "mfa"), false);
-    assert.equal(await isAdmin("collaborator", "aal1"), false);
-    assert.equal(await isAdmin("outsider", "aal1"), false);
+  it("keeps the old is_admin() out of every API role's reach, failing closed for any internal caller", async () => {
+    for (const who of ["owner", "partner", "absolute", "collaborator", "outsider", "anon", "service"]) {
+      assert.equal(await code(as(db, who, "select public.is_admin()")), "42501", who);
+    }
+    // What it would still answer a caller inside the database (run here as
+    // the table owner with a member's claims).
+    const internal = async (who, strength) => {
+      await db.query("select set_config('request.jwt.claims', $1, false)", [JSON.stringify({ role: "authenticated", sub: IDS[who], ...sessionClaims(strength), iat: issuedNow() })]);
+      try {
+        return (await one(db.query("select public.is_admin() as value"))).value;
+      } finally {
+        await db.query("select set_config('request.jwt.claims', '', false)");
+      }
+    };
+    assert.equal(await internal("partner", "mfa"), true);
+    assert.equal(await internal("partner", "aal1"), false, "an enrolled owner on a password-only session");
+    assert.equal(await internal("owner", "aal1"), false, "a migrated owner without MFA");
+    assert.equal(await internal("seo", "mfa"), false);
+    assert.equal(await internal("collaborator", "aal1"), false);
   });
 
   it("never tells a member someone else's status without team.read", async () => {
@@ -184,7 +204,7 @@ describe("invitations", () => {
   });
 
   it("needs a fresh MFA verification to invite into a role with approval powers", async () => {
-    assert.equal(await code(as(db, "owner", "select public.prepare_invitation('seo2@space.local', 'X', array['SEO'])")), "SU005");
+    assert.equal(await code(as(db, "owner", "select public.prepare_invitation('seo2@space.local', 'X', array['SEO'])", [], "stale")), "SU005");
     assert.equal(await code(as(db, "owner", "select public.prepare_invitation('seo2@space.local', 'X', array['SEO'])", [], "mfa")), null);
   });
 
@@ -308,7 +328,7 @@ describe("account lifecycle", () => {
 
     assert.equal(await code(as(db, "owner", "select public.reactivate_member($1)", [userId])), "SU008");
     assert.equal(await code(as(db, "owner", "select public.update_member_access($1, array['COLLABORATOR'], '[]'::jsonb, null)", [userId])), "SU008");
-    assert.equal(await code(db.query("update public.team_members set status = 'ACTIVE' where user_id = $1", [userId])), "SU008", "terminal even for the database owner");
+    assert.equal(await code(db.query("update public.team_members set status = 'ACTIVE' where user_id = $1", [userId])), "SU008", "terminal, even against a plain UPDATE by the table owner");
   });
 
   it("expires access at the end of its window, and reactivating needs a new end date or none", async () => {

@@ -6,7 +6,7 @@
 
 import { strict as assert } from "node:assert";
 import { after, before, describe, it } from "node:test";
-import { IDS, PROJECTS, as, code, createSecurityDb, one, outcome } from "./helpers/security-fixture.mjs";
+import { IDS, PROJECTS, as, code, createSecurityDb, defaultStrength, one, outcome } from "./helpers/security-fixture.mjs";
 
 let db;
 
@@ -21,16 +21,17 @@ after(async () => {
 const project = (id) => one(db.query("select * from public.projects where id = $1", [id]));
 const request = (id) => one(db.query("select * from public.change_requests where id = $1", [id]));
 
-async function draft(fields, { who = "collaborator", target = PROJECTS.assigned, publish = false, strength = "aal1" } = {}) {
+async function draft(fields, { who = "collaborator", target = PROJECTS.assigned, publish = false, strength = defaultStrength(who) } = {}) {
   return one(as(db, who, "select * from public.save_project_draft($1, $2::jsonb, $3)", [target, JSON.stringify(fields), publish], strength));
 }
 
 async function submitted(fields, options = {}) {
   const saved = await draft(fields, options);
-  return one(as(db, options.who ?? "collaborator", "select * from public.submit_change_request($1, 'Please review')", [saved.id], options.strength ?? "aal1"));
+  const who = options.who ?? "collaborator";
+  return one(as(db, who, "select * from public.submit_change_request($1, 'Please review')", [saved.id], options.strength ?? defaultStrength(who)));
 }
 
-const cancel = (id, who = "collaborator", strength = "aal1") => as(db, who, "select public.cancel_change_request($1)", [id], strength);
+const cancel = (id, who = "collaborator", strength = defaultStrength(who)) => as(db, who, "select public.cancel_change_request($1)", [id], strength);
 
 // Temporarily takes a permission away from a role, as an ABSOLUTE_ADMIN would.
 async function without(role, permission, fn) {

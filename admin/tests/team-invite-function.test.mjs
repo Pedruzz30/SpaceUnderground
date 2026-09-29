@@ -92,8 +92,8 @@ describe("team-invite function", () => {
     assert.equal(calls[0].headers.Authorization, `Bearer ${TOKEN}`, "the caller's own token decides");
   });
 
-  it("maps step-up, rank, duplicates and the hourly budget to their statuses", async () => {
-    for (const [code, status] of [["SU005", 403], ["SU009", 403], ["SU008", 409], ["SU007", 429], ["SU004", 422]]) {
+  it("maps step-up, rank, duplicates, the hourly budget and an ended session to their statuses", async () => {
+    for (const [code, status] of [["SU005", 403], ["SU009", 403], ["SU008", 409], ["SU007", 429], ["SU004", 422], ["SU013", 401]]) {
       const { deps } = harness({ prepare_invitation: { data: null, error: { code, message: code } } });
       assert.equal((await handleTeamInvite(request(INVITE), deps)).status, status, code);
     }

@@ -7,7 +7,7 @@
 
 import { strict as assert } from "node:assert";
 import { after, before, describe, it } from "node:test";
-import { IDS, PROJECTS, as, code, createSecurityDb, one, outcome } from "./helpers/security-fixture.mjs";
+import { IDS, PROJECTS, as, code, createSecurityDb, defaultStrength, one, outcome } from "./helpers/security-fixture.mjs";
 
 let db;
 
@@ -22,7 +22,7 @@ after(async () => {
 const projectRow = async (id) => one(db.query("select * from public.projects where id = $1", [id]));
 
 // A draft from the collaborator on the assigned project, submitted for review.
-async function pendingRequest(fields = { description: "Proposed" }, publish = false, who = "collaborator", project = PROJECTS.assigned, strength = "aal1") {
+async function pendingRequest(fields = { description: "Proposed" }, publish = false, who = "collaborator", project = PROJECTS.assigned, strength = defaultStrength(who)) {
   const draft = await one(as(db, who, "select * from public.save_project_draft($1, $2::jsonb, $3)", [project, JSON.stringify(fields), publish], strength));
   return one(as(db, who, "select * from public.submit_change_request($1)", [draft.id], strength));
 }
@@ -156,14 +156,14 @@ describe("security invariants", () => {
     );
   });
 
-  it("14. nobody updates the audit log, not even the database owner", async () => {
+  it("14. the audit log refuses UPDATE for every application role, and a plain UPDATE by the table owner", async () => {
     assert.equal(await code(as(db, "owner", "update public.security_audit_log set action = 'LOGIN_SUCCESS'")), "42501");
     assert.equal(await code(as(db, "absolute", "update public.security_audit_log set metadata = '{}'::jsonb", [], "mfa")), "42501");
     assert.equal(await code(as(db, "service", "update public.security_audit_log set metadata = '{}'::jsonb")), "42501");
     assert.equal(await code(db.query("update public.security_audit_log set metadata = '{}'::jsonb")), "42501");
   });
 
-  it("15. nobody deletes or truncates the audit log", async () => {
+  it("15. the audit log refuses DELETE and TRUNCATE on every normal path", async () => {
     const count = Number((await one(db.query("select count(*) from public.security_audit_log"))).count);
     assert.ok(count > 0);
     assert.equal(await code(as(db, "owner", "delete from public.security_audit_log")), "42501");

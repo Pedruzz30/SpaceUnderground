@@ -16,7 +16,8 @@ export async function createSupabaseDb() {
   await db.exec(`
     create role anon;
     create role authenticated;
-    create role service_role;
+    -- As on Supabase: the service role bypasses RLS (grants still apply).
+    create role service_role bypassrls;
     grant usage on schema public to anon, authenticated, service_role;
     create schema if not exists auth;
     create table auth.users (
@@ -78,10 +79,13 @@ export async function createSupabaseDb() {
 
 // Runs a callback the way PostgREST runs a request: as the given role, with
 // request.jwt.claims set. The claims are cleared afterwards, so SQL outside
-// runs with no JWT context at all, like a migration or the SQL editor. extra
-// adds claims Supabase Auth puts in a token: aal, amr, session_id.
+// runs with no JWT context at all, like a migration or the SQL editor.
+//
+// A signed-in request carries what a Supabase token carries after an MFA
+// sign-in (aal2, a TOTP entry in amr, iat), since privileged members hold
+// nothing without it. extra overrides any of it: aal, amr, iat, session_id.
 export async function asRole(db, role, uid, fn, extra = {}) {
-  const claims = JSON.stringify(uid ? { role, sub: uid, ...extra } : { role, ...extra });
+  const claims = JSON.stringify(uid ? { role, sub: uid, ...mfaClaims(30), iat: issuedNow(), ...extra } : { role, ...extra });
   await db.query("select set_config('request.jwt.claims', $1, false)", [claims]);
   await db.exec(`set role ${role};`);
   try {
@@ -99,6 +103,14 @@ export async function failure(db, sql, params = []) {
   } catch (error) {
     return error;
   }
+}
+
+// The iat of a token issued just now, rounded up past the current second:
+// it postdates anything a test did a moment ago (a revocation, say), the way
+// a sign-in after a revocation does. A test about an older token passes its
+// own iat.
+export function issuedNow() {
+  return Math.floor(Date.now() / 1000) + 1;
 }
 
 // Claims of a session that verified MFA `secondsAgo` seconds ago: aal2, with

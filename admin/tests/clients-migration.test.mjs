@@ -10,7 +10,8 @@
 import { strict as assert } from "node:assert";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
-import { applyMigrations, migrationFile, readMigration } from "./helpers/migration-files.mjs";
+import { readFileSync } from "node:fs";
+import { MIGRATIONS_DIR, applyMigrations, migrationFile, migrationFiles, readMigration } from "./helpers/migration-files.mjs";
 
 // Found by purpose, never by version: business workflows must come before
 // clients foundation, which migration-chain.test.mjs checks by timestamp.
@@ -32,8 +33,13 @@ let caseNumber = 100;
 // request.jwt.claims set ({"role": ..., "sub": ...}). The claims are cleared
 // afterwards, so SQL outside asRole runs with no JWT context at all, like a
 // migration or the SQL editor.
+// A signed-in request carries what Supabase puts in a token after an MFA
+// sign-in (aal2, a TOTP entry in amr, iat): the admin here is a migrated
+// OWNER, and privileged members hold nothing without MFA.
 async function asRole(role, uid, fn) {
-  const claims = JSON.stringify(uid ? { role, sub: uid } : { role });
+  const now = Math.floor(Date.now() / 1000);
+  const session = { aal: "aal2", amr: [{ method: "totp", timestamp: now - 30 }], iat: now + 1 };
+  const claims = JSON.stringify(uid ? { role, sub: uid, ...session } : { role });
   await db.query("select set_config('request.jwt.claims', $1, false)", [claims]);
   await db.exec(`set role ${role};`);
   try {
@@ -90,7 +96,7 @@ before(async () => {
   await db.exec(`
     create role anon;
     create role authenticated;
-    create role service_role;
+    create role service_role bypassrls;
     grant usage on schema public to anon, authenticated, service_role;
     create schema if not exists auth;
     create table auth.users (id uuid primary key, email text);
@@ -163,6 +169,13 @@ describe("clients foundation migration", () => {
   it("is idempotent", async () => {
     await db.exec(CLIENTS);
     await db.exec(CLIENTS);
+    // Re-running it rewrote what later migrations changed (the security
+    // foundation replaces the code generator, its grants and the column
+    // default). Re-apply those, so the rest of this file tests the schema
+    // production has rather than a mix of old and new.
+    for (const name of migrationFiles().filter((file) => file > CLIENTS_FILE)) {
+      await db.exec(readFileSync(`${MIGRATIONS_DIR}${name}`, "utf8"));
+    }
   });
 
   it("creates every column the admin repository selects", async () => {
@@ -229,8 +242,14 @@ describe("clients.code", () => {
     const blank = await failure("insert into public.clients (name, code) values ('Blank', '  ')");
     assert.equal(blank?.code, "23514");
 
-    const nullCode = await failure("insert into public.clients (name, code) values ('Null', null)");
-    assert.equal(nullCode?.code, "23502");
+    // An explicit null asks for a generated code, like leaving the column out:
+    // the security foundation assigns codes in a trigger (a column default
+    // needed EXECUTE on the generator from every inserting role). The column
+    // itself still refuses null on update.
+    const generated = await insertClient({ name: "Null", code: null });
+    assert.match(generated.code, /^CLIENT-\d{3,}$/);
+    const cleared = await failure("update public.clients set code = null where id = $1", [generated.id]);
+    assert.equal(cleared?.code, "23502");
   });
 });
 
@@ -391,6 +410,10 @@ describe("clients row level security", () => {
   });
 });
 
+// The generator's contract after the security foundation: it is not an RPC
+// for anyone (codes come from inserting a client, through the
+// clients_assign_code trigger), and it refuses anyone without clients.create
+// before drawing a number. Direct SQL (migrations, the SQL editor) keeps it.
 describe("client code generator authorization", () => {
   it("rejects anonymous visitors", async () => {
     const before = await sequenceValue();
@@ -403,8 +426,15 @@ describe("client code generator authorization", () => {
     const before = await sequenceValue();
     const error = await asRole("authenticated", USER_ID, () => failure("select public.next_client_code()"));
     assert.equal(error?.code, "42501");
-    assert.match(error.message, /not authorized to generate client codes/);
     assert.equal(await sequenceValue(), before, "a denied call must not consume a number");
+  });
+
+  it("refuses the insert of a signed-in user who is not an admin inside the generator", async () => {
+    const before = await sequenceValue();
+    const error = await asRole("authenticated", USER_ID, () => failure("insert into public.clients (name) values ('No code for you')"));
+    assert.equal(error?.code, "42501");
+    assert.match(error.message, /not authorized to generate client codes/);
+    assert.equal(await sequenceValue(), before);
   });
 
   it("does not burn a number when a non-admin insert is refused", async () => {
@@ -414,14 +444,20 @@ describe("client code generator authorization", () => {
     assert.equal(await sequenceValue(), before);
   });
 
-  it("serves an admin", async () => {
-    const { rows } = await asRole("authenticated", ADMIN_ID, () => db.query("select public.next_client_code() as code"));
+  it("serves an admin through the insert, not as an RPC", async () => {
+    const { rows } = await asRole("authenticated", ADMIN_ID, () => db.query("insert into public.clients (name) values ('Admin insert') returning code"));
     assert.match(rows[0].code, /^CLIENT-\d{3,}$/);
+    const before = await sequenceValue();
+    const error = await asRole("authenticated", ADMIN_ID, () => failure("select public.next_client_code()"));
+    assert.equal(error?.code, "42501", "the generator itself is not an API");
+    assert.equal(await sequenceValue(), before);
   });
 
-  it("serves the service role", async () => {
-    const { rows } = await asRole("service_role", null, () => db.query("select public.next_client_code() as code"));
+  it("serves the service role through the insert, not as an RPC", async () => {
+    const { rows } = await asRole("service_role", null, () => db.query("insert into public.clients (name) values ('Service insert') returning code"));
     assert.match(rows[0].code, /^CLIENT-\d{3,}$/);
+    const error = await asRole("service_role", null, () => failure("select public.next_client_code()"));
+    assert.equal(error?.code, "42501");
   });
 
   it("serves direct SQL with no JWT context (migrations, SQL editor)", async () => {

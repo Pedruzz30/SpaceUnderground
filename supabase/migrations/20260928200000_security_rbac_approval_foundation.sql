@@ -22,18 +22,26 @@
 --                   authorization lives in the JWT, so a suspension, a
 --                   removed role or an expiry applies to the very next query,
 --                   even for a token issued before it.
+--   sessions        revoking sessions, suspending or offboarding moves the
+--                   member's sessions_valid_after forward: every access token
+--                   issued before it (JWT iat) is refused from then on, even
+--                   after a reactivation. Only a new sign-in works again.
 --   project access  public.project_members for roles without projects.read.
 --   MFA             every permission of a privileged role needs an aal2
---                   session (after a grace period for migrated accounts);
+--                   session from its first use, with no grace period;
 --                   CRITICAL permissions need an MFA verification younger
 --                   than the step-up window, read from the JWT's amr claim.
 --   approvals       public.change_requests: a draft never touches the live
 --                   project; only approve_change_request() applies it, in one
 --                   transaction, against the version it was based on.
---   audit           public.security_audit_log: written only by the database,
---                   never updated, deleted or truncated.
+--   audit           public.security_audit_log: written only by the database;
+--                   append-only for every application role and path. The
+--                   database owner, who can alter schema and triggers, is
+--                   outside that trust boundary.
 --
--- Existing rows of public.admins become OWNER with 14 days to enable MFA.
+-- Existing rows of public.admins become OWNER; like every privileged member
+-- they must enable MFA at their first sign-in (the Admin opens the enrolment
+-- screen), and hold no permission until they do.
 -- Nobody becomes ABSOLUTE_ADMIN here: that is a one-off bootstrap run in the
 -- SQL editor (public.bootstrap_member). public.admins is kept as history and
 -- is no longer consulted for authorization.
@@ -366,7 +374,7 @@ create table if not exists public.team_members (
   status_reason text check (status_reason is null or length(status_reason) <= 500),
   access_starts_at timestamptz,
   access_expires_at timestamptz,
-  mfa_grace_until timestamptz,
+  sessions_valid_after timestamptz,
   mfa_enrolled_at timestamptz,
   invited_by uuid references auth.users (id) on delete set null,
   invited_at timestamptz,
@@ -386,17 +394,20 @@ comment on table public.team_members is
   'One row per person with Admin access. user_id is the identity (auth.users.id); ru is an immutable display identifier, never a secret. Written only by security definer functions.';
 comment on column public.team_members.ru is
   'Space Underground RU (SU-00001). Unique, immutable, never reused, derived from nothing personal.';
-comment on column public.team_members.mfa_grace_until is
-  'Until when a privileged member may work without an aal2 session. Set only for accounts migrated from public.admins.';
+comment on column public.team_members.sessions_valid_after is
+  'Access tokens issued before this moment (JWT iat) authorize nothing. Moved forward by session revocation, suspension and offboarding; never back.';
 
 create unique index if not exists team_members_email_key on public.team_members (lower(email));
 create index if not exists team_members_status_idx on public.team_members (status);
 
--- The RU and the user are identities; OFFBOARDED is terminal. Enforced here so
--- that not even a definer function can quietly break them.
+-- The RU and the user are identities; OFFBOARDED is terminal; the session
+-- cutoff only moves forward, so no reactivation can bring an old token back.
+-- Enforced here so that no definer function, and no plain UPDATE, can quietly
+-- break them.
 create or replace function public.guard_team_member_identity()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 begin
   if new.user_id is distinct from old.user_id then
@@ -407,6 +418,10 @@ begin
   end if;
   if old.status = 'OFFBOARDED' and new.status is distinct from 'OFFBOARDED' then
     raise exception 'an offboarded member cannot be reactivated' using errcode = 'SU008';
+  end if;
+  if old.sessions_valid_after is not null
+    and (new.sessions_valid_after is null or new.sessions_valid_after < old.sessions_valid_after) then
+    raise exception 'team_members.sessions_valid_after only moves forward' using errcode = '42501';
   end if;
   new.updated_at := now();
   return new;
@@ -559,7 +574,7 @@ create table if not exists public.security_audit_log (
 );
 
 comment on table public.security_audit_log is
-  'Append-only security events. Inserted only by security definer functions and triggers; UPDATE, DELETE and TRUNCATE are refused for every role.';
+  'Append-only security events. Inserted only by security definer functions and triggers; UPDATE, DELETE and TRUNCATE are refused by triggers on every normal path, for every application role. Infrastructure changes by the database owner (altering schema or triggers) are outside this trust boundary.';
 
 create index if not exists security_audit_log_created_idx on public.security_audit_log (created_at desc);
 create index if not exists security_audit_log_actor_idx on public.security_audit_log (actor_user_id, created_at desc);
@@ -570,6 +585,7 @@ create index if not exists security_audit_log_resource_idx on public.security_au
 create or replace function public.refuse_audit_changes()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 begin
   raise exception 'security_audit_log is append-only' using errcode = '42501';
@@ -594,6 +610,8 @@ create trigger security_audit_log_no_truncate
 -- directly against the database (migrations, the SQL editor) are trusted
 -- backends. PostgREST always sets request.jwt.claims, even to '{}' for an
 -- anonymous request, so an API call can never pass as "no JWT context".
+-- Always true or false, never null: callers write "not is_trusted_backend()",
+-- and a null there would skip the check it guards (claims without a role).
 create or replace function public.is_trusted_backend()
 returns boolean
 language plpgsql
@@ -609,7 +627,7 @@ begin
   if raw_claims is null and legacy_role is null and legacy_sub is null then
     return true;
   end if;
-  return coalesce(raw_claims::jsonb ->> 'role', legacy_role) = 'service_role';
+  return coalesce(raw_claims::jsonb ->> 'role', legacy_role, '') = 'service_role';
 end;
 $$;
 
@@ -722,6 +740,35 @@ as $$
   select coalesce((select public.member_row_active(m) from public.team_members m where m.user_id = p_user), false);
 $$;
 
+-- Whether the caller's access token was issued after their last session
+-- revocation (team_members.sessions_valid_after). Every decision about the
+-- caller goes through it, so a token issued before a revocation, a
+-- suspension or an offboarding never authorizes again, even once the member
+-- is reactivated. iat is whole seconds: a token from the same second as the
+-- cutoff is refused too (fail closed; signing in again a second later works).
+-- No cutoff, or no member row: nothing to refuse here.
+create or replace function public.caller_token_current()
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  cutoff timestamptz;
+  issued text := public.request_claims() ->> 'iat';
+begin
+  select sessions_valid_after into cutoff from public.team_members where user_id = auth.uid();
+  if cutoff is null then
+    return true;
+  end if;
+  if issued is null or issued !~ '^[0-9]{1,12}(\.[0-9]+)?$' then
+    return false;
+  end if;
+  return issued::numeric >= extract(epoch from cutoff);
+end;
+$$;
+
 create or replace function public.current_member_active()
 returns boolean
 language sql
@@ -729,7 +776,7 @@ stable
 security definer
 set search_path = public, pg_temp
 as $$
-  select public.member_is_active(auth.uid());
+  select public.member_is_active(auth.uid()) and public.caller_token_current();
 $$;
 
 -- Active, unexpired role grants of a member.
@@ -773,11 +820,14 @@ as $$
 $$;
 
 -- The MFA part of every permission check.
---   aal2 session             -> allowed (CRITICAL also needs a fresh step-up)
---   verified factor, aal1    -> denied: an enrolled person must finish MFA
---   privileged, no factor    -> denied, unless inside the migration grace
---                               period, and never for CRITICAL
---   not privileged, no factor-> allowed, except CRITICAL
+--   CRITICAL                  -> a fresh MFA verification (step-up)
+--   aal2 session              -> allowed
+--   verified factor, aal1     -> denied: an enrolled person must finish MFA
+--   privileged, no factor     -> denied: roles with approval powers need MFA
+--                                from their first use, migrated accounts too
+--   not privileged, no factor -> allowed
+-- Enrolling a factor goes through Supabase Auth, not through a permission,
+-- so a privileged member without MFA is never locked out of enabling it.
 create or replace function public.mfa_gate(p_user uuid, p_risk text)
 returns boolean
 language plpgsql
@@ -785,8 +835,6 @@ stable
 security definer
 set search_path = public, pg_temp
 as $$
-declare
-  grace timestamptz;
 begin
   if p_risk = 'CRITICAL' then
     return public.step_up_satisfied();
@@ -797,11 +845,7 @@ begin
   if public.user_has_verified_factor(p_user) then
     return false;
   end if;
-  if public.member_requires_mfa(p_user) then
-    select mfa_grace_until into grace from public.team_members where user_id = p_user;
-    return grace is not null and grace > now();
-  end if;
-  return true;
+  return not public.member_requires_mfa(p_user);
 end;
 $$;
 
@@ -822,9 +866,10 @@ as $$
     );
 $$;
 
--- The authorization decision. Default deny: no session, no membership, not
--- ACTIVE, outside the access window, permission not granted by an active
--- role, unknown permission, or MFA not satisfied for its risk -> false.
+-- The authorization decision. Default deny: no session, a token issued
+-- before the member's last session revocation, no membership, not ACTIVE,
+-- outside the access window, permission not granted by an active role,
+-- unknown permission, or MFA not satisfied for its risk -> false.
 create or replace function public.has_permission(p_permission text)
 returns boolean
 language plpgsql
@@ -836,7 +881,7 @@ declare
   uid uuid := auth.uid();
   risk text;
 begin
-  if uid is null then
+  if uid is null or not public.caller_token_current() then
     return false;
   end if;
   select risk_level into risk from public.permissions where key = p_permission;
@@ -848,6 +893,8 @@ end;
 $$;
 
 -- Raises instead of returning false, with the reason the Admin shows:
+--   SU013  this token was issued before the member's sessions were revoked:
+--          sign in again
 --   SU006  the roles grant it, but this session has not completed MFA (enrol
 --          a factor, or verify the one enrolled)
 --   SU005  the roles grant it, the session has MFA, and the action is
@@ -863,6 +910,9 @@ as $$
 begin
   if public.has_permission(p_permission) then
     return;
+  end if;
+  if auth.uid() is not null and not public.caller_token_current() then
+    raise exception 'this session was ended; sign in again' using errcode = 'SU013';
   end if;
   if auth.uid() is not null and public.role_grants_permission(auth.uid(), p_permission) then
     if public.jwt_aal() = 'aal2' then
@@ -905,9 +955,10 @@ as $$
     or public.is_project_member(p_project, p_write);
 $$;
 
--- Kept for compatibility, now answered by RBAC: an active OWNER or
--- ABSOLUTE_ADMIN whose MFA is in order. Every policy of the old model is
--- replaced below; anything still calling this fails closed for other roles.
+-- The old binary check, redefined so that anything that still called it
+-- would fail closed: an active OWNER or ABSOLUTE_ADMIN with a current token
+-- and MFA in order. No policy, function, view or client calls it after this
+-- migration, so no API role may execute it (section 17).
 create or replace function public.is_admin()
 returns boolean
 language plpgsql
@@ -918,7 +969,7 @@ as $$
 declare
   uid uuid := auth.uid();
 begin
-  if uid is null or not public.member_is_active(uid) then
+  if uid is null or not public.member_is_active(uid) or not public.caller_token_current() then
     return false;
   end if;
   if not exists (select 1 from public.member_roles(uid) role_key where role_key in ('OWNER', 'ABSOLUTE_ADMIN')) then
@@ -1185,6 +1236,7 @@ create trigger activity_log_stamp_author
 create or replace function public.refuse_legacy_admin_write()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 begin
   raise exception 'public.admins is no longer used for access; grant roles with the Team module or public.bootstrap_member()'
@@ -1197,8 +1249,13 @@ create trigger admins_refuse_writes
   before insert or update on public.admins
   for each row execute function public.refuse_legacy_admin_write();
 
--- Client codes are drawn by whoever may create clients (the column default),
--- the service role, or SQL without a request JWT.
+-- Client codes. Until now the generator was the column default, which made
+-- it an RPC every signed-in account could call (the default runs as the
+-- inserting role, so it needed EXECUTE). Now a trigger assigns the code when
+-- a client is inserted without one, and the generator is reachable only from
+-- that trigger and from SQL without a request JWT (migrations, the SQL
+-- editor). An insert by anyone without clients.create is refused here, before
+-- a number is drawn: a sequence is not transactional.
 create or replace function public.next_client_code()
 returns text
 language plpgsql
@@ -1221,6 +1278,30 @@ begin
   return candidate;
 end;
 $$;
+
+-- Assigns the code of a client inserted without one. SECURITY DEFINER, so the
+-- inserting role needs no EXECUTE on the generator. An explicit code is kept
+-- as it is (a blank one still fails the table's check).
+create or replace function public.assign_client_code()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if new.code is null then
+    new.code := public.next_client_code();
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists clients_assign_code on public.clients;
+create trigger clients_assign_code
+  before insert on public.clients
+  for each row execute function public.assign_client_code();
+
+alter table public.clients alter column code drop default;
 
 -- ---------------------------------------------------------------------------
 -- 10. row level security: every is_admin() policy replaced by permissions
@@ -1416,7 +1497,7 @@ create policy financial_transactions_admin_delete on public.financial_transactio
 -- legacy admins roster: your own row, or the team's
 drop policy if exists admins_read on public.admins;
 create policy admins_read on public.admins for select to authenticated
-  using (user_id = (select auth.uid()) or (select public.has_permission('team.read')));
+  using ((user_id = (select auth.uid()) and (select public.caller_token_current())) or (select public.has_permission('team.read')));
 
 -- ---------------------------------------------------------------------------
 -- 11. row level security on the new tables
@@ -1460,16 +1541,17 @@ create policy approval_routes_member_read on public.approval_routes for select t
 drop policy if exists security_settings_member_read on public.security_settings;
 create policy security_settings_member_read on public.security_settings for select to authenticated using ((select public.current_member_active()));
 
--- People: yourself, or the team (team.read). Emails are personal data.
+-- People: yourself (with a current token), or the team (team.read). Emails
+-- are personal data.
 drop policy if exists team_members_read on public.team_members;
 create policy team_members_read on public.team_members for select to authenticated
-  using (user_id = (select auth.uid()) or (select public.has_permission('team.read')));
+  using ((user_id = (select auth.uid()) and (select public.caller_token_current())) or (select public.has_permission('team.read')));
 drop policy if exists user_roles_read on public.user_roles;
 create policy user_roles_read on public.user_roles for select to authenticated
-  using (user_id = (select auth.uid()) or (select public.has_permission('team.read')));
+  using ((user_id = (select auth.uid()) and (select public.caller_token_current())) or (select public.has_permission('team.read')));
 drop policy if exists project_members_read on public.project_members;
 create policy project_members_read on public.project_members for select to authenticated
-  using (user_id = (select auth.uid()) or (select public.has_permission('team.read')));
+  using ((user_id = (select auth.uid()) and (select public.caller_token_current())) or (select public.has_permission('team.read')));
 drop policy if exists team_invitations_read on public.team_invitations;
 create policy team_invitations_read on public.team_invitations for select to authenticated
   using ((select public.has_permission('team.read')));
@@ -1522,6 +1604,25 @@ begin
   return removed;
 exception
   when insufficient_privilege then return null;
+end;
+$$;
+
+-- Ends every session of a member at once. The cutoff makes each access token
+-- issued so far worthless from the next request on (caller_token_current);
+-- deleting the auth sessions stops any of them from being refreshed. The
+-- cutoff only moves forward, so a later reactivation brings nothing back.
+create or replace function public.end_member_sessions(p_user uuid)
+returns integer
+language plpgsql
+volatile
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  update public.team_members
+  set sessions_valid_after = greatest(coalesce(sessions_valid_after, now()), now())
+  where user_id = p_user;
+  return public.revoke_auth_sessions(p_user);
 end;
 $$;
 
@@ -1585,10 +1686,11 @@ begin
     when m.status = 'OFFBOARDED' then 'OFFBOARDED'
     when m.status = 'SUSPENDED' then 'SUSPENDED'
     when public.member_effective_status(m) = 'EXPIRED' then 'EXPIRED'
+    when not public.caller_token_current() then 'SESSION_REVOKED'
     when m.status = 'INVITED' then 'INVITED'
     when m.access_starts_at is not null and m.access_starts_at > now() then 'NOT_STARTED'
     when enrolled and aal <> 'aal2' then 'MFA_CHALLENGE_REQUIRED'
-    when requires and not enrolled and (m.mfa_grace_until is null or m.mfa_grace_until <= now()) then 'MFA_ENROLL_REQUIRED'
+    when requires and not enrolled and aal <> 'aal2' then 'MFA_ENROLL_REQUIRED'
     else null
   end;
 
@@ -1596,6 +1698,7 @@ begin
     into granted
   from public.permissions p
   where public.member_row_active(m)
+    and public.caller_token_current()
     and p.key in (select rp.permission_key from public.role_permissions rp where rp.role_key in (select public.member_roles(uid)));
 
   return jsonb_build_object(
@@ -1630,7 +1733,6 @@ begin
       'required', requires,
       'enrolled', enrolled,
       'aal', aal,
-      'grace_until', m.mfa_grace_until,
       'step_up', public.step_up_satisfied()
     ),
     'settings', (
@@ -1696,6 +1798,9 @@ begin
   if not found then
     raise exception 'not a team member' using errcode = '42501';
   end if;
+  if not public.caller_token_current() then
+    raise exception 'this session was ended; sign in again' using errcode = 'SU013';
+  end if;
   if m.status = 'ACTIVE' then
     return public.my_access();
   end if;
@@ -1729,7 +1834,7 @@ declare
   session_id text := public.request_claims() ->> 'session_id';
   signed_in timestamptz;
 begin
-  if uid is null or not exists (select 1 from public.team_members where user_id = uid) then
+  if uid is null or not exists (select 1 from public.team_members where user_id = uid) or not public.caller_token_current() then
     return;
   end if;
   if session_id is not null and exists (
@@ -1741,6 +1846,29 @@ begin
   select (to_jsonb(u) ->> 'last_sign_in_at')::timestamptz into signed_in from auth.users u where u.id = uid;
   update public.team_members set last_sign_in_at = coalesce(signed_in, now()) where user_id = uid;
   perform public.write_audit('LOGIN_SUCCESS', 'team_member', uid::text, uid, jsonb_build_object('session_id', session_id));
+end;
+$$;
+
+-- "Sign out everywhere", by the member: every access token issued so far,
+-- this one included, stops authorizing at once, and no session can be
+-- refreshed. A token that is already out of date changes nothing.
+create or replace function public.revoke_my_sessions()
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  uid uuid := auth.uid();
+  revoked integer;
+begin
+  if uid is null or not exists (select 1 from public.team_members where user_id = uid) or not public.caller_token_current() then
+    return jsonb_build_object('sessions_revoked', 0);
+  end if;
+  revoked := public.end_member_sessions(uid);
+  perform public.write_audit('SESSION_REVOKED', 'team_member', uid::text, uid, jsonb_build_object('sessions', revoked, 'cause', 'self'));
+  return jsonb_build_object('sessions_revoked', revoked);
 end;
 $$;
 
@@ -1758,7 +1886,7 @@ declare
   m public.team_members%rowtype;
 begin
   select * into m from public.team_members where user_id = uid for update;
-  if not found then
+  if not found or not public.caller_token_current() then
     return public.my_access();
   end if;
   if enrolled and m.mfa_enrolled_at is null then
@@ -2131,7 +2259,7 @@ begin
     where user_id = invitation.user_id;
     update public.user_roles set revoked_at = now(), revoked_by = auth.uid() where user_id = invitation.user_id and revoked_at is null;
     update public.project_members set revoked_at = now(), revoked_by = auth.uid() where user_id = invitation.user_id and revoked_at is null;
-    perform public.revoke_auth_sessions(invitation.user_id);
+    perform public.end_member_sessions(invitation.user_id);
     perform public.set_auth_ban(invitation.user_id, true);
   end if;
   perform public.write_audit('INVITATION_CANCELLED', 'team_invitation', p_invitation::text, invitation.user_id,
@@ -2245,7 +2373,8 @@ end;
 $$;
 
 -- ACTIVE (or INVITED, or EXPIRED) -> SUSPENDED: no access at all, sessions
--- revoked, sign-in banned, until reactivated.
+-- ended (tokens issued before now never authorize again, even after a
+-- reactivation), sign-in banned, until reactivated.
 create or replace function public.suspend_member(p_user uuid, p_reason text)
 returns jsonb
 language plpgsql
@@ -2268,7 +2397,7 @@ begin
     raise exception 'member is %', m.status using errcode = 'SU008';
   end if;
   update public.team_members set status = 'SUSPENDED', suspended_at = now(), status_reason = left(btrim(p_reason), 500) where user_id = p_user;
-  revoked := public.revoke_auth_sessions(p_user);
+  revoked := public.end_member_sessions(p_user);
   banned := public.set_auth_ban(p_user, true);
   perform public.write_audit('USER_SUSPENDED', 'team_member', p_user::text, p_user,
     jsonb_build_object('reason', left(btrim(p_reason), 200), 'previous_status', public.member_effective_status(m), 'sign_in_banned', banned));
@@ -2280,6 +2409,8 @@ $$;
 -- SUSPENDED or EXPIRED -> ACTIVE. Once the access window has ended, the new
 -- end date (or none, for permanent access) is the caller's explicit choice; a
 -- suspension inside the window keeps its end date unless a new one is given.
+-- The session cutoff is left where the suspension put it: the member signs in
+-- again, and no token from before comes back.
 create or replace function public.reactivate_member(p_user uuid, p_access_expires_at timestamptz default null)
 returns jsonb
 language plpgsql
@@ -2349,7 +2480,7 @@ begin
   where requester_id = p_user and status in ('DRAFT', 'PENDING');
   get diagnostics cancelled = row_count;
   update public.team_invitations set status = 'CANCELLED' where user_id = p_user and status in ('PENDING', 'SENT');
-  revoked := public.revoke_auth_sessions(p_user);
+  revoked := public.end_member_sessions(p_user);
   banned := public.set_auth_ban(p_user, true);
   perform public.write_audit('USER_OFFBOARDED', 'team_member', p_user::text, p_user,
     jsonb_build_object('reason', left(btrim(p_reason), 200), 'previous_status', public.member_effective_status(m),
@@ -2372,7 +2503,7 @@ declare
 begin
   perform public.require_permission('sessions.revoke');
   perform public.assert_can_manage(p_user);
-  revoked := public.revoke_auth_sessions(p_user);
+  revoked := public.end_member_sessions(p_user);
   perform public.write_audit('SESSION_REVOKED', 'team_member', p_user::text, p_user, jsonb_build_object('sessions', revoked, 'cause', 'manual'));
   return jsonb_build_object('user_id', p_user, 'sessions_revoked', revoked);
 end;
@@ -2979,8 +3110,9 @@ $$;
 -- Postgres grants EXECUTE on every new function to PUBLIC, and Supabase adds
 -- anon, authenticated and service_role through default privileges. So every
 -- function created here starts with no grant at all, and only what the API
--- has to reach is granted back. (is_admin() and next_client_code() are
--- redefined, not new, and keep the grants they already had.)
+-- has to reach is granted back. That includes the two redefined ones:
+-- is_admin() has no caller left, and next_client_code() is reached only
+-- through the clients_assign_code trigger.
 
 do $$
 declare
@@ -2992,6 +3124,8 @@ begin
     where p.pronamespace = 'public'::regnamespace
       and p.proname = any (array[
         'next_member_ru', 'guard_team_member_identity', 'refuse_audit_changes',
+        'is_admin', 'next_client_code', 'assign_client_code', 'caller_token_current', 'end_member_sessions',
+        'revoke_my_sessions',
         'is_trusted_backend', 'request_claims', 'jwt_aal', 'step_up_satisfied', 'user_has_verified_factor',
         'member_row_active', 'member_effective_status', 'member_is_active', 'current_member_active',
         'member_roles', 'member_max_rank', 'member_requires_mfa', 'mfa_gate', 'role_grants_permission',
@@ -3015,14 +3149,14 @@ end $$;
 -- Checked inside policies, as the signed-in caller.
 grant execute on function
   public.is_trusted_backend(), public.request_claims(), public.jwt_aal(), public.step_up_satisfied(),
-  public.current_member_active(), public.has_permission(text), public.require_permission(text),
+  public.caller_token_current(), public.current_member_active(), public.has_permission(text), public.require_permission(text),
   public.is_project_member(uuid, boolean), public.has_project_access(uuid, boolean)
   to authenticated, service_role;
 
 -- What the Admin calls. Each one authorizes the caller itself.
 grant execute on function
   public.my_access(), public.member_directory(uuid[]), public.activate_my_membership(),
-  public.record_sign_in(), public.record_mfa_state(),
+  public.record_sign_in(), public.record_mfa_state(), public.revoke_my_sessions(),
   public.prepare_invitation(text, text, text[], jsonb, timestamptz, timestamptz),
   public.prepare_invitation_resend(uuid), public.cancel_invitation(uuid),
   public.update_member_access(uuid, text[], jsonb, timestamptz, text), public.suspend_member(uuid, text),
@@ -3039,6 +3173,22 @@ grant execute on function
 grant execute on function
   public.complete_invitation(uuid, uuid), public.fail_invitation(uuid, text), public.expire_stale_access()
   to service_role;
+
+-- The client code sequence is used only by the generator, which runs as its
+-- owner; the service role no longer needs it either.
+revoke all on sequence public.clients_code_seq from public, anon, authenticated, service_role;
+
+-- Functions from earlier migrations that the Security Advisor flags for a
+-- mutable search_path. Their bodies only call built-ins or schema-qualified
+-- functions (storage.foldername), so pinning the path changes nothing they
+-- do; it only stops an object earlier in a caller's path from shadowing one.
+alter function public.touch_updated_at() set search_path = public, pg_temp;
+alter function public.stamp_published_at() set search_path = public, pg_temp;
+alter function public.media_project_id(text) set search_path = public, pg_temp;
+alter function public.valid_i18n_translations(jsonb) set search_path = public, pg_temp;
+alter function public.stamp_client_archived_at() set search_path = public, pg_temp;
+alter function public.stamp_financial_paid_at() set search_path = public, pg_temp;
+alter function public.stamp_commercial_opportunity_stage() set search_path = public, pg_temp;
 
 -- Identity columns draw from sequences that default privileges also hand to
 -- every API role; nobody but the definer functions needs them.
@@ -3058,9 +3208,11 @@ end $$;
 -- 18. bootstrap: today's admins become OWNER
 -- ---------------------------------------------------------------------------
 -- Every row of public.admins has full access today, whatever its role column
--- says, so each one becomes OWNER: nobody loses access by applying this.
--- They get 14 days to enable MFA; review and narrow the roles afterwards in
--- the Team module. Nobody becomes ABSOLUTE_ADMIN here.
+-- says, so each one becomes OWNER: nobody loses their role by applying this.
+-- There is no grace period: like every privileged member, they enable MFA at
+-- their first sign-in (the Admin shows the enrolment screen; enrolling needs
+-- no permission) and hold nothing until they do. Review and narrow the roles
+-- afterwards in the Team module. Nobody becomes ABSOLUTE_ADMIN here.
 
 do $$
 declare
@@ -3076,14 +3228,13 @@ begin
     where not exists (select 1 from public.team_members m where m.user_id = a.user_id)
     order by a.created_at, a.user_id
   loop
-    insert into public.team_members (user_id, display_name, email, status, activated_at, mfa_grace_until, created_at)
+    insert into public.team_members (user_id, display_name, email, status, activated_at, created_at)
     values (
       legacy.user_id,
       left(coalesce(legacy.full_name, split_part(coalesce(legacy.email, 'admin@unknown'), '@', 1)), 120),
       lower(coalesce(legacy.email, legacy.user_id::text || '@unknown.invalid')),
       'ACTIVE',
       now(),
-      now() + interval '14 days',
       legacy.created_at
     )
     returning ru into member_ru;

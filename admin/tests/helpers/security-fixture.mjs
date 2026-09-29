@@ -2,7 +2,7 @@
 // member of every kind the access model distinguishes, for the security tests.
 //
 //   owner          a row of public.admins before the security foundation, so
-//                  an OWNER inside the MFA grace period, without a factor
+//                  an OWNER without a factor (no grace period: it needs MFA)
 //   partner        OWNER with a verified TOTP factor
 //   absolute       ABSOLUTE_ADMIN with a verified factor (break-glass)
 //   seo, manager   SEO / MANAGER with a verified factor
@@ -18,7 +18,7 @@
 // editor; everything the tests then do goes through the API roles.
 
 import { applyMigrations } from "./migration-files.mjs";
-import { ADMIN_ID, USER_ID, asRole, createSupabaseDb, mfaClaims } from "./supabase-db.mjs";
+import { ADMIN_ID, USER_ID, asRole, createSupabaseDb, issuedNow, mfaClaims } from "./supabase-db.mjs";
 
 const id = (n) => `a0000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
@@ -107,12 +107,28 @@ export function sessionClaims(strength = "aal1") {
   return { aal: "aal1", amr: [{ method: "password", timestamp: now() - 60 }] };
 }
 
-// Runs one statement as a signed-in member (or anon when who is "anon").
-export function as(db, who, sql, params = [], strength = "aal1", extra = {}) {
+// Members whose roles require MFA hold nothing on a password-only session,
+// so they sign in with MFA unless a test is about a weaker session and says so.
+const PRIVILEGED = new Set(["owner", "partner", "absolute", "seo", "manager"]);
+
+export const defaultStrength = (who) => (PRIVILEGED.has(who) ? "mfa" : "aal1");
+
+// Runs one statement as a signed-in member (or anon when who is "anon"), with
+// a token issued just now; extra.iat stands for an older token.
+export function as(db, who, sql, params = [], strength = defaultStrength(who), extra = {}) {
   if (who === "anon") return asRole(db, "anon", null, () => db.query(sql, params));
   if (who === "service") return asRole(db, "service_role", null, () => db.query(sql, params));
-  return asRole(db, "authenticated", IDS[who], () => db.query(sql, params), { ...sessionClaims(strength), session_id: `s-${who}`, ...extra });
+  return asRole(db, "authenticated", IDS[who], () => db.query(sql, params), {
+    ...sessionClaims(strength),
+    iat: issuedNow(),
+    session_id: `s-${who}`,
+    ...extra,
+  });
 }
+
+// The iat of a token issued `seconds` ago: one that predates whatever a test
+// does next.
+export const issuedAgo = (seconds = 60) => Math.floor(Date.now() / 1000) - seconds;
 
 // The result of an attempt, as one word: "ok" (rows came back), "none" (the
 // statement ran and touched nothing), or the SQLSTATE of the refusal

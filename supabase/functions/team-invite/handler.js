@@ -24,6 +24,7 @@ const CODES = {
   SU009: 403, // rank
   SU010: 404, // not found
   SU011: 410, // expired
+  SU013: 401, // this session was ended: sign in again
 };
 
 const allowedOrigins = (env) =>

@@ -27,9 +27,10 @@ const SECURITY_TABLES = [
 ];
 
 // Functions from before the security migration that anon may run: the public
-// site's checks, and trigger functions, which cannot be called directly.
+// site's media check and the translations check, and trigger functions, which
+// cannot be called directly. is_admin() is not among them any more: nothing
+// calls it after the migration.
 const ANON_EXECUTABLE = [
-  "is_admin",
   "media_project_id",
   "stamp_client_archived_at",
   "stamp_commercial_opportunity_stage",
@@ -56,6 +57,10 @@ const INTERNAL = [
   "normalize_project_grants",
   "bootstrap_member",
   "next_member_ru",
+  "end_member_sessions",
+  "is_admin",
+  "next_client_code",
+  "assign_client_code",
 ];
 
 let db;
@@ -115,6 +120,14 @@ describe("database surface", () => {
     }
   });
 
+  it("pins the search_path of every function in public, with pg_temp last", async () => {
+    const { rows } = await db.query(
+      "select p.oid::regprocedure::text as sig, coalesce(array_to_string(p.proconfig, ','), '') as config from pg_proc p where p.pronamespace = 'public'::regnamespace order by 1",
+    );
+    assert.ok(rows.length > 60);
+    assert.deepEqual(rows.filter((row) => !/search_path=public, pg_temp/.test(row.config)).map((row) => row.sig), []);
+  });
+
   it("keeps the invitation's service steps to the service role", async () => {
     assert.ok(!(await executable("authenticated")).includes("complete_invitation"));
     assert.ok((await executable("service_role")).includes("complete_invitation"));
@@ -124,7 +137,7 @@ describe("database surface", () => {
     const { rows } = await db.query(
       `select c.relname, r.rolname from pg_class c cross join pg_roles r
        where c.relkind = 'S' and c.relnamespace = 'public'::regnamespace
-         and c.relname in ('team_member_ru_seq', 'change_requests_number_seq', 'security_audit_log_id_seq', 'user_roles_id_seq', 'project_members_id_seq')
+         and c.relname in ('team_member_ru_seq', 'change_requests_number_seq', 'security_audit_log_id_seq', 'user_roles_id_seq', 'project_members_id_seq', 'clients_code_seq')
          and r.rolname in ('anon', 'authenticated', 'service_role')
          and has_sequence_privilege(r.rolname, c.oid, 'usage')`,
     );

@@ -30,8 +30,13 @@ const EMBEDS = listed
 let db;
 let clientId;
 
+// A signed-in request carries what Supabase puts in a token after an MFA
+// sign-in (aal2, a TOTP entry in amr, iat): the admin here is a migrated
+// OWNER, and privileged members hold nothing without MFA.
 async function asRole(role, uid, fn) {
-  const claims = JSON.stringify(uid ? { role, sub: uid } : { role });
+  const now = Math.floor(Date.now() / 1000);
+  const session = { aal: "aal2", amr: [{ method: "totp", timestamp: now - 30 }], iat: now + 1 };
+  const claims = JSON.stringify(uid ? { role, sub: uid, ...session } : { role });
   await db.query("select set_config('request.jwt.claims', $1, false)", [claims]);
   await db.exec(`set role ${role};`);
   try {
@@ -64,7 +69,7 @@ before(async () => {
   await db.exec(`
     create role anon;
     create role authenticated;
-    create role service_role;
+    create role service_role bypassrls;
     grant usage on schema public to anon, authenticated, service_role;
     alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
     alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
