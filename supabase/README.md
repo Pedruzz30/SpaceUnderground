@@ -209,7 +209,13 @@ also lists how to apply and verify it.
 | `security_settings` | Step-up window, expiries, invitation budget. |
 
 It also adds `projects.version`, guards on publishing, archiving and the
-settings columns, and forces the author of `activity_log` rows.
+settings columns, and forces the author of `activity_log` rows. And it
+changes what earlier migrations left: client codes are assigned by a trigger
+(`next_client_code()` stops being an RPC for any API role, and the column
+loses its default); `is_admin()` has no caller left and no API role may
+execute it; the older functions get a pinned `search_path`; and a session
+cutoff (`team_members.sessions_valid_after`) refuses tokens issued before a
+revocation, a suspension or an offboarding.
 
 ### Identity: `id` vs `case_number`
 

@@ -38,21 +38,23 @@ flowchart LR
 5. [Row level security](#row-level-security)
 6. [Project access](#project-access)
 7. [Account lifecycle](#account-lifecycle)
-8. [MFA and step-up](#mfa-and-step-up)
-9. [Approval workflow](#approval-workflow)
-10. [Risk model](#risk-model)
-11. [Audit logging](#audit-logging)
-12. [Suspension](#suspension)
-13. [Offboarding](#offboarding)
-14. [Critical operations](#critical-operations)
-15. [Bootstrap and break-glass](#bootstrap-and-break-glass)
-16. [The Admin's side](#the-admins-side)
-17. [HTTP security headers](#http-security-headers)
-18. [Rate limiting](#rate-limiting)
-19. [Threat model](#threat-model)
-20. [Applying the migration](#applying-the-migration)
-21. [Verify after applying](#verify-after-applying)
-22. [Known limitations](#known-limitations)
+8. [Sessions and token revocation](#sessions-and-token-revocation)
+9. [MFA and step-up](#mfa-and-step-up)
+10. [Approval workflow](#approval-workflow)
+11. [Risk model](#risk-model)
+12. [Audit logging](#audit-logging)
+13. [Suspension](#suspension)
+14. [Offboarding](#offboarding)
+15. [Critical operations](#critical-operations)
+16. [Bootstrap and break-glass](#bootstrap-and-break-glass)
+17. [The Admin's side](#the-admins-side)
+18. [HTTP security headers](#http-security-headers)
+19. [Rate limiting](#rate-limiting)
+20. [Threat model](#threat-model)
+21. [Applying the migration](#applying-the-migration)
+22. [Verify after applying](#verify-after-applying)
+23. [Hardening notes](#hardening-notes)
+24. [Known limitations](#known-limitations)
 
 ## Authentication
 
@@ -74,14 +76,16 @@ is no other login, no shared account, no master password and no bypass.
 - **No CPF** or any other personal document takes part in authentication or
   identity. None is stored.
 
-Manual settings in the Supabase dashboard (Authentication), required:
+Manual settings in the Supabase dashboard (Authentication), all **blocking**
+before the deploy (see `docs/release-checklist.md`):
 
 | Setting | Value | Why |
 | --- | --- | --- |
 | Allow new users to sign up | **off** | Invitations are the only way in. |
 | Multi-factor → TOTP | enabled (default) | MFA for privileged roles. |
 | Redirect URLs | the Admin's URL | Invitation and recovery links land on `#/welcome`. |
-| JWT expiry | 3600 s or less | Bounds how long an already issued token lives (it authorizes nothing after a suspension anyway). |
+| Leaked password protection | **on** | Refuses passwords known from breaches (the Security Advisor reports it off today). |
+| JWT expiry and sessions | 3600 s or less; refresh token rotation on | Bounds how long a token lives unnoticed; a revoked, suspended or offboarded member's token authorizes nothing anyway (session cutoff). |
 | Custom SMTP | recommended | The built-in sender allows only a few emails per hour. |
 
 ## Identity and the RU
@@ -150,7 +154,9 @@ to hide.
 flowchart TD
   R[Request] --> U{auth.uid?}
   U -- no --> D[deny]
-  U -- yes --> M{member ACTIVE<br/>inside access window?}
+  U -- yes --> T{token issued after the<br/>last session cutoff?}
+  T -- no --> SU013[refuse SU013: sign in again]
+  T -- yes --> M{member ACTIVE<br/>inside access window?}
   M -- no --> D
   M -- yes --> G{an active, unexpired role<br/>grants the permission?}
   G -- no --> D
@@ -164,15 +170,13 @@ flowchart TD
   F -- yes --> SU006[refuse SU006: finish MFA]
   F -- no --> P{role requires MFA?}
   P -- no --> A
-  P -- yes --> GR{inside migration<br/>grace period?}
-  GR -- yes --> A
-  GR -- no --> SU006
+  P -- yes --> SU006
 ```
 
 That is `public.has_permission(key)`: `SECURITY DEFINER`, `search_path`
 pinned, evaluated once per statement inside policies (`(select …)`).
 `public.require_permission(key)` raises the reason instead: `42501` not
-allowed, `SU006` finish MFA, `SU005` step-up.
+allowed, `SU013` session ended, `SU006` finish MFA, `SU005` step-up.
 
 Error codes of the security functions:
 
@@ -191,20 +195,25 @@ Error codes of the security functions:
 | `SU010` | not found |
 | `SU011` | expired |
 | `SU012` | requester no longer active |
+| `SU013` | this session was ended (revoked, suspended, offboarded): sign in again |
 
 ## Row level security
 
 Every table in `public` has RLS on. Every policy that used the old binary
 `is_admin()` is replaced by a permission check (`security-surface.test.mjs`
-fails if one survives). `is_admin()` itself is kept for compatibility and now
-means "active `OWNER` or `ABSOLUTE_ADMIN` with MFA in order".
+fails if one survives). Nothing calls `is_admin()` any more — no policy,
+function, view, constraint, Admin code, Edge Function or service — so no API
+role may execute it (`anon`, `authenticated` and `service_role` all lost
+`EXECUTE`). It is redefined to fail closed (active `OWNER` or `ABSOLUTE_ADMIN`
+with a current token and MFA in order) in case an internal caller ever
+appears.
 
 | Table | anon | SELECT (authenticated) | INSERT | UPDATE | DELETE |
 | --- | --- | --- | --- | --- | --- |
 | `projects` | published + visible, public columns only | `projects.read`, or an assigned project | `projects.create` (+ `publish` if created published) | `projects.edit`; status changes need `publish` / `archive` (trigger) | `projects.delete` |
 | `project_gallery`, `project_modules` | of published projects | project access | `projects.edit` | `projects.edit` | `projects.edit` |
 | `storage.objects` (project-media) | of published projects | `files.read` + project access | `files.upload` + `projects.edit` or EDIT on that project | `files.upload` + `projects.edit` | `files.delete` |
-| `clients` | — | `clients.read` | `clients.create` | `clients.edit`; archiving needs `clients.archive` (trigger) | `clients.delete` |
+| `clients` | — | `clients.read` | `clients.create`; the code is assigned by a trigger | `clients.edit`; archiving needs `clients.archive` (trigger) | `clients.delete` |
 | `commercial_*` | — | `commercial.read` | `commercial.edit` | `commercial.edit` | `commercial.delete` |
 | `financial_transactions` | — | `finance.read` | `finance.edit` | `finance.edit` | `finance.delete` |
 | `plans`, `plan_features` | visible plans | `services.read` | `services.edit` | `services.edit` | `services.edit` |
@@ -213,7 +222,7 @@ means "active `OWNER` or `ABSOLUTE_ADMIN` with MFA in order".
 | `activity_log` | — | `logs.read`, or your own entries | active member; author forced to the caller | — | — |
 | `admins` (legacy) | — | your own row, or `team.read` | refused (trigger) | refused | — |
 | `roles`, `permissions`, `role_permissions`, `approval_routes`, `security_settings` | — | active members | — | — | — |
-| `team_members`, `user_roles`, `project_members` | — | yourself, or `team.read` | — | — | — |
+| `team_members`, `user_roles`, `project_members` | — | yourself (with a current token), or `team.read` | — | — | — |
 | `team_invitations` | — | `team.read` | — | — | — |
 | `change_requests` | — | your own (`approvals.read`); others' once submitted (`approvals.read_all`) | — | — | — |
 | `security_audit_log` | — | your events (`audit.read`), everything (`audit.read_all`) | — | — | — |
@@ -273,13 +282,43 @@ stateDiagram-v2
   timestamp, the member row stays, `team_members.user_id` references
   `auth.users` with `on delete restrict`.
 
+## Sessions and token revocation
+
+A Supabase access token stays valid until it expires, even after its session
+is deleted. So ending sessions is not only deleting them:
+
+- `team_members.sessions_valid_after` is the member's session cutoff. Revoking
+  sessions (`revoke_member_sessions`), suspending, offboarding, cancelling an
+  invitation and "sign out everywhere" (`revoke_my_sessions`) move it to
+  `now()`. It only moves forward: a trigger refuses to clear it or move it
+  back, even for a plain `UPDATE` by the table owner.
+- Every decision about the caller (`has_permission`, `current_member_active`,
+  `require_permission`, `my_access`, the own-row policies) checks the token's
+  `iat` against the cutoff (`caller_token_current()`). A token issued before
+  it authorizes nothing from the next request on; `require_permission` says
+  `SU013` and `my_access()` answers `blocked_reason: SESSION_REVOKED`.
+- Reactivating a suspended member does **not** move the cutoff back: an old
+  token never authorizes again. Only a new sign-in (a new `iat`) works.
+- The auth sessions are also deleted, so no old token can be refreshed.
+- `iat` is whole seconds, so a token from the same second as the cutoff is
+  refused too (fail closed: signing in again a second later works). This
+  relies on Supabase Auth's and Postgres's clocks agreeing to within a second,
+  as they do on the same platform.
+- The Admin re-reads `my_access()` on navigation when its snapshot is older
+  than 15 s, and at once when any request answers `SU013`; the "session
+  ended" screen then offers to sign in again.
+
 ## MFA and step-up
 
 - **Required** for `ABSOLUTE_ADMIN`, `OWNER`, `SEO` and `MANAGER` (every role
-  with approval powers). Without a verified factor their permissions resolve
-  to nothing; the Admin shows the enrolment screen.
-- **Migrated accounts** (today's `admins` rows) get 14 days of grace
-  (`mfa_grace_until`), never for CRITICAL permissions.
+  with approval powers), **from the first use**: there is no grace period,
+  migrated owners included. Without a verified factor on an `aal2` session
+  their permissions resolve to nothing; the Admin shows the enrolment screen.
+- **No lockout**: enrolling goes through Supabase Auth (`mfa.enroll`,
+  `mfa.challengeAndVerify`), which needs no permission of ours, so the
+  enrolment screen always works. A person who loses their authenticator is
+  recovered by an operator deleting the factor in the Supabase dashboard
+  (Authentication → Users); they enrol again at the next sign-in.
 - **Enrolled means enforced**: an account with a verified factor on an `aal1`
   session holds nothing until it verifies the code, whatever its role.
 - **Step-up**: CRITICAL permissions need an MFA verification younger than
@@ -288,8 +327,8 @@ stateDiagram-v2
   Admin asks for the code when the database answers `SU005` and retries once.
 - The TOTP secret lives in Supabase Auth only. The Admin shows the QR code and
   the key once, during enrolment, and never stores or sends them anywhere.
-- The Team list shows each member's state: MFA on, required, in grace, or
-  optional (from `team_members.mfa_enrolled_at`, recorded by
+- The Team list shows each member's state: MFA on, required, or optional
+  (from `team_members.mfa_enrolled_at`, recorded by
   `record_mfa_state()` from what Supabase Auth holds, not from the browser).
 
 ## Approval workflow
@@ -360,8 +399,11 @@ the request, the session's `aal` and sanitized metadata:
 PUBLISHED/UNPUBLISHED/ARCHIVED/DELETED`, `APPROVAL_DRAFTED/REQUESTED/
 APPROVED/REJECTED/CANCELLED/EXPIRED/REBASED`.
 
-- **Append-only for everyone**: no role has `INSERT`, `UPDATE` or `DELETE`;
-  triggers refuse `UPDATE`, `DELETE` and `TRUNCATE` even for the table owner.
+- **Append-only for the application's roles and normal paths**: no API role
+  has `INSERT`, `UPDATE` or `DELETE`, and triggers refuse `UPDATE`, `DELETE`
+  and `TRUNCATE` on every normal path, a plain `UPDATE` by the table owner
+  included. Administrative infrastructure changes by the database owner, who
+  can alter the schema or drop the triggers, are outside this trust boundary.
 - **Written by the database only**: `write_audit()` is internal (no API role
   can call it); the project triggers and security functions call it.
 - **No secrets**: metadata keys that look like passwords, tokens,
@@ -380,20 +422,22 @@ APPROVED/REJECTED/CANCELLED/EXPIRED/REBASED`.
 ## Suspension
 
 `suspend_member` (`team.suspend`, reason required): status `SUSPENDED`,
-sessions deleted (refresh tokens go with them), sign-in banned in Supabase
-Auth (`auth.users.banned_until`). Because every check reads the current
-status, an access token issued before the suspension authorizes **nothing**
-from the next request on: no reads, no RPC, no approval, no publication.
+session cutoff moved to now, sessions deleted (refresh tokens go with them),
+sign-in banned in Supabase Auth (`auth.users.banned_until`). Every check
+reads the current status, so an access token authorizes **nothing** from the
+next request on: no reads, no RPC, no approval, no publication.
 `reactivate_member` restores the access (and a new end date when the window
-had ended; a suspension inside the window keeps its end date).
+had ended; a suspension inside the window keeps its end date) but not the old
+tokens: the cutoff stays, so the member signs in again.
 
 ## Offboarding
 
 `offboard_member` (`team.offboard`, reason required) is final: status
-`OFFBOARDED` (a trigger refuses any way back, even for the table owner), every
-role and project grant revoked, open drafts and pending requests cancelled,
-open invitations cancelled, sessions deleted, sign-in banned. The member row,
-the RU, authorship of past changes and the audit trail stay.
+`OFFBOARDED` (a trigger refuses any way back, a plain `UPDATE` by the table
+owner included), every role and project grant revoked, open drafts and
+pending requests cancelled, open invitations cancelled, session cutoff moved,
+sessions deleted, sign-in banned. The member row, the RU, authorship of past
+changes and the audit trail stay.
 
 ## Critical operations
 
@@ -408,10 +452,13 @@ the RU, authorship of past changes and the audit trail stay.
 
 ## Bootstrap and break-glass
 
-Applying the migration turns every row of `public.admins` into an **OWNER**
-with 14 days to enable MFA, so nobody loses access. Nobody becomes
-`ABSOLUTE_ADMIN` automatically, and `public.admins` stops granting anything
-(new rows are refused with a pointer to the Team module).
+Applying the migration turns every row of `public.admins` into an **OWNER**,
+so nobody loses their role. There is no grace period: like every privileged
+member, an owner holds nothing until they enable MFA, which the new Admin asks
+for at their first sign-in. **Deploy the new Admin before applying the
+migration**: the Admin in production today has no enrolment screen. Nobody
+becomes `ABSOLUTE_ADMIN` automatically, and `public.admins` stops granting
+anything (new rows are refused with a pointer to the Team module).
 
 To create the break-glass account (once, by hand):
 
@@ -506,22 +553,24 @@ it belongs to Supabase's platform limits.
 
 ### 2. An owner's password is compromised
 - **Attack:** someone has an owner's password.
-- **Defense:** owners must use MFA: after the grace period, without the TOTP
-  code the account holds nothing. CRITICAL actions need a fresh code. Owners
-  cannot remove each other; the break-glass account can suspend a compromised
-  owner.
-- **Residual risk:** during the 14-day grace period after the migration, a
-  password alone opens an owner's account (not CRITICAL actions). Enable MFA
-  on both owner accounts on day one.
+- **Defense:** owners must use MFA from the first use: without the TOTP code
+  the account holds nothing, migrated accounts included. CRITICAL actions
+  need a fresh code. Owners cannot remove each other; the break-glass account
+  can suspend a compromised owner, which ends every token at once.
+- **Residual risk:** an attacker with both the password and the TOTP device
+  (or a phished code, within its 30 s) gets in until someone suspends the
+  account.
 
 ### 3. A JWT is stolen
 - **Attack:** an access token is copied from a device.
 - **Defense:** the token only proves identity; every request re-reads status,
-  roles and grants, so suspension or offboarding makes it worthless at once.
-  CRITICAL actions need an `amr` entry younger than 10 minutes. Revoking
-  sessions kills the refresh token.
-- **Residual risk:** until the token expires (JWT expiry) or the member is
-  suspended, it works with that member's current permissions.
+  roles and grants, and checks the token's `iat` against the member's session
+  cutoff. Revoking the member's sessions (or suspending or offboarding them)
+  makes every token issued so far worthless at once, and a reactivation does
+  not bring it back. CRITICAL actions need an `amr` entry younger than 10
+  minutes. The refresh token dies with the session.
+- **Residual risk:** until someone revokes the sessions (or the token
+  expires), a stolen token works with that member's current permissions.
 
 ### 4. JavaScript edited in DevTools
 - **Attack:** the attacker unhides buttons, forges the access snapshot, calls
@@ -559,8 +608,9 @@ it belongs to Supabase's platform limits.
 
 ### 8. An offboarded person keeps a session
 - **Attack:** a laptop still has a signed-in tab.
-- **Defense:** offboarding sets the status (checked on every request), revokes
-  sessions and refresh tokens and bans sign-in.
+- **Defense:** offboarding sets the status (checked on every request), moves
+  the session cutoff (every existing token is refused), deletes the sessions
+  and refresh tokens and bans sign-in.
 - **Residual risk:** the open tab keeps what it already rendered on screen;
   no new data loads.
 
@@ -589,9 +639,12 @@ it belongs to Supabase's platform limits.
 ### 11. A tampered audit log
 - **Attack:** hide traces by updating, deleting or truncating the log.
 - **Defense:** no write grant for any API role; triggers refuse update, delete
-  and truncate even for the owner (invariants 14, 15).
-- **Residual risk:** a platform superuser can disable triggers. Exporting the
-  log periodically to storage outside the project would close that.
+  and truncate on every normal path, a plain update by the table owner
+  included (invariants 14, 15).
+- **Residual risk:** the database owner (and the platform's superuser) can
+  alter the schema or drop the triggers: that is outside the application's
+  trust boundary. Exporting the log periodically to storage outside the
+  project would narrow it.
 
 ### 12. A malicious draft
 - **Attack:** a collaborator proposes scripts in text fields, a
@@ -633,11 +686,15 @@ it belongs to Supabase's platform limits.
    select a.user_id, a.role, u.email from public.admins a join auth.users u on u.id = a.user_id;
    ```
 
-3. In Supabase Auth settings: turn **off** sign-ups; confirm TOTP is enabled;
-   add the Admin URL to Redirect URLs.
-4. Apply: `supabase db push`, or paste the file into the SQL editor (it runs
+3. In Supabase Auth settings (all **blocking**, see the release checklist):
+   sign-ups **off**; TOTP enabled; the Admin URL in Redirect URLs; leaked
+   password protection **on**; JWT expiry and session settings reviewed.
+4. **Deploy the new Admin first.** Before the migration it falls back to the
+   legacy model and works as today; after it, privileged accounts need MFA
+   from their first sign-in and only the new Admin has the enrolment screen.
+5. Apply: `supabase db push`, or paste the file into the SQL editor (it runs
    as one script and is safe to run twice).
-5. Deploy the Edge Function (needs the Supabase CLI and project access):
+6. Deploy the Edge Function (needs the Supabase CLI and project access):
 
    ```bash
    supabase secrets set ADMIN_ALLOWED_ORIGINS=https://<admin host> ADMIN_INVITE_REDIRECT_URL=https://<admin host>/
@@ -647,9 +704,8 @@ it belongs to Supabase's platform limits.
    `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are
    provided by the Edge runtime (REQUIRES VERIFICATION with the new API keys:
    if the legacy JWT keys are disabled, set the service key secret by hand).
-6. Deploy the Admin (the order does not matter: before the migration it falls
-   back to the legacy model).
-7. Both owners: sign in, enable MFA in Settings → Account.
+7. Both owners: sign in; the Admin opens the MFA enrolment screen; enrol and
+   verify.
 8. Create the break-glass account ([Bootstrap](#bootstrap-and-break-glass)).
 9. Adjust roles in the Team module (for example Pedro: add `SEO`).
 10. Optional: schedule `select public.expire_stale_access();` daily (pg_cron).
@@ -668,6 +724,12 @@ Each of these is REQUIRES VERIFICATION until run against production:
       platform refuses the delete.
 - [ ] Sign-in ban works: the suspended test member cannot sign in
       (`banned_until` set; `sign_in_banned: true` in the audit line).
+- [ ] Token revocation works: with a signed-in test member, revoke their
+      sessions from the Team screen; their next request is refused (the
+      Admin shows "session ended") and a new sign-in works.
+- [ ] An authorized member creates a client without a code and gets a
+      `CLIENT-…` code; `select public.next_client_code()` through the API is
+      refused.
 - [ ] `postgres` can read `auth.mfa_factors`:
       `select count(*) from auth.mfa_factors;` in the SQL editor.
 - [ ] As `anon` with the publishable key, `team_members?select=ru&limit=1`
@@ -678,6 +740,23 @@ Each of these is REQUIRES VERIFICATION until run against production:
       choosing a password activates the account, and the audit log shows
       `USER_INVITED` and `USER_ACTIVATED`.
 - [ ] Settings → System lists no pending migration.
+
+## Hardening notes
+
+- **Client codes** are assigned by a trigger (`clients_assign_code`) when a
+  client is inserted without one. The generator used to be the column
+  default, which made it an RPC every signed-in account could call; now no
+  API role can execute it, not even the service role, and an insert by
+  someone without `clients.create` is refused before a number is drawn.
+- **`search_path`** is pinned (`public, pg_temp`) on every function in
+  `public`, including those of earlier migrations the Security Advisor flags
+  (`touch_updated_at`, `stamp_published_at`, `media_project_id`,
+  `valid_i18n_translations`, `stamp_client_archived_at`,
+  `stamp_financial_paid_at`, `stamp_commercial_opportunity_stage`).
+- **Trusted backends**: `is_trusted_backend()` is always true or false, never
+  null. A null would have skipped every guard written as
+  `not is_trusted_backend()` for claims without a role.
+- **`is_admin()`** has no caller left and no API role may execute it.
 
 ## Known limitations
 
@@ -695,3 +774,6 @@ Each of these is REQUIRES VERIFICATION until run against production:
 - **Email templates** are Supabase's defaults; customising them (e.g. to use
   `token_hash` links) is optional and supported by the welcome screen.
 - The 320 px topbar overflow of the account chip predates this work.
+- **Session cutoff precision**: `iat` has whole seconds, so a new sign-in in
+  the same second as a revocation is refused too (sign in again). The check
+  assumes Supabase Auth's and Postgres's clocks agree within a second.

@@ -37,6 +37,30 @@ Run everything from the repo root unless noted.
       Supabase env and `ADMIN_EMAIL` / `ADMIN_PASSWORD`). It creates and then
       deletes its own `E2E Client <timestamp>` rows.
 
+### Security settings — BLOCKING before deploying the security branch
+
+These live in the Supabase dashboard, not in the repository, so no test can
+check them. Every box must be checked by a person, on the production project,
+before the Admin of `feat/security-rbac-approvals` is deployed or its
+migration applied. Details: `docs/security-architecture.md`, "Authentication".
+
+- [ ] **Public sign-up OFF** (Authentication → Sign In / Providers → "Allow
+      new users to sign up"): access is by invitation only.
+- [ ] **TOTP / MFA enabled** (Authentication → Multi-Factor): privileged roles
+      hold nothing without it, from their first sign-in.
+- [ ] **Redirect URLs** include the Admin's URL (Authentication → URL
+      Configuration): invitation and recovery links land on `#/welcome`.
+- [ ] **Leaked password protection enabled** (Authentication → Attack
+      Protection / Passwords). The Security Advisor reports it disabled today.
+- [ ] **JWT and session configuration reviewed**: JWT expiry 3600 s or less,
+      refresh token rotation on.
+- [ ] **Deploy order**: the new Admin is deployed **before** the migration is
+      applied. After the migration, owners need MFA at their first sign-in and
+      only the new Admin has the enrolment screen; before it, the new Admin
+      runs on the legacy model.
+- [ ] After applying: the Security Advisor shows no "function search_path
+      mutable" warning for `public` and no anon-executable `is_admin()`.
+
 ### 3. The real database — the step that is actually skipped
 
 Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
@@ -135,12 +159,13 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       an additive `default` is not the same as a backfill.
 
 - [ ] `20260928200000_security_rbac_approval_foundation.sql` — **pending**.
-      Follow `docs/security-architecture.md` ("Applying the migration" and
-      "Verify after applying"): sign-ups off and TOTP on in Supabase Auth,
-      apply, deploy the `team-invite` Edge Function with its secrets, both
-      owners enable MFA within the 14-day grace, create the break-glass
-      account with `bootstrap_member`. Then, as `anon` with the publishable
-      key, `team_members?select=ru&limit=1` and
+      Only after every box of "Security settings" above is checked and the
+      new Admin is deployed. Follow `docs/security-architecture.md`
+      ("Applying the migration" and "Verify after applying"): apply, deploy
+      the `team-invite` Edge Function with its secrets, both owners enable MFA
+      at their first sign-in (there is no grace period), create the
+      break-glass account with `bootstrap_member`. Then, as `anon` with the
+      publishable key, `team_members?select=ru&limit=1` and
       `security_audit_log?select=id&limit=1` are refused, and the public
       project query still returns `200`.
 
