@@ -79,7 +79,7 @@ before(async () => {
     create table auth.users (id uuid primary key, email text);
     -- The factors Supabase Auth keeps; the security foundation reads them on
     -- every permission check.
-    create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id), status text not null default 'unverified');
+    create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id), status text not null default 'unverified', created_at timestamptz not null default now(), updated_at timestamptz not null default now());
     create or replace function auth.uid() returns uuid language sql stable as $$
       select coalesce(
         nullif(current_setting('request.jwt.claim.sub', true), ''),
@@ -106,8 +106,9 @@ before(async () => {
   // OWNER, as it does in production.
   await db.query("insert into auth.users (id, email) values ($1, 'admin@space.local'), ($2, 'someone@space.local')", [ADMIN_ID, USER_ID]);
   await applyMigrations(db, { legacyAdmins: [ADMIN_ID] });
-  // The TOTP factor an OWNER needs from the first use.
-  await db.query("insert into auth.mfa_factors (user_id, status) values ($1, 'verified')", [ADMIN_ID]);
+  // The TOTP factor an OWNER needs from the first use, verified before the
+  // sessions the tests sign in with.
+  await db.query("insert into auth.mfa_factors (user_id, status, created_at, updated_at) values ($1, 'verified', now() - interval '1 day', now() - interval '1 day')", [ADMIN_ID]);
   const { rows } = await db.query("insert into public.clients (name, status) values ('Owner', 'ACTIVE') returning id");
   clientId = rows[0].id;
   await db.query(

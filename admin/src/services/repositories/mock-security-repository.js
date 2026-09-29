@@ -131,13 +131,29 @@ function factorsOf(state, member) {
   return state.factors[member?.userId] ?? (member?.mfaEnrolledAt ? [{ id: `factor-${member.userId}`, type: "totp", status: "verified", name: "Mock", createdAt: member.mfaEnrolledAt }] : []);
 }
 
-const hasVerifiedFactor = (member) => factorsOf(read(), member).some((factor) => factor.status === "verified");
+// Since when the member's current factors exist: the earliest verification
+// among them (mfa_enrolment_since in the database); null without one, and a
+// time it cannot read counts as never (it only refuses).
+function enrolmentSince(member) {
+  const times = factorsOf(read(), member)
+    .filter((factor) => factor.status === "verified")
+    .map((factor) => Date.parse(factor.updatedAt ?? factor.createdAt ?? ""));
+  return times.length ? Math.min(...times.map((time) => (Number.isNaN(time) ? Infinity : time))) : null;
+}
 
-// The session's MFA only counts while the member still has a factor: the
-// mock session keeps its verification after a removal, as a Supabase token
-// keeps aal2 until it is refreshed.
-const sessionVerified = (member) => hasVerifiedFactor(member) && mfaMethods().length > 0;
-const stepUpSatisfied = (member) => hasVerifiedFactor(member) && stepUpFresh(mfaMethods(), STEP_UP_SECONDS);
+const hasVerifiedFactor = (member) => enrolmentSince(member) !== null;
+
+// The session's MFA counts only if it verified the member's current factors.
+// The mock session keeps its verification after a removal, as a Supabase
+// token keeps aal2 until it is refreshed; one from before the factors
+// enrolled since does not count, even once there is a factor again.
+function sessionVerified(member) {
+  const since = enrolmentSince(member);
+  const verifiedAt = Date.parse(currentMockSession()?.mfaVerifiedAt ?? "");
+  return Number.isFinite(since) && Number.isFinite(verifiedAt) && verifiedAt >= since;
+}
+
+const stepUpSatisfied = (member) => sessionVerified(member) && stepUpFresh(mfaMethods(), STEP_UP_SECONDS);
 
 // The database's mfa_gate: privileged roles need a verified factor, whatever
 // the session says; a member with a factor needs a session that verified it;
@@ -316,7 +332,8 @@ export const mockAccessRepository = {
     const member = me(state) ?? fail("42501");
     const factors = await this.listFactors();
     const factor = factors.find((item) => item.id === factorId);
-    if (factor) factor.status = "verified";
+    // Supabase Auth stamps updated_at when a factor becomes verified.
+    if (factor && factor.status !== "verified") Object.assign(factor, { status: "verified", updatedAt: nowIso() });
     state.factors[member.userId] = factors;
     if (!member.mfaEnrolledAt) {
       member.mfaEnrolledAt = nowIso();

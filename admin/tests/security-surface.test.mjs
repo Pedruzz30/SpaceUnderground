@@ -46,6 +46,8 @@ const INTERNAL = [
   "set_auth_ban",
   "auth_user_has_password",
   "user_has_verified_factor",
+  "mfa_enrolment_since",
+  "caller_mfa_current",
   "mfa_gate",
   "member_roles",
   "member_is_active",

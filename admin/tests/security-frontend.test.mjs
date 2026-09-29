@@ -301,6 +301,31 @@ describe("mock workflow", () => {
     await logout();
   });
 
+  it("does not accept a session from before the factor enrolled since", async () => {
+    await as("owner");
+    const mfa = await import("../src/services/mfa-service.js");
+    const { loadAccess } = await import("../src/services/access-service.js");
+    const { getSession } = await import("../src/services/auth-service.js");
+    const repository = await (await import("../src/services/repositories/index.js")).getAccessRepository();
+    const KEY = "space-admin:session:v1";
+    // T1: this session verified factor A. Another copy of it keeps it as is.
+    const t1 = sessionStorage.getItem(KEY);
+    const [factorA] = await mfa.listFactors();
+    await repository.unenroll(factorA.id);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const factorB = await mfa.enrollTotp("B");
+    await mfa.verifyTotp(factorB.id, "123456");
+    assert.equal((await loadAccess(await getSession(), { force: true })).blockedReason, null, "T2, from verifying B, works");
+
+    const t2 = sessionStorage.getItem(KEY);
+    sessionStorage.setItem(KEY, t1);
+    const stale = await loadAccess(await getSession(), { force: true });
+    assert.equal(stale.blockedReason, "MFA_CHALLENGE_REQUIRED", "T1 verified A, not B");
+    await assert.rejects(team.listMembers(), (error) => error.code === "mfa_required");
+    sessionStorage.setItem(KEY, t2);
+    await logout();
+  });
+
   it("refreshes the session as soon as a factor is removed, and enrolling again restores access", async () => {
     await as("owner");
     const mfa = await import("../src/services/mfa-service.js");

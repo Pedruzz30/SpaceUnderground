@@ -58,6 +58,15 @@ migration applied. Details: `docs/security-architecture.md`, "Authentication".
       `select has_table_privilege('postgres', 'auth.mfa_factors', 'select');`
       is `true`. Every permission check reads them (a token's `aal2` alone
       is not MFA), so without it no check can answer.
+- [ ] **`auth.mfa_factors` has `created_at` and `updated_at`**
+      (`timestamp with time zone`, not null): the query is in
+      `docs/security-architecture.md`, "Applying the migration", step 2.
+- [ ] **Supabase Auth stamps a factor's verification**: with a throwaway
+      test account, enrol TOTP, wait a minute, then verify the code;
+      `select created_at, updated_at from auth.mfa_factors where user_id = '<test user>';`
+      shows `updated_at` at the verification, not at the enrolment. The
+      rule that keeps an old token from coming back after a factor
+      rotation relies on it. Delete the test account afterwards.
 - [ ] **Deploy order**: the new Admin is deployed **before** the migration is
       applied. After the migration, owners need MFA at their first sign-in and
       only the new Admin has the enrolment screen; before it, the new Admin

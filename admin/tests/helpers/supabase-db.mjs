@@ -28,11 +28,15 @@ export async function createSupabaseDb() {
       last_sign_in_at timestamptz,
       raw_user_meta_data jsonb not null default '{}'::jsonb
     );
+    -- The columns the security foundation reads, as Supabase Auth has them:
+    -- created_at at enrolment, updated_at when the factor is verified.
     create table auth.mfa_factors (
       id uuid primary key default gen_random_uuid(),
       user_id uuid not null references auth.users (id) on delete cascade,
       factor_type text not null default 'totp',
-      status text not null default 'unverified'
+      status text not null default 'unverified',
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
     );
     create table auth.sessions (
       id uuid primary key default gen_random_uuid(),
@@ -115,9 +119,18 @@ export function issuedNow() {
 
 // A verified TOTP factor, as Supabase Auth records one once its first code
 // is accepted. A token only reaches aal2 through one, so a member acting with
-// mfaClaims needs one too: the database checks the factor on every request.
-export async function addVerifiedFactor(db, uid) {
-  await db.query("insert into auth.mfa_factors (user_id, status) values ($1, 'verified')", [uid]);
+// mfaClaims needs one too: the database checks the factor on every request,
+// and that the token's MFA is no older than it. By default it was verified a
+// day ago, before any session a test signs in with; pass verifiedAt (a Date)
+// for one verified later. Returns its id and the second it was verified.
+export async function addVerifiedFactor(db, uid, { verifiedAt = null } = {}) {
+  const { rows } = await db.query(
+    `insert into auth.mfa_factors (user_id, status, created_at, updated_at)
+     values ($1, 'verified', coalesce($2::timestamptz, now() - interval '1 day'), coalesce($2::timestamptz, now() - interval '1 day'))
+     returning id, floor(extract(epoch from updated_at))::bigint as verified_second`,
+    [uid, verifiedAt],
+  );
+  return { id: rows[0].id, verifiedSecond: Number(rows[0].verified_second) };
 }
 
 // Claims of a session that verified MFA `secondsAgo` seconds ago: aal2, with

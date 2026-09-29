@@ -28,13 +28,16 @@
 --                   after a reactivation. Only a new sign-in works again.
 --   project access  public.project_members for roles without projects.read.
 --   MFA             every permission of a privileged role needs a verified
---                   factor (auth.mfa_factors, read on every check) and an
---                   aal2 session, from its first use, with no grace period;
---                   CRITICAL permissions also need an MFA verification
---                   younger than the step-up window, read from the JWT's amr
---                   claim. A token's aal2 and amr outlive a removed factor
---                   until the session is refreshed, so the token alone never
---                   counts as MFA.
+--                   factor (auth.mfa_factors, read on every check) and a
+--                   token whose MFA (aal2, and the amr entry's time) is no
+--                   older than the member's current factors, from its first
+--                   use, with no grace period; CRITICAL permissions also
+--                   need that MFA verification to be younger than the
+--                   step-up window. A token's aal2 and amr outlive a removed
+--                   factor until the session is refreshed, so the token alone
+--                   never counts as MFA, and a token refused after a factor
+--                   change is never accepted again, whatever is enrolled
+--                   later.
 --   approvals       public.change_requests: a draft never touches the live
 --                   project; only approve_change_request() applies it, in one
 --                   transaction, against the version it was based on.
@@ -661,12 +664,13 @@ as $$
   select coalesce(public.request_claims() ->> 'aal', 'aal1');
 $$;
 
--- An MFA verification younger than the step-up window, by a caller who still
--- has a verified factor. aal2 alone is not enough for CRITICAL actions: a
--- session that verified MFA hours ago must verify again
--- (supabase.auth.mfa.challengeAndVerify), which refreshes amr. And the amr
--- entry is not enough either: it stays in the token after the factor is
--- removed, until the session is refreshed.
+-- An MFA verification younger than the step-up window, of the caller's
+-- current factors (caller_mfa_current). aal2 alone is not enough for CRITICAL
+-- actions: a session that verified MFA hours ago must verify again
+-- (supabase.auth.mfa.challengeAndVerify), which refreshes amr. And a recent
+-- amr entry is not enough either: it stays in the token after its factor is
+-- removed, until the session is refreshed, and it may predate the factor
+-- enrolled since.
 create or replace function public.step_up_satisfied()
 returns boolean
 language plpgsql
@@ -678,10 +682,7 @@ declare
   claims jsonb := public.request_claims();
   max_age integer;
 begin
-  if coalesce(claims ->> 'aal', 'aal1') <> 'aal2' or jsonb_typeof(claims -> 'amr') is distinct from 'array' then
-    return false;
-  end if;
-  if not public.user_has_verified_factor(auth.uid()) then
+  if not public.caller_mfa_current() then
     return false;
   end if;
   select step_up_max_age_seconds into max_age from public.security_settings where key = 'global';
@@ -709,6 +710,74 @@ begin
     return false;
   end if;
   return exists (select 1 from auth.mfa_factors f where f.user_id = p_user and f.status = 'verified');
+end;
+$$;
+
+-- Since when the member's current MFA enrolment exists: the earliest moment
+-- at which one of their verified factors became what it is now. Supabase Auth
+-- sets updated_at when a factor is verified (created_at is its enrolment), so
+-- greatest(created_at, updated_at) is never earlier than its verification.
+--   - Removing a factor can only move this later, and a factor verified from
+--     now on can never move it earlier: a token refused because its MFA
+--     predates the current enrolment stays refused for good, whatever is
+--     enrolled afterwards.
+--   - A factor missing either timestamp counts as verified at infinity, and
+--     infinity refuses every token.
+-- null: no verified factor.
+create or replace function public.mfa_enrolment_since(p_user uuid)
+returns timestamptz
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if p_user is null or to_regclass('auth.mfa_factors') is null then
+    return null;
+  end if;
+  return (
+    select min(case
+      when f.created_at is null or f.updated_at is null then 'infinity'::timestamptz
+      else greatest(f.created_at, f.updated_at)
+    end)
+    from auth.mfa_factors f
+    where f.user_id = p_user and f.status = 'verified'
+  );
+end;
+$$;
+
+-- Whether the caller's token proves MFA for their current enrolment: aal2,
+-- and an MFA entry in amr (totp, phone, webauthn) no older than
+-- mfa_enrolment_since(). amr has whole seconds and is compared with the
+-- second of the enrolment: the token issued by the verification itself
+-- carries that same second. A token that verified a factor since removed
+-- (factor A) is refused once A is gone, and stays refused after factor B is
+-- enrolled: aal2 and an amr entry say that MFA happened, not with which
+-- factor, so the time is what ties the token to the current factors.
+create or replace function public.caller_mfa_current()
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  claims jsonb := public.request_claims();
+  since timestamptz;
+  verified bigint;
+begin
+  if coalesce(claims ->> 'aal', 'aal1') <> 'aal2' or jsonb_typeof(claims -> 'amr') is distinct from 'array' then
+    return false;
+  end if;
+  since := public.mfa_enrolment_since(auth.uid());
+  if since is null or not isfinite(since) then
+    return false;
+  end if;
+  select max((entry ->> 'timestamp')::bigint) into verified
+  from jsonb_array_elements(claims -> 'amr') as entry
+  where entry ->> 'method' in ('totp', 'phone', 'webauthn')
+    and (entry ->> 'timestamp') ~ '^[0-9]{1,12}$';
+  return verified is not null and verified >= floor(extract(epoch from since))::bigint;
 end;
 $$;
 
@@ -829,16 +898,17 @@ as $$
   );
 $$;
 
--- The MFA part of every permission check. It reads both the factors the
--- member has now (auth.mfa_factors) and what the token says, because a token
--- keeps aal2 and its amr entries after the factor behind them is removed,
--- until the session is refreshed:
+-- The MFA part of every permission check, for the caller (p_user is always
+-- auth.uid()). It reads the factors the member has now (auth.mfa_factors) as
+-- well as the token, because a token keeps aal2 and its amr entries after the
+-- factor behind them is removed, until the session is refreshed:
 --   privileged, no verified factor -> denied, whatever the token says: roles
 --                                     with approval powers need MFA from their
 --                                     first use, migrated accounts too
---   CRITICAL                       -> a verified factor and a fresh MFA
---                                     verification (step-up)
---   verified factor                -> the session must be aal2
+--   CRITICAL                       -> a fresh MFA verification of the current
+--                                     factors (step-up)
+--   verified factor                -> a token whose MFA is no older than the
+--                                     current factors (caller_mfa_current)
 --   not privileged, no factor      -> allowed
 -- Enrolling a factor goes through Supabase Auth, not through a permission,
 -- so a privileged member without MFA is never locked out of enabling it.
@@ -859,7 +929,7 @@ begin
     return has_factor and public.step_up_satisfied();
   end if;
   if has_factor then
-    return public.jwt_aal() = 'aal2';
+    return public.caller_mfa_current();
   end if;
   return true;
 end;
@@ -913,10 +983,10 @@ $$;
 --          sign in again
 --   SU006  the roles grant it, but MFA is not complete: no verified factor
 --          (enrol one; an aal2 token left over from a removed factor does
---          not count), or a factor this session has not verified
---   SU005  the roles grant it, the member has a verified factor, the
---          session is aal2, and the action is CRITICAL: verify again
---          (step-up)
+--          not count), or a token that has not verified the current factors
+--          (verify the code)
+--   SU005  the roles grant it, the token verified the current factors, and
+--          the action is CRITICAL: verify again (step-up)
 --   42501  not granted at all
 create or replace function public.require_permission(p_permission text)
 returns void
@@ -933,7 +1003,7 @@ begin
     raise exception 'this session was ended; sign in again' using errcode = 'SU013';
   end if;
   if auth.uid() is not null and public.role_grants_permission(auth.uid(), p_permission) then
-    if public.jwt_aal() = 'aal2' and public.user_has_verified_factor(auth.uid()) then
+    if public.caller_mfa_current() then
       raise exception 'this action needs a recent MFA verification (%)', p_permission using errcode = 'SU005';
     end if;
     raise exception 'this account must complete MFA first (%)', p_permission using errcode = 'SU006';
@@ -1677,7 +1747,9 @@ $$;
 -- member's last session revocation gets only that reason: no identity,
 -- roles, projects or settings (its own rows are closed to it by RLS too).
 -- The MFA state comes from the factors the member has now, not from the
--- token alone: an aal2 token left over from a removed factor is not MFA.
+-- token alone: an aal2 token left over from a removed factor is not MFA, and
+-- neither is one whose MFA predates the factors enrolled since
+-- (MFA_CHALLENGE_REQUIRED: verify the current factor).
 create or replace function public.my_access()
 returns jsonb
 language plpgsql
@@ -1721,7 +1793,7 @@ begin
     when m.status = 'INVITED' then 'INVITED'
     when m.access_starts_at is not null and m.access_starts_at > now() then 'NOT_STARTED'
     when requires and not enrolled then 'MFA_ENROLL_REQUIRED'
-    when enrolled and aal <> 'aal2' then 'MFA_CHALLENGE_REQUIRED'
+    when enrolled and not public.caller_mfa_current() then 'MFA_CHALLENGE_REQUIRED'
     else null
   end;
 
@@ -3157,6 +3229,7 @@ begin
         'is_admin', 'next_client_code', 'assign_client_code', 'caller_token_current', 'end_member_sessions',
         'revoke_my_sessions',
         'is_trusted_backend', 'request_claims', 'jwt_aal', 'step_up_satisfied', 'user_has_verified_factor',
+        'mfa_enrolment_since', 'caller_mfa_current',
         'member_row_active', 'member_effective_status', 'member_is_active', 'current_member_active',
         'member_roles', 'member_max_rank', 'member_requires_mfa', 'mfa_gate', 'role_grants_permission',
         'has_permission', 'require_permission', 'is_project_member', 'has_project_access', 'write_audit',

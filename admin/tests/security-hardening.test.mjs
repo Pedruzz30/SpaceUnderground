@@ -110,13 +110,15 @@ describe("MFA from the first use", () => {
     await db.query("insert into auth.users (id, email, encrypted_password) values ($1, 'new-manager@space.local', 'hash')", [userId]);
     await db.query("insert into public.team_members (user_id, display_name, email, status) values ($1, 'New manager', 'new-manager@space.local', 'ACTIVE')", [userId]);
     await db.query("insert into public.user_roles (user_id, role_key) values ($1, 'MANAGER')", [userId]);
-    const { asRole } = await import("./helpers/supabase-db.mjs");
-    const read = (aal) => asRole(db, "authenticated", userId, () => db.query("select id from public.projects where id = $1", [PROJECTS.assigned]), { aal, amr: [] });
-    assert.equal(await outcome(read("aal1")), "none");
-    assert.equal(await outcome(read("aal2")), "none", "no factor: an aal2 claim alone is not MFA");
+    const { asRole, mfaClaims } = await import("./helpers/supabase-db.mjs");
+    const read = (claims) => asRole(db, "authenticated", userId, () => db.query("select id from public.projects where id = $1", [PROJECTS.assigned]), claims);
+    const aal1 = { aal: "aal1", amr: [] };
+    assert.equal(await outcome(read(aal1)), "none");
+    assert.equal(await outcome(read(mfaClaims())), "none", "no factor: an aal2 token alone is not MFA");
     await addVerifiedFactor(db, userId);
-    assert.equal(await outcome(read("aal1")), "none");
-    assert.equal(await outcome(read("aal2")), "ok");
+    assert.equal(await outcome(read(aal1)), "none");
+    assert.equal(await outcome(read({ aal: "aal2", amr: [] })), "none", "aal2 with no MFA entry in amr proves nothing");
+    assert.equal(await outcome(read(mfaClaims())), "ok");
   });
 
   it("does not ask MFA of roles that do not require it", async () => {

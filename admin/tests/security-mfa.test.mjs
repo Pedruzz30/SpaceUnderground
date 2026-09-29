@@ -2,15 +2,17 @@
 // keeps aal2 and the TOTP entry of amr in an access token after its factor is
 // removed (supabase.auth.mfa.unenroll), until the session is refreshed; the
 // database reads auth.mfa_factors on every check, so that token authorizes
-// nothing a factor was needed for. Also: an ended session learns only that
-// it was ended from my_access(), nothing about the member.
+// nothing a factor was needed for. Nor does it come back when another factor
+// is enrolled: the token's MFA must be no older than the current factors.
+// Also: an ended session learns only that it was ended from my_access(),
+// nothing about the member.
 //
 //   npm test
 
 import { strict as assert } from "node:assert";
 import { after, before, describe, it } from "node:test";
 import { IDS, PROJECTS, as, code, createSecurityDb, issuedAgo, one, outcome } from "./helpers/security-fixture.mjs";
-import { addVerifiedFactor, issuedNow, mfaClaims } from "./helpers/supabase-db.mjs";
+import { addVerifiedFactor, asRole, issuedNow, mfaClaims } from "./helpers/supabase-db.mjs";
 
 let db;
 
@@ -128,6 +130,165 @@ describe("a token that outlives its MFA factor", () => {
       await addVerifiedFactor(db, IDS.partner);
       await as(db, "partner", "select public.record_mfa_state()");
     }
+  });
+});
+
+describe("factor rotation never brings an old token back", () => {
+  let serial = 0;
+  // A member of their own for each test: an ACTIVE holder of `role` with
+  // factor A, verified a day ago.
+  const member = async (role) => {
+    serial += 1;
+    const id = `f0000000-0000-4000-8000-${String(serial).padStart(12, "0")}`;
+    const email = `rotation-${serial}@space.local`;
+    await db.query("insert into auth.users (id, email, encrypted_password) values ($1, $2, 'hash')", [id, email]);
+    await db.query("insert into public.team_members (user_id, display_name, email, status) values ($1, 'Rotation', $2, 'ACTIVE')", [id, email]);
+    await db.query("insert into public.user_roles (user_id, role_key) values ($1, $2)", [id, role]);
+    const factorA = await addVerifiedFactor(db, id);
+    return { id, factorA };
+  };
+  // A token whose MFA (the TOTP entry of amr) happened at `second`.
+  const mfaAt = (second) => ({
+    aal: "aal2",
+    amr: [
+      { method: "password", timestamp: second - 60 },
+      { method: "totp", timestamp: second },
+    ],
+    iat: issuedNow(),
+    session_id: `s-${second}`,
+  });
+  const nowSecond = () => Math.floor(Date.now() / 1000);
+  const run = (id, claims, sql, params = []) => asRole(db, "authenticated", id, () => db.query(sql, params), claims);
+  const allowed = async (id, claims, permission) => (await one(run(id, claims, "select public.has_permission($1) as ok", [permission]))).ok;
+  const reasonOf = async (id, claims) => (await one(run(id, claims, "select public.my_access() as access"))).access.blocked_reason;
+  const stepUp = async (id, claims) => (await one(run(id, claims, "select public.step_up_satisfied() as ok"))).ok;
+  const removeFactor = (factorId) => db.query("delete from auth.mfa_factors where id = $1", [factorId]);
+  const removeAll = (id) => db.query("delete from auth.mfa_factors where user_id = $1", [id]);
+  // Factor B, verified just now, as Supabase Auth stamps it.
+  const enrolNow = (id) => addVerifiedFactor(db, id, { verifiedAt: new Date() });
+
+  it("A and B: T1 is refused once factor A is removed, and still refused after factor B is enrolled", async () => {
+    const { id, factorA } = await member("OWNER");
+    const t1 = mfaAt(nowSecond() - 30);
+    assert.equal(await allowed(id, t1, "team.invite"), true, "T1 works with factor A");
+
+    await removeFactor(factorA.id);
+    assert.equal(await allowed(id, t1, "team.invite"), false, "A: no factor");
+    assert.equal(await reasonOf(id, t1), "MFA_ENROLL_REQUIRED");
+
+    await enrolNow(id);
+    assert.equal(await allowed(id, t1, "team.invite"), false, "B: a new factor does not revive T1");
+    assert.equal(await outcome(run(id, t1, "select id from public.projects where id = $1", [PROJECTS.assigned])), "none", "RLS refuses it");
+    assert.equal(await code(run(id, t1, "select public.require_permission('team.invite')")), "SU006", "verify the current factor");
+    assert.equal(await reasonOf(id, t1), "MFA_CHALLENGE_REQUIRED", "the Admin asks for a code, not for enrolment");
+    assert.equal(await stepUp(id, t1), false);
+  });
+
+  it("C and E: a token from verifying factor B works, from the very second of the verification", async () => {
+    const { id, factorA } = await member("OWNER");
+    await removeFactor(factorA.id);
+    const factorB = await enrolNow(id);
+    const t2 = mfaAt(factorB.verifiedSecond);
+    assert.equal(await allowed(id, t2, "team.invite"), true);
+    assert.equal(await outcome(run(id, t2, "select id from public.projects where id = $1", [PROJECTS.assigned])), "ok");
+    assert.equal(await reasonOf(id, t2), null);
+    assert.equal(await allowed(id, mfaAt(factorB.verifiedSecond - 1), "team.invite"), false, "one second earlier predates B");
+  });
+
+  it("D and F: CRITICAL refuses the old token's recent TOTP entry, and accepts a fresh verification of factor B", async () => {
+    const { id, factorA } = await member("ABSOLUTE_ADMIN");
+    const t1 = mfaAt(nowSecond() - 5);
+    assert.equal(await allowed(id, t1, "security.manage"), true, "a fresh step-up with factor A");
+
+    await removeFactor(factorA.id);
+    const factorB = await enrolNow(id);
+    assert.equal(await allowed(id, t1, "security.manage"), false, "D: its TOTP entry is 5 s old, but older than B");
+    assert.equal(await allowed(id, t1, "critical_settings.manage"), false);
+    assert.equal(await stepUp(id, t1), false);
+    assert.equal(await code(run(id, t1, "select public.require_permission('security.manage')")), "SU006");
+
+    const t2 = mfaAt(factorB.verifiedSecond);
+    assert.equal(await allowed(id, t2, "security.manage"), true, "F: a fresh verification of B");
+    assert.equal(await stepUp(id, t2), true);
+  });
+
+  it("keeps T1 refused through every later change of factors", async () => {
+    const { id, factorA } = await member("OWNER");
+    const t1 = mfaAt(nowSecond() - 30);
+    await removeFactor(factorA.id);
+    const refused = async (step) => assert.equal(await allowed(id, t1, "team.invite"), false, step);
+
+    const b = await enrolNow(id);
+    await refused("B enrolled");
+    const c = await enrolNow(id);
+    await refused("C enrolled too");
+    await removeFactor(b.id);
+    await refused("B removed");
+    await db.query("update auth.mfa_factors set updated_at = now() where id = $1", [c.id]);
+    await refused("C changed (renamed)");
+    await removeAll(id);
+    await refused("no factor");
+    await enrolNow(id);
+    await refused("D enrolled");
+  });
+
+  it("does not revive T1 through a factor enrolled before it and verified after A was removed", async () => {
+    const { id, factorA } = await member("OWNER");
+    // Enrolled an hour ago and left unverified.
+    const { rows } = await db.query(
+      "insert into auth.mfa_factors (user_id, status, created_at, updated_at) values ($1, 'unverified', now() - interval '1 hour', now() - interval '1 hour') returning id",
+      [id],
+    );
+    const t1 = mfaAt(nowSecond() - 30);
+    assert.equal(await allowed(id, t1, "team.invite"), true);
+    await removeFactor(factorA.id);
+    // Supabase Auth stamps updated_at when it verifies the factor.
+    await db.query("update auth.mfa_factors set status = 'verified', updated_at = now() where id = $1", [rows[0].id]);
+    assert.equal(await allowed(id, t1, "team.invite"), false);
+  });
+
+  it("logs nobody out for adding a second factor, and refuses once the factor older than the token is gone", async () => {
+    const { id, factorA } = await member("OWNER");
+    const t = mfaAt(nowSecond() - 30);
+    const b = await enrolNow(id);
+    assert.equal(await allowed(id, t, "team.invite"), true, "factor A is still there");
+    await removeFactor(b.id);
+    assert.equal(await allowed(id, t, "team.invite"), true);
+    await enrolNow(id);
+    await removeFactor(factorA.id);
+    assert.equal(await allowed(id, t, "team.invite"), false, "only a factor newer than the token is left");
+  });
+
+  it("decides from auth.mfa_factors, never from team_members.mfa_enrolled_at", async () => {
+    const withFactor = await member("OWNER");
+    const t = mfaAt(nowSecond() - 30);
+    await db.query("update public.team_members set mfa_enrolled_at = null where user_id = $1", [withFactor.id]);
+    assert.equal(await allowed(withFactor.id, t, "team.invite"), true, "no record, but a verified factor");
+
+    const without = await member("OWNER");
+    await removeAll(without.id);
+    await db.query("update public.team_members set mfa_enrolled_at = now() where user_id = $1", [without.id]);
+    assert.equal(await allowed(without.id, t, "team.invite"), false, "a record, but no factor");
+  });
+
+  it("fails closed on MFA claims it cannot read", async () => {
+    const { id } = await member("OWNER");
+    const second = nowSecond() - 30;
+    // (asRole fills in a valid amr unless a test replaces it; undefined drops it.)
+    const malformed = [
+      { aal: "aal2", amr: undefined },
+      { aal: "aal2", amr: [] },
+      { aal: "aal2", amr: "totp" },
+      { aal: "aal2", amr: [{ method: "password", timestamp: second }] },
+      { aal: "aal2", amr: [{ method: "totp", timestamp: "soon" }] },
+      { aal: "aal2", amr: [{ method: "totp", timestamp: -1 }] },
+      { aal: "aal2", amr: [{ method: "totp" }] },
+      { aal: "aal1", amr: [{ method: "totp", timestamp: second }] },
+    ];
+    for (const claims of malformed) {
+      assert.equal(await allowed(id, { ...claims, iat: issuedNow() }, "team.invite"), false, JSON.stringify(claims));
+    }
+    assert.equal(await allowed(id, mfaAt(second), "team.invite"), true, "sanity: a well-formed token works");
   });
 });
 

@@ -102,7 +102,7 @@ before(async () => {
     create table auth.users (id uuid primary key, email text);
     -- The factors Supabase Auth keeps; the security foundation reads them on
     -- every permission check.
-    create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id), status text not null default 'unverified');
+    create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id), status text not null default 'unverified', created_at timestamptz not null default now(), updated_at timestamptz not null default now());
     -- Supabase's own definition: the legacy claim first, then the claims JSON.
     create or replace function auth.uid() returns uuid language sql stable as $$
       select coalesce(
@@ -153,8 +153,9 @@ before(async () => {
       },
     },
   });
-  // The TOTP factor an OWNER needs from the first use.
-  await db.query("insert into auth.mfa_factors (user_id, status) values ($1, 'verified')", [ADMIN_ID]);
+  // The TOTP factor an OWNER needs from the first use, verified before the
+  // sessions the tests sign in with.
+  await db.query("insert into auth.mfa_factors (user_id, status, created_at, updated_at) values ($1, 'verified', now() - interval '1 day', now() - interval '1 day')", [ADMIN_ID]);
 });
 
 after(async () => {
