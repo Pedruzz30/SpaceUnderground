@@ -701,7 +701,7 @@ language plpgsql
 stable
 security definer
 set search_path = public, pg_temp
-as $
+as $mfa_factor$
 begin
   if p_user is null or to_regclass('auth.mfa_factors') is null then
     return false;
@@ -714,7 +714,7 @@ begin
       and f.factor_type::text = 'totp'
   );
 end;
-$;
+$mfa_factor$;
 
 -- The only MFA method this Admin currently knows how to challenge is TOTP.
 -- Any other Supabase Auth factor type is deliberately null and refused.
@@ -723,11 +723,11 @@ returns text
 language sql
 immutable
 set search_path = public, pg_temp
-as $
+as $mfa_method$
   select case p_factor_type
     when 'totp' then 'totp'
   end;
-$;
+$mfa_method$;
 
 -- The second of the MFA verification the caller's token proves, judged
 -- against Supabase Auth's live session state, not the token alone; null when
