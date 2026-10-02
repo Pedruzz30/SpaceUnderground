@@ -11,8 +11,8 @@ how changes are reviewed, and what is recorded. The short version:
   page in DevTools changes the page, not the answer.
 
 Everything described here lives in
-[`supabase/migrations/20260928200000_security_rbac_approval_foundation.sql`](../supabase/migrations/20260928200000_security_rbac_approval_foundation.sql)
-(**not applied yet**, see [Applying the migration](#applying-the-migration)),
+[`supabase/migrations/20261002033705_security_rbac_approval_foundation.sql`](../supabase/migrations/20261002033705_security_rbac_approval_foundation.sql)
+(**applied to production 2026-10-02**, see [Applying the migration](#applying-the-migration)),
 [`supabase/functions/team-invite/`](../supabase/functions/team-invite/) and
 [`admin/src/security/`](../admin/src/security/).
 
@@ -720,7 +720,7 @@ it belongs to Supabase's platform limits.
 
 ## Applying the migration
 
-**Not applied.** Applying it is a production change; do it deliberately.
+**Applied to production on 2026-10-02.** The steps below are retained as the deployment record and verification procedure.
 
 1. Read the migration once more; confirm nothing else is pending:
 

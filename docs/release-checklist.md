@@ -122,7 +122,7 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       | `20260928013040` | `clients_post_review_hardening` | APPLIED |
       | `20260928031922` | `financial_foundation` | APPLIED |
       | `20260928035023` | `commercial_opportunities` | APPLIED |
-      | `20260928200000` | `security_rbac_approval_foundation` | PENDING |
+      | `20261002033705` | `security_rbac_approval_foundation` | APPLIED |
 
       Recorded versions must never be renamed or repaired. After the normalize,
       production plans read `Max` = `ON_REQUEST`, `Plus` = `AVAILABLE`,
@@ -184,7 +184,7 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
 - [ ] Any new column has the value the feature expects on the existing rows —
       an additive `default` is not the same as a backfill.
 
-- [ ] `20260928200000_security_rbac_approval_foundation.sql` — **pending**.
+- [ ] `20261002033705_security_rbac_approval_foundation.sql` — **applied 2026-10-02**.
       Only after every box of "Security settings" above is checked and the
       new Admin is deployed. Follow `docs/security-architecture.md`
       ("Applying the migration" and "Verify after applying"): apply, deploy

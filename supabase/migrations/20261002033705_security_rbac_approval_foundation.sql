@@ -1,8 +1,8 @@
 -- Space Underground - security foundation
 --
 -- Identity, RBAC, project access, account lifecycle, MFA and step-up, drafts
--- with approvals, and an append-only security audit log. NOT APPLIED by
--- anyone automatically: review it, then apply it by hand
+-- with approvals, and an append-only security audit log. Applied to production
+-- on 2026-10-02 after review; this filename matches the recorded remote version.
 -- (docs/security-architecture.md, "Applying the migration").
 --
 -- Before this migration a single function, public.is_admin() (a row in
