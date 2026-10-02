@@ -563,7 +563,7 @@ function renderEditor(state) {
 
     <form class="editor-form client-editor-form" data-client-editor data-mode="${isCreate ? "create" : "edit"}" novalidate>
       <div class="editor-toolbar">
-        <button type="submit" class="button button--primary" data-client-save data-requires="clients.edit" data-i18n="${isCreate ? "clientEditor.createClient" : "clientEditor.saveChanges"}">${escapeHtml(
+        <button type="submit" class="button button--primary" data-client-save data-requires="${isCreate ? "clients.create" : "clients.edit"}" data-i18n="${isCreate ? "clientEditor.createClient" : "clientEditor.saveChanges"}">${escapeHtml(
           t(isCreate ? "clientEditor.createClient" : "clientEditor.saveChanges"),
         )}</button>
       </div>

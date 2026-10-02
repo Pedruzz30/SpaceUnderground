@@ -370,9 +370,9 @@ describe("MFA bound to the live session", () => {
     assert.equal(await allowed(second.id, kept.claims), false, "a factor that is gone");
   });
 
-  it("9: maps TOTP to the totp amr method, and refuses another method's entry", async () => {
+  it("9: maps TOTP to the totp amr method, and refuses every other factor method", async () => {
     const { rows } = await db.query("select public.mfa_method('totp') as totp, public.mfa_method('phone') as phone, public.mfa_method('webauthn') as webauthn, public.mfa_method('sms') as other");
-    assert.deepEqual(rows[0], { totp: "totp", phone: "mfa/phone", webauthn: "mfa/webauthn", other: null });
+    assert.deepEqual(rows[0], { totp: "totp", phone: null, webauthn: null, other: null });
 
     const { id, factorA } = await newMember("OWNER");
     const { claims } = await mfaSession(db, id, { factorId: factorA, at: secondsAgo(30) });
@@ -382,21 +382,12 @@ describe("MFA bound to the live session", () => {
     assert.equal(await allowed(id, wrongMethod), false, "a TOTP session proves nothing with a phone entry");
   });
 
-  it("10: reads phone and WebAuthn as mfa/phone and mfa/webauthn, never the bare names", async () => {
+  it("10: phone and WebAuthn alone never satisfy the Admin's TOTP gate", async () => {
     for (const [type, method] of [["phone", "mfa/phone"], ["webauthn", "mfa/webauthn"]]) {
       const { id, factorA } = await newMember("OWNER", { type });
-      const { sessionId, claims } = await mfaSession(db, id, { factorId: factorA, at: secondsAgo(30) });
+      const { claims } = await mfaSession(db, id, { factorId: factorA, at: secondsAgo(30) });
       assert.deepEqual(claims.amr.map((entry) => entry.method), ["password", method]);
-      assert.equal(await allowed(id, claims), true, method);
-      const bare = { ...claims, amr: claims.amr.map((entry) => (entry.method === method ? { ...entry, method: type } : entry)) };
-      assert.equal(await allowed(id, bare), false, `the bare "${type}"`);
-
-      // Removing it downgrades the session; Supabase Auth's clean-up of amr
-      // matches the factor type, so the mfa/* entry stays, and still counts
-      // for nothing.
-      await unenroll(db, factorA);
-      assert.ok((await db.query("select 1 from auth.mfa_amr_claims where session_id = $1 and authentication_method = $2", [sessionId, method])).rows.length);
-      assert.equal(await allowed(id, claims), false, `${method} after the removal`);
+      assert.equal(await allowed(id, claims), false, `${type} cannot satisfy the TOTP-only Admin gate`);
     }
   });
 

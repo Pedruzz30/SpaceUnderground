@@ -121,10 +121,10 @@ describe("decision policy", () => {
     assert.equal(stepUpFresh([{ method: "totp", timestamp: at(3600) }], 600, now), false);
     assert.equal(stepUpFresh([{ method: "password", timestamp: at(1) }], 600, now), false);
     assert.equal(stepUpFresh([], 600, now), false);
-    // Supabase Auth's names for phone and WebAuthn verifications.
-    assert.equal(stepUpFresh([{ method: "mfa/phone", timestamp: at(30) }], 600, now), true);
-    assert.equal(stepUpFresh([{ method: "mfa/webauthn", timestamp: at(30) }], 600, now), true);
-    assert.equal(stepUpFresh([{ method: "phone", timestamp: at(30) }], 600, now), false, "not a name Supabase Auth records");
+    // This Admin implements TOTP end to end; other Auth factors do not count.
+    assert.equal(stepUpFresh([{ method: "mfa/phone", timestamp: at(30) }], 600, now), false);
+    assert.equal(stepUpFresh([{ method: "mfa/webauthn", timestamp: at(30) }], 600, now), false);
+    assert.equal(stepUpFresh([{ method: "phone", timestamp: at(30) }], 600, now), false);
     assert.equal(stepUpFresh([{ method: "webauthn", timestamp: at(30) }], 600, now), false);
   });
 });

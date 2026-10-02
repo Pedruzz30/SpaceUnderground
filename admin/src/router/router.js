@@ -45,6 +45,7 @@ const pages = [
   { test: (route) => route === "/welcome", page: welcomePage },
   { test: (route) => route === "/dashboard" || route === "/", page: dashboardPage },
   { test: (route) => route === "/projects", page: projectsPage, any: ["projects.read", "projects.read_assigned"] },
+  { test: (route) => route === "/projects/new", page: projectEditorPage, any: ["projects.create"] },
   // Editors get the editor; members who may only propose changes get drafts.
   {
     test: (route) => /^\/projects\/[^/]+$/.test(route),

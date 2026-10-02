@@ -691,37 +691,43 @@ begin
 end;
 $$;
 
--- Whether a user has a verified MFA factor. plpgsql so the reference to
--- auth.mfa_factors is resolved when called, not when created.
+-- Whether a user has the verified TOTP factor this Admin can challenge.
+-- Other Supabase Auth factor types do not satisfy the Admin MFA gate; a
+-- privileged member who only has one of those is sent to TOTP enrolment
+-- instead of a challenge screen the UI cannot complete.
 create or replace function public.user_has_verified_factor(p_user uuid)
 returns boolean
 language plpgsql
 stable
 security definer
 set search_path = public, pg_temp
-as $$
+as $
 begin
   if p_user is null or to_regclass('auth.mfa_factors') is null then
     return false;
   end if;
-  return exists (select 1 from auth.mfa_factors f where f.user_id = p_user and f.status = 'verified');
+  return exists (
+    select 1
+    from auth.mfa_factors f
+    where f.user_id = p_user
+      and f.status = 'verified'
+      and f.factor_type::text = 'totp'
+  );
 end;
-$$;
+$;
 
--- The method Supabase Auth records in amr (and in auth.mfa_amr_claims) when a
--- factor of this type is verified. Any other type: null, and refused.
+-- The only MFA method this Admin currently knows how to challenge is TOTP.
+-- Any other Supabase Auth factor type is deliberately null and refused.
 create or replace function public.mfa_method(p_factor_type text)
 returns text
 language sql
 immutable
 set search_path = public, pg_temp
-as $$
+as $
   select case p_factor_type
     when 'totp' then 'totp'
-    when 'phone' then 'mfa/phone'
-    when 'webauthn' then 'mfa/webauthn'
   end;
-$$;
+$;
 
 -- The second of the MFA verification the caller's token proves, judged
 -- against Supabase Auth's live session state, not the token alone; null when

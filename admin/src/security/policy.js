@@ -14,9 +14,9 @@ import { getAccess, getRiskLevel, hasPermission, hasProjectAccess, requiresAppro
 
 export const OUTCOMES = ["execute", "confirm", "step_up", "request_approval", "deny"];
 
-// The amr methods Supabase Auth records for an MFA verification: TOTP, phone
-// and WebAuthn factors.
-export const MFA_METHODS = ["totp", "mfa/phone", "mfa/webauthn"];
+// The Admin currently challenges TOTP only. Other Supabase Auth factors do
+// not satisfy this UI's step-up flow until the Admin implements them end to end.
+export const MFA_METHODS = ["totp"];
 
 // A fresh MFA verification, read from the amr entries of the current session
 // (Supabase Auth: [{ method, timestamp }]).

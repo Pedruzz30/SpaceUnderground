@@ -750,9 +750,9 @@ it belongs to Supabase's platform limits.
    `factor_id`, `id`, `user_id`):
 
    ```sql
-   select has_table_privilege('postgres', 'auth.sessions', 'select'),
-          has_table_privilege('postgres', 'auth.mfa_amr_claims', 'select'),
-          has_table_privilege('postgres', 'auth.mfa_factors', 'select');
+   select has_table_privilege(current_user, 'auth.sessions', 'select'),
+          has_table_privilege(current_user, 'auth.mfa_amr_claims', 'select'),
+          has_table_privilege(current_user, 'auth.mfa_factors', 'select');
    select table_name, column_name, data_type from information_schema.columns
    where table_schema = 'auth'
      and (table_name, column_name) in (

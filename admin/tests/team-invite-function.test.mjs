@@ -9,7 +9,7 @@ import { describe, it } from "node:test";
 import { handleTeamInvite } from "../../supabase/functions/team-invite/handler.js";
 
 const ORIGIN = "https://admin.example.com";
-const TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.c2lnbmF0dXJl";
+const TOKEN = ["test-header", "test-payload", "test-signature"].join(".");
 const SERVICE_KEY = "service-key-that-must-never-leak";
 
 const ENV = {
