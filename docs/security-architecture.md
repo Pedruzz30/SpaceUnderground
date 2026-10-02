@@ -753,18 +753,26 @@ it belongs to Supabase's platform limits.
    select has_table_privilege(current_user, 'auth.sessions', 'select'),
           has_table_privilege(current_user, 'auth.mfa_amr_claims', 'select'),
           has_table_privilege(current_user, 'auth.mfa_factors', 'select');
-   select table_name, column_name, data_type from information_schema.columns
+   select table_name, column_name, data_type
+   from information_schema.columns
    where table_schema = 'auth'
-     and (table_name, column_name) in (
-       ('sessions', 'id'), ('sessions', 'user_id'), ('sessions', 'aal'), ('sessions', 'factor_id'),
-       ('mfa_factors', 'id'), ('mfa_factors', 'user_id'), ('mfa_factors', 'status'), ('mfa_factors', 'factor_type'),
-       ('mfa_amr_claims', 'session_id'), ('mfa_amr_claims', 'authentication_method'), ('mfa_amr_claims', 'updated_at'))
+     and (
+       (table_name = 'sessions' and column_name = any (array['id', 'user_id', 'aal', 'factor_id']))
+       or (table_name = 'mfa_factors' and column_name = any (array['id', 'user_id', 'status', 'factor_type']))
+       or (table_name = 'mfa_amr_claims' and column_name = any (array['session_id', 'authentication_method', 'updated_at']))
+     )
    order by 1, 2;
    ```
 
-3. In Supabase Auth settings (all **blocking**, see the release checklist):
-   sign-ups **off**; TOTP enabled; the Admin URL in Redirect URLs; leaked
-   password protection **on**; JWT expiry and session settings reviewed.
+3. In Supabase Auth settings (see the release checklist):
+   sign-ups **off**; TOTP enabled; the Admin origin is allow-listed in Redirect
+   URLs; JWT expiry and refresh-token settings reviewed. The Admin consumes the
+   Auth callback at the site root and immediately rewrites it to `#/welcome`,
+   so an exact fragment redirect entry is not required. Leaked-password
+   protection must be enabled when the project is on Pro or above; on Free,
+   where Supabase does not offer the control, the documented Free-plan
+   exception applies together with TOTP for privileged roles and the Admin's
+   password rules.
 4. **Deploy the new Admin first.** Before the migration it falls back to the
    legacy model and works as today; after it, privileged accounts need MFA
    from their first sign-in and only the new Admin has the enrolment screen.
