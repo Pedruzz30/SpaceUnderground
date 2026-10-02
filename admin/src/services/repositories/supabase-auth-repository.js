@@ -2,8 +2,11 @@ import { getSupabaseClient } from "../../lib/supabase.js";
 import { toDataError } from "../errors.js";
 import { t } from "../../i18n/index.js";
 
-// Authentication proves who you are; the admins table decides whether you are
-// allowed in. Both checks are enforced again by RLS on every query.
+// Authentication proves who you are; the database decides what you may do
+// (public.my_access(), read by the access service). The legacy admins row is
+// still read so that, before the security migration is applied, the Admin
+// keeps treating its members as it always has. RLS enforces both on every
+// query.
 async function adminMembership(supabase, userId) {
   if (!userId) return null;
 
@@ -35,13 +38,8 @@ export const supabaseAuthRepository = {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw toDataError(error, t("errors.data.signInCredentials"));
 
-    const session = await describeSession(supabase, data.session);
-    if (!session?.isAdmin) {
-      await supabase.auth.signOut();
-      throw toDataError({ code: "unauthorized" }, "Access denied.");
-    }
-
-    return session;
+    // Membership is checked by the auth service, from the database's answer.
+    return describeSession(supabase, data.session);
   },
 
   async signOut() {

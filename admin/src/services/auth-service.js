@@ -1,5 +1,7 @@
 import { DataError, toDataError } from "./errors.js";
 import { getAuthRepository } from "./repositories/index.js";
+import { forgetAccess, forgetDirectory, loadAccess, recordSignIn, revokeMySessions } from "./access-service.js";
+import { invalidatePendingCount } from "./approval-service.js";
 import { t } from "../i18n/index.js";
 import { PASSWORD_MIN, validateNewPassword } from "../utils/settings-checks.js";
 
@@ -9,15 +11,40 @@ import { PASSWORD_MIN, validateNewPassword } from "../utils/settings-checks.js";
 let cachedSession = null;
 let resolvedOnce = false;
 
+function forgetSession() {
+  cachedSession = null;
+  resolvedOnce = true;
+  forgetAccess();
+  forgetDirectory();
+  invalidatePendingCount();
+}
+
+// Signing in is not being let in: the database says whether this account is a
+// member (or, before the security migration, an admin). An account that is
+// neither is signed straight back out. A member who is suspended, expired or
+// still owes MFA stays signed in and is shown why they cannot go further.
 export async function login(credentials) {
   try {
     const repository = await getAuthRepository();
     cachedSession = await repository.signIn(credentials);
     resolvedOnce = true;
-    return cachedSession;
   } catch (error) {
     throw toDataError(error, t("errors.data.signIn"));
   }
+
+  let access = null;
+  try {
+    access = await loadAccess(cachedSession, { force: true });
+  } catch (error) {
+    await logout().catch(() => {});
+    throw error;
+  }
+  if (!access || access.blockedReason === "NOT_MEMBER" || access.blockedReason === "UNAUTHENTICATED") {
+    await logout().catch(() => {});
+    throw new DataError(t("errors.unauthorized"), { code: "unauthorized" });
+  }
+  recordSignIn();
+  return cachedSession;
 }
 
 export async function logout() {
@@ -27,8 +54,7 @@ export async function logout() {
   } catch (error) {
     throw toDataError(error, t("errors.data.signOut"));
   } finally {
-    cachedSession = null;
-    resolvedOnce = true;
+    forgetSession();
   }
 }
 
@@ -85,12 +111,15 @@ export async function changePassword(password, confirmation) {
   }
 }
 
+// Every device: the database first refuses every token issued so far (an
+// access token would otherwise live until it expires), then Supabase Auth
+// revokes the refresh tokens.
 export async function signOutEverywhere() {
   try {
+    await revokeMySessions();
     await (await getAuthRepository()).signOutEverywhere();
   } finally {
-    cachedSession = null;
-    resolvedOnce = true;
+    forgetSession();
   }
 }
 

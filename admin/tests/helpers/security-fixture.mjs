@@ -1,0 +1,195 @@
+// A Supabase-shaped database with the whole migration chain applied and one
+// member of every kind the access model distinguishes, for the security tests.
+//
+//   owner          a row of public.admins before the security foundation, so
+//                  an OWNER; it enabled TOTP at its first sign-in, as it must
+//                  (no grace period). Tests about an OWNER without a factor
+//                  remove it first.
+//   partner        OWNER with a verified TOTP factor
+//   absolute       ABSOLUTE_ADMIN with a verified factor (break-glass)
+//   seo, manager   SEO / MANAGER with a verified factor
+//   collaborator   COLLABORATOR: EDIT on the assigned project, VIEW on the
+//                  published one
+//   collaborator2  COLLABORATOR: EDIT on the other project only
+//   viewer         VIEWER: VIEW on the assigned project
+//   suspended      COLLABORATOR, SUSPENDED, still holding EDIT on assigned
+//   expired        COLLABORATOR, ACTIVE but past access_expires_at
+//   outsider       signed up in Supabase Auth, never a member
+//
+// Members are seeded with plain SQL and no JWT, like someone running the SQL
+// editor; everything the tests then do goes through the API roles.
+//
+// A member with a verified factor acts from a signed-in session that
+// completed MFA with it (memberSession); one without acts with a token whose
+// session proves no MFA.
+
+import { applyMigrations } from "./migration-files.mjs";
+import { ADMIN_ID, USER_ID, addVerifiedFactor, asRole, createSupabaseDb, issuedNow, mfaClaims, mfaSession } from "./supabase-db.mjs";
+
+const id = (n) => `a0000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+
+export const IDS = {
+  owner: ADMIN_ID,
+  outsider: USER_ID,
+  partner: id(2),
+  absolute: id(3),
+  seo: id(4),
+  manager: id(5),
+  collaborator: id(6),
+  collaborator2: id(7),
+  viewer: id(8),
+  suspended: id(9),
+  expired: id(10),
+};
+
+export const PROJECTS = {
+  assigned: "b0000000-0000-4000-8000-000000000001",
+  other: "b0000000-0000-4000-8000-000000000002",
+  published: "b0000000-0000-4000-8000-000000000003",
+};
+
+const MEMBERS = [
+  { key: "partner", role: "OWNER", factor: true },
+  { key: "absolute", role: "ABSOLUTE_ADMIN", factor: true },
+  { key: "seo", role: "SEO", factor: true },
+  { key: "manager", role: "MANAGER", factor: true },
+  { key: "collaborator", role: "COLLABORATOR", projects: [["assigned", "EDIT"], ["published", "VIEW"]] },
+  { key: "collaborator2", role: "COLLABORATOR", projects: [["other", "EDIT"]] },
+  { key: "viewer", role: "VIEWER", projects: [["assigned", "VIEW"]] },
+  { key: "suspended", role: "COLLABORATOR", status: "SUSPENDED", projects: [["assigned", "EDIT"]] },
+  { key: "expired", role: "COLLABORATOR", expired: true, projects: [["assigned", "EDIT"]] },
+];
+
+export async function createSecurityDb() {
+  const db = await createSupabaseDb();
+  for (const key of Object.keys(IDS)) {
+    if (key === "owner" || key === "outsider") continue;
+    await db.query("insert into auth.users (id, email, encrypted_password) values ($1, $2, 'hash')", [IDS[key], `${key}@space.local`]);
+  }
+  await db.query("update auth.users set encrypted_password = 'hash' where id = $1", [IDS.owner]);
+  await applyMigrations(db, { legacyAdmins: [IDS.owner] });
+  await addVerifiedFactor(db, IDS.owner);
+
+  await db.query(
+    `insert into public.projects (id, case_number, name, slug, editorial_status, visible, description)
+     values ($1, 101, 'Assigned', 'assigned', 'DRAFT', false, 'Original'),
+            ($2, 102, 'Other', 'other', 'DRAFT', false, 'Other'),
+            ($3, 103, 'Published', 'published', 'PUBLISHED', true, 'Live')`,
+    [PROJECTS.assigned, PROJECTS.other, PROJECTS.published],
+  );
+
+  for (const member of MEMBERS) {
+    const uid = IDS[member.key];
+    await db.query(
+      `insert into public.team_members (user_id, display_name, email, status, activated_at, access_expires_at, access_starts_at)
+       values ($1, $2, $3, $4, now(), $5, $6)`,
+      [
+        uid,
+        member.key,
+        `${member.key}@space.local`,
+        member.status ?? "ACTIVE",
+        member.expired ? new Date(Date.now() - 3600_000) : null,
+        member.expired ? new Date(Date.now() - 7 * 86400_000) : null,
+      ],
+    );
+    await db.query("insert into public.user_roles (user_id, role_key) values ($1, $2)", [uid, member.role]);
+    for (const [project, level] of member.projects ?? []) {
+      await db.query("insert into public.project_members (user_id, project_id, access_level) values ($1, $2, $3)", [uid, PROJECTS[project], level]);
+    }
+    if (member.factor) await addVerifiedFactor(db, uid);
+  }
+  return db;
+}
+
+const now = () => Math.floor(Date.now() / 1000);
+
+// Claims for each strength of session. "aal1" is a password-only session;
+// "mfa" verified TOTP 30 s ago (fresh enough for step-up); "stale" is aal2
+// but verified an hour ago.
+export function sessionClaims(strength = "aal1") {
+  if (strength === "mfa") return mfaClaims(30);
+  if (strength === "stale") return mfaClaims(3600);
+  return { aal: "aal1", amr: [{ method: "password", timestamp: now() - 60 }] };
+}
+
+// Members whose roles require MFA hold nothing on a password-only session,
+// so they sign in with MFA unless a test is about a weaker session and says so.
+const PRIVILEGED = new Set(["owner", "partner", "absolute", "seo", "manager"]);
+
+export const defaultStrength = (who) => (PRIVILEGED.has(who) ? "mfa" : "aal1");
+
+const signedIn = new WeakMap();
+
+// The session a member's tokens come from, when they hold a verified factor:
+// a sign-in that completed MFA with one of their factors two hours ago, so
+// that any strength a test asks for ("mfa" 30 s ago, "stale" an hour ago) is
+// no older than the session's proof. When that session was ended (revoked,
+// suspended) or lost its factor, this is a new sign-in. null for a member
+// without a factor. Tests about one particular session pass its session_id.
+export async function memberSession(db, uid) {
+  const sessions = signedIn.get(db) ?? new Map();
+  signedIn.set(db, sessions);
+  const { rows } = await db.query(
+    `select f.id as factor_id,
+            exists (
+              select 1 from auth.sessions s join auth.mfa_factors bound on bound.id = s.factor_id
+              where s.id = $2 and s.user_id = $1 and s.aal = 'aal2' and bound.user_id = $1 and bound.status = 'verified'
+            ) as live
+     from auth.mfa_factors f
+     where f.user_id = $1 and f.status = 'verified'
+     order by f.updated_at
+     limit 1`,
+    [uid, sessions.get(uid) ?? null],
+  );
+  if (!rows.length) return null;
+  if (rows[0].live) return sessions.get(uid);
+  const { sessionId } = await mfaSession(db, uid, { factorId: rows[0].factor_id, at: new Date(Date.now() - 2 * 3600_000) });
+  sessions.set(uid, sessionId);
+  return sessionId;
+}
+
+// Runs one statement as a signed-in member (or anon when who is "anon"), with
+// a token issued just now from the member's session; extra.iat stands for an
+// older token, extra.session_id for another session.
+export async function as(db, who, sql, params = [], strength = defaultStrength(who), extra = {}) {
+  if (who === "anon") return asRole(db, "anon", null, () => db.query(sql, params));
+  if (who === "service") return asRole(db, "service_role", null, () => db.query(sql, params));
+  const session = await memberSession(db, IDS[who]);
+  return asRole(db, "authenticated", IDS[who], () => db.query(sql, params), {
+    ...sessionClaims(strength),
+    iat: issuedNow(),
+    session_id: session ?? `s-${who}`,
+    ...extra,
+  });
+}
+
+// The iat of a token issued `seconds` ago: one that predates whatever a test
+// does next.
+export const issuedAgo = (seconds = 60) => Math.floor(Date.now() / 1000) - seconds;
+
+// The result of an attempt, as one word: "ok" (rows came back), "none" (the
+// statement ran and touched nothing), or the SQLSTATE of the refusal
+// ("42501" not allowed, "SU005" step-up, ...).
+export async function outcome(promise) {
+  try {
+    const { rows } = await promise;
+    return rows.length ? "ok" : "none";
+  } catch (error) {
+    return error.code ?? error.message;
+  }
+}
+
+// The SQLSTATE a statement fails with, or null when it succeeds.
+export async function code(promise) {
+  try {
+    await promise;
+    return null;
+  } catch (error) {
+    return error.code ?? error.message;
+  }
+}
+
+export async function one(promise) {
+  const { rows } = await promise;
+  return rows[0];
+}

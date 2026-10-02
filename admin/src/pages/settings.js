@@ -13,6 +13,13 @@ import { getSiteSettings, saveSiteSettings } from "../services/settings-service.
 import { resolveImageUrl } from "../services/storage-service.js";
 import { checkModules, exportBackup } from "../services/system-service.js";
 import { initials } from "../utils/client-relationship.js";
+import { bindMfaEnroll, mfaEnrollMarkup } from "../components/mfa-enroll.js";
+import { getAccess, hasAnyPermission, hasPermission, isSecurityModelActive } from "../security/access.js";
+import { roleLabelKey } from "../security/catalog.js";
+import { loadAccess, recordMfaState } from "../services/access-service.js";
+import { listFactors, removeFactor } from "../services/mfa-service.js";
+import { formatFullDate } from "../utils/format.js";
+import { mfaState } from "../utils/team-view.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 import {
   PASSWORD_MIN,
@@ -29,16 +36,27 @@ import {
 } from "../utils/settings-checks.js";
 
 // Four tabs. "Site público" is the public configuration the site reads with
-// the anon key; "Conta" is the signed-in admin; "Sistema" reads every module
+// the anon key; "Conta" is the signed-in member; "Sistema" reads every module
 // live; "Dados" exports them. Only the first one has unsaved state, and the
 // other three load the first time they are opened.
+//
+// Each tab names the permissions that show it (none: every member, since
+// everyone manages their own password and MFA). The database refuses the
+// data behind a hidden tab anyway.
 
 const TABS = [
-  ["site", "settings.tabs.site"],
-  ["account", "settings.tabs.account"],
-  ["system", "settings.tabs.system"],
-  ["data", "settings.tabs.data"],
+  ["site", "settings.tabs.site", ["settings.read", "seo.read"]],
+  ["account", "settings.tabs.account", null],
+  ["system", "settings.tabs.system", ["settings.read"]],
+  ["data", "settings.tabs.data", ["data.export"]],
 ];
+
+const visibleTabs = () => TABS.filter(([, , any]) => !any || hasAnyPermission(any));
+
+// Identity fields belong to settings.edit, search and sharing to seo.edit;
+// the database checks the same split per column.
+const IDENTITY_FIELDS = ["siteName", "siteUrl", "contactEmail", "locale"];
+const SEARCH_FIELDS = ["seoTitle", "seoDescription", "ogImagePath"];
 
 const MODULE_LABELS = {
   projects: "settings.system.modules.projects",
@@ -355,10 +373,15 @@ function accountMarkup() {
           <div data-account-session><p class="empty-inline" data-i18n="common.loading">${escapeHtml(t("common.loading"))}</p></div>
         </section>
         <section class="panel settings-panel">
-          ${panelHead("settings.account.teamEyebrow", "settings.account.teamTitle")}
-          <p class="settings-copy" data-i18n="settings.account.teamCopy">${escapeHtml(t("settings.account.teamCopy"))}</p>
+          ${panelHead("security.team.eyebrow", "settings.account.accessTitle")}
+          <div data-account-access aria-live="polite"></div>
+          ${
+            isSecurityModelActive()
+              ? ""
+              : `<p class="settings-copy" data-i18n="settings.account.teamCopy">${escapeHtml(t("settings.account.teamCopy"))}</p>
           <ul class="settings-team" data-account-team aria-live="polite"></ul>
-          <p class="settings-note" data-i18n="settings.account.teamHowTo">${escapeHtml(t("settings.account.teamHowTo"))}</p>
+          <p class="settings-note" data-i18n="settings.account.teamHowTo">${escapeHtml(t("settings.account.teamHowTo"))}</p>`
+          }
         </section>
       </div>
       <div class="settings-stack">
@@ -386,6 +409,10 @@ function accountMarkup() {
             <p class="settings-note" data-i18n="settings.account.passwordNote">${escapeHtml(t("settings.account.passwordNote"))}</p>
           </form>
         </section>
+        <section class="panel settings-panel" data-account-mfa-panel>
+          ${panelHead("settings.account.securityEyebrow", "security.mfa.title")}
+          <div data-account-mfa aria-live="polite"><p class="empty-inline">${escapeHtml(t("common.loading"))}</p></div>
+        </section>
         <section class="panel settings-panel settings-panel--danger">
           ${panelHead("settings.account.sessionsEyebrow", "settings.account.sessionsTitle")}
           <p class="settings-copy" data-i18n="settings.account.sessionsCopy">${escapeHtml(t("settings.account.sessionsCopy"))}</p>
@@ -400,6 +427,8 @@ function sessionMarkup(session) {
   const user = session?.user ?? {};
   const email = user.email ?? "";
   const role = session?.role ?? null;
+  const access = getAccess();
+  const roles = access?.source === "legacy" ? [] : access?.roles ?? [];
   const facts = [
     ["settings.account.lastSignIn", formatDateTime(user.lastSignInAt)],
     ["settings.account.expires", formatDateTime(session?.expiresAt)],
@@ -411,7 +440,14 @@ function sessionMarkup(session) {
       <div class="client-avatar client-avatar--large client-avatar--active" aria-hidden="true">${escapeHtml(initials(email.split("@")[0]))}</div>
       <div>
         <strong>${escapeHtml(email || "—")}</strong>
-        ${role ? `<span class="badge badge--success">${escapeHtml(t(ROLE_LABELS[role] ?? ROLE_LABELS.admin))}</span>` : ""}
+        ${
+          roles.length
+            ? roles.map((item) => `<span class="badge badge--success">${escapeHtml(t(roleLabelKey(item.key)))}</span>`).join(" ")
+            : role
+              ? `<span class="badge badge--success">${escapeHtml(t(ROLE_LABELS[role] ?? ROLE_LABELS.admin))}</span>`
+              : ""
+        }
+        ${access?.member?.ru ? `<code class="team-ru">${escapeHtml(access.member.ru)}</code>` : ""}
       </div>
     </div>
     <dl class="settings-facts">
@@ -437,6 +473,36 @@ function teamMarkup(roster, currentUserId) {
       `;
     })
     .join("");
+}
+
+function accessMarkup(access) {
+  if (!access) return "";
+  const member = access.member ?? {};
+  const facts = [
+    ["security.member.validity", member.accessExpiresAt ? t("security.team.until", { date: formatFullDate(member.accessExpiresAt) }) : t("security.team.permanent")],
+    ["security.member.projectsCount", access.permissions.has("projects.read") ? t("security.team.allProjects") : String(access.projects.length)],
+  ];
+  return `
+    <dl class="settings-facts">
+      ${facts.map(([key, value]) => `<div><dt>${escapeHtml(t(key))}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}
+    </dl>
+    ${hasPermission("team.read", access) && isSecurityModelActive(access) ? `<p><a class="button button--compact" href="#/team">${escapeHtml(t("settings.account.manageTeam"))}</a></p>` : ""}
+  `;
+}
+
+function mfaStatusMarkup(access, factor) {
+  const state = factor ? "enabled" : mfaState({ roles: (access?.roles ?? []).map((role) => role.key), mfaEnrolledAt: null });
+  const tone = { enabled: "success", required: "danger", optional: "neutral" }[state];
+  return `
+    <p class="mfa-status"><span class="badge badge--${tone}">${escapeHtml(t(`security.mfaState.${state}`))}</span></p>
+    <p class="settings-copy">${escapeHtml(t(factor ? "security.mfa.enabledCopy" : state === "optional" ? "security.mfa.optionalCopy" : "security.mfa.requiredCopy"))}</p>
+    ${
+      factor
+        ? `<dl class="settings-facts"><div><dt>${escapeHtml(t("security.mfa.factor"))}</dt><dd>${escapeHtml(factor.name || "TOTP")} · ${escapeHtml(formatFullDate(factor.createdAt))}</dd></div></dl>
+           <button class="button button--danger" type="button" data-mfa-remove="${escapeAttribute(factor.id)}">${escapeHtml(t("security.mfa.remove"))}</button>`
+        : mfaEnrollMarkup()
+    }
+  `;
 }
 
 function rulesMarkup(form, email) {
@@ -548,7 +614,7 @@ function dataMarkup() {
         ${panelHead("settings.data.eyebrow", "settings.data.backupTitle")}
         <p class="settings-copy" data-i18n="settings.data.backupCopy">${escapeHtml(t("settings.data.backupCopy"))}</p>
         <p class="settings-note settings-note--warning" data-i18n="settings.data.backupExcludes">${escapeHtml(t("settings.data.backupExcludes"))}</p>
-        <button class="button button--primary" type="button" data-backup-export data-i18n="settings.data.export">${escapeHtml(t("settings.data.export"))}</button>
+        <button class="button button--primary" type="button" data-backup-export data-requires="data.export" data-i18n="settings.data.export">${escapeHtml(t("settings.data.export"))}</button>
         <p class="settings-backup-result" data-backup-result aria-live="polite" hidden></p>
       </section>
       <section class="panel settings-panel">
@@ -609,17 +675,17 @@ export const settingsPage = {
     </section>
     <div class="settings-shell" data-settings>
       <div class="tabs settings-tabs" role="tablist" aria-label="${escapeAttribute(t("settings.sections"))}" data-i18n-aria-label="settings.sections">
-        ${TABS.map(
+        ${visibleTabs().map(
           ([id, key], index) =>
             `<button type="button" role="tab" id="settings-tab-${id}" data-tab="${id}" aria-selected="${index === 0}" aria-controls="settings-panel-${id}" tabindex="${index === 0 ? 0 : -1}" data-i18n="${key}">${escapeHtml(t(key))}</button>`,
         ).join("")}
       </div>
-      <section class="settings-tabpanel" id="settings-panel-site" role="tabpanel" aria-labelledby="settings-tab-site">
+      <section class="settings-tabpanel" id="settings-panel-site" role="tabpanel" aria-labelledby="settings-tab-site"${visibleTabs()[0]?.[0] === "site" ? "" : " hidden"}>
         <form class="settings-grid" data-settings-form aria-busy="true" novalidate>
           <section class="panel"><p class="empty-inline" data-i18n="settings.loadingSettings">${t("settings.loadingSettings")}</p></section>
         </form>
       </section>
-      <section class="settings-tabpanel" id="settings-panel-account" role="tabpanel" aria-labelledby="settings-tab-account" hidden data-settings-account></section>
+      <section class="settings-tabpanel" id="settings-panel-account" role="tabpanel" aria-labelledby="settings-tab-account"${visibleTabs()[0]?.[0] === "account" ? "" : " hidden"} data-settings-account></section>
       <section class="settings-tabpanel" id="settings-panel-system" role="tabpanel" aria-labelledby="settings-tab-system" hidden data-settings-system></section>
       <section class="settings-tabpanel" id="settings-panel-data" role="tabpanel" aria-labelledby="settings-tab-data" hidden data-settings-data></section>
     </div>
@@ -654,7 +720,8 @@ export const settingsPage = {
     };
     tablist.addEventListener("click", openActiveTab);
     tablist.addEventListener("keydown", openActiveTab);
-    loaded.add("site");
+    const siteVisible = visibleTabs().some(([id]) => id === "site");
+    if (siteVisible) loaded.add("site");
 
     /* ---- site: drafts per language */
 
@@ -838,6 +905,14 @@ export const settingsPage = {
       state.seoTranslation = { ...(settings.translations?.[TRANSLATION_LOCALE] ?? {}) };
       state.og = { ...state.og, path: null };
       form.innerHTML = siteFormMarkup(settings);
+      const lock = (names, permission) =>
+        names.forEach((name) => {
+          if (form.elements[name] && !hasPermission(permission)) form.elements[name].disabled = true;
+        });
+      lock(IDENTITY_FIELDS, "settings.edit");
+      lock(SEARCH_FIELDS, "seo.edit");
+      form.querySelector("[data-settings-save]")?.setAttribute("data-requires", "settings.edit|seo.edit");
+      form.querySelector("[data-settings-discard]")?.setAttribute("data-requires", "settings.edit|seo.edit");
       paintSeoLocale();
       state.baseline = snapshot();
       setSaveState("saved");
@@ -845,15 +920,17 @@ export const settingsPage = {
       probeOg();
     }
 
-    try {
-      mountSite(await getSiteSettings());
-      form.removeAttribute("aria-busy");
-    } catch (error) {
-      form.innerHTML = `<section class="panel"><p class="empty-inline">${escapeHtml(describeError(error, t("settings.loadError")))}</p></section>`;
-      form.removeAttribute("aria-busy");
-    }
+    if (siteVisible) {
+      try {
+        mountSite(await getSiteSettings());
+        form.removeAttribute("aria-busy");
+      } catch (error) {
+        form.innerHTML = `<section class="panel"><p class="empty-inline">${escapeHtml(describeError(error, t("settings.loadError")))}</p></section>`;
+        form.removeAttribute("aria-busy");
+      }
 
-    setNavigationGuard(() => isDirty());
+      setNavigationGuard(() => isDirty());
+    }
 
     form.addEventListener("input", (event) => {
       if (!state.saved) return;
@@ -941,18 +1018,78 @@ export const settingsPage = {
       };
       paintAccount();
 
-      // Not awaited: a slow roster never holds up the password form.
+      const accessBox = panel.querySelector("[data-account-access]");
+      const paintAccessBox = () => {
+        accessBox.innerHTML = accessMarkup(getAccess());
+      };
+      paintAccessBox();
+
+      // Before the security migration the legacy roster is all there is. Not
+      // awaited: a slow roster never holds up the password form.
       const team = panel.querySelector("[data-account-team]");
-      getAdminRoster()
-        .then((roster) => {
-          paintTeam = () => {
-            team.innerHTML = teamMarkup(roster, session?.user?.id);
-          };
-          paintTeam();
-        })
-        .catch((error) => {
-          team.innerHTML = `<li class="empty-inline">${escapeHtml(describeError(error, t("settings.account.teamError")))}</li>`;
+      if (team) {
+        getAdminRoster()
+          .then((roster) => {
+            paintTeam = () => {
+              team.innerHTML = teamMarkup(roster, session?.user?.id);
+              paintAccessBox();
+            };
+            paintTeam();
+          })
+          .catch((error) => {
+            team.innerHTML = `<li class="empty-inline">${escapeHtml(describeError(error, t("settings.account.teamError")))}</li>`;
+          });
+      } else {
+        paintTeam = paintAccessBox;
+      }
+
+      // MFA through Supabase Auth: enrol, or remove the enrolled factor.
+      const mfaBox = panel.querySelector("[data-account-mfa]");
+      const paintMfa = async () => {
+        try {
+          const factor = (await listFactors()).find((item) => item.type === "totp" && item.status === "verified") ?? null;
+          mfaBox.innerHTML = mfaStatusMarkup(getAccess(), factor);
+          if (!factor) {
+            bindMfaEnroll(mfaBox, {
+              onDone: async () => {
+                await loadAccess(getCachedSession(), { force: true }).catch(() => null);
+                showToast(t("security.mfa.enabled"));
+                await paintMfa();
+              },
+            });
+          }
+        } catch (error) {
+          mfaBox.innerHTML = `<p class="empty-inline">${escapeHtml(describeError(error, t("security.mfa.loadError")))}</p>`;
+        }
+      };
+      paintMfa();
+      mfaBox.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-mfa-remove]");
+        if (!button) return;
+        const confirmed = await confirmModal({
+          title: t("security.mfa.removeTitle"),
+          body: `<p>${escapeHtml(t(getAccess()?.mfa.required ? "security.mfa.removeRequiredBody" : "security.mfa.removeBody"))}</p>`,
+          confirmLabel: t("security.mfa.remove"),
         });
+        if (!confirmed) return;
+        button.disabled = true;
+        try {
+          await removeFactor(button.dataset.mfaRemove);
+          await recordMfaState();
+          await loadAccess(getCachedSession(), { force: true }).catch(() => null);
+          showToast(t("security.mfa.removed"));
+          // A role that requires MFA holds nothing without it: the Admin
+          // shows the enrolment screen straight away.
+          if (getAccess()?.blockedReason) {
+            window.dispatchEvent(new CustomEvent("space-admin:access-changed"));
+            return;
+          }
+          await paintMfa();
+        } catch (error) {
+          showToast(describeError(error, t("security.mfa.removeError")));
+          button.disabled = false;
+        }
+      });
 
       const clearPasswordErrors = () =>
         passwordForm.querySelectorAll("[data-error-for]").forEach((node) => {
@@ -1138,7 +1275,7 @@ export const settingsPage = {
     /* ---- language switch: generated markup is re-worded from what is on screen */
 
     onLocaleChange(root, () => {
-      paintSite();
+      if (state.saved) paintSite();
       const kind = form.querySelector("[data-settings-state]")?.dataset.kind;
       if (kind) setSaveState(kind);
       paintAccount();
@@ -1148,6 +1285,9 @@ export const settingsPage = {
       const source = document.querySelector("[data-settings-source]");
       if (source) source.textContent = sourceLabel();
     });
+
+    // Members without the site tab start on the first tab they do see.
+    if (!siteVisible) openActiveTab();
 
   },
   beforeLeave: () => clearNavigationGuard(),

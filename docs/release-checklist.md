@@ -31,10 +31,49 @@ Run everything from the repo root unless noted.
 - [ ] `npm run test:e2e:i18n`
 - [ ] `cd admin && npm run test:e2e` (needs `npm run dev:mock` running)
 - [ ] `cd admin && npm run test:e2e:i18n` (needs `npm run dev:mock` running)
+- [ ] `cd admin && npm run test:e2e:security` (needs `npm run dev:mock` running)
 - [ ] `cd admin && npm run test:e2e:clients` against the real project, only
       after the clients foundation migration is applied there (needs `npm run dev` with
       Supabase env and `ADMIN_EMAIL` / `ADMIN_PASSWORD`). It creates and then
       deletes its own `E2E Client <timestamp>` rows.
+
+### Security settings — BLOCKING before deploying the security branch
+
+These live in the Supabase dashboard, not in the repository, so no test can
+check them. Every box must be checked by a person, on the production project,
+before the Admin of `feat/security-rbac-approvals` is deployed or its
+migration applied. Details: `docs/security-architecture.md`, "Authentication".
+
+- [ ] **Public sign-up OFF** (Authentication → Sign In / Providers → "Allow
+      new users to sign up"): access is by invitation only.
+- [ ] **TOTP / MFA enabled** (Authentication → Multi-Factor): privileged roles
+      hold nothing without it, from their first sign-in.
+- [ ] **Redirect URLs** include the Admin's URL (Authentication → URL
+      Configuration): invitation and recovery links land on `#/welcome`.
+- [ ] **Leaked password protection enabled** (Authentication → Attack
+      Protection / Passwords). The Security Advisor reports it disabled today.
+- [ ] **JWT and session configuration reviewed**: JWT expiry 3600 s or less,
+      refresh token rotation on.
+- [ ] **The database can read Supabase Auth's MFA and session state**: in
+      the SQL editor, `postgres` can `select` from `auth.mfa_factors`,
+      `auth.sessions` and `auth.mfa_amr_claims`, and they have the columns
+      the check reads. Both queries are in `docs/security-architecture.md`,
+      "Applying the migration", step 2. Every privileged permission check
+      reads them (a token's `aal2` alone is not MFA), so without them no
+      check can answer.
+- [ ] **Supabase Auth binds a session to the factor it verified**: with a
+      throwaway test account, enrol and verify TOTP, then, for the
+      `session_id` in its access token, `auth.sessions` shows `aal2` and the
+      factor's id in `factor_id`, and `auth.mfa_amr_claims` a `totp` row at
+      the verification; remove the factor and the session is `aal1` with no
+      factor. The check that keeps a token from outliving its factor reads
+      exactly this. Delete the test account afterwards.
+- [ ] **Deploy order**: the new Admin is deployed **before** the migration is
+      applied. After the migration, owners need MFA at their first sign-in and
+      only the new Admin has the enrolment screen; before it, the new Admin
+      runs on the legacy model.
+- [ ] After applying: the Security Advisor shows no "function search_path
+      mutable" warning for `public` and no anon-executable `is_admin()`.
 
 ### 3. The real database — the step that is actually skipped
 
@@ -71,6 +110,7 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       | `20260928013040` | `clients_post_review_hardening` | APPLIED |
       | `20260928031922` | `financial_foundation` | APPLIED |
       | `20260928035023` | `commercial_opportunities` | APPLIED |
+      | `20260928200000` | `security_rbac_approval_foundation` | PENDING |
 
       Recorded versions must never be renamed or repaired. After the normalize,
       production plans read `Max` = `ON_REQUEST`, `Plus` = `AVAILABLE`,
@@ -131,6 +171,17 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       `src/scripts/supabase-public.js` (`PROJECT_COLUMNS`, `PLAN_COLUMNS`).
 - [ ] Any new column has the value the feature expects on the existing rows —
       an additive `default` is not the same as a backfill.
+
+- [ ] `20260928200000_security_rbac_approval_foundation.sql` — **pending**.
+      Only after every box of "Security settings" above is checked and the
+      new Admin is deployed. Follow `docs/security-architecture.md`
+      ("Applying the migration" and "Verify after applying"): apply, deploy
+      the `team-invite` Edge Function with its secrets, both owners enable MFA
+      at their first sign-in (there is no grace period), create the
+      break-glass account with `bootstrap_member`. Then, as `anon` with the
+      publishable key, `team_members?select=ru&limit=1` and
+      `security_audit_log?select=id&limit=1` are refused, and the public
+      project query still returns `200`.
 
 How to apply a migration: Supabase CLI `supabase db push`, or paste the file
 into the SQL editor in order. Never edit or rename an already applied migration;

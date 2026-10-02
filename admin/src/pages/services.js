@@ -135,7 +135,7 @@ function serviceCard(plan) {
           <span class="row-menu__panel" role="menu" hidden>
             <a role="menuitem" href="${escapeAttribute(publicHref)}" target="_blank" rel="noreferrer">${escapeHtml(t("services.actionViewPublic"))}</a>
             <button type="button" role="menuitem" data-service-duplicate="${escapeAttribute(plan.id)}">${escapeHtml(t("services.actionDuplicate"))}</button>
-            <button type="button" role="menuitem" data-service-archive="${escapeAttribute(plan.id)}" data-archive-action="${archiveAction}">${escapeHtml(archiveLabel)}</button>
+            <button type="button" role="menuitem" data-service-archive="${escapeAttribute(plan.id)}" data-requires="services.edit" data-archive-action="${archiveAction}">${escapeHtml(archiveLabel)}</button>
           </span>
         </span>
       </footer>
@@ -178,7 +178,7 @@ export const servicesPage = {
         <p data-i18n="services.intro">${escapeHtml(t("services.intro"))}</p>
       </div>
       <div class="heading-actions">
-        <button class="button button--primary" type="button" data-new-service data-i18n="services.newService">${escapeHtml(t("services.newService"))}</button>
+        <button class="button button--primary" type="button" data-new-service data-requires="services.edit" data-i18n="services.newService">${escapeHtml(t("services.newService"))}</button>
       </div>
     </section>
 

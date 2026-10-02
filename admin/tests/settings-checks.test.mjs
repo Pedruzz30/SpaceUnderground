@@ -148,7 +148,7 @@ describe("account service", () => {
     assert.equal(session.role, "owner");
     assert.ok(session.user.lastSignInAt);
     assert.ok(new Date(session.expiresAt) > new Date());
-    assert.deepEqual((await getAdminRoster()).map((member) => [member.userId, member.role]), [["mock-admin", "owner"]]);
+    assert.deepEqual((await getAdminRoster()).map((member) => [member.userId, member.role]), [["mock-owner", "owner"]]);
   });
 
   it("refuses a weak password before it reaches the auth provider", async () => {
