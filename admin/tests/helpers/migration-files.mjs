@@ -37,3 +37,21 @@ export function migrationPath(purpose) {
 export function readMigration(purpose) {
   return readFileSync(migrationPath(purpose), "utf8");
 }
+
+// Applies every migration in order, the way production ran them. before maps
+// a file name to a callback run just before that file (rows that must exist
+// when a backfill runs). legacyAdmins are rows of public.admins from before
+// the security foundation, which turns each one into an OWNER, exactly as it
+// does in production; they must already exist in auth.users.
+export async function applyMigrations(db, { legacyAdmins = [], before = {} } = {}) {
+  const security = migrationFile("security_rbac_approval_foundation");
+  for (const name of migrationFiles()) {
+    if (before[name]) await before[name]();
+    if (name === security) {
+      for (const id of legacyAdmins) {
+        await db.query("insert into public.admins (user_id, role) values ($1, 'owner') on conflict (user_id) do nothing", [id]);
+      }
+    }
+    await db.exec(readFileSync(`${MIGRATIONS_DIR}${name}`, "utf8"));
+  }
+}

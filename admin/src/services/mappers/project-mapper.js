@@ -88,6 +88,9 @@ export function mapProjectFromDatabase(row) {
     updatedAt: row.updated_at ?? null,
     publishedAt: row.published_at ?? null,
     translations: row.translations ?? {},
+    // Bumped by the database on every update (security migration); drafts
+    // record the version they started from. null before that migration.
+    version: row.version == null ? null : Number(row.version),
   };
 }
 

@@ -69,7 +69,7 @@ function renderOrphan(orphan, index) {
       <span><strong>${escapeHtml(orphan.path)}</strong><small>${escapeHtml(orphan.type || t("media.asset"))}</small></span>
       <span>${orphan.size ? escapeHtml(t("media.bytes", { size: orphan.size })) : "—"}</span>
       <span>${orphan.createdAt ? escapeHtml(new Date(orphan.createdAt).toLocaleString(document.documentElement.lang || undefined)) : "—"}</span>
-      <button class="button button--danger" type="button" data-delete-orphan="${index}" data-i18n="common.delete">${t("common.delete")}</button>
+      <button class="button button--danger" type="button" data-delete-orphan="${index}" data-requires="files.delete" data-i18n="common.delete">${t("common.delete")}</button>
     </div>
   `;
 }

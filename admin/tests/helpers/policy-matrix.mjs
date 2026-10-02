@@ -4,12 +4,15 @@
 //   "none"    allowed to ask, but no row is visible or touched
 //   "ok"      the row is read or written
 // so a test states the whole policy as one expected table.
+//
+// The admin is privileged, so their requests need the session that completed
+// MFA: adminClaims carries it (its session_id).
 
 import { ADMIN_ID, USER_ID, asRole } from "./supabase-db.mjs";
 
-async function attempt(db, role, uid, sql, params) {
+async function attempt(db, role, uid, sql, params, claims) {
   try {
-    const { rows } = await asRole(db, role, uid, () => db.query(sql, params));
+    const { rows } = await asRole(db, role, uid, () => db.query(sql, params), claims);
     return rows.length ? "ok" : "none";
   } catch (error) {
     if (error.code === "42501") return "denied";
@@ -26,15 +29,16 @@ const ROLES = [
 // seed() inserts a row with no JWT context (like the SQL editor) and returns
 // its id. insertSql inserts one row and returns it. The admin deletes the seed
 // row last, so each run starts from a fresh one.
-export async function policyMatrix(db, { table, seed, insertSql, insertParams = [], updateSet }) {
+export async function policyMatrix(db, { table, seed, insertSql, insertParams = [], updateSet, adminClaims = {} }) {
   const matrix = {};
   for (const [label, role, uid] of ROLES) {
     const id = await seed();
+    const claims = uid === ADMIN_ID ? adminClaims : {};
     matrix[label] = {
-      select: await attempt(db, role, uid, `select id from public.${table} where id = $1`, [id]),
-      insert: await attempt(db, role, uid, insertSql, insertParams),
-      update: await attempt(db, role, uid, `update public.${table} set ${updateSet} where id = $1 returning id`, [id]),
-      delete: await attempt(db, role, uid, `delete from public.${table} where id = $1 returning id`, [id]),
+      select: await attempt(db, role, uid, `select id from public.${table} where id = $1`, [id], claims),
+      insert: await attempt(db, role, uid, insertSql, insertParams, claims),
+      update: await attempt(db, role, uid, `update public.${table} set ${updateSet} where id = $1 returning id`, [id], claims),
+      delete: await attempt(db, role, uid, `delete from public.${table} where id = $1 returning id`, [id], claims),
     };
   }
   return matrix;

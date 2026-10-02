@@ -44,6 +44,9 @@ function writeAll(projects) {
 function normalizeGallery(project) {
   const next = {
     ...project,
+    // Mock stand-in for projects.version: bumped on every save, which is all
+    // the mock approval flow needs to detect a stale draft.
+    version: Number(project.version) || 1,
     gallery: Array.isArray(project.gallery)
       ? project.gallery.map((item) => ({ ...item, path: item.path ?? item.url ?? "" }))
       : [],
@@ -157,6 +160,8 @@ export const mockProjectRepository = {
       caseNumber: current.caseNumber,
       createdAt: current.createdAt,
       updatedAt: nowIso(),
+      // Owned by the store, like the database's trigger: a patch cannot set it.
+      version: (Number(current.version) || 1) + 1,
     };
 
     if (Array.isArray(patch.modules)) {

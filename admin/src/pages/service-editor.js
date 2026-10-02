@@ -121,10 +121,10 @@ function overviewMarkup(plan) {
         <article class="overview-card">
           <span>${escapeHtml(t("services.quickActions"))}</span>
           <div class="overview-actions">
-            <button type="submit" class="button" data-editor-action data-action-overview-save>${escapeHtml(t("common.save"))}</button>
+            <button type="submit" class="button" data-editor-action data-action-overview-save data-requires="services.edit">${escapeHtml(t("common.save"))}</button>
             <a class="button" href="${escapeAttribute(publicUrl)}" target="_blank" rel="noreferrer">${escapeHtml(t("services.actionViewPublic"))}</a>
             <button type="button" class="button" data-editor-action data-action-duplicate ${plan.id ? "" : "hidden"}>${escapeHtml(t("services.actionDuplicate"))}</button>
-            <button type="button" class="button" data-editor-action data-action-archive ${plan.id ? "" : "hidden"}>${escapeHtml(plan.status === "ARCHIVED" ? t("services.actionUnarchive") : t("services.actionArchive"))}</button>
+            <button type="button" class="button" data-editor-action data-action-archive data-requires="services.edit" ${plan.id ? "" : "hidden"}>${escapeHtml(plan.status === "ARCHIVED" ? t("services.actionUnarchive") : t("services.actionArchive"))}</button>
           </div>
         </article>
       </section>
@@ -192,7 +192,7 @@ function renderEditor(plan, isCreate) {
     <form class="editor-form service-editor-grid" data-service-editor data-service-id="${escapeAttribute(plan.id || "")}" data-mode="${isCreate ? "create" : "edit"}" novalidate>
       <div class="service-editor-main">
         <div class="editor-toolbar">
-          <button type="submit" class="button button--primary" data-editor-action data-action-save>${escapeHtml(isCreate ? t("services.createService") : t("services.saveChanges"))}</button>
+          <button type="submit" class="button button--primary" data-editor-action data-action-save data-requires="services.edit">${escapeHtml(isCreate ? t("services.createService") : t("services.saveChanges"))}</button>
         </div>
         <div class="tabs" role="tablist" aria-label="${escapeAttribute(t("services.editorSections"))}">
           ${[

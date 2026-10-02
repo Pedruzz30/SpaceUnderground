@@ -13,7 +13,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
-import { MIGRATIONS_DIR, migrationFiles, readMigration } from "./helpers/migration-files.mjs";
+import { applyMigrations, readMigration } from "./helpers/migration-files.mjs";
+import { addVerifiedFactor, mfaSession } from "./helpers/supabase-db.mjs";
 
 const ADMIN_ID = "11111111-1111-1111-1111-111111111111";
 const USER_ID = "22222222-2222-2222-2222-222222222222";
@@ -29,9 +30,17 @@ const EMBEDS = listed
 
 let db;
 let clientId;
+// The admin's signed-in session, which completed MFA (see before()).
+let adminSession = null;
 
+// A signed-in request carries what Supabase puts in a token after an MFA
+// sign-in (aal2, a TOTP entry in amr, iat, and for the admin the session
+// that verified it): the admin here is a migrated OWNER, and privileged
+// members hold nothing without MFA.
 async function asRole(role, uid, fn) {
-  const claims = JSON.stringify(uid ? { role, sub: uid } : { role });
+  const now = Math.floor(Date.now() / 1000);
+  const session = { aal: "aal2", amr: [{ method: "totp", timestamp: now - 30 }], iat: now + 1, ...(uid === ADMIN_ID ? { session_id: adminSession } : {}) };
+  const claims = JSON.stringify(uid ? { role, sub: uid, ...session } : { role });
   await db.query("select set_config('request.jwt.claims', $1, false)", [claims]);
   await db.exec(`set role ${role};`);
   try {
@@ -64,7 +73,7 @@ before(async () => {
   await db.exec(`
     create role anon;
     create role authenticated;
-    create role service_role;
+    create role service_role bypassrls;
     grant usage on schema public to anon, authenticated, service_role;
     alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
     alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
@@ -72,6 +81,11 @@ before(async () => {
 
     create schema if not exists auth;
     create table auth.users (id uuid primary key, email text);
+    -- The factors and sessions Supabase Auth keeps; the security foundation
+    -- reads them on every permission check.
+    create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id), factor_type text not null default 'totp', status text not null default 'unverified', created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+    create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id), aal text, factor_id uuid, created_at timestamptz not null default now());
+    create table auth.mfa_amr_claims (id uuid primary key default gen_random_uuid(), session_id uuid not null references auth.sessions (id) on delete cascade, authentication_method text not null, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique (session_id, authentication_method));
     create or replace function auth.uid() returns uuid language sql stable as $$
       select coalesce(
         nullif(current_setting('request.jwt.claim.sub', true), ''),
@@ -94,12 +108,14 @@ before(async () => {
     alter table storage.objects enable row level security;
   `);
 
-  for (const name of migrationFiles()) {
-    await db.exec(readFileSync(`${MIGRATIONS_DIR}${name}`, "utf8"));
-  }
-
+  // The admin is one from before the security foundation, which makes them an
+  // OWNER, as it does in production.
   await db.query("insert into auth.users (id, email) values ($1, 'admin@space.local'), ($2, 'someone@space.local')", [ADMIN_ID, USER_ID]);
-  await db.query("insert into public.admins (user_id, role) values ($1, 'owner')", [ADMIN_ID]);
+  await applyMigrations(db, { legacyAdmins: [ADMIN_ID] });
+  // The TOTP factor an OWNER needs from the first use, and the session that
+  // verified it two hours ago.
+  const factor = await addVerifiedFactor(db, ADMIN_ID);
+  adminSession = (await mfaSession(db, ADMIN_ID, { factorId: factor.id, at: new Date(Date.now() - 2 * 3600_000) })).sessionId;
   const { rows } = await db.query("insert into public.clients (name, status) values ('Owner', 'ACTIVE') returning id");
   clientId = rows[0].id;
   await db.query(

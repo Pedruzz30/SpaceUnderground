@@ -175,7 +175,7 @@ export const logsPage = {
       </div>
       <div class="heading-actions">
         <button class="button" type="button" data-log-refresh data-i18n="logs.refresh">${t("logs.refresh")}</button>
-        <button class="button button--primary" type="button" data-log-export disabled data-i18n="logs.export">${t("logs.export")}</button>
+        <button class="button button--primary" type="button" data-log-export data-requires="data.export" disabled data-i18n="logs.export">${t("logs.export")}</button>
       </div>
     </section>
 

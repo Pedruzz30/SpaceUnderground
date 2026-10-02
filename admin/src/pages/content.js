@@ -447,7 +447,7 @@ export const contentPage = {
               ${localeTabs("site-content")}
               ${localeHint("site-content")}
               <span data-content-state>${stateLabel(entry, dirty, saving, saveError)}</span>
-              <button class="button button--primary" type="submit" data-action-save ${saving ? "disabled" : ""}>${escapeHtml(saving ? t("content.saving") : t("content.saveSection"))}</button>
+              <button class="button button--primary" type="submit" data-action-save data-requires="cms.edit" ${saving ? "disabled" : ""}>${escapeHtml(saving ? t("content.saving") : t("content.saveSection"))}</button>
             </div>
           </header>
           <div class="cms-editor-meta">

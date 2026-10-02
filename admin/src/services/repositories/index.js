@@ -9,6 +9,7 @@ import { mockMediaRepository } from "./mock-media-repository.js";
 import { mockPlanRepository } from "./mock-plan-repository.js";
 import { mockProjectRepository } from "./mock-project-repository.js";
 import { mockSettingsRepository } from "./mock-settings-repository.js";
+import { mockAccessRepository, mockApprovalRepository, mockAuditRepository, mockTeamRepository } from "./mock-security-repository.js";
 
 // Chooses the active data source. Supabase repositories are imported lazily so
 // mock mode never pulls the Supabase client into the initial bundle.
@@ -30,6 +31,10 @@ export async function getRepositories() {
       { supabaseClientRepository },
       { supabaseFinancialRepository },
       { supabaseCommercialRepository },
+      { supabaseAccessRepository },
+      { supabaseTeamRepository },
+      { supabaseApprovalRepository },
+      { supabaseAuditRepository },
     ] = await Promise.all([
       import("./supabase-project-repository.js"),
       import("./supabase-auth-repository.js"),
@@ -41,6 +46,10 @@ export async function getRepositories() {
       import("./supabase-client-repository.js"),
       import("./supabase-financial-repository.js"),
       import("./supabase-commercial-repository.js"),
+      import("./supabase-access-repository.js"),
+      import("./supabase-team-repository.js"),
+      import("./supabase-approval-repository.js"),
+      import("./supabase-audit-repository.js"),
     ]);
 
     repositories = {
@@ -54,6 +63,10 @@ export async function getRepositories() {
       clients: supabaseClientRepository,
       financial: supabaseFinancialRepository,
       commercial: supabaseCommercialRepository,
+      access: supabaseAccessRepository,
+      team: supabaseTeamRepository,
+      approvals: supabaseApprovalRepository,
+      audit: supabaseAuditRepository,
     };
   } else {
     repositories = {
@@ -67,6 +80,10 @@ export async function getRepositories() {
       clients: mockClientRepository,
       financial: mockFinancialRepository,
       commercial: mockCommercialRepository,
+      access: mockAccessRepository,
+      team: mockTeamRepository,
+      approvals: mockApprovalRepository,
+      audit: mockAuditRepository,
     };
   }
 
@@ -111,4 +128,20 @@ export async function getFinancialRepository() {
 
 export async function getCommercialRepository() {
   return (await getRepositories()).commercial;
+}
+
+export async function getAccessRepository() {
+  return (await getRepositories()).access;
+}
+
+export async function getTeamRepository() {
+  return (await getRepositories()).team;
+}
+
+export async function getApprovalRepository() {
+  return (await getRepositories()).approvals;
+}
+
+export async function getAuditRepository() {
+  return (await getRepositories()).audit;
 }

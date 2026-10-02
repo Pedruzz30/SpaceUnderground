@@ -196,7 +196,7 @@ export const projectsPage = {
         <p data-i18n="projects.intro">${t("projects.intro")}</p>
       </div>
       <div class="heading-actions">
-        <button class="button button--primary" type="button" data-new-project data-i18n="projects.newProject">${t("projects.newProject")}</button>
+        <button class="button button--primary" type="button" data-new-project data-requires="projects.create" data-i18n="projects.newProject">${t("projects.newProject")}</button>
       </div>
     </section>
 
