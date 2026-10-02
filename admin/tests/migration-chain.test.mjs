@@ -32,6 +32,8 @@ const RECORDED_IN_PRODUCTION = [
   "20260928013040_clients_post_review_hardening.sql",
   "20260928031922_financial_foundation.sql",
   "20260928035023_commercial_opportunities.sql",
+  // Applied 2026-10-02 (docs/release-checklist.md).
+  "20261002033705_security_rbac_approval_foundation.sql",
 ];
 
 // Schema production already had before the CLI recorded anything. Their
@@ -49,7 +51,7 @@ const HISTORICAL = [
 ];
 
 // Written after the recorded production history and not applied yet.
-const PENDING = ["security_rbac_approval_foundation"];
+const PENDING = ["automation_v2"];
 
 function toDate(stamp) {
   const [, y, mo, d, h, mi, s] = stamp.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
@@ -192,6 +194,14 @@ describe("financial migrations", () => {
   });
 });
 
+describe("automation migrations", () => {
+  it("puts automation v2 after everything it extends", () => {
+    for (const purpose of ["automation_runs", "business_workflows", "commercial_opportunities", "financial_foundation", "security_rbac_approval_foundation"]) {
+      assert.ok(version(migrationFile("automation_v2")) > version(migrationFile(purpose)), `must follow ${purpose}`);
+    }
+  });
+});
+
 describe("security migrations", () => {
   it("comes after every module whose policies it replaces", () => {
     for (const purpose of ["commercial_opportunities", "financial_foundation", "clients_post_review_hardening", "activity_log", "site_settings"]) {
@@ -225,6 +235,7 @@ describe("fresh database", () => {
       "financial_foundation",
       "commercial_opportunities",
       "security_rbac_approval_foundation",
+      "automation_v2",
     ]) {
       const name = migrationFile(purpose);
       await assert.doesNotReject(() => db.exec(read(name)), `${name} is not idempotent`);
