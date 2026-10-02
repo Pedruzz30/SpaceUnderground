@@ -450,8 +450,8 @@ export const commercialPage = {
         <p data-i18n="commercial.intro">${t("commercial.intro")}</p>
       </div>
       <div class="heading-actions">
-        <button class="button" type="button" data-com-export disabled data-i18n="commercial.exportCsv">${t("commercial.exportCsv")}</button>
-        <button class="button button--primary" type="button" data-com-new disabled data-i18n="commercial.newOpportunity">${t("commercial.newOpportunity")}</button>
+        <button class="button" type="button" data-com-export data-requires="data.export" disabled data-i18n="commercial.exportCsv">${t("commercial.exportCsv")}</button>
+        <button class="button button--primary" type="button" data-com-new data-requires="commercial.edit" disabled data-i18n="commercial.newOpportunity">${t("commercial.newOpportunity")}</button>
       </div>
     </section>
 

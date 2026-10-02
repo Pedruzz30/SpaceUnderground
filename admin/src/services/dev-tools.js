@@ -5,6 +5,7 @@ import { resetMockCommercial } from "./repositories/mock-commercial-repository.j
 import { resetMockFinancial } from "./repositories/mock-financial-repository.js";
 import { resetMockPlans } from "./repositories/mock-plan-repository.js";
 import { resetMockProjects } from "./repositories/mock-project-repository.js";
+import { resetMockSecurity } from "./repositories/mock-security-repository.js";
 
 // Restores the seed data from data/projects.js. Development helper only:
 // run `window.__resetSpaceAdminMocks()` in the browser console.
@@ -15,6 +16,7 @@ export function resetMockData() {
   resetMockFinancial();
   resetMockCommercial();
   resetMockActivity();
+  resetMockSecurity();
 }
 
 if (typeof window !== "undefined") {

@@ -1,6 +1,26 @@
+import { isSupabaseMode } from "../config/env.js";
+import { MOCK_PROFILES } from "../data/team.js";
+import { requestPasswordReset } from "../services/access-service.js";
 import { login } from "../services/auth-service.js";
 import { describeError } from "../services/errors.js";
 import { t } from "../i18n/index.js";
+import { escapeHtml } from "../utils/html.js";
+
+// Sign-in is email and the person's own password; MFA follows when their
+// account has it. There is no sign-up here: access is by invitation only.
+// Mock mode adds a profile picker so each role's Admin can be tried locally.
+
+function profilePicker() {
+  if (isSupabaseMode()) return "";
+  return `
+    <div class="field">
+      <label for="login-profile" data-i18n="login.mockProfile">${t("login.mockProfile")}</label>
+      <select id="login-profile" name="profile" data-login-profile>
+        ${MOCK_PROFILES.map((profile) => `<option value="${profile}">${escapeHtml(t(`login.profiles.${profile}`))}</option>`).join("")}
+      </select>
+    </div>
+  `;
+}
 
 export const loginPage = {
   title: () => t("login.title"),
@@ -30,8 +50,20 @@ export const loginPage = {
             <label for="login-password" data-i18n="login.password">${t("login.password")}</label>
             <input id="login-password" name="password" type="password" autocomplete="current-password" required>
           </div>
+          ${profilePicker()}
           <p class="field-error" data-login-error role="alert" hidden></p>
           <button class="button button--primary" type="submit" data-login-submit data-i18n="login.submit">${t("login.submit")}</button>
+        </form>
+
+        <button class="login-forgot" type="button" data-login-forgot data-i18n="login.forgot">${t("login.forgot")}</button>
+        <form class="login-form login-reset" data-login-reset hidden novalidate>
+          <p class="login-panel__copy" data-i18n="login.resetCopy">${t("login.resetCopy")}</p>
+          <div class="field">
+            <label for="reset-email" data-i18n="login.email">${t("login.email")}</label>
+            <input id="reset-email" name="email" type="email" autocomplete="email" required>
+          </div>
+          <p class="login-panel__copy" data-login-reset-status role="status" aria-live="polite" hidden></p>
+          <button class="button" type="submit" data-login-reset-submit data-i18n="login.resetSubmit">${t("login.resetSubmit")}</button>
         </form>
 
         <p class="login-panel__foot" data-i18n="login.restricted">${t("login.restricted")}</p>
@@ -58,6 +90,7 @@ export const loginPage = {
         await login({
           email: form.elements.email.value.trim(),
           password: form.elements.password.value,
+          profile: form.elements.profile?.value,
         });
         window.location.hash = "#/dashboard";
       } catch (error) {
@@ -68,6 +101,31 @@ export const loginPage = {
         form.removeAttribute("aria-busy");
         pending = false;
       }
+    });
+
+    const forgot = document.querySelector("[data-login-forgot]");
+    const reset = document.querySelector("[data-login-reset]");
+    const resetStatus = document.querySelector("[data-login-reset-status]");
+    forgot?.addEventListener("click", () => {
+      reset.hidden = !reset.hidden;
+      if (!reset.hidden) reset.elements.email.value = form.elements.email.value.trim();
+    });
+    // Whatever Supabase Auth answers, the screen says the same thing, so it
+    // never tells anyone which addresses have an account.
+    reset?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const email = reset.elements.email.value.trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        resetStatus.hidden = false;
+        resetStatus.textContent = t("security.invite.emailInvalid");
+        return;
+      }
+      const button = reset.querySelector("[data-login-reset-submit]");
+      button.disabled = true;
+      await requestPasswordReset(email).catch(() => null);
+      resetStatus.hidden = false;
+      resetStatus.textContent = t("login.resetSent");
+      button.disabled = false;
     });
   },
 };

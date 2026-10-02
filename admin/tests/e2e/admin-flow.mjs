@@ -1117,7 +1117,10 @@ try {
   assert.equal(await page.locator("[data-password-rules] li.is-ok").count(), 4, "every password rule ticks");
   await page.click("[data-password-submit]");
   await page.waitForFunction(() => document.querySelector("#settings-password")?.value === "");
-  await page.waitForSelector(".settings-team__row.is-you");
+  // With the security model, the account tab shows the member's own access
+  // (the legacy admins roster only appears before the migration).
+  await page.waitForSelector("[data-account-access] .settings-facts");
+  await page.waitForSelector("[data-account-mfa] .mfa-status");
 
   await page.click('[data-tab="system"]');
   await page.waitForFunction(() => document.querySelectorAll('[data-health-status="ok"]').length === 8);

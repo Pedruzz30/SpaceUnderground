@@ -1,10 +1,15 @@
 import { initRouter } from "./router/router.js";
 import { t } from "./i18n/index.js";
+import { captureAuthLink } from "./security/auth-link.js";
 import "./services/dev-tools.js";
 
 document.documentElement.classList.add("js");
 
 const root = document.querySelector("#app");
+
+// An invitation or recovery link carries a session in the address; it is read
+// and removed before the router ever sees it.
+captureAuthLink();
 
 if (!window.location.hash) {
   window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#/login`);

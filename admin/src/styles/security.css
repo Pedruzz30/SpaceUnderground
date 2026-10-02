@@ -1,0 +1,733 @@
+/* Team, approvals, audit, MFA and the access screens. Same surfaces, mono
+   labels and lime accent as the rest of the Admin; nothing here is new
+   design, only the pieces these screens add. */
+
+/* Controls hidden for lack of permission (security/gates.js). */
+[data-gated] {
+  display: none !important;
+}
+
+/* --- page headings ---------------------------------------------------------------------- */
+
+.page-heading .back-link {
+  display: block;
+  width: fit-content;
+  margin-bottom: 0.6rem;
+  color: var(--text-muted);
+  font: 500 0.68rem/1.3 var(--mono);
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.page-heading .back-link:hover,
+.page-heading .back-link:focus-visible {
+  color: var(--accent);
+}
+
+/* --- navigation ------------------------------------------------------------------------- */
+
+.side-link {
+  gap: 0.5rem;
+}
+
+/* layout.css styles every span in a link as a small mono tag (the old "soon"
+   marker); the label keeps the link's own type. */
+.side-link .side-link__label {
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: none;
+}
+
+.side-link .side-link__badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  padding: 0 0.35rem;
+  background: var(--accent);
+  color: var(--ink);
+  font: 700 0.62rem/1 var(--mono);
+}
+
+.sidebar__notice {
+  margin: 0 var(--space-3) var(--space-2);
+  border: 1px dashed color-mix(in srgb, var(--warning) 45%, var(--border));
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.7rem;
+  color: var(--warning);
+  font: 500 0.62rem/1.45 var(--mono);
+}
+
+.topbar__ru,
+.team-ru {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.18rem 0.5rem;
+  color: var(--accent);
+  font: 600 0.62rem/1 var(--mono);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.team-uuid {
+  color: var(--text-muted);
+  font: 500 0.66rem/1.3 var(--mono);
+  word-break: break-all;
+}
+
+.badge--role {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  color: var(--text-soft);
+}
+
+.badge--danger {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  color: var(--danger);
+}
+
+/* --- access screens --------------------------------------------------------------------- */
+
+.login-panel--danger {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+}
+
+.login-forgot {
+  justify-self: start;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--text-muted);
+  font: 500 0.7rem/1.4 var(--mono);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.login-forgot:hover,
+.login-forgot:focus-visible {
+  color: var(--accent);
+}
+
+.login-reset {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+
+/* --- MFA --------------------------------------------------------------------------------- */
+
+.mfa-enroll {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.mfa-steps {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+}
+
+.mfa-qr {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mfa-qr img {
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  padding: 0.5rem;
+}
+
+.mfa-secret {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.7rem;
+  color: var(--accent);
+  font: 600 0.78rem/1.4 var(--mono);
+  letter-spacing: 0.12em;
+  word-break: break-all;
+}
+
+.mfa-verify {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.mfa-code {
+  max-width: 11rem;
+  font: 600 1.1rem/1 var(--mono);
+  letter-spacing: 0.35em;
+  text-align: center;
+}
+
+.mfa-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 var(--space-2);
+}
+
+/* --- team -------------------------------------------------------------------------------- */
+
+.team-table .ops-table__head,
+.team-table .ops-row {
+  grid-template-columns:
+    minmax(13rem, 1.6fr) 6.5rem minmax(9rem, 1.1fr) minmax(9rem, 1fr) minmax(9rem, 1fr) 7.5rem 7.5rem;
+}
+
+.team-row__who {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.team-row__roles,
+.team-row__badges,
+.member-heading__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.member-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.member-grid > .settings-panel--danger,
+.member-grid > #activity {
+  grid-column: 1 / -1;
+}
+
+.member-grid .settings-facts {
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+
+.member-grid .settings-facts dd {
+  overflow-wrap: anywhere;
+}
+
+.member-grid h3,
+.member-grid h4 {
+  margin: 0 0 var(--space-2);
+}
+
+.member-grid h4 {
+  color: var(--text-muted);
+  font: 600 0.66rem/1.2 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.member-access,
+.member-access fieldset {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.member-access fieldset,
+.invite-validity,
+.invite-projects {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+
+.member-access legend,
+.invite-validity legend,
+.invite-projects legend {
+  padding: 0 0.35rem;
+  color: var(--text-muted);
+  font: 600 0.62rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.member-roles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem 1rem;
+}
+
+.member-roles small {
+  color: var(--warning);
+  font: 500 0.6rem/1 var(--mono);
+}
+
+.member-requests {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.danger-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* --- invitation ------------------------------------------------------------------------- */
+
+.invite-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 1fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.invite-grid > .settings-panel {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.invite-validity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.invite-validity > label,
+.member-access .invite-validity > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  color: var(--text-primary);
+  font: 500 0.86rem/1.3 var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.invite-validity input[type="radio"] {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.invite-validity .field,
+.invite-validity input[type="date"] {
+  flex: 1 1 12rem;
+  margin: 0;
+}
+
+.invite-projects {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.invite-project {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.65rem;
+}
+
+.invite-project span {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.invite-project small {
+  color: var(--text-muted);
+  font: 500 0.6rem/1 var(--mono);
+}
+
+.invite-preview h3 {
+  margin: 0 0 var(--space-3);
+}
+
+.invite-preview__grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.invite-preview__column h4 {
+  margin: 0 0 0.4rem;
+  font: 600 0.62rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.invite-preview__column ul {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+
+.invite-preview__column li::before {
+  content: "✓ ";
+  color: var(--success);
+}
+
+.invite-preview__column li.is-missing::before {
+  content: "✕ ";
+  color: var(--danger);
+}
+
+/* --- approvals --------------------------------------------------------------------------- */
+
+.approval-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: var(--space-3);
+}
+
+.approval-card {
+  display: grid;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  background: var(--surface);
+}
+
+.approval-card header,
+.approval-card footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.approval-card footer {
+  justify-content: space-between;
+  color: var(--text-muted);
+}
+
+.approval-card__number {
+  margin-right: auto;
+  color: var(--accent);
+  font: 700 0.72rem/1 var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.approval-card dl {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.approval-card dl div {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.approval-card dt {
+  color: var(--text-muted);
+  font: 500 0.62rem/1.5 var(--mono);
+  text-transform: uppercase;
+}
+
+.approval-card dd {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.review-meta {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.review-message {
+  margin: 0;
+  border-left: 2px solid var(--accent);
+  padding: 0.4rem 0 0.4rem var(--space-3);
+}
+
+.review-message p {
+  margin: 0.25rem 0 0;
+  white-space: pre-wrap;
+}
+
+.review-conflict {
+  margin: 0 0 var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--warning) 7%, transparent);
+  color: var(--warning);
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.diff-scroll {
+  overflow-x: auto;
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.diff-table th,
+.diff-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.6rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.diff-table thead th {
+  color: var(--text-muted);
+  font: 600 0.62rem/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.diff-table tbody th {
+  width: 12rem;
+  font-weight: 600;
+}
+
+.diff-table tbody th small {
+  display: block;
+  color: var(--text-muted);
+  font: 500 0.6rem/1.4 var(--mono);
+}
+
+.diff-table pre {
+  margin: 0;
+  font: 500 0.78rem/1.45 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.diff-table tr.is-changed .diff-old pre {
+  color: var(--danger);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
+.diff-table tr.is-changed .diff-new pre {
+  color: var(--success);
+}
+
+.diff-table tr.is-same {
+  opacity: 0.6;
+}
+
+.diff-asset {
+  display: block;
+  max-width: 16rem;
+  max-height: 10rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+/* --- drafts ------------------------------------------------------------------------------ */
+
+.draft-form input[type="color"] {
+  width: 4.5rem;
+  min-height: 2.6rem;
+  padding: 0.25rem;
+  cursor: pointer;
+}
+
+.draft-form fieldset {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.draft-form__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3);
+}
+
+.draft-poster {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.draft-poster img,
+.draft-poster__empty {
+  width: 9rem;
+  height: 5.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.draft-poster__empty {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font: 500 0.62rem/1 var(--mono);
+}
+
+.dash-grid--member {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dash-grid--member .panel {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+}
+
+.member-project {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.dash-security__count {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 0 var(--space-2);
+}
+
+.dash-security__count strong {
+  color: var(--accent);
+  font: 700 1.6rem/1 var(--display);
+}
+
+/* --- audit ------------------------------------------------------------------------------- */
+
+.audit-list {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.audit-line {
+  display: grid;
+  grid-template-columns: 9.5rem auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.7rem;
+  background: var(--surface);
+  font-size: 0.8rem;
+}
+
+.audit-line time {
+  color: var(--text-muted);
+  font: 500 0.64rem/1.3 var(--mono);
+}
+
+.audit-line small {
+  grid-column: 3 / 4;
+  color: var(--text-muted);
+}
+
+.audit-line__aal {
+  grid-column: 4 / 5 !important;
+  grid-row: 1;
+  font: 600 0.58rem/1 var(--mono) !important;
+}
+
+.audit-list--compact .audit-line {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.audit-list--compact .audit-line time,
+.audit-list--compact .audit-line__aal {
+  display: none;
+}
+
+.audit-list--compact .audit-line small {
+  grid-column: 1 / -1;
+}
+
+.audit-more {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+
+/* --- responsive -------------------------------------------------------------------------- */
+
+/* The topbar drops the role tag on phones (responsive.css); the RU goes with
+   it and stays on the account and team screens. */
+@media (max-width: 760px) {
+  .topbar__ru {
+    display: none;
+  }
+}
+
+@media (max-width: 1400px) {
+  .team-table {
+    min-width: 60rem;
+  }
+}
+
+@media (max-width: 1100px) {
+  .invite-grid,
+  .member-grid,
+  .dash-grid--member {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .team-table {
+    min-width: 0;
+  }
+
+  .team-table .ops-table__head,
+  .team-table .ops-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .audit-line {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .audit-line small,
+  .audit-line__aal {
+    grid-column: 1 / -1 !important;
+  }
+
+  .mfa-qr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .member-roles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

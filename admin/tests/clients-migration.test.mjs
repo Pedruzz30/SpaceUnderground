@@ -8,10 +8,11 @@
 // No Docker, no Supabase project and no credentials required.
 
 import { strict as assert } from "node:assert";
-import { readFileSync } from "node:fs";
 import { after, before, describe, it } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
-import { MIGRATIONS_DIR, migrationFile, migrationFiles, readMigration } from "./helpers/migration-files.mjs";
+import { readFileSync } from "node:fs";
+import { MIGRATIONS_DIR, applyMigrations, migrationFile, migrationFiles, readMigration } from "./helpers/migration-files.mjs";
+import { addVerifiedFactor, mfaSession } from "./helpers/supabase-db.mjs";
 
 // Found by purpose, never by version: business workflows must come before
 // clients foundation, which migration-chain.test.mjs checks by timestamp.
@@ -28,13 +29,21 @@ const { CLIENT_COLUMNS } = await import("../src/services/mappers/client-mapper.j
 
 let db;
 let caseNumber = 100;
+// The admin's signed-in session, which completed MFA (see before()).
+let adminSession = null;
 
 // Runs a callback the way PostgREST runs a request: as the given role, with
 // request.jwt.claims set ({"role": ..., "sub": ...}). The claims are cleared
 // afterwards, so SQL outside asRole runs with no JWT context at all, like a
 // migration or the SQL editor.
+// A signed-in request carries what Supabase puts in a token after an MFA
+// sign-in (aal2, a TOTP entry in amr, iat, and for the admin the session
+// that verified it): the admin here is a migrated OWNER, and privileged
+// members hold nothing without MFA.
 async function asRole(role, uid, fn) {
-  const claims = JSON.stringify(uid ? { role, sub: uid } : { role });
+  const now = Math.floor(Date.now() / 1000);
+  const session = { aal: "aal2", amr: [{ method: "totp", timestamp: now - 30 }], iat: now + 1, ...(uid === ADMIN_ID ? { session_id: adminSession } : {}) };
+  const claims = JSON.stringify(uid ? { role, sub: uid, ...session } : { role });
   await db.query("select set_config('request.jwt.claims', $1, false)", [claims]);
   await db.exec(`set role ${role};`);
   try {
@@ -91,10 +100,15 @@ before(async () => {
   await db.exec(`
     create role anon;
     create role authenticated;
-    create role service_role;
+    create role service_role bypassrls;
     grant usage on schema public to anon, authenticated, service_role;
     create schema if not exists auth;
     create table auth.users (id uuid primary key, email text);
+    -- The factors and sessions Supabase Auth keeps; the security foundation
+    -- reads them on every permission check.
+    create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id), factor_type text not null default 'totp', status text not null default 'unverified', created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+    create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id), aal text, factor_id uuid, created_at timestamptz not null default now());
+    create table auth.mfa_amr_claims (id uuid primary key default gen_random_uuid(), session_id uuid not null references auth.sessions (id) on delete cascade, authentication_method text not null, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique (session_id, authentication_method));
     -- Supabase's own definition: the legacy claim first, then the claims JSON.
     create or replace function auth.uid() returns uuid language sql stable as $$
       select coalesce(
@@ -132,17 +146,23 @@ before(async () => {
   // The whole chain, in order, as production has it. Later migrations (the
   // post-review hardening grants every public project column) need tables and
   // columns from earlier ones, so a hand-picked subset would not apply.
-  for (const name of migrationFiles()) {
-    if (name === CLIENTS_FILE) {
-      // Rows that exist before clients foundation runs: one without a code and
-      // one already archived, the two shapes the backfill has to repair.
-      await db.query("insert into public.clients (name, status, created_at) values ('Legacy One', 'ACTIVE', now() - interval '2 days')");
-      await db.query("insert into public.clients (name, status, code, created_at) values ('Legacy Two', 'ARCHIVED', 'CLIENT-007', now() - interval '1 day')");
-    }
-    await db.exec(readFileSync(`${MIGRATIONS_DIR}${name}`, "utf8"));
-  }
-
-  await db.query("insert into public.admins (user_id, role) values ($1, 'owner')", [ADMIN_ID]);
+  // The admin is one from before the security foundation, which makes them an
+  // OWNER, as it does in production.
+  await applyMigrations(db, {
+    legacyAdmins: [ADMIN_ID],
+    before: {
+      [CLIENTS_FILE]: async () => {
+        // Rows that exist before clients foundation runs: one without a code and
+        // one already archived, the two shapes the backfill has to repair.
+        await db.query("insert into public.clients (name, status, created_at) values ('Legacy One', 'ACTIVE', now() - interval '2 days')");
+        await db.query("insert into public.clients (name, status, code, created_at) values ('Legacy Two', 'ARCHIVED', 'CLIENT-007', now() - interval '1 day')");
+      },
+    },
+  });
+  // The TOTP factor an OWNER needs from the first use, and the session that
+  // verified it two hours ago.
+  const factor = await addVerifiedFactor(db, ADMIN_ID);
+  adminSession = (await mfaSession(db, ADMIN_ID, { factorId: factor.id, at: new Date(Date.now() - 2 * 3600_000) })).sessionId;
 });
 
 after(async () => {
@@ -162,6 +182,13 @@ describe("clients foundation migration", () => {
   it("is idempotent", async () => {
     await db.exec(CLIENTS);
     await db.exec(CLIENTS);
+    // Re-running it rewrote what later migrations changed (the security
+    // foundation replaces the code generator, its grants and the column
+    // default). Re-apply those, so the rest of this file tests the schema
+    // production has rather than a mix of old and new.
+    for (const name of migrationFiles().filter((file) => file > CLIENTS_FILE)) {
+      await db.exec(readFileSync(`${MIGRATIONS_DIR}${name}`, "utf8"));
+    }
   });
 
   it("creates every column the admin repository selects", async () => {
@@ -228,8 +255,14 @@ describe("clients.code", () => {
     const blank = await failure("insert into public.clients (name, code) values ('Blank', '  ')");
     assert.equal(blank?.code, "23514");
 
-    const nullCode = await failure("insert into public.clients (name, code) values ('Null', null)");
-    assert.equal(nullCode?.code, "23502");
+    // An explicit null asks for a generated code, like leaving the column out:
+    // the security foundation assigns codes in a trigger (a column default
+    // needed EXECUTE on the generator from every inserting role). The column
+    // itself still refuses null on update.
+    const generated = await insertClient({ name: "Null", code: null });
+    assert.match(generated.code, /^CLIENT-\d{3,}$/);
+    const cleared = await failure("update public.clients set code = null where id = $1", [generated.id]);
+    assert.equal(cleared?.code, "23502");
   });
 });
 
@@ -390,6 +423,10 @@ describe("clients row level security", () => {
   });
 });
 
+// The generator's contract after the security foundation: it is not an RPC
+// for anyone (codes come from inserting a client, through the
+// clients_assign_code trigger), and it refuses anyone without clients.create
+// before drawing a number. Direct SQL (migrations, the SQL editor) keeps it.
 describe("client code generator authorization", () => {
   it("rejects anonymous visitors", async () => {
     const before = await sequenceValue();
@@ -402,8 +439,15 @@ describe("client code generator authorization", () => {
     const before = await sequenceValue();
     const error = await asRole("authenticated", USER_ID, () => failure("select public.next_client_code()"));
     assert.equal(error?.code, "42501");
-    assert.match(error.message, /not authorized to generate client codes/);
     assert.equal(await sequenceValue(), before, "a denied call must not consume a number");
+  });
+
+  it("refuses the insert of a signed-in user who is not an admin inside the generator", async () => {
+    const before = await sequenceValue();
+    const error = await asRole("authenticated", USER_ID, () => failure("insert into public.clients (name) values ('No code for you')"));
+    assert.equal(error?.code, "42501");
+    assert.match(error.message, /not authorized to generate client codes/);
+    assert.equal(await sequenceValue(), before);
   });
 
   it("does not burn a number when a non-admin insert is refused", async () => {
@@ -413,14 +457,20 @@ describe("client code generator authorization", () => {
     assert.equal(await sequenceValue(), before);
   });
 
-  it("serves an admin", async () => {
-    const { rows } = await asRole("authenticated", ADMIN_ID, () => db.query("select public.next_client_code() as code"));
+  it("serves an admin through the insert, not as an RPC", async () => {
+    const { rows } = await asRole("authenticated", ADMIN_ID, () => db.query("insert into public.clients (name) values ('Admin insert') returning code"));
     assert.match(rows[0].code, /^CLIENT-\d{3,}$/);
+    const before = await sequenceValue();
+    const error = await asRole("authenticated", ADMIN_ID, () => failure("select public.next_client_code()"));
+    assert.equal(error?.code, "42501", "the generator itself is not an API");
+    assert.equal(await sequenceValue(), before);
   });
 
-  it("serves the service role", async () => {
-    const { rows } = await asRole("service_role", null, () => db.query("select public.next_client_code() as code"));
+  it("serves the service role through the insert, not as an RPC", async () => {
+    const { rows } = await asRole("service_role", null, () => db.query("insert into public.clients (name) values ('Service insert') returning code"));
     assert.match(rows[0].code, /^CLIENT-\d{3,}$/);
+    const error = await asRole("service_role", null, () => failure("select public.next_client_code()"));
+    assert.equal(error?.code, "42501");
   });
 
   it("serves direct SQL with no JWT context (migrations, SQL editor)", async () => {
