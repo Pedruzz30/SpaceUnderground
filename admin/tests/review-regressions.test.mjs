@@ -19,7 +19,7 @@ describe("PR review regressions", () => {
 
   it("gates client creation with clients.create and edits with clients.edit", async () => {
     const source = await read("src/pages/client-detail.js");
-    assert.match(source, /data-client-save data-requires="\\\$\{isCreate \? "clients\.create" : "clients\.edit"\}"/);
+    assert.ok(source.includes('data-client-save data-requires="${isCreate ? "clients.create" : "clients.edit"}"'));
   });
 
   it("keeps the Admin MFA contract TOTP-only end to end", async () => {
