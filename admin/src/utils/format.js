@@ -12,7 +12,9 @@ function currencyFormatter() {
   });
 }
 
-const DAY = 24 * 60 * 60 * 1000;
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 
 function toDate(value) {
   // new Date(null) is the epoch, not an error, so empty values are rejected up
@@ -55,6 +57,30 @@ export function formatRelativeDay(value) {
     return new Intl.RelativeTimeFormat(getLocale(), { numeric: "always" }).format(-days, "day");
   }
   return formatDayMonth(date);
+}
+
+// How long ago, however long: "hoje", "há 9 dias", "há 3 meses". The lists
+// switch to a date after a week (formatRelativeDay); the Dashboard reads ages,
+// so it keeps counting. With `time`, the first day reads in minutes and hours
+// ("há 15 minutos"), for events rather than records.
+export function formatRelativeAge(value, { time = false, now = Date.now() } = {}) {
+  const date = toDate(value);
+  if (!date) return "—";
+
+  const diff = now - date.getTime();
+  if (diff < 0) return formatDayMonth(date);
+  const relative = (amount, unit, numeric = "always") => new Intl.RelativeTimeFormat(getLocale(), { numeric }).format(-amount, unit);
+  if (diff < DAY) {
+    if (!time) return t("format.today");
+    if (diff < MINUTE) return relative(0, "second", "auto");
+    if (diff < HOUR) return relative(Math.floor(diff / MINUTE), "minute");
+    return relative(Math.floor(diff / HOUR), "hour");
+  }
+  if (diff < 2 * DAY) return t("format.yesterday");
+  const days = Math.floor(diff / DAY);
+  if (days < 60) return relative(days, "day");
+  if (days < 365) return relative(Math.floor(days / 30), "month");
+  return relative(Math.floor(days / 365), "year");
 }
 
 export function formatDayMonth(value) {
