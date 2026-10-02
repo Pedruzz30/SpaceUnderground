@@ -20,6 +20,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.core.errors import code_for
 from app.core.logging import configure_logging, get_logger, log_event, request_id_var
 from app.schemas.common import ErrorResponse, HealthResponse
 
@@ -35,18 +36,6 @@ _SAFE_REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
 def resolve_request_id(raw: str | None) -> str:
     value = (raw or "").strip()
     return value if _SAFE_REQUEST_ID.match(value) else uuid.uuid4().hex
-
-# Maps an HTTP status onto the stable `code` clients branch on. Anything not
-# listed is reported as `error`, so a new status never leaks an ad-hoc string.
-ERROR_CODES = {
-    status.HTTP_400_BAD_REQUEST: "bad_request",
-    status.HTTP_401_UNAUTHORIZED: "unauthorized",
-    status.HTTP_404_NOT_FOUND: "not_found",
-    status.HTTP_422_UNPROCESSABLE_ENTITY: "validation_error",
-    status.HTTP_500_INTERNAL_SERVER_ERROR: "internal_error",
-    status.HTTP_502_BAD_GATEWAY: "upstream_error",
-    status.HTTP_503_SERVICE_UNAVAILABLE: "not_configured",
-}
 
 
 @asynccontextmanager
@@ -142,10 +131,10 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
-        code = ERROR_CODES.get(exc.status_code, "error")
         return JSONResponse(
             status_code=exc.status_code,
-            content=ErrorResponse(code=code, message=str(exc.detail)).model_dump(),
+            content=ErrorResponse(code=code_for(exc), message=str(exc.detail)).model_dump(),
+            headers=getattr(exc, "headers", None),
         )
 
     @app.exception_handler(RequestValidationError)

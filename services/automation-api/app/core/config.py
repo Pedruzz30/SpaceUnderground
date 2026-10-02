@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     app_port: int = 8000
 
     service_name: str = "space-underground-automation"
-    version: str = "0.1.0"
+    version: str = "0.2.0"
 
     # Read-only credentials for the Supabase project. The service role key is
     # optional so the service can boot, serve /health and run its tests without
@@ -46,8 +46,7 @@ class Settings(BaseSettings):
     # access-control-allow-origin back and the Admin reported the service as
     # offline while it was answering 200 to curl.
     admin_origin: str = (
-        "http://localhost:5174,http://127.0.0.1:5174,"
-        "http://localhost:5173,http://127.0.0.1:5173"
+        "http://localhost:5174,http://127.0.0.1:5174," "http://localhost:5173,http://127.0.0.1:5173"
     )
 
     # Optional shared secret, sent as X-API-Token. This is the service-to-service
@@ -57,14 +56,25 @@ class Settings(BaseSettings):
     api_token: str = ""
 
     # When true, a caller may present a Supabase access token as
-    # `Authorization: Bearer`. The service verifies it against Supabase and
-    # requires the user to hold a row in public.admins.
+    # `Authorization: Bearer`. The service asks Supabase who the token belongs
+    # to, then asks the database itself -- public.has_permission(), with that
+    # same token -- whether the member holds the permission each endpoint
+    # needs. That is the check row level security runs, MFA and session
+    # revocation included, so the API can never grant more than the Admin.
     admin_jwt_auth: bool = True
 
-    # How long a verified identity is trusted before it is checked again. The
-    # Dashboard polls, and re-verifying every poll would add two Supabase round
-    # trips per request for an answer that changes rarely.
-    admin_jwt_cache_seconds: float = 60.0
+    # How long an identity or a permission answer is trusted before it is
+    # asked again. Short on purpose: revoking a member or a role takes effect
+    # within it. Workflows that write business data re-check without it.
+    admin_jwt_cache_seconds: float = 30.0
+
+    # The calendar the scheduled jobs count days in. "Overdue" is a business
+    # day boundary, and the business runs on Brasilia time, not UTC.
+    app_timezone: str = "America/Sao_Paulo"
+
+    # A run still RUNNING after this long was abandoned (the process stopped
+    # mid-run). It is reported as stale and may be retried as a new run.
+    stale_run_minutes: int = 15
 
     log_level: str = "INFO"
 
@@ -119,14 +129,17 @@ class Settings(BaseSettings):
     @property
     def allowed_origins(self) -> list[str]:
         """CORS allowlist. Comma-separated so a staging host can be added."""
-        return [origin.strip() for origin in self.admin_origin.split(",") if origin.strip()]
+        return [
+            origin.strip().rstrip("/")
+            for origin in self.admin_origin.split(",")
+            if origin.strip() and "*" not in origin
+        ]
 
     @property
     def has_local_origin(self) -> bool:
         """Whether the allowlist still contains a development origin."""
         return any(
-            origin.startswith(("http://localhost", "http://127.0.0.1"))
-            for origin in self.allowed_origins
+            origin.startswith(("http://localhost", "http://127.0.0.1")) for origin in self.allowed_origins
         )
 
     @property
@@ -151,19 +164,23 @@ class Settings(BaseSettings):
                 "SUPABASE_SERVICE_ROLE_KEY holds a public key; a secret/service role key is required."
             )
 
-        if not self.allowed_origins:
+        if "*" in self.admin_origin:
+            # Dropped from the allowlist either way; said out loud so nobody
+            # believes a wildcard is in effect.
+            problems.append("ADMIN_ORIGIN must list explicit origins; a wildcard is never allowed.")
+        elif not self.allowed_origins:
             problems.append("ADMIN_ORIGIN is empty; no browser origin may call this service.")
-        elif self.has_local_origin:
+        elif self.is_production and self.has_local_origin:
             # A production deployment that kept the development default would
             # accept requests from any developer's laptop.
             problems.append(
                 "ADMIN_ORIGIN still allows a localhost origin; set it to the deployed Admin origin."
             )
+        elif self.is_production and any(not origin.startswith("https://") for origin in self.allowed_origins):
+            problems.append("ADMIN_ORIGIN must only list https origins in production.")
 
         if not self.api_token and not self.admin_jwt_auth:
-            problems.append(
-                "No authentication is enabled; set API_TOKEN or leave ADMIN_JWT_AUTH on."
-            )
+            problems.append("No authentication is enabled; set API_TOKEN or leave ADMIN_JWT_AUTH on.")
 
         return problems
 
@@ -173,9 +190,7 @@ class Settings(BaseSettings):
         # service cannot do privileged work with it, and saying so is more
         # useful than failing later at the first write.
         return bool(
-            self.supabase_url
-            and self.supabase_service_role_key
-            and not self.service_role_key_is_public
+            self.supabase_url and self.supabase_service_role_key and not self.service_role_key_is_public
         )
 
 

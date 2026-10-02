@@ -28,7 +28,7 @@ def test_published_without_a_poster_is_incomplete():
     assert check_for(analysis, "poster").status.value == "fail"
     assert analysis.status.value == "incomplete"
     assert analysis.score < 100
-    assert "Faca upload do poster antes de publicar." in analysis.recommendations
+    assert "Faça upload do poster antes de publicar." in analysis.recommendations
 
 
 def test_a_draft_without_a_poster_only_warns():
@@ -147,7 +147,7 @@ def test_a_stale_project_warns():
 
     check = check_for(analysis, "freshness")
     assert check.status.value == "warn"
-    assert "Sem atualizacao" in check.message
+    assert "Sem atualização" in check.message
 
 
 def test_an_unusable_updated_at_does_not_raise():

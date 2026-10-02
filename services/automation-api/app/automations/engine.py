@@ -5,7 +5,7 @@ A run is an event plus an ordered list of steps. The engine owns the lifecycle
 what their step actually does. That split is what keeps a handler from having
 to remember to stamp a duration or catch its own exceptions.
 
-Three rules the whole design rests on:
+The rules the whole design rests on:
 
   1. A step that raises does not crash the run. It is recorded as FAILED with a
      sanitised message, the steps before it keep their results, and the run
@@ -16,9 +16,13 @@ Three rules the whole design rests on:
      after Supabase has already published, so the worst a broken workflow can
      do is record itself as broken.
 
-  3. Every step is bounded. A handler that hangs is a handler that would hold a
-     worker open, so each one runs under a timeout and a timeout is just
-     another controlled FAILED result.
+  3. Every step is bounded. A handler that hangs would hold a worker open, so
+     each one runs under a timeout, and a timeout is just another controlled
+     FAILED result.
+
+  4. One deliberate action, one run. A dispatch carrying an idempotency key
+     that was already recorded -- finished or still running -- returns that
+     run instead of executing again.
 """
 
 from __future__ import annotations
@@ -28,11 +32,14 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.core.logging import get_logger, log_event
 from app.services.run_store import RunStore
 from app.services.supabase_service import SupabaseService
+
+if TYPE_CHECKING:
+    from app.core.security import Access
 
 logger = get_logger("automation")
 
@@ -45,6 +52,8 @@ RUNNING = "RUNNING"
 SUCCESS = "SUCCESS"
 FAILED = "FAILED"
 SKIPPED = "SKIPPED"
+
+FINISHED = (SUCCESS, FAILED, SKIPPED)
 
 
 def _now() -> datetime:
@@ -60,9 +69,9 @@ def _elapsed_ms(started: datetime, finished: datetime) -> int:
 
     `datetime.now()` is wall clock, not monotonic: an NTP correction during a
     run can place `finished` before `started`. The database refuses a negative
-    duration (`duration_ms >= 0` in migration 010), so without this clamp a
-    clock adjustment would fail the write and strand the run at RUNNING --
-    the one state that means "still going" and would never resolve.
+    duration (`duration_ms >= 0`), so without this clamp a clock adjustment
+    would fail the write and strand the run at RUNNING -- the one state that
+    means "still going" and would never resolve.
     """
     return max(0, int((finished - started).total_seconds() * 1000))
 
@@ -89,9 +98,22 @@ class StepContext:
     payload: dict[str, Any]
     supabase: SupabaseService
     dry_run: bool = False
+    # Who the run acts for. None only when a test drives the engine directly;
+    # handlers that write ask it before they do.
+    access: Access | None = None
+    run_id: str | None = None
     # Results of the steps that already ran, by name, so a later step can build
     # on an earlier one without the handler passing state around by hand.
     results: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def actor_id(self) -> str | None:
+        return self.access.user_id if self.access else None
+
+    async def can(self, permission: str, *, fresh: bool = False) -> bool:
+        """Whether the caller holds `permission`. True when nobody is calling
+        (the engine driven directly), which only tests do."""
+        return True if self.access is None else await self.access.can(permission, fresh=fresh)
 
 
 StepFunction = Callable[[StepContext], Awaitable[Any]]
@@ -102,12 +124,26 @@ class Step:
     name: str
     run: StepFunction
     timeout: float = DEFAULT_STEP_TIMEOUT_SECONDS
+    # A permission needed to *see* this step's result when the run is read
+    # back. A finance review is history like any other, but the Logs screen is
+    # open to members who may not read the ledger.
+    visible_with: str | None = None
 
 
 @dataclass
 class Workflow:
     event: str
     steps: list[Step]
+    # Every one is required to dispatch or retry the workflow.
+    permissions: tuple[str, ...] = ()
+    # Business writes: permissions are re-checked without the cache first.
+    writes: bool = False
+    entity_type: str | None = None
+    description: str = ""
+    # A permission needed to see anything this workflow found (its summary,
+    # actions and step results), for workflows whose whole output is
+    # sensitive -- a scan of the ledger, say. Status and timing stay visible.
+    visible_with: str | None = None
 
 
 def _sanitise(error: Exception) -> str:
@@ -127,12 +163,7 @@ def _sanitise(error: Exception) -> str:
 async def _execute_step(step: Step, context: StepContext, run_id: str | None) -> dict[str, Any]:
     started = _now()
     log_event(
-        logger,
-        logging.INFO,
-        "automation.step.started",
-        run_id=run_id,
-        event=context.event,
-        step=step.name,
+        logger, logging.INFO, "automation.step.started", run_id=run_id, event=context.event, step=step.name
     )
 
     status = SUCCESS
@@ -185,6 +216,7 @@ async def run_workflow(
     idempotency_key: str | None = None,
     retry_of: str | None = None,
     dry_run: bool = False,
+    access: Access | None = None,
 ) -> dict[str, Any]:
     """Executes a workflow end to end and records it.
 
@@ -193,9 +225,9 @@ async def run_workflow(
     """
     payload = payload or {}
 
-    # An identical dispatch that was already recorded is returned as-is rather
-    # than run again -- a double click plus a network retry must not produce two
-    # runs. A deliberate second run later supplies a different operation id.
+    # An identical dispatch already recorded is returned as-is rather than run
+    # again -- a double click plus a network retry must not produce two runs.
+    # A deliberate second run later supplies a different operation id.
     if idempotency_key:
         existing = await store.find_by_idempotency_key(idempotency_key)
         if existing:
@@ -209,23 +241,34 @@ async def run_workflow(
             return {**existing, "deduplicated": True}
 
     started = _now()
-    created = await store.create(
-        {
-            "event": workflow.event,
-            "status": RUNNING,
-            "source": source,
-            "entity_type": entity_type,
-            "entity_id": entity_id,
-            "payload": payload,
-            "started_at": _iso(started),
-            "idempotency_key": idempotency_key,
-            "retry_of": retry_of,
-        }
-    )
+    record = {
+        "event": workflow.event,
+        "status": RUNNING,
+        "source": source,
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "payload": payload,
+        "started_at": _iso(started),
+        "idempotency_key": idempotency_key,
+        "retry_of": retry_of,
+    }
+    actor = access.user_id if access else None
+    if actor:
+        record["requested_by"] = actor
 
-    # A run created by a concurrent identical dispatch comes back already
-    # finished; nothing is gained by running it a second time.
-    if created and created.get("status") in (SUCCESS, FAILED, SKIPPED):
+    created, inserted = await store.create(record)
+
+    # The key was taken between the lookup above and the insert: a concurrent
+    # identical dispatch won the race. Whatever state its run is in, it is
+    # *the* run for this operation, and executing again would do the work twice.
+    if created is not None and not inserted:
+        log_event(
+            logger,
+            logging.INFO,
+            "automation.run.deduplicated",
+            run_id=created.get("id"),
+            event=workflow.event,
+        )
         return {**created, "deduplicated": True}
 
     run_id = created.get("id") if created else None
@@ -248,20 +291,22 @@ async def run_workflow(
         payload=payload,
         supabase=supabase,
         dry_run=dry_run,
+        access=access,
+        run_id=run_id,
     )
 
     steps: list[dict[str, Any]] = []
     status = SUCCESS
 
     for step in workflow.steps:
-        record = await _execute_step(step, context, run_id)
-        steps.append(record)
+        step_record = await _execute_step(step, context, run_id)
+        steps.append(step_record)
 
-        if record["status"] == SUCCESS:
-            context.results[step.name] = record["result"]
+        if step_record["status"] == SUCCESS:
+            context.results[step.name] = step_record["result"]
             continue
 
-        if record["status"] == FAILED:
+        if step_record["status"] == FAILED:
             # Stop at the first failure: later steps are written assuming the
             # earlier ones produced something, and running them anyway would
             # turn one real error into a cascade of misleading ones.
@@ -298,11 +343,13 @@ async def run_workflow(
         "finished_at": _iso(finished),
         "duration_ms": duration_ms,
         "retry_of": retry_of,
+        "requested_by": actor,
+        "created_at": created.get("created_at") if created else None,
         "persisted": persisted,
     }
 
     if run_id:
-        await store.update(
+        updated = await store.update(
             run_id,
             {
                 "status": status,
@@ -313,6 +360,10 @@ async def run_workflow(
                 "duration_ms": duration_ms,
             },
         )
+        # The run executed, but its final state never reached the table: the
+        # history now says RUNNING forever. Reported, so the Admin can say so.
+        if updated is None:
+            run["persisted"] = False
 
     log_event(
         logger,
@@ -323,7 +374,7 @@ async def run_workflow(
         entity_id=entity_id,
         status=status,
         duration_ms=duration_ms,
-        persisted=persisted,
+        persisted=run["persisted"],
     )
 
     return run

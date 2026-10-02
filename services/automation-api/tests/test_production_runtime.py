@@ -1,8 +1,9 @@
 """What has to hold once this service is reachable from the internet.
 
-Phase 4 proved the workflows. These are the properties that only start to
-matter when the process is no longer on someone's laptop: who may call it, what
-it refuses, what it says about itself, and what it must never say.
+Who may call it, what it refuses, what it says about itself, and what it must
+never say. Authorization is the database's own answer
+(`public.has_permission`, asked with the member's token); the fake below
+answers per member and per key the way the RBAC catalog does.
 """
 
 from __future__ import annotations
@@ -12,10 +13,8 @@ import pytest
 from app.core.config import get_settings
 from app.core.security import reset_identity_cache
 from app.main import resolve_request_id
-from app.services.supabase_service import SupabaseUnavailable
-
-ADMIN_ID = "84c64f19-83fb-4613-a7ce-83c720c6798c"
-OTHER_ID = "11111111-1111-4111-8111-111111111111"
+from app.services.supabase_service import SupabaseRejected, SupabaseUnavailable
+from tests.conftest import BEARER, COLLABORATOR, MANAGER, MEMBER_ID, OWNER, SEO, member_client, project_row
 
 PRODUCTION_ENV = {
     "APP_ENV": "production",
@@ -23,6 +22,8 @@ PRODUCTION_ENV = {
     "SUPABASE_SERVICE_ROLE_KEY": "sb_secret_abc123",
     "ADMIN_ORIGIN": "https://admin.example.com",
 }
+
+PUBLISHED = {"event": "project.published", "entity_id": "1"}
 
 
 @pytest.fixture
@@ -34,62 +35,121 @@ def production(monkeypatch):
     return monkeypatch
 
 
-def identity_client(make_client, **kwargs):
-    return make_client([], tokens={"good-token": ADMIN_ID, "other-token": OTHER_ID}, **kwargs)
+def healthy_project():
+    return project_row(live_preview_enabled=False, preview_url=None)
 
 
-# --- admin access token ------------------------------------------------------
+# --- member access token -------------------------------------------------------
 
 
-def test_an_admin_access_token_is_accepted(production, make_client):
-    client, fake = identity_client(make_client, admins={ADMIN_ID})
+def test_a_member_with_the_permission_is_accepted(production, make_client):
+    client, fake = member_client(make_client, OWNER)
 
-    response = client.get(
-        "/api/v1/automations/runs",
-        headers={"Authorization": "Bearer good-token"},
-    )
+    response = client.get("/api/v1/automations/runs", headers=BEARER)
 
     assert response.status_code == 200
-    # The token was checked against Supabase rather than decoded here.
+    # Identity from Supabase Auth, authorization from the database itself.
     assert "get_token_user" in fake.calls
-    assert f"user_is_admin:{ADMIN_ID}" in fake.calls
+    assert "has_permission:logs.read" in fake.calls
+
+
+def test_public_admins_is_never_consulted(production, make_client):
+    """Since the security foundation it is history: a suspended former admin
+    keeps their row there."""
+    client, fake = member_client(make_client, OWNER)
+
+    client.get("/api/v1/automations/runs", headers=BEARER)
+
+    assert not any("admin" in call for call in fake.calls)
 
 
 def test_an_invalid_access_token_is_refused(production, make_client):
-    client, _ = identity_client(make_client, admins={ADMIN_ID})
+    client, _ = member_client(make_client, OWNER)
 
-    response = client.get(
-        "/api/v1/automations/runs",
-        headers={"Authorization": "Bearer forged-token"},
-    )
+    response = client.get("/api/v1/automations/runs", headers={"Authorization": "Bearer forged-token"})
 
     assert response.status_code == 401
     assert response.json()["code"] == "unauthorized"
 
 
-def test_a_valid_user_who_is_not_an_admin_is_forbidden(production, make_client):
+def test_a_signed_in_user_without_the_permission_is_forbidden(production, make_client):
     """Authentication is not authorisation: signing in is not access."""
-    client, _ = identity_client(make_client, admins={ADMIN_ID})
+    client, _ = member_client(make_client, COLLABORATOR)
 
-    response = client.get(
-        "/api/v1/automations/runs",
-        headers={"Authorization": "Bearer other-token"},
-    )
+    response = client.get("/api/v1/automations/runs", headers=BEARER)
 
     # 403, not 401: the Admin can then say "your account lacks access" instead
-    # of bouncing a correctly signed-in operator back to the login screen.
+    # of bouncing a correctly signed-in member back to the login screen.
     assert response.status_code == 403
-    assert response.json()["code"] == "error"
+    assert response.json()["code"] == "forbidden"
+    assert "logs.read" in response.json()["message"]
+
+
+def test_someone_who_is_not_a_member_at_all_is_forbidden(production, make_client):
+    # other-token belongs to a real Supabase user with no membership: the
+    # database grants them nothing.
+    client, _ = member_client(make_client, OWNER)
+
+    response = client.get("/api/v1/automations/runs", headers={"Authorization": "Bearer other-token"})
+
+    assert response.status_code == 403
+
+
+def test_each_event_needs_the_permission_of_its_effect(production, make_client):
+    """project.published needs projects.publish: a member who could not publish
+    cannot run the publication workflow either."""
+    client, _ = member_client(make_client, {"logs.read", "projects.read"}, rows=[healthy_project()])
+
+    response = client.post("/api/v1/automations/dispatch", json=PUBLISHED, headers=BEARER)
+
+    assert response.status_code == 403
+    assert "projects.publish" in response.json()["message"]
+
+
+def test_a_member_who_may_publish_dispatches_the_publication_workflow(production, make_client):
+    client, fake = member_client(make_client, SEO, rows=[healthy_project()])
+
+    response = client.post("/api/v1/automations/dispatch", json=PUBLISHED, headers=BEARER)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "SUCCESS"
+    assert response.json()["source"] == "admin"
+    # The run records who asked for it.
+    assert fake.runs.rows[0]["requested_by"] == MEMBER_ID
+    assert response.json()["requested_by"] == MEMBER_ID
+
+
+def test_mfa_or_a_revoked_session_is_decided_by_the_database(production, make_client):
+    """has_permission answers false for a member whose MFA is incomplete or whose
+    session was revoked; the service has no rule of its own to get wrong."""
+    client, fake = member_client(make_client, OWNER)
+    fake.grants[MEMBER_ID] = set()  # what the database answers for that member
+
+    response = client.get("/api/v1/automations/runs", headers=BEARER)
+
+    assert response.status_code == 403
+
+
+def test_a_database_without_the_permission_check_fails_closed(production, make_client):
+    """has_permission missing (security foundation not applied) is not access."""
+    client, _ = member_client(
+        make_client, OWNER, permission_error=SupabaseRejected("missing", status=404, code="PGRST202")
+    )
+
+    response = client.get("/api/v1/automations/runs", headers=BEARER)
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "not_configured"
 
 
 def test_no_credentials_at_all_is_refused_in_production(production, make_client):
-    client, _ = identity_client(make_client, admins={ADMIN_ID})
+    client, _ = member_client(make_client, OWNER)
 
     assert client.get("/api/v1/automations/runs").status_code == 401
 
 
 def test_a_malformed_authorization_header_is_refused(production, make_client):
-    client, _ = identity_client(make_client, admins={ADMIN_ID})
+    client, _ = member_client(make_client, OWNER)
 
     for header in ("good-token", "Basic good-token", "Bearer", "Bearer "):
         response = client.get("/api/v1/automations/runs", headers={"Authorization": header})
@@ -102,63 +162,100 @@ def test_supabase_being_down_is_not_reported_as_forbidden(production, make_clien
     Reporting 401/403 here would send an operator hunting for an access rule
     that was never wrong, so an unverifiable caller is a 503 instead.
     """
-    client, _ = identity_client(
-        make_client,
-        admins={ADMIN_ID},
-        identity_error=SupabaseUnavailable("Could not reach Supabase."),
-    )
+    client, _ = member_client(make_client, OWNER, identity_error=SupabaseUnavailable("down"))
 
-    response = client.get(
-        "/api/v1/automations/runs",
-        headers={"Authorization": "Bearer good-token"},
-    )
+    response = client.get("/api/v1/automations/runs", headers=BEARER)
 
     assert response.status_code == 503
+    assert response.json()["code"] == "unavailable"
+
+
+def test_a_permission_check_that_cannot_reach_the_database_is_unavailable(production, make_client):
+    client, _ = member_client(make_client, OWNER, permission_error=SupabaseUnavailable("down"))
+
+    response = client.get("/api/v1/automations/runs", headers=BEARER)
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "unavailable"
 
 
 def test_a_verified_identity_is_not_re_checked_on_every_call(production, make_client):
-    """The Dashboard polls; verification must not cost two round trips a poll."""
-    client, fake = identity_client(make_client, admins={ADMIN_ID})
-    headers = {"Authorization": "Bearer good-token"}
+    """The Dashboard polls; verification must not cost round trips a poll."""
+    client, fake = member_client(make_client, OWNER)
 
     for _ in range(3):
-        assert client.get("/api/v1/automations/runs", headers=headers).status_code == 200
+        assert client.get("/api/v1/automations/runs", headers=BEARER).status_code == 200
 
     assert fake.calls.count("get_token_user") == 1
+    assert fake.calls.count("has_permission:logs.read") == 1
 
 
-# --- service token -----------------------------------------------------------
+def test_a_workflow_that_writes_asks_for_its_permissions_fresh(production, make_client):
+    """A member revoked seconds ago must not slip one last business write in."""
+    from tests.conftest import opportunity_row
+
+    client, fake = member_client(make_client, OWNER, opportunities=[opportunity_row()])
+    body = {
+        "event": "commercial.opportunity.won",
+        "entity_id": opportunity_row()["id"],
+        "payload": {"project_category": "System"},
+    }
+
+    client.post("/api/v1/automations/dispatch", json=body, headers=BEARER)
+    client.post("/api/v1/automations/dispatch", json=body, headers=BEARER)
+
+    # Asked on each dispatch, never answered from the cache.
+    assert fake.calls.count("has_permission:projects.create") == 2
 
 
-def test_the_service_token_still_works_for_machines(production, make_client, monkeypatch):
-    """CI and scripts keep a shared secret; only the browser may not."""
-    monkeypatch.setenv("API_TOKEN", "s3rv1ce")
+def test_auth_me_reports_what_the_member_may_do(production, make_client):
+    client, _ = member_client(make_client, MANAGER)
+
+    body = client.get("/api/v1/auth/me", headers=BEARER).json()
+
+    assert body["kind"] == "member"
+    assert body["user_id"] == MEMBER_ID
+    assert "commercial.edit" in body["permissions"]
+    assert "finance.read" not in body["permissions"]
+    assert "token" not in str(body).lower()
+
+
+# --- service token -------------------------------------------------------------
+
+
+def test_the_service_token_still_works_for_machines(production, make_client):
+    """CI and the scheduler keep a shared secret; only the browser may not."""
+    production.setenv("API_TOKEN", "s3rv1ce")
     get_settings.cache_clear()
 
-    client, _ = identity_client(make_client, admins={ADMIN_ID})
+    client, _ = member_client(make_client, OWNER)
 
     assert client.get("/api/v1/automations/runs", headers={"X-API-Token": "s3rv1ce"}).status_code == 200
     assert client.get("/api/v1/automations/runs", headers={"X-API-Token": "wrong"}).status_code == 401
 
 
-def test_an_admin_token_still_works_when_a_service_token_exists(production, make_client, monkeypatch):
-    monkeypatch.setenv("API_TOKEN", "s3rv1ce")
+def test_a_member_token_still_works_when_a_service_token_exists(production, make_client):
+    production.setenv("API_TOKEN", "s3rv1ce")
     get_settings.cache_clear()
 
-    client, _ = identity_client(make_client, admins={ADMIN_ID})
+    client, _ = member_client(make_client, OWNER)
 
-    response = client.get(
-        "/api/v1/automations/runs",
-        headers={"Authorization": "Bearer good-token"},
-    )
-    assert response.status_code == 200
+    assert client.get("/api/v1/automations/runs", headers=BEARER).status_code == 200
 
 
-# --- health and readiness ----------------------------------------------------
+def test_a_service_token_is_never_accepted_when_none_is_configured(production, make_client):
+    client, _ = member_client(make_client, OWNER)
+
+    response = client.get("/api/v1/automations/runs", headers={"X-API-Token": ""})
+
+    assert response.status_code == 401
+
+
+# --- health and readiness ------------------------------------------------------
 
 
 def test_health_never_describes_a_credential(production, make_client):
-    client, _ = identity_client(make_client, admins={ADMIN_ID})
+    client, _ = member_client(make_client, OWNER)
 
     body = client.get("/api/v1/health").json()
     serialised = str(body)
@@ -169,14 +266,15 @@ def test_health_never_describes_a_credential(production, make_client):
 
 
 def test_health_stays_open_so_a_probe_never_needs_a_secret(production, make_client):
-    client, _ = identity_client(make_client, admins={ADMIN_ID})
+    client, _ = member_client(make_client, OWNER)
 
     assert client.get("/health").status_code == 200
     assert client.get("/api/v1/health").status_code == 200
+    assert client.get("/api/v1/ready").status_code == 200
 
 
-def test_readiness_is_ready_when_configuration_and_storage_are_fine(production, make_client):
-    client, _ = identity_client(make_client, admins={ADMIN_ID})
+def test_readiness_is_ready_when_configuration_storage_and_schema_are_fine(production, make_client):
+    client, _ = member_client(make_client, OWNER)
 
     response = client.get("/api/v1/ready")
 
@@ -186,13 +284,23 @@ def test_readiness_is_ready_when_configuration_and_storage_are_fine(production, 
 
 def test_readiness_refuses_when_history_is_unreachable(production, make_client):
     """Not ready, but still alive: the liveness probe must not go down with it."""
-    client, _ = make_client([], storage=False, tokens={}, admins=set())
+    client, _ = make_client([], storage=False)
 
     response = client.get("/api/v1/ready")
 
     assert response.status_code == 503
     assert response.json()["ready"] is False
     assert client.get("/health").status_code == 200
+
+
+def test_readiness_refuses_before_the_v2_migration_is_applied(production, make_client):
+    client, _ = make_client([], schema=False)
+
+    body = client.get("/api/v1/ready").json()
+
+    assert body["ready"] is False
+    schema = next(check for check in body["checks"] if check["name"] == "automation_schema")
+    assert schema["configured"] is False
 
 
 def test_readiness_names_a_configuration_problem_without_values(make_client, monkeypatch):
@@ -209,7 +317,7 @@ def test_readiness_names_a_configuration_problem_without_values(make_client, mon
     assert "sb_publishable_abc123" not in detail
 
 
-# --- startup -----------------------------------------------------------------
+# --- startup -------------------------------------------------------------------
 
 
 def test_production_refuses_to_start_without_structural_configuration(monkeypatch):
@@ -238,6 +346,29 @@ def test_production_refuses_a_localhost_origin(monkeypatch):
     assert "localhost" in problems
 
 
+@pytest.mark.parametrize("origin", ["*", "https://admin.example.com,*"])
+def test_a_wildcard_origin_is_never_accepted(monkeypatch, origin):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "sb_secret_abc123")
+    monkeypatch.setenv("ADMIN_ORIGIN", origin)
+    get_settings.cache_clear()
+
+    settings = get_settings()
+    assert "*" not in settings.allowed_origins
+    assert any("wildcard" in problem for problem in settings.startup_problems)
+
+
+def test_production_refuses_a_plain_http_origin(monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "sb_secret_abc123")
+    monkeypatch.setenv("ADMIN_ORIGIN", "http://admin.example.com")
+    get_settings.cache_clear()
+
+    assert any("https" in problem for problem in get_settings().startup_problems)
+
+
 def test_development_starts_with_problems_and_only_warns(make_client):
     """A developer with half a configuration still gets a running service."""
     client, _ = make_client([])
@@ -253,11 +384,11 @@ def test_a_temporary_outage_is_not_a_startup_problem(production):
     assert problems == ""
 
 
-# --- CORS --------------------------------------------------------------------
+# --- CORS ----------------------------------------------------------------------
 
 
 def test_production_cors_allows_only_the_configured_origin(production, make_client):
-    client, _ = identity_client(make_client, admins={ADMIN_ID})
+    client, _ = member_client(make_client, OWNER)
 
     allowed = client.options(
         "/api/v1/automations/runs",
@@ -271,27 +402,21 @@ def test_production_cors_allows_only_the_configured_origin(production, make_clie
 
     refused = client.options(
         "/api/v1/automations/runs",
-        headers={
-            "Origin": "https://evil.example.com",
-            "Access-Control-Request-Method": "GET",
-        },
+        headers={"Origin": "https://evil.example.com", "Access-Control-Request-Method": "GET"},
     )
     assert refused.headers.get("access-control-allow-origin") is None
 
 
 def test_cors_never_pairs_an_allowlist_with_credentials(production, make_client):
-    client, _ = identity_client(make_client, admins={ADMIN_ID})
+    client, _ = member_client(make_client, OWNER)
 
-    response = client.get(
-        "/api/v1/health",
-        headers={"Origin": "https://admin.example.com"},
-    )
+    response = client.get("/api/v1/health", headers={"Origin": "https://admin.example.com"})
 
     assert response.headers.get("access-control-allow-origin") == "https://admin.example.com"
     assert response.headers.get("access-control-allow-credentials") is None
 
 
-# --- request id --------------------------------------------------------------
+# --- request id ----------------------------------------------------------------
 
 
 def test_a_request_id_is_returned_and_generated_when_absent(make_client):

@@ -18,7 +18,7 @@ from app.automations.engine import (
     run_workflow,
 )
 from app.automations.registry import get_workflow, known_events
-from tests.conftest import FakeRunStore, FakeSupabaseService, client_row, plan_row, project_row, proposal_row
+from tests.conftest import FakeRunStore, FakeSupabaseService, project_row
 
 # --- registry --------------------------------------------------------------
 
@@ -26,7 +26,7 @@ from tests.conftest import FakeRunStore, FakeSupabaseService, client_row, plan_r
 def test_only_this_phase_events_are_registered():
     # Registering an event with no workflow would make a typo look like a
     # working no-op, so the registry stays deliberately small.
-    assert known_events() == ("commercial.proposal.accepted", "project.completed", "project.published")
+    assert known_events() == ("commercial.opportunity.won", "project.completed", "project.published")
 
 
 def test_each_workflow_declares_ordered_steps():
@@ -49,16 +49,30 @@ def test_project_completed_declares_business_readiness_steps():
 
 
 def test_commercial_handoff_declares_ordered_steps():
-    steps = [step.name for step in get_workflow("commercial.proposal.accepted").steps]
+    steps = [step.name for step in get_workflow("commercial.opportunity.won").steps]
 
     assert steps == [
-        "validate_proposal",
+        "validate_opportunity",
         "resolve_client",
-        "resolve_service",
-        "prepare_project",
-        "prepare_financial_context",
+        "open_project",
+        "review_financial",
         "register_handoff",
     ]
+
+
+def test_the_retired_proposal_event_is_not_dispatchable():
+    # Its runs stay in the history; the model it read is no longer written.
+    assert get_workflow("commercial.proposal.accepted") is None
+
+
+def test_every_workflow_names_the_permissions_of_its_effect():
+    assert get_workflow("project.published").permissions == ("projects.publish",)
+    assert get_workflow("project.completed").permissions == ("projects.edit",)
+    assert set(get_workflow("commercial.opportunity.won").permissions) == {
+        "commercial.edit",
+        "projects.create",
+    }
+    assert get_workflow("commercial.opportunity.won").writes is True
 
 
 def test_an_unregistered_event_has_no_workflow():
@@ -207,10 +221,10 @@ async def test_a_run_survives_a_clock_that_jumps_backwards(monkeypatch):
     real_now = engine_module._now()
     stamps = iter(
         [
-            real_now,                                  # run start
-            real_now + timedelta(milliseconds=10),     # step start
-            real_now - timedelta(seconds=30),          # step end: clock jumped back
-            real_now - timedelta(seconds=31),          # run end: still behind
+            real_now,  # run start
+            real_now + timedelta(milliseconds=10),  # step start
+            real_now - timedelta(seconds=30),  # step end: clock jumped back
+            real_now - timedelta(seconds=31),  # run end: still behind
         ]
     )
     monkeypatch.setattr(engine_module, "_now", lambda: next(stamps))
@@ -296,6 +310,48 @@ async def test_a_different_operation_id_runs_again():
     await _run([Step(name="one", run=ok)], store=store, idempotency_key="project.published:1:op-2")
 
     assert len(store.rows) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_concurrent_identical_dispatch_does_not_execute_twice():
+    """The key was free at lookup time and taken by the insert.
+
+    Another request with the same operation id won the race and is still
+    running. Executing anyway would do the work twice under one run id.
+    """
+    store = FakeRunStore()
+    store.race_winner = {
+        "id": "00000000-0000-4000-8000-0000000000aa",
+        "event": "project.published",
+        "status": "RUNNING",
+        "idempotency_key": "project.published:1:op-race",
+    }
+    calls = []
+
+    async def ok(context):
+        calls.append(1)
+        return None
+
+    run = await _run([Step(name="one", run=ok)], store=store, idempotency_key="project.published:1:op-race")
+
+    assert calls == []
+    assert run["deduplicated"] is True
+    assert run["id"] == "00000000-0000-4000-8000-0000000000aa"
+    assert run["status"] == "RUNNING"
+
+
+@pytest.mark.asyncio
+async def test_a_run_whose_final_state_was_not_stored_says_so():
+    store = FakeRunStore()
+
+    async def lose_storage(context):
+        store._available = False
+        return None
+
+    run = await _run([Step(name="one", run=lose_storage)], store=store)
+
+    assert run["status"] == "SUCCESS"
+    assert run["persisted"] is False
 
 
 @pytest.mark.asyncio
@@ -415,97 +471,10 @@ def test_project_completed_reports_finance_and_cms_readiness(make_client):
     ).json()
 
     assert body["result"]["business_status"] == "SUCCESS"
-    assert body["steps"][3]["result"]["status"] == "SKIPPED"
+    # No ledger entry is tied to this project: a fact, reported, not a failure.
+    assert body["steps"][3]["result"]["status"] == "NONE"
     assert body["steps"][4]["result"]["status"] == "READY"
     assert body["result"]["summary"]["cms_status"] == "READY"
-
-
-def test_commercial_proposal_accepted_creates_a_project_draft(make_client):
-    client, fake = make_client(
-        [],
-        proposals=[proposal_row()],
-        clients=[client_row()],
-        plans=[plan_row()],
-    )
-
-    body = client.post(
-        "/api/v1/automations/dispatch",
-        json={"event": "commercial.proposal.accepted", "entity_id": proposal_row()["id"]},
-    ).json()
-
-    assert body["status"] == "SUCCESS"
-    assert body["entity_type"] == "commercial_proposal"
-    assert body["result"]["business_status"] == "SUCCESS"
-    assert body["result"]["actions"][0]["status"] == "executed"
-    assert fake.rows[0]["editorial_status"] == "DRAFT"
-    assert fake.rows[0]["visible"] is False
-    assert fake.handoffs[0]["proposal_id"] == proposal_row()["id"]
-
-
-def test_commercial_handoff_dry_run_plans_without_writing(make_client):
-    client, fake = make_client(
-        [],
-        proposals=[proposal_row()],
-        clients=[client_row()],
-        plans=[plan_row()],
-    )
-
-    body = client.post(
-        "/api/v1/automations/dispatch",
-        json={
-            "event": "commercial.proposal.accepted",
-            "payload": {"proposal_id": proposal_row()["id"]},
-            "dry_run": True,
-        },
-    ).json()
-
-    assert body["status"] == "SUCCESS"
-    assert body["source"] == "dry_run"
-    assert body["result"]["dry_run"] is True
-    assert body["result"]["actions"][0]["status"] == "planned"
-    assert fake.rows == []
-
-
-def test_commercial_handoff_second_run_detects_existing_project(make_client):
-    proposal = proposal_row()
-    client, fake = make_client(
-        [],
-        proposals=[proposal],
-        clients=[client_row()],
-        plans=[plan_row()],
-    )
-
-    first = client.post(
-        "/api/v1/automations/dispatch",
-        json={"event": "commercial.proposal.accepted", "entity_id": proposal["id"]},
-    ).json()
-    second = client.post(
-        "/api/v1/automations/dispatch",
-        json={"event": "commercial.proposal.accepted", "entity_id": proposal["id"]},
-    ).json()
-
-    assert first["result"]["actions"][0]["status"] == "executed"
-    assert second["result"]["actions"][0]["status"] == "skipped"
-    assert len(fake.rows) == 1
-
-
-def test_commercial_handoff_fails_without_required_data(make_client):
-    proposal = proposal_row(project_category=None)
-    client, _ = make_client(
-        [],
-        proposals=[proposal],
-        clients=[client_row()],
-        plans=[plan_row()],
-    )
-
-    body = client.post(
-        "/api/v1/automations/dispatch",
-        json={"event": "commercial.proposal.accepted", "entity_id": proposal["id"]},
-    ).json()
-
-    assert body["status"] == "FAILED"
-    assert body["result"]["business_status"] == "ATTENTION"
-    assert "project_category" in body["error"]
 
 
 def test_the_run_list_is_newest_first_and_filterable(make_client):
@@ -569,16 +538,46 @@ def test_run_stats_report_no_rate_before_anything_has_run(make_client):
 def test_run_stats_count_what_actually_happened(make_client):
     client, _ = make_client([project_row(live_preview_enabled=False, preview_url=None)])
 
+    for _ in range(4):
+        client.post("/api/v1/automations/dispatch", json={"event": "project.published", "entity_id": "1"})
+    client.post("/api/v1/automations/dispatch", json={"event": "project.published", "entity_id": "404"})
+
+    body = client.get("/api/v1/automations/runs/stats").json()
+
+    assert body["total"] == 5
+    assert body["success"] == 4
+    assert body["failed"] == 1
+    assert body["success_rate"] == 80.0
+    assert body["last_run"]["event"] == "project.published"
+    # The failure is named, so the Dashboard can point at it.
+    assert [item["reason"] for item in body["attention"]] == ["failed"]
+
+
+def test_run_stats_give_no_rate_for_a_tiny_sample(make_client):
+    """Two runs, one failed, is not "50% success": it is too little to say."""
+    client, _ = make_client([project_row(live_preview_enabled=False, preview_url=None)])
+
     client.post("/api/v1/automations/dispatch", json={"event": "project.published", "entity_id": "1"})
     client.post("/api/v1/automations/dispatch", json={"event": "project.published", "entity_id": "404"})
 
     body = client.get("/api/v1/automations/runs/stats").json()
 
     assert body["total"] == 2
-    assert body["success"] == 1
-    assert body["failed"] == 1
-    assert body["success_rate"] == 50.0
-    assert body["last_run"]["event"] == "project.published"
+    assert body["success_rate"] is None
+
+
+def test_a_failure_stops_needing_attention_once_a_retry_succeeds(make_client):
+    client, fake = make_client([])
+
+    failed = client.post(
+        "/api/v1/automations/dispatch", json={"event": "project.published", "entity_id": "1"}
+    ).json()
+    assert client.get("/api/v1/automations/runs/stats").json()["attention"][0]["run_id"] == failed["run_id"]
+
+    fake.rows.append(project_row(live_preview_enabled=False, preview_url=None))
+    client.post(f"/api/v1/automations/runs/{failed['run_id']}/retry")
+
+    assert client.get("/api/v1/automations/runs/stats").json()["attention"] == []
 
 
 def test_an_unreadable_history_table_is_not_reported_as_no_runs(make_client):

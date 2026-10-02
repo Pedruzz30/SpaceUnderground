@@ -31,7 +31,7 @@ def _auth_detail(settings: Settings) -> str | None:
     """Which mechanisms are enabled -- never a credential, not even its shape."""
     mechanisms = []
     if settings.admin_jwt_auth:
-        mechanisms.append("admin access token")
+        mechanisms.append("member access token (permissions checked in the database)")
     if settings.api_token:
         mechanisms.append("service token")
 
@@ -118,14 +118,26 @@ async def ready(
     )
 
     storage_available = False
+    schema_current = False
     if settings.supabase_configured:
         storage_available = await store.available()
+        schema_current = storage_available and await store.schema_current()
 
     checks.append(
         DependencyHealth(
             name="automation_storage",
             configured=storage_available,
             detail=None if storage_available else "automation_runs is not reachable.",
+        )
+    )
+    # Reachable but older than this version: runs would lose their author and
+    # the commercial handoff function would be missing. Apply the automation
+    # v2 migration before sending traffic here.
+    checks.append(
+        DependencyHealth(
+            name="automation_schema",
+            configured=schema_current,
+            detail=None if schema_current else "The automation v2 migration is not applied.",
         )
     )
 

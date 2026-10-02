@@ -16,7 +16,7 @@ def test_root_health_reports_the_service(make_client):
     assert response.json() == {
         "status": "ok",
         "service": "space-underground-automation",
-        "version": "0.1.0",
+        "version": "0.2.0",
     }
 
 

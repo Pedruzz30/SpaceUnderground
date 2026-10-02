@@ -8,7 +8,7 @@ than raising from inside a scoring rule.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta, timezone, tzinfo
 
 
 def parse_timestamp(value: object) -> datetime | None:
@@ -52,3 +52,28 @@ def days_since(value: object, *, now: datetime | None = None) -> int | None:
 
 def isoformat(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+# Brazil has kept a fixed UTC-03:00 since daylight saving ended in 2019. Used
+# only when the host has no IANA time zone database (Windows without tzdata),
+# so a missing package can never move "today" by three hours silently.
+_FIXED_OFFSETS = {"America/Sao_Paulo": timedelta(hours=-3), "UTC": timedelta(0)}
+
+
+def business_timezone(name: str) -> tzinfo:
+    """The time zone business days are counted in."""
+    try:
+        from zoneinfo import ZoneInfo
+
+        return ZoneInfo(name)
+    except Exception:  # noqa: BLE001 - ZoneInfoNotFoundError, ValueError, missing tzdata
+        return timezone(_FIXED_OFFSETS.get(name, timedelta(0)), name)
+
+
+def business_today(name: str, *, now: datetime | None = None) -> date:
+    """Today's calendar date in the business time zone.
+
+    "Overdue" compares a due date with this, the way the Admin compares it
+    with the operator's local day.
+    """
+    return (now or utc_now()).astimezone(business_timezone(name)).date()

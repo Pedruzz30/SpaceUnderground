@@ -127,31 +127,31 @@ def build_checks(row: dict[str, Any]) -> list[AnalysisCheck]:
     # --- enum domains -------------------------------------------------------
     category = _text(row.get("category"))
     if category in VALID_CATEGORIES:
-        checks.append(_check("category", CheckStatus.OK, "Categoria valida: " + category + "."))
+        checks.append(_check("category", CheckStatus.OK, "Categoria válida: " + category + "."))
     else:
         checks.append(
-            _check("category", CheckStatus.FAIL, "Categoria fora do dominio: " + (category or "vazia") + ".")
+            _check("category", CheckStatus.FAIL, "Categoria fora do domínio: " + (category or "vazia") + ".")
         )
 
     status = _text(row.get("status"))
     if status in VALID_STATUSES:
-        checks.append(_check("status", CheckStatus.OK, "Status valido: " + status + "."))
+        checks.append(_check("status", CheckStatus.OK, "Status válido: " + status + "."))
     else:
         checks.append(
-            _check("status", CheckStatus.FAIL, "Status fora do dominio: " + (status or "vazio") + ".")
+            _check("status", CheckStatus.FAIL, "Status fora do domínio: " + (status or "vazio") + ".")
         )
 
     editorial = _text(row.get("editorial_status"))
     if editorial in VALID_EDITORIAL:
         checks.append(
-            _check("editorial_status", CheckStatus.OK, "Status editorial valido: " + editorial + ".")
+            _check("editorial_status", CheckStatus.OK, "Status editorial válido: " + editorial + ".")
         )
     else:
         checks.append(
             _check(
                 "editorial_status",
                 CheckStatus.FAIL,
-                "Status editorial invalido: " + (editorial or "vazio") + ".",
+                "Status editorial inválido: " + (editorial or "vazio") + ".",
             )
         )
 
@@ -162,7 +162,7 @@ def build_checks(row: dict[str, Any]) -> list[AnalysisCheck]:
             _check(
                 "description",
                 CheckStatus.FAIL if published else CheckStatus.WARN,
-                "Projeto publicado sem descricao." if published else "Projeto sem descricao.",
+                "Projeto publicado sem descrição." if published else "Projeto sem descrição.",
             )
         )
     elif len(description) < MIN_DESCRIPTION_LENGTH:
@@ -170,11 +170,11 @@ def build_checks(row: dict[str, Any]) -> list[AnalysisCheck]:
             _check(
                 "description",
                 CheckStatus.WARN,
-                "Descricao curta: " + str(len(description)) + " caracteres.",
+                "Descrição curta: " + str(len(description)) + " caracteres.",
             )
         )
     else:
-        checks.append(_check("description", CheckStatus.OK, "Descricao preenchida."))
+        checks.append(_check("description", CheckStatus.OK, "Descrição preenchida."))
 
     # --- publication coherence ----------------------------------------------
     visible = bool(row.get("visible"))
@@ -183,22 +183,22 @@ def build_checks(row: dict[str, Any]) -> list[AnalysisCheck]:
             _check(
                 "publication_consistency",
                 CheckStatus.OK,
-                "Publicado e visivel." if published else "Nao publicado e oculto.",
+                "Publicado e visível." if published else "Não publicado e oculto.",
             )
         )
     elif published:
         checks.append(
-            _check("publication_consistency", CheckStatus.FAIL, "Publicado porem marcado como oculto.")
+            _check("publication_consistency", CheckStatus.FAIL, "Publicado, porém marcado como oculto.")
         )
     else:
-        checks.append(_check("publication_consistency", CheckStatus.FAIL, "Visivel porem nao publicado."))
+        checks.append(_check("publication_consistency", CheckStatus.FAIL, "Visível, porém não publicado."))
 
     if published:
         if row.get("published_at"):
-            checks.append(_check("published_at", CheckStatus.OK, "Data de publicacao registrada."))
+            checks.append(_check("published_at", CheckStatus.OK, "Data de publicação registrada."))
         else:
             checks.append(
-                _check("published_at", CheckStatus.WARN, "Publicado sem data de publicacao registrada.")
+                _check("published_at", CheckStatus.WARN, "Publicado sem data de publicação registrada.")
             )
 
     # --- presentation assets ------------------------------------------------
@@ -215,13 +215,13 @@ def build_checks(row: dict[str, Any]) -> list[AnalysisCheck]:
 
     modules = _rows(row, "project_modules")
     if modules:
-        checks.append(_check("modules", CheckStatus.OK, str(len(modules)) + " modulo(s) de apresentacao."))
+        checks.append(_check("modules", CheckStatus.OK, str(len(modules)) + " módulo(s) de apresentação."))
     else:
         checks.append(
             _check(
                 "modules",
                 CheckStatus.FAIL if published else CheckStatus.WARN,
-                "Projeto publicado sem modulos." if published else "Projeto sem modulos.",
+                "Projeto publicado sem módulos." if published else "Projeto sem módulos.",
             )
         )
 
@@ -237,11 +237,11 @@ def build_checks(row: dict[str, Any]) -> list[AnalysisCheck]:
             _check(
                 "presentation",
                 CheckStatus.WARN,
-                "Apresentacao incompleta: " + ", ".join(missing_presentation) + ".",
+                "Apresentação incompleta: " + ", ".join(missing_presentation) + ".",
             )
         )
     else:
-        checks.append(_check("presentation", CheckStatus.OK, "Apresentacao completa."))
+        checks.append(_check("presentation", CheckStatus.OK, "Apresentação completa."))
 
     tech_stack = row.get("tech_stack")
     if isinstance(tech_stack, list) and tech_stack:
@@ -249,16 +249,16 @@ def build_checks(row: dict[str, Any]) -> list[AnalysisCheck]:
             _check("tech_stack", CheckStatus.OK, str(len(tech_stack)) + " tecnologia(s) listada(s).")
         )
     else:
-        checks.append(_check("tech_stack", CheckStatus.WARN, "Stack tecnica nao informada."))
+        checks.append(_check("tech_stack", CheckStatus.WARN, "Stack técnica não informada."))
 
     # --- links --------------------------------------------------------------
     project_url = _text(row.get("project_url"))
     if not project_url:
-        checks.append(_check("project_url", CheckStatus.OK, "Sem URL publica (opcional)."))
+        checks.append(_check("project_url", CheckStatus.OK, "Sem URL pública (opcional)."))
     elif _is_http_url(project_url):
-        checks.append(_check("project_url", CheckStatus.OK, "URL publica valida."))
+        checks.append(_check("project_url", CheckStatus.OK, "URL pública válida."))
     else:
-        checks.append(_check("project_url", CheckStatus.FAIL, "URL publica invalida."))
+        checks.append(_check("project_url", CheckStatus.FAIL, "URL pública inválida."))
 
     # The demo rule is a coherence check, not a URL check: the flag is the
     # source of truth, and a URL alone must never put a project on the site.
@@ -266,9 +266,9 @@ def build_checks(row: dict[str, Any]) -> list[AnalysisCheck]:
     live_enabled = row.get("live_preview_enabled") is True
 
     if live_enabled and _is_http_url(preview_url):
-        checks.append(_check("live_preview", CheckStatus.OK, "Demonstracao ao vivo configurada."))
+        checks.append(_check("live_preview", CheckStatus.OK, "Demonstração ao vivo configurada."))
     elif live_enabled and preview_url:
-        checks.append(_check("live_preview", CheckStatus.FAIL, "Demo habilitada com URL invalida."))
+        checks.append(_check("live_preview", CheckStatus.FAIL, "Demo habilitada com URL inválida."))
     elif live_enabled:
         checks.append(_check("live_preview", CheckStatus.FAIL, "Demo habilitada sem URL de preview."))
     elif preview_url:
@@ -276,30 +276,30 @@ def build_checks(row: dict[str, Any]) -> list[AnalysisCheck]:
             _check("live_preview", CheckStatus.WARN, "URL de preview definida com a demo desabilitada.")
         )
     else:
-        checks.append(_check("live_preview", CheckStatus.OK, "Sem demonstracao ao vivo."))
+        checks.append(_check("live_preview", CheckStatus.OK, "Sem demonstração ao vivo."))
 
     # --- i18n ---------------------------------------------------------------
     done, total = _english_coverage(row)
     percent = round((done / total) * 100) if total else 100
     if percent == 100:
-        checks.append(_check("translations_en", CheckStatus.OK, "Traducao para ingles completa."))
+        checks.append(_check("translations_en", CheckStatus.OK, "Tradução para inglês completa."))
     else:
         checks.append(
             _check(
                 "translations_en",
                 CheckStatus.WARN,
-                "Traducao para ingles em " + str(percent) + "%: " + str(done) + "/" + str(total) + ".",
+                "Tradução para inglês em " + str(percent) + "%: " + str(done) + "/" + str(total) + ".",
             )
         )
 
     # --- freshness ----------------------------------------------------------
     age = days_since(row.get("updated_at"))
     if age is None:
-        checks.append(_check("freshness", CheckStatus.WARN, "Sem data de atualizacao valida."))
+        checks.append(_check("freshness", CheckStatus.WARN, "Sem data de atualização válida."))
     elif age > STALE_AFTER_DAYS:
-        checks.append(_check("freshness", CheckStatus.WARN, "Sem atualizacao ha " + str(age) + " dias."))
+        checks.append(_check("freshness", CheckStatus.WARN, "Sem atualização há " + str(age) + " dias."))
     else:
-        checks.append(_check("freshness", CheckStatus.OK, "Atualizado ha " + str(age) + " dia(s)."))
+        checks.append(_check("freshness", CheckStatus.OK, "Atualizado há " + str(age) + " dia(s)."))
 
     return checks
 
@@ -307,22 +307,22 @@ def build_checks(row: dict[str, Any]) -> list[AnalysisCheck]:
 # What to do about each failing check. Kept apart from the message so the
 # report says what is wrong and, independently, what to do next.
 RECOMMENDATIONS = {
-    "identity": "Defina nome e slug antes de qualquer publicacao.",
+    "identity": "Defina nome e slug antes de qualquer publicação.",
     "client": "Associe o cliente responsavel pelo caso.",
     "category": "Corrija a categoria para um dos valores aceitos pelo schema.",
     "status": "Corrija o status para um dos valores aceitos pelo schema.",
     "editorial_status": "Corrija o status editorial para DRAFT, PUBLISHED ou ARCHIVED.",
-    "description": "Escreva uma descricao com pelo menos 80 caracteres.",
+    "description": "Escreva uma descrição com pelo menos 80 caracteres.",
     "publication_consistency": "Alinhe status editorial e visibilidade.",
-    "published_at": "Republique o projeto para registrar a data de publicacao.",
-    "poster": "Faca upload do poster antes de publicar.",
-    "modules": "Cadastre ao menos um modulo de apresentacao.",
-    "gallery": "Adicione imagens a galeria do projeto.",
-    "presentation": "Complete os campos de apresentacao usados pelo viewer.",
+    "published_at": "Republique o projeto para registrar a data de publicação.",
+    "poster": "Faça upload do poster antes de publicar.",
+    "modules": "Cadastre ao menos um módulo de apresentação.",
+    "gallery": "Adicione imagens à galeria do projeto.",
+    "presentation": "Complete os campos de apresentação usados pelo viewer.",
     "tech_stack": "Liste as tecnologias usadas no projeto.",
-    "project_url": "Corrija a URL publica para um endereco http ou https.",
-    "live_preview": "Alinhe live_preview_enabled com uma preview_url http ou https valida.",
-    "translations_en": "Complete a traducao para ingles dos campos pendentes.",
+    "project_url": "Corrija a URL pública para um endereço http ou https.",
+    "live_preview": "Alinhe live_preview_enabled com uma preview_url http ou https válida.",
+    "translations_en": "Complete a tradução para inglês dos campos pendentes.",
     "freshness": "Revise o conteudo do projeto ou confirme que ele esta encerrado.",
 }
 

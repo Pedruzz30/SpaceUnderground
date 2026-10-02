@@ -73,3 +73,12 @@ class ErrorResponse(BaseModel):
 
     code: str = Field(examples=["not_found"])
     message: str = Field(examples=["Project not found."])
+
+
+class CallerSession(BaseModel):
+    """The caller as this service proved it. Never carries the token."""
+
+    kind: str = Field(examples=["member", "service", "anonymous"])
+    user_id: str | None = None
+    # The automation-relevant permissions the database granted, as of now.
+    permissions: list[str] = Field(default_factory=list)
