@@ -23,7 +23,7 @@ describe("PR review regressions", () => {
   });
 
   it("keeps the Admin MFA contract TOTP-only end to end", async () => {
-    const migration = await read("../supabase/migrations/20260928200000_security_rbac_approval_foundation.sql");
+    const migration = await read("../supabase/migrations/20261002033705_security_rbac_approval_foundation.sql");
     const policy = await read("src/security/policy.js");
     assert.match(migration, /f\.factor_type::text = 'totp'/);
     assert.match(migration, /when 'totp' then 'totp'/);
