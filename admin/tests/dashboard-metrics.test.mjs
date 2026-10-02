@@ -7,19 +7,25 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 
 import {
+  SECURITY_ALERT_ACTIONS,
   activeClients,
   activeEngagements,
-  adminDataStatus,
+  approvalChecks,
   barPercent,
+  contactLevel,
   financialTotals,
   followUps,
+  liveProjects,
   openOpportunities,
+  operationStatus,
   operationalChecks,
   periodStart,
   pipelineSummary,
   projectChecks,
   projectHealth,
   rankAttention,
+  receivablesSummary,
+  securityAlerts,
   withinPeriod,
 } from "../src/utils/dashboard-metrics.js";
 import { mapClientFromDatabase } from "../src/services/mappers/client-mapper.js";
@@ -114,6 +120,44 @@ describe("financial totals", () => {
   });
 });
 
+describe("receivables summary", () => {
+  const today = "2026-09-20";
+  const ledger = [
+    { type: "INCOME", status: "PENDING", amount: 75, dueDate: "2026-09-10", description: "Domain renewal" },
+    { type: "INCOME", status: "PENDING", amount: 73, dueDate: "2026-10-05", description: "Domain" },
+    { type: "INCOME", status: "PAID", amount: 900, dueDate: "2026-09-01", paidAt: "2026-09-02", description: "Paid" },
+    { type: "INCOME", status: "CANCELLED", amount: 500, dueDate: "2026-09-01", description: "Cancelled" },
+    { type: "EXPENSE", status: "PENDING", amount: 40, dueDate: "2026-09-15", description: "Hosting" },
+  ];
+
+  it("says how many charges are behind the amount, and how many are late", () => {
+    const summary = receivablesSummary(ledger, new Date(`${today}T12:00:00`));
+    assert.equal(summary.total, 148);
+    assert.equal(summary.count, 2);
+    assert.equal(summary.overdueCount, 1);
+    assert.equal(summary.overdueTotal, 75);
+  });
+
+  it("keeps what is owed by the studio apart from what is owed to it", () => {
+    const summary = receivablesSummary(ledger, new Date(`${today}T12:00:00`));
+    assert.equal(summary.toPay, 40);
+    assert.equal(summary.overduePayable, 40);
+  });
+
+  it("never counts settled or cancelled entries as pending", () => {
+    const summary = receivablesSummary(ledger.filter((entry) => entry.status !== "PENDING"));
+    assert.deepEqual([summary.total, summary.count, summary.overdueCount, summary.toPay], [0, 0, 0, 0]);
+  });
+
+  it("agrees with the period totals about what is revenue: a pending charge is not", () => {
+    // "R$ 148 to receive" and "R$ 0 this month" are both true at once.
+    const pendingOnly = ledger.filter((entry) => entry.status === "PENDING");
+    assert.equal(receivablesSummary(pendingOnly, NOW).total, 148);
+    assert.equal(financialTotals(pendingOnly, "month", NOW).revenue, 0);
+    assert.equal(financialTotals(pendingOnly, "month", NOW).result, 0);
+  });
+});
+
 describe("bar percentages", () => {
   it("clamps between 0 and 100 and survives a zero maximum", () => {
     assert.equal(barPercent(5, 10), 50);
@@ -133,6 +177,20 @@ describe("primary indicators", () => {
     ];
     // Delivered, editorially archived and client-less work is not an engagement.
     assert.equal(activeEngagements(engagements), 2);
+  });
+
+  it("counts shipped work apart from work in delivery", () => {
+    const projects = [
+      { id: "1", clientId: "001", status: "In Development", editorialStatus: "DRAFT" },
+      { id: "2", clientId: "001", status: "Live", editorialStatus: "PUBLISHED" },
+      { id: "3", clientId: null, status: "Live", editorialStatus: "PUBLISHED" },
+      { id: "4", clientId: "002", status: "Live", editorialStatus: "ARCHIVED" },
+    ];
+    // "0 in delivery" next to four LIVE badges was the contradiction: the two
+    // counts answer different questions, so both are shown.
+    assert.equal(liveProjects(projects), 2, "live and not archived, with or without a client");
+    assert.equal(activeEngagements(projects), 1);
+    assert.equal(liveProjects([]), 0);
   });
 
   it("counts only clients with an active relationship", () => {
@@ -197,6 +255,77 @@ describe("needs attention", () => {
     assert.equal(items.filter((item) => item.category === "COMMERCIAL").length, 1, "the open high priority deal");
   });
 
+  it("grades each item: late money and broken publication are critical, hygiene is normal", () => {
+    const byDetail = (items, text) => items.find((item) => item.detail.includes(text));
+    const checks = projectChecks(projects);
+    assert.equal(byDetail(checks, "published but hidden").priority, "critical");
+    assert.equal(byDetail(checks, "missing poster").priority, "attention");
+    assert.equal(byDetail(checks, "still a draft").priority, "normal");
+    assert.equal(byDetail(checks, "missing description").priority, "normal");
+
+    const now = new Date("2026-09-20T12:00:00");
+    const money = operationalChecks(
+      {
+        transactions: [
+          { type: "INCOME", status: "PENDING", amount: 10, dueDate: "2026-09-01", description: "Late" },
+          { type: "INCOME", status: "PENDING", amount: 20, dueDate: "2026-09-20", description: "Today" },
+          { type: "INCOME", status: "PENDING", amount: 30, dueDate: "2026-10-20", description: "Later" },
+          { type: "EXPENSE", status: "PENDING", amount: 40, dueDate: "2026-09-01", description: "Bill" },
+          { type: "EXPENSE", status: "PENDING", amount: 50, dueDate: "2026-10-01", description: "Not due" },
+        ],
+      },
+      now,
+    );
+    assert.deepEqual(
+      money.map((item) => [item.detailParams.description, item.priority]),
+      [
+        ["Late", "critical"],
+        ["Today", "today"],
+        ["Later", "attention"],
+        ["Bill", "critical"],
+      ],
+      "a bill that is not due yet asks for nothing",
+    );
+    assert.equal(byDetail(money, "Today").detailKey, "dashboard.attention.transactionDueToday");
+    const ranked = rankAttention(money, 6, 6).map((item) => item.priority);
+    assert.deepEqual(ranked, ["critical", "critical", "today", "attention"], "late first, then today, then open");
+  });
+
+  it("flags a missed next action as critical and an open high priority deal as attention", () => {
+    const now = new Date("2026-09-20T12:00:00");
+    const items = operationalChecks(
+      {
+        opportunities: [
+          { id: "a", stage: "NEW", priority: "HIGH", client: "ACME" },
+          { id: "b", stage: "CONTACTED", priority: "LOW", client: "BETA", nextAction: "Call", nextActionAt: "2026-09-01" },
+        ],
+      },
+      now,
+    );
+    assert.deepEqual(
+      items.map((item) => [item.title, item.priority]),
+      [
+        ["ACME", "attention"],
+        ["BETA", "critical"],
+      ],
+    );
+  });
+
+  it("turns changes waiting for review into one item, and none when there is nothing to review", () => {
+    assert.deepEqual(approvalChecks(0), []);
+    assert.deepEqual(approvalChecks(null), [], "a count that failed is not zero pending, and not an item either");
+    assert.deepEqual(approvalChecks(undefined), []);
+    const [item, ...rest] = approvalChecks(3);
+    assert.equal(rest.length, 0, "one item however many requests");
+    assert.equal(item.category, "APPROVAL");
+    assert.equal(item.href, "#/approvals");
+    assert.equal(item.detailParams.count, 3);
+    assert.equal(item.priority, "attention");
+    // After money, before deals and editorial checks.
+    const ranked = rankAttention([...projectChecks(projects), ...approvalChecks(3), ...operationalChecks({ transactions, opportunities })]);
+    assert.deepEqual(ranked.slice(0, 2).map((entry) => entry.category), ["FINANCIAL", "APPROVAL"]);
+  });
+
   it("leaves proposals to the follow up queue so no deal is listed twice", () => {
     const attention = operationalChecks({ transactions, opportunities }).map((item) => item.title);
     const queue = followUps({ clients, opportunities }, NOW).map((item) => item.title);
@@ -252,6 +381,29 @@ describe("follow ups", () => {
   it("caps the queue", () => {
     assert.ok(followUps({ clients, opportunities }, NOW).length <= 4);
   });
+
+  it("grades how late a contact is, without shouting before 60 days", () => {
+    assert.deepEqual(
+      [0, 30, 31, 60, 61, 90, 91, 400].map(contactLevel),
+      ["normal", "normal", "attention", "attention", "alert", "alert", "priority", "priority"],
+    );
+    assert.equal(contactLevel(undefined), "normal");
+    assert.equal(contactLevel(Number.NaN), "normal");
+  });
+
+  it("carries that grade on each quiet relationship, and on nothing else", () => {
+    const quiet = (days) => ({ id: `c${days}`, name: `Quiet ${days}`, status: "ACTIVE", lastContactAt: daysBefore(days) });
+    const items = followUps({ clients: [quiet(45), quiet(70), quiet(125), { id: "lead", name: "Lead", status: "LEAD" }] }, NOW, 10);
+    assert.deepEqual(
+      items.map((item) => [item.category, item.days, item.level]),
+      [
+        ["LEAD", undefined, undefined],
+        ["CLIENT", 45, "attention"],
+        ["CLIENT", 70, "alert"],
+        ["CLIENT", 125, "priority"],
+      ],
+    );
+  });
 });
 
 describe("system health", () => {
@@ -270,22 +422,86 @@ describe("system health", () => {
     assert.ok(health.issues > 0);
   });
 
-  it("only reports connected when both admin queries came back", () => {
-    assert.equal(adminDataStatus({ projectsOk: true, activityOk: true }).label, "CONNECTED");
-    assert.equal(adminDataStatus({ projectsOk: true, activityOk: false }).label, "DEGRADED");
-    assert.equal(adminDataStatus({ projectsOk: false, activityOk: true }).label, "DEGRADED");
-    assert.equal(adminDataStatus({ projectsOk: false, activityOk: false }).label, "UNAVAILABLE");
+  it("only reports connected when every read it made came back", () => {
+    const reads = (projects, logs) => [
+      { id: "projects", ok: projects },
+      { id: "logs", ok: logs },
+    ];
+    assert.equal(operationStatus(reads(true, true)).label, "CONNECTED");
+    assert.equal(operationStatus(reads(true, false)).label, "DEGRADED");
+    assert.equal(operationStatus(reads(false, true)).label, "DEGRADED");
+    assert.equal(operationStatus(reads(false, false)).label, "UNAVAILABLE");
   });
 
-  it("names which query failed instead of a generic warning", () => {
-    assert.match(adminDataStatus({ projectsOk: true, activityOk: false }).detail, /Activity/);
-    assert.match(adminDataStatus({ projectsOk: false, activityOk: true }).detail, /Project/);
+  it("names which read failed instead of a generic warning", () => {
+    const status = operationStatus([
+      { id: "projects", ok: true },
+      { id: "financial", ok: false },
+      { id: "commercial", ok: false },
+      { id: "logs", ok: true },
+    ]);
+    assert.deepEqual(status.failed, ["financial", "commercial"]);
+    assert.equal(status.state, "degraded");
   });
 
-  it("a failing activity read can never be reported as connected", () => {
-    const status = adminDataStatus({ projectsOk: true, activityOk: false });
+  it("a failing read can never be reported as connected", () => {
+    const status = operationStatus([
+      { id: "projects", ok: true },
+      { id: "logs", ok: false },
+    ]);
     assert.notEqual(status.label, "CONNECTED");
     assert.equal(status.tone, "warn");
+  });
+
+  it("does not report a module the member may not read as an outage", () => {
+    // null: the read was never sent. It is neither a success nor a failure.
+    const status = operationStatus([
+      { id: "projects", ok: true },
+      { id: "financial", ok: null },
+      { id: "logs", ok: null },
+    ]);
+    assert.deepEqual([status.state, status.label, status.failed], ["ok", "CONNECTED", []]);
+    const down = operationStatus([
+      { id: "projects", ok: false },
+      { id: "financial", ok: null },
+    ]);
+    assert.equal(down.state, "down", "the only read that was made failed");
+    assert.equal(down.tone, "danger");
+  });
+});
+
+describe("security alerts", () => {
+  const now = new Date("2026-09-20T12:00:00.000Z");
+  const at = (minutes) => new Date(now.getTime() - minutes * 60_000).toISOString();
+  const line = (id, action, minutes) => ({ id, action, createdAt: at(minutes) });
+
+  it("keeps only what deserves a look: lost access, ended sessions, changed rules", () => {
+    const trail = [
+      line(1, "LOGIN_SUCCESS", 1),
+      line(2, "SESSION_REVOKED", 15),
+      line(3, "ROLE_ASSIGNED", 20),
+      line(4, "ACCESS_UPDATED", 25),
+      line(5, "APPROVAL_REJECTED", 30),
+      line(6, "MFA_REMOVED", 40),
+      line(7, "PROJECT_PUBLISHED", 50),
+    ];
+    assert.deepEqual(securityAlerts(trail, now).map((entry) => entry.action), ["SESSION_REVOKED", "MFA_REMOVED"]);
+    for (const action of ["LOGIN_SUCCESS", "ROLE_ASSIGNED", "ACCESS_UPDATED", "APPROVAL_REQUESTED", "PROJECT_UPDATED"]) {
+      assert.equal(SECURITY_ALERT_ACTIONS.includes(action), false, `${action} stays on the Audit page`);
+    }
+  });
+
+  it("is recent or it is not an alert: 72 hours, newest first", () => {
+    const trail = [line(1, "USER_SUSPENDED", 60 * 71), line(2, "SESSION_REVOKED", 60 * 73), line(3, "PERMISSION_CHANGED", 5)];
+    assert.deepEqual(securityAlerts(trail, now).map((entry) => entry.id), [3, 1]);
+    assert.deepEqual(securityAlerts(trail, now, 1).map((entry) => entry.id), [3], "a shorter window");
+  });
+
+  it("leaves out an entry it cannot date, and says nothing for an empty trail", () => {
+    assert.deepEqual(securityAlerts([{ id: 1, action: "SESSION_REVOKED", createdAt: "not a date" }, { id: 2, action: "SESSION_REVOKED" }], now), []);
+    assert.deepEqual(securityAlerts([line(1, "SESSION_REVOKED", -5)], now), [], "nor one dated in the future");
+    assert.deepEqual(securityAlerts([], now), []);
+    assert.deepEqual(securityAlerts(undefined, now), []);
   });
 });
 

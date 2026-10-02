@@ -611,18 +611,6 @@
   gap: 0.5rem;
 }
 
-.dash-security__count {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin: 0 0 var(--space-2);
-}
-
-.dash-security__count strong {
-  color: var(--accent);
-  font: 700 1.6rem/1 var(--display);
-}
-
 /* --- audit ------------------------------------------------------------------------------- */
 
 .audit-list {
@@ -659,19 +647,6 @@
   grid-column: 4 / 5 !important;
   grid-row: 1;
   font: 600 0.58rem/1 var(--mono) !important;
-}
-
-.audit-list--compact .audit-line {
-  grid-template-columns: auto minmax(0, 1fr);
-}
-
-.audit-list--compact .audit-line time,
-.audit-list--compact .audit-line__aal {
-  display: none;
-}
-
-.audit-list--compact .audit-line small {
-  grid-column: 1 / -1;
 }
 
 .audit-more {

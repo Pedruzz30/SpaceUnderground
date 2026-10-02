@@ -6,6 +6,7 @@ import {
   formatCurrency,
   formatDayMonth,
   formatFullDate,
+  formatRelativeAge,
   formatRelativeDay,
   formatSignedCurrency,
 } from "../src/utils/format.js";
@@ -41,6 +42,46 @@ describe("relative day formatting", () => {
   it("returns an em dash for unusable values", () => {
     assert.equal(formatRelativeDay("not-a-date"), "—");
     assert.equal(formatRelativeDay(null), "—");
+  });
+});
+
+describe("relative age formatting", () => {
+  const now = Date.parse("2026-09-20T12:00:00.000Z");
+  const ago = (ms) => new Date(now - ms);
+  const MINUTE = 60 * 1000;
+
+  it("keeps counting where the lists switch to a date", () => {
+    setLocale("pt-BR", { persist: false });
+    assert.equal(formatRelativeAge(ago(2 * 60 * MINUTE), { now }), "hoje");
+    assert.equal(formatRelativeAge(ago(1.5 * DAY), { now }), "ontem");
+    assert.equal(formatRelativeAge(ago(9 * DAY), { now }), "há 9 dias");
+    assert.equal(formatRelativeAge(ago(59 * DAY), { now }), "há 59 dias");
+    assert.equal(formatRelativeAge(ago(125 * DAY), { now }), "há 4 meses");
+    assert.equal(formatRelativeAge(ago(800 * DAY), { now }), "há 2 anos");
+
+    setLocale("en", { persist: false });
+    assert.equal(formatRelativeAge(ago(2 * 60 * MINUTE), { now }), "today");
+    assert.equal(formatRelativeAge(ago(9 * DAY), { now }), "9 days ago");
+    assert.equal(formatRelativeAge(ago(125 * DAY), { now }), "4 months ago");
+  });
+
+  it("reads the first day in minutes and hours for events", () => {
+    setLocale("pt-BR", { persist: false });
+    assert.equal(formatRelativeAge(ago(10 * 1000), { time: true, now }), "agora");
+    assert.equal(formatRelativeAge(ago(15 * MINUTE), { time: true, now }), "há 15 minutos");
+    assert.equal(formatRelativeAge(ago(3 * 60 * MINUTE), { time: true, now }), "há 3 horas");
+    assert.equal(formatRelativeAge(ago(1.5 * DAY), { time: true, now }), "ontem");
+
+    setLocale("en", { persist: false });
+    assert.equal(formatRelativeAge(ago(10 * 1000), { time: true, now }), "now");
+    assert.equal(formatRelativeAge(ago(15 * MINUTE), { time: true, now }), "15 minutes ago");
+  });
+
+  it("returns an em dash for unusable values and a date for the future", () => {
+    setLocale("pt-BR", { persist: false });
+    assert.equal(formatRelativeAge("not-a-date"), "—");
+    assert.equal(formatRelativeAge(null), "—");
+    assert.equal(formatRelativeAge(new Date(now + 3 * DAY), { now }), formatDayMonth(new Date(now + 3 * DAY)));
   });
 });
 

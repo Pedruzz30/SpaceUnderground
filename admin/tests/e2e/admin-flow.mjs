@@ -102,6 +102,15 @@ try {
   assert.equal(await page.locator("[data-pulse-row]").count(), 2, "seeded project pulse");
   assert.equal(await page.locator('[data-health-metric="published"]').innerText(), "2", "seeded published cases");
   assert.equal(await page.locator('[data-health-metric="drafts"]').innerText(), "0", "seeded draft cases");
+  // Every panel takes a whole column, the approvals panel included: it once
+  // sat in one twelfth of the grid with the rest of its row empty.
+  const dashPanels = await page
+    .locator(".dash-layout > .dash-panel")
+    .evaluateAll((nodes) => nodes.filter((node) => node.offsetParent !== null).map((node) => Math.round(node.getBoundingClientRect().width)));
+  assert.equal(await page.locator("[data-dash-approvals]").count(), 1, "the approvals panel is on the Dashboard");
+  assert.ok(dashPanels.length >= 8, `the Dashboard panels are rendered (${dashPanels.length})`);
+  assert.ok(Math.max(...dashPanels) - Math.min(...dashPanels) <= 1, `every panel is as wide as its column: ${dashPanels.join(", ")}`);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, "the Dashboard does not scroll sideways");
 
   // Projects list.
   await page.click('a[href="#/projects"]');
@@ -254,7 +263,7 @@ try {
   assert.equal(await page.locator("[data-pulse-row]").count(), 2, "final project pulse");
   assert.equal(await page.locator('[data-health-metric="published"]').innerText(), "2", "final published cases");
   assert.equal(await page.locator('[data-health-metric="drafts"]').innerText(), "0", "final draft cases");
-  assert.ok((await page.locator(".activity-list > div").count()) > 0, "activity log populated");
+  assert.ok((await page.locator("[data-activity] li").count()) > 0, "activity log populated");
 
 
   /* ------------------------------------------------ projects hub: metrics */

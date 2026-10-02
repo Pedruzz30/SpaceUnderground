@@ -1,16 +1,37 @@
 /* Dashboard command center. Composition, typography and hierarchy carry the
    weight here — no new tokens, no extra effects, no parallel component set.
-   Shared primitives (.panel, .button, .badge, .ops-row, .ops-figures,
-   .ops-amount, .activity-list, .stats-grid) are reused as-is. */
+   Shared primitives (.panel, .button, .badge, .stat-card, .stats-grid,
+   .ops-amount) are reused as-is.
 
-.dash-legend {
-  margin: calc(var(--space-2) * -1) 0 var(--space-4);
+   Three visual levels:
+     1  the KPI strip
+     2  the working panels (attention, projects, relationship, financial,
+        commercial, operation) on the panel surface
+     3  the quiet ones (approvals, security, recent activity), outlined only
+   A panel in an exceptional state is marked with data-emphasis, so what is
+   normal stays quiet and what needs action is what the eye finds. */
+
+/* --- heading ------------------------------------------------------------ */
+
+.dash-heading {
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+}
+
+.dash-heading h2 {
+  margin: 0.3rem 0 0;
+  font-size: clamp(1.35rem, 2.2vw, 1.75rem);
+}
+
+.dash-heading__actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .dash-period {
-  display: grid;
-  min-width: 11rem;
-  gap: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
 }
 
 .dash-period > span {
@@ -20,8 +41,61 @@
   text-transform: uppercase;
 }
 
-/* --- modular grid ------------------------------------------------------- */
+/* Same height as the buttons it sits next to. */
+.dash-period select {
+  width: auto;
+  min-width: 10rem;
+  min-height: 2.55rem;
+  padding-block: 0;
+  font-size: 0.9rem;
+}
 
+/* The "+" is decoration: the label itself stays the translated text, so a
+   locale change can rewrite it in place. */
+.dash-add::before {
+  content: "+";
+  margin-right: 0.45rem;
+}
+
+/* The title, the period and two actions do not fit one line beside the
+   sidebar on a small desktop: the actions take their own row instead of
+   breaking the title in two. */
+@media (max-width: 1180px) {
+  .dash-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dash-heading__actions {
+    justify-content: flex-start;
+  }
+}
+
+/* --- KPI strip ---------------------------------------------------------- */
+
+.dash-kpis {
+  margin-bottom: var(--space-3);
+}
+
+.dash-kpis .stat-card {
+  min-height: 0;
+  padding: var(--space-3) var(--space-4);
+}
+
+.dash-kpis .stat-card strong {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 2rem;
+}
+
+.dash-kpis .stat-card p {
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+/* --- layout ------------------------------------------------------------- */
+
+/* The member dashboard (dashboard-member.js) lays its three panels out on
+   this grid; its columns are set in security.css. */
 .dash-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -32,63 +106,211 @@
   min-width: 0;
 }
 
-/* --- needs attention / follow ups --------------------------------------- */
-
-.dash-queue {
-  display: grid;
-  gap: 0.5rem;
+/* The panels flow in priority order (attention, projects, relationship,
+   money, pipeline, operation, then the quiet ones) down one column and into
+   the next, and the browser balances the two. No panel holds a placed cell:
+   one that is not rendered (no permission, security model not applied) is
+   simply not in the flow, and a calm day with a short attention list moves
+   the break instead of leaving one column half empty. On one column the same
+   order is the reading order. */
+.dash-layout {
+  column-gap: var(--space-3);
 }
 
-.dash-queue-item {
+/* A panel is as wide as its column, whatever the window: what is inside
+   adapts to the panel (container queries below), not to the viewport. */
+.dash-panel {
+  min-width: 0;
+  margin-bottom: var(--space-3);
+  padding: 1.15rem 1.25rem 1.25rem;
+  break-inside: avoid;
+  container-type: inline-size;
+}
+
+.dash-panel--quiet {
+  background: transparent;
+}
+
+.dash-panel[data-emphasis="danger"] {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.dash-panel[data-emphasis="warning"] {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+}
+
+.dash-panel[data-emphasis="accent"] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: var(--surface);
+}
+
+@media (min-width: 761px) {
+  .dash-layout {
+    column-count: 2;
+  }
+}
+
+/* --- panel head --------------------------------------------------------- */
+
+.dash-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.dash-head h3 {
+  margin: 0;
+  color: var(--text-soft);
+  font: 600 0.66rem/1.3 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dash-panel--attention .dash-head h3 {
+  color: var(--accent);
+}
+
+.dash-head__meta,
+.dash-more {
+  color: var(--text-muted);
+  font: 500 0.62rem/1.3 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.dash-head__meta.is-critical {
+  color: var(--danger);
+}
+
+.dash-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: color 120ms ease;
+}
+
+.dash-more:hover,
+.dash-more:focus-visible {
+  color: var(--accent);
+}
+
+/* --- lists: attention, projects, relationship ---------------------------- */
+
+.dash-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-list > li + li {
+  border-top: 1px solid var(--border);
+}
+
+.dash-item {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 0.75rem;
+  margin: 0 -0.6rem;
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 0.6rem;
   color: inherit;
-  transition: border-color 120ms ease, background 120ms ease;
+  transition: background 120ms ease;
 }
 
-.dash-queue-item:hover,
-.dash-queue-item:focus-visible {
-  border-color: var(--border);
-  background: rgba(255, 255, 255, 0.025);
+.dash-item:hover,
+.dash-item:focus-visible {
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.dash-queue-item__body {
+.dash-item__body {
   display: grid;
   min-width: 0;
-  gap: 0.15rem;
   flex: 1;
+  gap: 0.2rem;
 }
 
-.dash-queue-item__category {
+.dash-item__category {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.5rem;
   color: var(--text-muted);
   font: 600 0.56rem/1 var(--mono);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.dash-queue-item strong {
+.dash-item strong {
   color: var(--text-primary);
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
-.dash-queue-item__detail {
+.dash-item__detail {
   color: var(--text-muted);
   font-size: 0.82rem;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
-.dash-queue-item > b {
+.dash-item > b {
   color: var(--text-muted);
   font-weight: 500;
 }
 
-.dash-queue-item:hover > b,
-.dash-queue-item:focus-visible > b {
+.dash-item:hover > b,
+.dash-item:focus-visible > b {
   color: var(--accent);
+}
+
+/* A project row carries its two states and its age on the same line as the
+   name; in a panel too narrow for that, they go under the name instead of
+   squeezing it. */
+.dash-item--project {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: "body meta arrow";
+  gap: 0.5rem 0.75rem;
+}
+
+.dash-item--project .dash-item__body {
+  grid-area: body;
+}
+
+.dash-item--project > b {
+  grid-area: arrow;
+}
+
+.dash-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  grid-area: meta;
+}
+
+.dash-item__meta .dash-item__when {
+  margin-left: 0.4rem;
+}
+
+@container (max-width: 28rem) {
+  .dash-item--project {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "body arrow"
+      "meta meta";
+  }
+}
+
+.dash-item__when {
+  color: var(--text-muted);
+  font: 500 0.6rem/1.3 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .dash-dot {
@@ -99,14 +321,52 @@
   background: var(--border-strong);
 }
 
-.dash-dot--danger {
+.dash-dot--critical,
+.dash-dot--priority {
   background: var(--danger);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
-.dash-dot--warning {
+.dash-dot--today,
+.dash-dot--attention,
+.dash-dot--alert {
   background: var(--warning);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--warning) 12%, transparent);
+}
+
+.dash-dot--ok {
+  background: var(--success);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 12%, transparent);
+}
+
+/* Only what stands out is flagged, and only the top of each scale takes a
+   colour: the rest stays in the neutral ink. */
+.dash-flag {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.2rem 0.4rem;
+  color: var(--text-soft);
+  font: 600 0.5rem/1 var(--mono);
+  letter-spacing: 0.1em;
+}
+
+.dash-flag--critical,
+.dash-flag--priority {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  color: var(--danger);
+}
+
+.dash-flag--today,
+.dash-flag--alert {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+  color: var(--warning);
+}
+
+.dash-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.55;
 }
 
 .dash-inline-note {
@@ -121,27 +381,9 @@
   color: var(--warning);
 }
 
-/* --- quick actions ------------------------------------------------------ */
-
-.dash-actions {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.dash-actions .button {
-  width: 100%;
-}
-
-/* --- project pulse ------------------------------------------------------ */
-
-.dash-pulse .ops-table__head,
-.dash-pulse .ops-row {
-  grid-template-columns: 4rem minmax(8rem, 1.5fr) 7.5rem 7.5rem 6rem 1.5rem;
-}
-
 .dash-skeleton {
   position: relative;
-  min-height: 3.4rem;
+  min-height: 3rem;
   margin-bottom: 0.4rem;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -159,7 +401,123 @@
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
 
-/* --- commercial pipeline rail ------------------------------------------- */
+/* --- financial ---------------------------------------------------------- */
+
+.dash-figure {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.dash-figure strong {
+  color: var(--text-primary);
+  font: 600 clamp(1.7rem, 2.6vw, 2.1rem) / 1 var(--display);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-figure span {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.dash-alert {
+  margin: 0.6rem 0 0;
+  color: var(--danger);
+  font: 600 0.62rem/1.4 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dash-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.6rem;
+  margin: 0.6rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.dash-line b {
+  color: var(--text-primary);
+  font: 500 0.84rem/1.3 var(--mono);
+}
+
+.dash-line em {
+  color: var(--danger);
+  font-size: 0.78rem;
+  font-style: normal;
+}
+
+.dash-sub {
+  margin: var(--space-3) 0 0.65rem;
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+  color: var(--text-muted);
+  font: 600 0.58rem/1.3 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dash-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.dash-figures dt {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.dash-figures dd {
+  margin: 0.25rem 0 0;
+  color: var(--text-primary);
+  font: 500 0.95rem/1.2 var(--mono);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.dash-figures dd.is-in {
+  color: var(--success);
+}
+
+.dash-figures dd.is-out {
+  color: var(--danger);
+}
+
+/* --- commercial --------------------------------------------------------- */
+
+.dash-empty {
+  display: grid;
+  justify-items: start;
+  gap: 0.45rem;
+}
+
+.dash-empty strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.dash-empty p {
+  max-width: 38ch;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.dash-empty .dash-empty__note {
+  font: 500 0.6rem/1.5 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dash-empty .button {
+  margin-top: 0.35rem;
+}
 
 .dash-pipeline {
   display: grid;
@@ -180,22 +538,17 @@
   text-transform: uppercase;
 }
 
-.dash-pipeline__track,
-.dash-bar__track {
+.dash-pipeline__track {
+  height: 6px;
   overflow: hidden;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
 }
 
-.dash-pipeline__track {
-  height: 6px;
-}
-
 /* The fill width is the one data-driven value on this page: it is set as a
    custom property so the measurement stays in the markup and the styling
    stays here. */
-.dash-pipeline__fill,
-.dash-bar__fill {
+.dash-pipeline__fill {
   display: block;
   width: var(--dash-fill, 0%);
   height: 100%;
@@ -213,186 +566,220 @@
   text-align: right;
 }
 
-.dash-figures {
-  margin-top: var(--space-3);
-}
-
-/* --- financial snapshot -------------------------------------------------- */
-
-.dash-hero {
-  display: grid;
-  gap: 0.4rem;
-  margin: 0 0 var(--space-4);
-}
-
-.dash-hero > span {
-  color: var(--text-muted);
-  font: 600 0.6rem/1 var(--mono);
-  letter-spacing: 0.12em;
-}
-
-.dash-hero strong {
-  color: var(--accent);
-  font-size: clamp(1.9rem, 3.1vw, 2.5rem);
-  font-weight: 650;
-  line-height: 1;
-}
-
-.dash-bars {
-  display: grid;
-  gap: 0.65rem;
-  margin-bottom: var(--space-4);
-}
-
-.dash-bar {
-  display: grid;
-  grid-template-columns: 5rem minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.dash-bar__label {
+.dash-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  margin: var(--space-3) 0 0;
   color: var(--text-soft);
-  font: 500 0.72rem/1 var(--mono);
+  font: 500 0.64rem/1.4 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.dash-bar__track {
-  height: 8px;
+.dash-summary .is-accent {
+  color: var(--accent);
 }
 
-.dash-bar__fill--in {
-  background: color-mix(in srgb, var(--success) 70%, transparent);
-}
+/* --- operation ---------------------------------------------------------- */
 
-.dash-bar__fill--out {
-  background: color-mix(in srgb, var(--danger) 62%, transparent);
-}
-
-.dash-ledger {
-  display: grid;
-  gap: 0.55rem;
+.dash-status {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   margin: 0;
-  border-top: 1px solid var(--border);
-  padding: var(--space-3) 0 0;
+  color: var(--text-soft);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+/* A failed read turns the one-line status into a notice that names it. */
+.dash-status--danger,
+.dash-status--warning {
+  display: grid;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+}
+
+.dash-status--danger {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.dash-status--warning {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+
+.dash-status strong {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.dash-status ul {
+  margin: 0;
+  padding-left: 1.05rem;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.dash-rows {
+  display: grid;
+  gap: 0.45rem;
+  margin: var(--space-3) 0 0;
+}
+
+.dash-rows div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.2rem var(--space-3);
+  font-size: 0.84rem;
+}
+
+.dash-rows dt {
+  color: var(--text-muted);
+}
+
+.dash-rows dd {
+  margin: 0;
+  color: var(--text-soft);
+  font: 500 0.64rem/1.4 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dash-rows .dash-state--ok {
+  color: var(--success);
+}
+
+.dash-rows .dash-state--warn {
+  color: var(--warning);
+}
+
+.dash-rows .dash-state--danger {
+  color: var(--danger);
+}
+
+.dash-cases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.9rem;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.dash-cases strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.dash-cases .is-warn strong {
+  color: var(--warning);
+}
+
+/* --- approvals, security, recent activity -------------------------------- */
+
+.dash-quiet-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem var(--space-3);
+}
+
+.dash-quiet {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.dash-quiet strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.dash-quiet--stack {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.dash-quiet-body .dash-inline-note {
+  width: 100%;
+  margin: 0;
+}
+
+.dash-activity {
+  display: grid;
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
 
-.dash-ledger li {
+/* The title and its age share a line; the detail, when there is one, goes
+   under them. */
+.dash-activity li {
   display: grid;
-  grid-template-columns: 6rem minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.15rem var(--space-3);
+  padding: 0.55rem 0;
+  font-size: 0.84rem;
 }
 
-.dash-ledger__type {
-  color: var(--text-muted);
-  font: 600 0.58rem/1 var(--mono);
-  letter-spacing: 0.08em;
+.dash-activity li:first-child {
+  padding-top: 0;
 }
 
-.dash-ledger__description {
+.dash-activity li:last-child {
+  padding-bottom: 0;
+}
+
+.dash-activity li + li {
+  border-top: 1px solid var(--border);
+}
+
+.dash-activity strong,
+.dash-activity span {
   overflow: hidden;
-  color: var(--text-soft);
-  font-size: 0.82rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* --- system health ------------------------------------------------------- */
-
-.dash-health {
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+.dash-activity strong {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
-.dash-health small {
-  display: block;
-  margin-top: 0.4rem;
+.dash-activity span {
+  grid-column: 1 / -1;
+  grid-row: 2;
   color: var(--text-muted);
-  font: 500 0.6rem/1.45 var(--mono);
 }
 
-.dash-health .dash-health-value--ok {
-  color: var(--success);
+.dash-activity span:empty {
+  display: none;
 }
 
-.dash-health .dash-health-value--warn {
-  color: var(--warning);
+.dash-activity time {
+  color: var(--text-muted);
+  font: 500 0.6rem/1.3 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.dash-health .dash-health-value--danger {
-  color: var(--danger);
-}
-
-/* --- layout ------------------------------------------------------------- */
-
-/* Explicit areas rather than auto-placement: the DOM order is the mobile
-   reading order, and desktop rearranges finance/commercial around it. */
-@media (min-width: 861px) {
-  .dash-grid {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-  }
-
-  .dash-panel--attention {
-    grid-area: 1 / 1 / 2 / 8;
-  }
-
-  /* Five shortcuts should not stretch to match a six-item attention list. */
-  .dash-panel--actions {
-    grid-area: 1 / 8 / 2 / 13;
-    align-self: start;
-  }
-
-  .dash-panel--pulse {
-    grid-area: 2 / 1 / 3 / 13;
-  }
-
-  .dash-panel--commercial {
-    grid-area: 3 / 1 / 4 / 7;
-  }
-
-  .dash-panel--finance {
-    grid-area: 3 / 7 / 4 / 13;
-  }
-
-  .dash-panel--followups {
-    grid-area: 4 / 1 / 5 / 7;
-  }
-
-  .dash-panel--activity {
-    grid-area: 4 / 7 / 5 / 13;
-  }
-
-  .dash-panel--health {
-    grid-area: 5 / 1 / 6 / 13;
-  }
-}
-
-@media (max-width: 1400px) {
-  .dash-pulse {
-    min-width: 41rem;
-  }
-}
-
-@media (max-width: 860px) {
-  .dash-pulse {
-    min-width: 0;
-  }
-
-  /* dashboard.css loads after operations.css, so the stacked-row template has
-     to be restated here or the desktop columns survive on a phone. */
-  .dash-pulse .ops-table__head,
-  .dash-pulse .ops-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .dash-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .dash-actions .button:first-child {
-    grid-column: 1 / -1;
-  }
-}
+/* --- small screens ------------------------------------------------------- */
 
 @media (max-width: 760px) {
   /* Two compact KPI tiles read better than a single column on a phone; the
@@ -401,28 +788,44 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .dash-kpis .stat-card {
+    padding: var(--space-3);
+  }
+
+  .dash-kpis .stat-card strong {
+    font-size: 1.6rem;
+  }
+
+  /* The period on its own row, the actions sharing the next one. */
+  .dash-heading__actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  }
+
   .dash-period {
-    width: 100%;
+    grid-column: 1 / -1;
+  }
+
+  .dash-period select {
+    flex: 1;
+  }
+
+  .dash-panel {
+    padding: var(--space-3);
+  }
+
+  .dash-activity span {
+    white-space: normal;
   }
 }
 
 @media (max-width: 600px) {
-  .dash-queue-item > b {
+  .dash-item > b {
     display: none;
   }
 
-  .dash-ledger li,
-  .dash-bar,
   .dash-pipeline__row {
     gap: 0.5rem;
-  }
-
-  .dash-ledger li {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .dash-ledger__type {
-    grid-column: 1 / -1;
   }
 }
 
