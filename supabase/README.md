@@ -32,7 +32,7 @@ so older notes and commits stay easy to follow.
 | `20260928013040` | `clients_post_review_hardening` | APPLIED (recorded) |
 | `20260928031922` | `financial_foundation` | APPLIED (recorded) |
 | `20260928035023` | `commercial_opportunities` | APPLIED (recorded) |
-| `20260928200000` | `security_rbac_approval_foundation` | **PENDING — not applied** |
+| `20261002033705` | `security_rbac_approval_foundation` | **APPLIED — 2026-10-02** |
 
 Every recorded version and name matches
 `select version, name from supabase_migrations.schema_migrations` exactly and
@@ -191,7 +191,7 @@ Plus:
 - `touch_updated_at()` trigger — the database owns `updated_at`.
 - `stamp_published_at()` trigger — stamps `published_at` on first publication and never resets it.
 
-`migrations/20260928200000_security_rbac_approval_foundation.sql` (pending)
+`migrations/20261002033705_security_rbac_approval_foundation.sql` (applied 2026-10-02)
 replaces the binary `is_admin()` model with identities, roles and
 permissions, project access, the account lifecycle, MFA and step-up, drafts
 with approvals, and an append-only security audit log. It is documented in
