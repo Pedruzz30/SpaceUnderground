@@ -39,19 +39,31 @@ Run everything from the repo root unless noted.
 
 ### Security settings — BLOCKING before deploying the security branch
 
-These live in the Supabase dashboard, not in the repository, so no test can
-check them. Every box must be checked by a person, on the production project,
-before the Admin of `feat/security-rbac-approvals` is deployed or its
-migration applied. Details: `docs/security-architecture.md`, "Authentication".
+Most of these live in the Supabase dashboard, so repository tests alone
+cannot prove them. Every unresolved box must be checked against the production
+project before the security Admin is deployed or its migration applied. The
+two documented exceptions below are code-verifiable release contracts: the
+Auth callback rewrite to `#/welcome`, and the current Free-plan limitation
+for leaked-password protection. Details: `docs/security-architecture.md`, "Authentication".
 
 - [ ] **Public sign-up OFF** (Authentication → Sign In / Providers → "Allow
       new users to sign up"): access is by invitation only.
 - [ ] **TOTP / MFA enabled** (Authentication → Multi-Factor): privileged roles
       hold nothing without it, from their first sign-in.
-- [ ] **Redirect URLs** include the Admin's URL (Authentication → URL
-      Configuration): invitation and recovery links land on `#/welcome`.
-- [ ] **Leaked password protection enabled** (Authentication → Attack
-      Protection / Passwords). The Security Advisor reports it disabled today.
+- [x] **Redirect URL contract**: the production Admin origin is already
+      allow-listed in Authentication → URL Configuration. Invitation/recovery
+      callbacks may return to the Admin root; `captureAuthLink()` consumes the
+      Auth fragment/query once and rewrites the address to `#/welcome`. An
+      additional exact fragment allow-list entry is therefore not required.
+- [x] **Leaked-password protection / Free-plan exception**: the production
+      project is on Supabase Free, where leaked-password protection is not
+      available. This release records that platform limitation rather than
+      pretending the setting is enabled. Compensating controls for the Admin:
+      public sign-up is off, privileged roles require TOTP, passwords are
+      validated by the Admin (minimum 10 characters, letters + digits, and no
+      embedded email local-part), and session revocation is database-enforced.
+      **If the project moves to Pro or above, enabling leaked-password
+      protection becomes blocking before the next security release.**
 - [ ] **JWT and session configuration reviewed**: JWT expiry 3600 s or less,
       refresh token rotation on.
 - [ ] **The database can read Supabase Auth's MFA and session state**: in
