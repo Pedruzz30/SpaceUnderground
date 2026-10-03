@@ -1,8 +1,11 @@
+import { serviceStatusMarkup, serviceStateNote } from "../components/automation-panel.js";
+import { entityLabel, eventLabel } from "../components/automation-runs.js";
 import { badge, badgeType } from "../components/badge.js";
 import { statCard } from "../components/stat-card.js";
 import { spaceStatus } from "../data/dashboard.js";
 import { DATA_SOURCE } from "../config/env.js";
 import { getActivityWithStatus } from "../services/activity-service.js";
+import { getAutomationRunStats, isAutomationApiAvailable } from "../services/automation-api.js";
 import { pendingApprovalCount } from "../services/approval-service.js";
 import { listAuditEntries } from "../services/audit-service.js";
 import { getClients } from "../services/client-service.js";
@@ -32,6 +35,7 @@ import {
   receivablesSummary,
   securityAlerts,
 } from "../utils/dashboard-metrics.js";
+import { LOADING, NOT_CONFIGURED, SUCCESS, createAutomationResource } from "../utils/automation-state.js";
 import { escapeHtml } from "../utils/html.js";
 import { hasPermission, isSecurityModelActive } from "../security/access.js";
 import { memberDashboard } from "./dashboard-member.js";
@@ -408,6 +412,112 @@ function renderActivity({ items, ok }) {
   `;
 }
 
+/* ------------------------------------------------------------- automation */
+
+// The automation service, from its own run statistics: whether it answers,
+// how the recent runs went, and the runs that need a person. Optional by
+// design -- "not configured" is a quiet line, not an outage, and an
+// unreachable service never holds up or blanks the rest of the Dashboard.
+
+// Shared across visits within the TTL, so returning to the Dashboard does not
+// re-ask the service every time.
+const automationStats = createAutomationResource(() => getAutomationRunStats());
+
+const ATTENTION_DOT = { failed: "critical", stale: "attention", attention: "attention" };
+
+function automationItem(item) {
+  const detail = [t(`automation.reasons.${item.reason}`), entityLabel(item), item.error || ""].filter(Boolean).join(" · ");
+  return `
+    <li>
+      <a class="dash-item" href="#/logs/automation">
+        <span class="dash-dot dash-dot--${escapeHtml(ATTENTION_DOT[item.reason] ?? "attention")}" aria-hidden="true"></span>
+        <span class="dash-item__body">
+          <span class="dash-item__category" data-i18n="automation.title">${escapeHtml(t("automation.title"))}</span>
+          <strong>${escapeHtml(eventLabel(item.event))}</strong>
+          <span class="dash-item__detail">${escapeHtml(detail)}</span>
+        </span>
+        <span class="dash-item__when">${escapeHtml(formatRelativeAge(item.created_at, { time: true }))}</span>
+        <b aria-hidden="true">&rarr;</b>
+      </a>
+    </li>
+  `;
+}
+
+function renderAutomation(state) {
+  if (state.status === LOADING) return { html: loadingNote(), tone: "" };
+  if (state.status !== SUCCESS) {
+    return {
+      tone: "",
+      html: `<p class="dash-status">${serviceStatusMarkup(state.status)}</p>${serviceStateNote(state.status)}`,
+    };
+  }
+
+  const stats = state.data ?? {};
+  const attention = Array.isArray(stats.attention) ? stats.attention : [];
+  const failed = attention.some((item) => item.reason === "failed");
+  const headline = `<p class="dash-status">${serviceStatusMarkup(SUCCESS)}<span>${escapeHtml(plural("automation.dashboard.recent", stats.total ?? 0))}</span></p>`;
+
+  if (stats.storage_available === false) {
+    return { tone: "warning", html: `${headline}<p class="dash-note" data-i18n="automation.dashboard.storageUnavailable">${t("automation.dashboard.storageUnavailable")}</p>` };
+  }
+  if (!stats.total) {
+    return { tone: "", html: `${headline}<p class="dash-note" data-i18n="automation.dashboard.noRuns">${t("automation.dashboard.noRuns")}</p>` };
+  }
+
+  // A rate needs a sample: the service sends none below its threshold.
+  const rate = Number.isFinite(stats.success_rate) ? t("automation.dashboard.rateValue", { rate: stats.success_rate }) : t("automation.dashboard.rateTooFew");
+  const last = stats.last_run;
+
+  return {
+    tone: failed ? "danger" : attention.length ? "warning" : "",
+    html: `
+      <div class="dash-automation" data-automation-stats>
+        ${headline}
+        <dl class="dash-figures">
+          <div><dt data-i18n="automation.dashboard.success">${t("automation.dashboard.success")}</dt><dd>${escapeHtml(stats.success ?? 0)}</dd></div>
+          <div><dt data-i18n="automation.dashboard.failed">${t("automation.dashboard.failed")}</dt><dd${stats.failed ? ` class="is-out"` : ""}>${escapeHtml(stats.failed ?? 0)}</dd></div>
+          <div><dt data-i18n="automation.dashboard.rate">${t("automation.dashboard.rate")}</dt><dd data-automation-rate>${escapeHtml(rate)}</dd></div>
+        </dl>
+        ${
+          last
+            ? `<p class="dash-automation__last"><span data-i18n="automation.dashboard.lastRun">${t("automation.dashboard.lastRun")}</span>: <strong>${escapeHtml(eventLabel(last.event))}</strong> · ${escapeHtml(t(`automation.runStatus.${last.status}`))} · <time datetime="${escapeHtml(last.created_at ?? "")}">${escapeHtml(formatRelativeAge(last.created_at, { time: true }))}</time></p>`
+            : ""
+        }
+        ${
+          attention.length
+            ? `<h4 class="dash-sub">${escapeHtml(plural("automation.dashboard.attentionCount", attention.length))}</h4><ul class="dash-list" data-automation-attention>${attention.map(automationItem).join("")}</ul>`
+            : `<p class="dash-quiet" data-automation-clear data-i18n="automation.dashboard.allClear">${t("automation.dashboard.allClear")}</p>`
+        }
+      </div>
+    `,
+  };
+}
+
+function automationPanel() {
+  return `
+      <article class="panel dash-panel" aria-labelledby="dash-automation-title" data-requires="logs.read">
+        ${panelHead({ titleKey: "automation.title", id: "dash-automation-title", aside: moreLink({ href: "#/logs/automation", labelKey: "automation.dashboard.openRuns", requires: "logs.read" }) })}
+        <div data-dash-automation aria-busy="true">${renderAutomation({ status: isAutomationApiAvailable() ? LOADING : NOT_CONFIGURED }).html}</div>
+      </article>`;
+}
+
+// Resolved on its own, never awaited by the rest of the page.
+async function paintAutomation() {
+  const node = document.querySelector("[data-dash-automation]");
+  if (!node || !hasPermission("logs.read")) return;
+  const state = await automationStats.read();
+  if (!node.isConnected) return;
+
+  const paint = () => {
+    const view = renderAutomation(state);
+    node.innerHTML = view.html;
+    node.removeAttribute("aria-busy");
+    emphasize(node, view.tone);
+  };
+  paint();
+  onLocaleChange(node, paint);
+}
+
 /* -------------------------------------------------- approvals and security */
 
 // Nothing to review is a line, not a card with a zero in it.
@@ -539,6 +649,7 @@ const fullDashboard = {
         ${panelHead({ titleKey: "dashboard.operation.title", id: "dash-health-title", aside: moreLink({ href: "#/cms", labelKey: "dashboard.operation.openCms", requires: "cms.read" }) })}
         <div data-health aria-busy="true">${loadingNote()}</div>
       </article>
+      ${automationPanel()}
       ${approvalsPanel()}
       ${securityPanel()}
 
@@ -560,6 +671,8 @@ const fullDashboard = {
       emphasize(financeEl, finance.overdue ? "danger" : "");
     };
     periodEl?.addEventListener("change", paintFinancial);
+
+    void paintAutomation();
 
     // One failing query must never blank the Dashboard: each block resolves
     // independently, and the page renders from whatever answered.
