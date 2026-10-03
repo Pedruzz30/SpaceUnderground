@@ -6,6 +6,7 @@ import { onLocaleChange, statusLabel, t } from "../i18n/index.js";
 import { getAccess, hasPermission } from "../security/access.js";
 import { resolveMembers } from "../services/access-service.js";
 import { approveRequest, cancelRequest, getRequest, invalidatePendingCount, rebaseRequest, rejectRequest, submitRequest } from "../services/approval-service.js";
+import { dispatchAfterCommit } from "../services/automation-events.js";
 import { describeError } from "../services/errors.js";
 import { getProjectById } from "../services/project-service.js";
 import { resolveImageUrl } from "../services/storage-service.js";
@@ -200,7 +201,21 @@ export const approvalReviewPage = {
         });
         if (comment === null) return;
         await act(
-          () => withStepUp(() => approveRequest(request.id, comment || null)),
+          async () => {
+            const outcome = await withStepUp(() => approveRequest(request.id, comment || null));
+            // Applied by the database: the project is published now. The
+            // publication check follows, keyed by the request, so approving
+            // (or retrying) this request is one run however often it repeats.
+            if (request.action === "project.publish") {
+              void dispatchAfterCommit("project.published", {
+                entityType: "project",
+                entityId: request.resourceId,
+                payload: { project_id: request.resourceId, change_request_id: request.id },
+                operationId: `approval:${request.id}`,
+              });
+            }
+            return outcome;
+          },
           t(request.action === "project.publish" ? "security.review.approvedPublished" : "security.review.approved"),
         );
       } else if (event.target.closest("[data-review-reject]")) {

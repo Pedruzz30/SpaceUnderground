@@ -25,6 +25,12 @@ import { BASE_LOCALE, TRANSLATION_LOCALE, localeHint, localeTabs } from "../comp
 import { publicSiteUrl } from "../config/public-site.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
 import { isLivePreviewUrl, liveDemoState, projectHealth, publishReadiness } from "../utils/project-health.js";
+import { isSupabaseMode } from "../config/env.js";
+import { serviceStateNote } from "../components/automation-panel.js";
+import { runStatusBadge, shortRunId } from "../components/automation-runs.js";
+import { analyzeProject, isAutomationApiAvailable } from "../services/automation-api.js";
+import { dispatchAfterCommit } from "../services/automation-events.js";
+import { ERROR, FORBIDDEN, IDLE, LOADING, NOT_CONFIGURED, SUCCESS, stateForError } from "../utils/automation-state.js";
 
 const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/avif,image/gif";
 
@@ -252,6 +258,86 @@ function overviewBadgesMarkup(values, health) {
   `;
 }
 
+/* --------------------------------------------- automation: analysis, events */
+
+// The operational analysis comes from the automation service, so the row it
+// describes is the one stored in the database -- not the form on screen. The
+// two are shown side by side on purpose and answer different questions:
+//
+//   projectHealth (left)   "is this form ready to publish?"
+//   analysis (below)       "is the persisted record operationally coherent?"
+//
+// Neither replaces the other.
+
+const ANALYSIS_CHECK_CLASS = { ok: "ok", warn: "warning", fail: "required" };
+
+// The status that means "delivered" (services/automation-api, business/projects):
+// a save that moves the stored status into Live is what project.completed means.
+const COMPLETED_STATUS = "Live";
+
+// Survives the re-mount that a save triggers, scoped per project, so opening a
+// different case never shows the previous one's run.
+const lastRuns = new Map();
+
+function analysisMarkup(state) {
+  if (state.status === LOADING) return `<p class="empty-inline">${escapeHtml(t("automation.analysis.loading"))}</p>`;
+  // Unconfigured, unreachable or closed to this member: said as such. A 404
+  // is none of those -- the row is simply not in the database yet.
+  if ([NOT_CONFIGURED, FORBIDDEN, ERROR].includes(state.status) && state.error?.code !== "not_found") {
+    return serviceStateNote(state.status, "empty-inline");
+  }
+  if (state.status !== SUCCESS || !state.data) {
+    // In mock mode the project is saved -- just not in the database the
+    // service reads, so "save the project" would be untrue there.
+    const key = isSupabaseMode() ? "automation.analysis.notSaved" : "automation.analysis.mockMode";
+    return `<p class="empty-inline" data-i18n="${key}">${escapeHtml(t(key))}</p>`;
+  }
+
+  const analysis = state.data;
+  const checks = Array.isArray(analysis.checks) ? analysis.checks : [];
+  const recommendations = Array.isArray(analysis.recommendations) ? analysis.recommendations : [];
+  const statusKey = `automation.analysis.statuses.${analysis.status}`;
+
+  return `
+    <div class="analysis-summary">
+      <div><span>${escapeHtml(t("automation.analysis.score"))}</span><strong>${escapeHtml(t("automation.analysis.scoreValue", { score: analysis.score }))}</strong></div>
+      <div><span>${escapeHtml(t("automation.analysis.result"))}</span>${statusBadge(t(statusKey) === statusKey ? String(analysis.status) : t(statusKey), analysis.status)}</div>
+    </div>
+    <div class="health-checks">
+      ${checks
+        .map(
+          (check) => `
+        <div class="health-check health-check--${escapeAttribute(ANALYSIS_CHECK_CLASS[check.status] ?? "warning")}" data-analysis-check="${escapeAttribute(check.key)}">
+          <span aria-hidden="true">${check.status === "ok" ? "OK" : "!"}</span>
+          <strong>${escapeHtml(check.message)}</strong>
+        </div>`,
+        )
+        .join("")}
+    </div>
+    ${
+      recommendations.length
+        ? `<div class="analysis-recommendations"><span>${escapeHtml(t("automation.analysis.recommendations"))}</span><ul>${recommendations.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>`
+        : `<p class="empty-inline">${escapeHtml(t("automation.analysis.allClear"))}</p>`
+    }
+  `;
+}
+
+function analysisSectionMarkup() {
+  return `
+    <section class="overview-card overview-analysis" aria-labelledby="project-analysis-title">
+      <div class="analysis-head">
+        <div>
+          <span id="project-analysis-title" data-i18n="automation.analysis.title">${escapeHtml(t("automation.analysis.title"))}</span>
+          <p data-i18n="automation.analysis.intro">${escapeHtml(t("automation.analysis.intro"))}</p>
+        </div>
+        <button type="button" class="button" data-action-analyze data-i18n="automation.analysis.run">${escapeHtml(t("automation.analysis.run"))}</button>
+      </div>
+      <div data-project-analysis aria-live="polite">${analysisMarkup({ status: IDLE, data: null, error: null })}</div>
+      <p class="analysis-last-run" data-last-run hidden></p>
+    </section>
+  `;
+}
+
 function overviewMarkup(project) {
   const health = projectHealth(project);
   const completeness = health.completeness;
@@ -284,6 +370,8 @@ function overviewMarkup(project) {
           </div>
         </article>
       </section>
+
+      ${analysisSectionMarkup()}
     </div>
   `;
 }
@@ -901,6 +989,55 @@ function mount(project, isCreate) {
 
   refreshProjectSignals();
 
+  /* ---- operational analysis (automation service) */
+
+  // Only for a stored project in Supabase mode: the service always reads the
+  // real database, so in mock mode it would describe a different row than
+  // the one on screen -- a report that looks right and is about something else.
+  const analysisId = isCreate || !isSupabaseMode() ? "" : String(project.dbId || "");
+  let analysisState = { status: IDLE, data: null, error: null };
+  let analysisRequest = null;
+
+  function paintAnalysis() {
+    const target = form.querySelector("[data-project-analysis]");
+    if (!target?.isConnected) return;
+    target.innerHTML = analysisMarkup(analysisState);
+    const button = form.querySelector("[data-action-analyze]");
+    if (button) button.disabled = analysisState.status === LOADING || analysisState.status === NOT_CONFIGURED || !analysisId;
+  }
+
+  function runAnalysis({ force = false } = {}) {
+    if (!analysisId) return;
+    if (!isAutomationApiAvailable()) {
+      analysisState = { status: NOT_CONFIGURED, data: null, error: null };
+      paintAnalysis();
+      return;
+    }
+    if (analysisRequest || (!force && analysisState.status === SUCCESS)) return;
+
+    analysisState = { status: LOADING, data: null, error: null };
+    paintAnalysis();
+    analysisRequest = analyzeProject(analysisId)
+      .then((data) => {
+        analysisState = { status: SUCCESS, data, error: null };
+      })
+      .catch((error) => {
+        // A failed analysis never touches the form: the editor stays usable.
+        analysisState = { status: stateForError(error), data: null, error };
+      })
+      .finally(() => {
+        analysisRequest = null;
+        paintAnalysis();
+      });
+  }
+
+  form.querySelector("[data-action-analyze]")?.addEventListener("click", () => runAnalysis({ force: true }));
+  form.querySelector('[role="tab"][data-tab="overview"]')?.addEventListener("click", () => runAnalysis());
+  paintAnalysis();
+  paintLastRun(analysisId);
+  // Overview is where an existing project opens, so the first analysis runs now.
+  if (!isCreate) runAnalysis();
+
   // Slug auto-generation from the project name until manually edited.
   form.elements.slug.addEventListener("input", () => {
     slugTouched = true;
@@ -1243,6 +1380,7 @@ function mount(project, isCreate) {
       unsavedUploads.clear();
       await removeProjectImages(pendingDeletions.splice(0));
       showToast(t("projectEditor.changesSaved"));
+      notifyCompletion(project, updated);
       await loadEditor(updated.id);
     } catch (error) {
       reportFailure(error, t("projectEditor.saveError"));
@@ -1269,6 +1407,11 @@ function mount(project, isCreate) {
       unsavedUploads.clear();
       await removeProjectImages(pendingDeletions.splice(0));
       showToast(t("projectEditor.projectPublished"));
+      // Publishing belongs to Supabase and is already done. The automation is
+      // fired after the fact, never awaited, and can never turn a successful
+      // publication into a failure.
+      if (updated.editorialStatus === "PUBLISHED") notifyProjectEvent("project.published", updated);
+      notifyCompletion(project, updated);
       await loadEditor(updated.id);
     } catch (error) {
       reportFailure(error, t("projectEditor.publishError"));
@@ -1392,6 +1535,55 @@ function mount(project, isCreate) {
     // the previous language until something was edited or a tab was reopened.
     refreshProjectSignals();
     applyStaticTranslations(document);
+  });
+}
+
+function paintLastRun(projectId) {
+  // The document, not a form closure: a save re-mounts the editor, so by the
+  // time a dispatch answers, the old form is detached.
+  const target = document.querySelector("[data-last-run]");
+  if (!target?.isConnected) return;
+  const run = projectId ? lastRuns.get(projectId) : null;
+  target.hidden = !run;
+  target.innerHTML = run
+    ? `<span>${escapeHtml(t("automation.analysis.lastRun"))}</span>${runStatusBadge(run)}<code>${escapeHtml(shortRunId(run.run_id))}</code><a href="#/logs/automation">${escapeHtml(t("automation.dashboard.openRuns"))}</a>`
+    : "";
+}
+
+/**
+ * Dispatches a project lifecycle event after a confirmed save. Never awaited
+ * by the save, never able to fail it: an unreachable service is a light
+ * notice, and the project stays exactly as it was saved.
+ *
+ * One operation id per deliberate action; the client retries a network
+ * failure with that same id, so a dispatch that did arrive is never run twice.
+ */
+function notifyProjectEvent(event, updated, { onResult } = {}) {
+  const projectId = String(updated?.dbId || "");
+  void dispatchAfterCommit(event, { entityType: "project", entityId: projectId, payload: { project_id: projectId } }).then(({ run, error, skipped }) => {
+    if (skipped) return;
+    if (error) {
+      // A member the service does not authorize for this event is not told
+      // their save had a problem: it did not.
+      if (stateForError(error) !== FORBIDDEN) showToast(t(event === "project.completed" ? "automation.complete.unavailable" : "automation.publish.unavailable"));
+      return;
+    }
+    lastRuns.set(projectId, run);
+    paintLastRun(projectId);
+    if (onResult) onResult(run);
+    else if (run?.status === "FAILED" || run?.result?.business_status === "ATTENTION") showToast(t("automation.publish.attention"));
+  });
+}
+
+// project.completed: the stored status moved into Live with this save.
+function notifyCompletion(before, updated) {
+  if (before?.status === COMPLETED_STATUS || updated?.status !== COMPLETED_STATUS) return;
+  notifyProjectEvent("project.completed", updated, {
+    onResult: (run) => {
+      const business = run?.result?.business_status;
+      const status = run?.status === "FAILED" ? t("automation.runStatus.FAILED") : t(`automation.businessStatus.${business === "ATTENTION" ? "ATTENTION" : "SUCCESS"}`);
+      showToast(t("automation.complete.checked", { status }));
+    },
   });
 }
 
