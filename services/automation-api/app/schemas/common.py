@@ -49,6 +49,10 @@ class DependencyHealth(BaseModel):
 class DetailedHealthResponse(HealthResponse):
     environment: str
     dependencies: list[DependencyHealth]
+    # Which caller kinds the service accepts: "member" (a Supabase access
+    # token, permissions checked in the database) and/or "service" (the
+    # shared token). Names only -- never what any credential is.
+    auth_modes: list[str] = Field(default_factory=list)
 
 
 class ReadinessResponse(BaseModel):

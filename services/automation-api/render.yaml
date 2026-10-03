@@ -1,29 +1,36 @@
-# Render blueprint for the automation API.
+# Render blueprint for the automation API (services/automation-api).
 #
-# Why Render, recorded here rather than in a chat log: it is the only candidate
-# that takes this repository from a GitHub branch with no CLI involved, which
-# matters because the Dockerfile is the deployment artefact and nothing else in
-# this project uses a vendor CLI. Netlify serves the Admin and GitHub Pages the
-# public site; neither can host a long-running ASGI process.
+# Why Render: it takes this repository from a GitHub branch with no CLI, and
+# the Dockerfile is the deployment artefact -- the same image a developer
+# builds locally. Netlify serves the Admin and GitHub Pages the public site;
+# neither can host a long-running ASGI process.
 #
-# Nothing secret is in this file. Every value marked `sync: false` must be set
-# in the Render dashboard, once, by a human -- see README section 14.
+# This file is not at the repository root, so point the Blueprint at it
+# (Render > New > Blueprint > "Blueprint path": services/automation-api/render.yaml),
+# or create the web service by hand with the same values.
+#
+# Nothing secret is in this file. Every value marked `sync: false` is set in
+# the Render dashboard, once, by a person (README, "Deploy").
 
 services:
   - type: web
     name: space-underground-automation
     runtime: docker
+    # Starter, not free: a free service sleeps, and the first Admin request
+    # after a nap would read as "unavailable" while it cold-starts.
     plan: starter
     region: oregon
     rootDir: services/automation-api
     dockerfilePath: ./Dockerfile
 
-    # Render supplies $PORT; the Dockerfile already honours it.
+    # Liveness only: the process answers. Readiness (/api/v1/ready) also needs
+    # Supabase and the automation v2 migration, and a dependency blip must not
+    # make Render restart a healthy process. Check /api/v1/ready after deploy.
     healthCheckPath: /health
 
-    # Deploys follow the branch. There is no separate pipeline: CI validates
-    # the change, Render builds the same Dockerfile a developer builds locally.
-    branch: feat/automation-production-runtime
+    # Deploys follow main, after review: a pull request runs the service's CI
+    # (.github/workflows/automation-api.yml) before anything reaches main.
+    branch: main
     autoDeploy: true
 
     envVars:
@@ -33,20 +40,24 @@ services:
         value: INFO
       - key: APP_HOST
         value: 0.0.0.0
-
-      # The Admin authenticates as its signed-in user, so this stays on.
+      # Business days for the scheduled jobs.
+      - key: APP_TIMEZONE
+        value: America/Sao_Paulo
+      # The Admin authenticates as its signed-in member, so this stays on.
       - key: ADMIN_JWT_AUTH
         value: "true"
 
       # Set in the dashboard. SUPABASE_SERVICE_ROLE_KEY and API_TOKEN are
-      # secrets; ADMIN_ORIGIN is not, but it is deployment-specific and the
-      # service refuses to start in production while it still allows localhost.
+      # secrets. ADMIN_ORIGIN is not, but it is deployment-specific: the exact
+      # https origin of the Admin on Netlify. The service refuses to start in
+      # production with a localhost, plain-http or wildcard origin.
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: ADMIN_ORIGIN
         sync: false
-      # Optional: only needed for CI and server-to-server scripts.
+      # For the scheduler (GitHub Actions, automation-jobs.yml) and scripts.
+      # Generate a long random value; never put it in the Admin.
       - key: API_TOKEN
         sync: false

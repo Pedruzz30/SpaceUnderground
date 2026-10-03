@@ -30,6 +30,9 @@ def test_versioned_health_reports_dependencies(make_client):
     assert body["status"] == "ok"
     assert body["environment"] == "development"
 
+    # Member tokens are always accepted; the service token only once one exists.
+    assert body["auth_modes"] == ["member"]
+
     dependencies = {item["name"]: item for item in body["dependencies"]}
     # Nothing is configured in the test environment, and health says so without
     # revealing a URL or any part of a key.

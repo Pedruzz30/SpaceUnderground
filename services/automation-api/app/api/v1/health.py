@@ -89,6 +89,11 @@ async def health(
         version=settings.version,
         environment=settings.app_env,
         dependencies=dependencies,
+        auth_modes=[
+            mode
+            for mode, enabled in (("member", settings.admin_jwt_auth), ("service", bool(settings.api_token)))
+            if enabled
+        ],
     )
 
 
@@ -137,7 +142,13 @@ async def ready(
         DependencyHealth(
             name="automation_schema",
             configured=schema_current,
-            detail=None if schema_current else "The automation v2 migration is not applied.",
+            detail=(
+                None
+                if schema_current
+                else "The automation v2 migration is not applied."
+                if storage_available
+                else "Not checked while automation_runs is unreachable."
+            ),
         )
     )
 
