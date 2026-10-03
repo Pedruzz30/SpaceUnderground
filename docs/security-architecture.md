@@ -235,7 +235,7 @@ write goes through a `SECURITY DEFINER` function that authorizes the caller
 first. The only always-true policies left are the public site's own content
 (`site_content`, `site_settings`).
 
-The service role (Edge Functions, the automation service) bypasses RLS as
+The service role (Edge Functions, the automation service — see "Automation service" below) bypasses RLS as
 before; triggers still bump project versions and write the audit log for it.
 
 ## Project access
@@ -914,3 +914,33 @@ Each of these is REQUIRES VERIFICATION until run against production:
   session's `auth.mfa_amr_claims` row on every verification. Were it not to,
   the check refuses (every privileged member would be asked to verify
   again), it never lets a token through.
+
+## Automation service
+
+`services/automation-api` holds the service role key, so it must never be a
+way around RBAC, approvals or MFA. It is not:
+
+- The Admin authenticates to it with the member's own Supabase access token;
+  the bundle carries no automation secret (`admin/tests/automation-integration.test.mjs`
+  fails if `X-API-Token` appears in `admin/src`).
+- The service asks Supabase Auth whose token it is, then calls
+  `public.has_permission(key)` **with that token** for the permission each
+  endpoint or workflow needs. The answer is the database's — the same function
+  the policies use — so suspension, expiry, revoked sessions and MFA (`mfa_gate`)
+  apply unchanged. `public.admins` is never consulted.
+- Each capability maps onto an existing permission of the same business effect
+  (`services/automation-api/app/core/permissions.py`); no automation permission
+  was added to the catalog. Workflows that write re-check without the cache.
+- Results a reader may not see (a finance review without `finance.read`) are
+  withheld from the run history the API returns.
+- Its one business write, `automation_open_project_for_opportunity()`, is
+  executable by the service role only and refuses any caller that is not a
+  trusted backend. Project triggers still stamp versions and write
+  `security_audit_log` entries for what it creates; `activity_log` rows are
+  authored by the member who triggered the run.
+- The scheduler uses `X-API-Token`, a server-side secret (Render and GitHub
+  Actions secrets). It can run jobs, which only read and record.
+- Approvals are not bypassed: the service never publishes. `project.published`
+  is dispatched after a publication the database already accepted — directly
+  by a member with `projects.publish`, or by `approve_change_request()`.
+

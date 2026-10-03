@@ -123,6 +123,7 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       | `20260928031922` | `financial_foundation` | APPLIED |
       | `20260928035023` | `commercial_opportunities` | APPLIED |
       | `20261002033705` | `security_rbac_approval_foundation` | APPLIED |
+      | `20261002233745` | `automation_v2` | PENDING |
 
       Recorded versions must never be renamed or repaired. After the normalize,
       production plans read `Max` = `ON_REQUEST`, `Plus` = `AVAILABLE`,
@@ -195,6 +196,16 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       `security_audit_log?select=id&limit=1` are refused, and the public
       project query still returns `200`.
 
+- [ ] `20261002233745_automation_v2.sql` — **pending**. Additive (no drop,
+      rename, delete or rewrite). Apply before deploying the automation
+      service: the service's `/api/v1/ready` answers 503 until it is applied.
+      Then, as `anon` and as a signed-in member, `automation_runs?select=id`
+      is refused, and the function is not executable:
+
+      select has_function_privilege('authenticated',
+        'public.automation_open_project_for_opportunity(uuid, text, text, text, boolean, uuid, uuid)',
+        'execute');   -- false
+
 How to apply a migration: Supabase CLI `supabase db push`, or paste the file
 into the SQL editor in order. Never edit or rename an already applied migration;
 add a new timestamped one (`YYYYMMDDHHMMSS_<name>.sql`, UTC).
@@ -206,6 +217,26 @@ add a new timestamped one (`YYYYMMDDHHMMSS_<name>.sql`, UTC).
 - [ ] Supabase key shape is respected: a modern `sb_publishable_...` key goes in
       the `apikey` header **only**. Sent as `Authorization: Bearer` it fails
       before RLS is evaluated. Only a legacy `eyJ...` JWT gets the bearer header.
+
+### 5. Automation service (services/automation-api)
+
+Order: migration `automation_v2` → Render service → Netlify Admin. Full
+steps and the production smoke test: `services/automation-api/README.md`
+("Deploy", "Smoke test").
+
+- [ ] Render web service from `services/automation-api/render.yaml`, branch
+      `main`; secrets set in Render only: `SUPABASE_SERVICE_ROLE_KEY`,
+      `API_TOKEN`; plus `SUPABASE_URL` and `ADMIN_ORIGIN` (the exact https
+      Admin origin — production refuses localhost, http and `*`).
+- [ ] `/health` 200, `/api/v1/health` shows no value, `/api/v1/ready` 200.
+- [ ] Netlify: `VITE_AUTOMATION_API_URL` set to the Render origin, and that
+      exact origin is in `connect-src` (`netlify.toml`). Never a service role
+      key or API token in any `VITE_` variable.
+- [ ] GitHub Actions: variable `AUTOMATION_API_URL`, secret
+      `AUTOMATION_API_TOKEN`; run "Automation jobs" once by hand.
+- [ ] In the real Admin: Settings › Sistema reads the service as Online and
+      Pronto; Logs › Automações lists runs; publishing a project records a
+      `project.published` run; retrying a FAILED run creates a new run.
 
 ## Blocking rule
 

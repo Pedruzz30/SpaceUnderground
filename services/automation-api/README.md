@@ -1,382 +1,299 @@
 # Automation API
 
-Python processing layer for Space Underground. It is a separate service: it
-does not replace Supabase, it does not serve the public site, and it does not
-reimplement the Admin.
+The processing layer of the Space Underground Admin: operational analysis,
+reports, an event/workflow engine with persistent run history and retry, and
+scheduled jobs. Python 3.12, FastAPI, httpx against Supabase PostgREST.
 
-## 1. Purpose
-
-The Admin and the public site are vanilla JavaScript talking to Supabase, and
-that stays true. This service exists for the work that does not belong in a
-browser: operational analysis, reporting, business handoffs, document
-generation, integrations and, later, AI.
-
-## 2. Architecture
-
-```
-Public site ----------+
-                      |
-Admin ------ Supabase |
-  |                   |
-  +--- Automation API-+
-          |
-          +-- Project analysis
-          +-- Reporting
-          +-- Automation engine
-```
-
-The rule that decides where a call goes:
-
-| Operation | Path |
-| --- | --- |
-| Read a project | Admin -> Supabase |
-| Save a project | Admin -> Supabase |
-| Generate a report | Admin -> Python |
-| Analyse a project | Admin -> Python |
-| Run an automation | Admin -> Python |
-| External integrations | Admin -> Python |
-
-Plain CRUD never routes through Python. That would only add a hop.
-
-Inside the service the layering is one-directional:
+It is an **additional capability**, never a hop in front of CRUD:
 
 ```text
-api/v1/* -> services/* -> supabase_service -> Supabase (PostgREST)
+CRUD                     Admin ──────────────────────────────▶ Supabase
+processing / workflows   Admin ──▶ Automation API ──(service role)──▶ Supabase
 ```
 
-`supabase_service.py` is the only module that performs HTTP against Supabase.
-Analysis and reporting are pure functions over row dictionaries, which is why
-their tests need no remote database.
+The Admin works without it. With `VITE_AUTOMATION_API_URL` unset every
+automation panel says *Não configurado* and nothing else changes.
 
-### Why httpx and not the Supabase Python SDK
+## 1. Architecture
 
-Most calls only read. The SDK would add a dependency and a client lifecycle in
-exchange for a thin wrapper over the same REST calls. Phase 4 adds one bounded
-business write path for proposal handoffs; it still goes through named service
-methods and an allowlist, never arbitrary SQL or frontend-supplied table names.
+```text
+app/
+├── main.py                 app factory: CORS, request ids, error envelope, /health
+├── core/
+│   ├── config.py           settings; production refuses unsafe configuration
+│   ├── security.py         who is calling (member token / service token) and
+│   │                       what they may do (public.has_permission, as them)
+│   ├── permissions.py      the RBAC key each capability needs
+│   ├── errors.py           stable error codes (not_configured ≠ unavailable)
+│   └── logging.py          structured logs with the request id
+├── api/v1/
+│   ├── health.py           /api/v1/health, /api/v1/ready
+│   ├── auth.py             /api/v1/auth/me
+│   ├── projects.py         /api/v1/projects/{id}/analyze
+│   ├── reports.py          /api/v1/reports/overview
+│   ├── automations.py      dispatch, run history, stats, retry
+│   └── jobs.py             /api/v1/jobs, /api/v1/jobs/run
+├── automations/
+│   ├── engine.py           steps, timeouts, sanitised errors, idempotency
+│   ├── registry.py         event -> workflow (and retired events)
+│   ├── jobs.py             scheduled jobs (detect, record, signal)
+│   └── handlers/           project_published, project_completed,
+│                           commercial_opportunity_won
+├── business/               commercial and project rules
+├── services/
+│   ├── supabase_service.py the only module that talks to Supabase
+│   ├── run_store.py        public.automation_runs (degrades, never raises)
+│   ├── project_analysis_service.py, reporting_service.py
+│   └── url_check_service.py SSRF-safe URL check for live demos
+└── schemas/, utils/
+```
 
-## 3. Installation
+Workflows run **synchronously** inside the request, one bounded step at a
+time (10 s default per step). There is no queue: every workflow finishes in
+well under a request timeout, and the response already carries a `run_id`, so
+moving to asynchronous execution later would not change what the Admin reads.
 
-Requires Python 3.12+.
+## 2. Authentication and authorization
+
+Two kinds of caller:
+
+| Caller | Credential | Used by |
+| --- | --- | --- |
+| member | `Authorization: Bearer <Supabase access token>` | the Admin |
+| service | `X-API-Token: <API_TOKEN>` (server-side only) | the scheduler, CI, scripts |
+
+For a member, the service asks Supabase Auth whose token it is, then asks the
+**database** — `public.has_permission(key)`, called through PostgREST *with
+the member's own token* — whether they hold the permission the endpoint
+needs. That is the function row level security uses, so membership status,
+access windows, revoked sessions, role grants and MFA are decided in one
+place. `public.admins` is not consulted (it is history since the security
+foundation). Workflows that write business data re-check their permissions
+without the cache; other answers are cached 30 s.
+
+There is no automation permission in the RBAC catalog; each capability maps
+onto the permission of the same business effect (`app/core/permissions.py`):
+
+| Capability | Permission(s) |
+| --- | --- |
+| run history, stats, registered automations, jobs list | `logs.read` |
+| project analysis, overview report | `projects.read` |
+| dispatch `project.published` | `projects.publish` |
+| dispatch `project.completed` | `projects.edit` |
+| dispatch `commercial.opportunity.won` | `commercial.edit` + `projects.create` (ledger link only with `finance.edit`) |
+| retry a run | `logs.read` + the workflow's own permissions |
+| run jobs by hand | `settings.edit` |
+| read a finance step's result | `finance.read` (otherwise withheld, `redacted: true`) |
+
+`admin/tests/automation-v2-migration.test.mjs` pins this against the real
+catalog: every key exists, and each role holds what the tests assume.
+
+Development may run with no credential at all (`APP_ENV=development` and no
+`API_TOKEN`); a member token that *is* sent is still verified. Production
+always requires one.
+
+## 3. Endpoints
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/health` | liveness, no I/O |
+| GET | `/api/v1/health` | configuration and dependencies, never a value |
+| GET | `/api/v1/ready` | 200 when configuration, run history and the v2 schema are fine; 503 with the failing checks otherwise |
+| GET | `/api/v1/auth/me` | who the service sees and their automation permissions |
+| POST | `/api/v1/projects/{id}/analyze` | analysis of the **stored** row (uuid or case number) |
+| GET | `/api/v1/reports/overview` | catalogue counts |
+| GET | `/api/v1/automations` | registered events, steps, permissions |
+| POST | `/api/v1/automations/dispatch` | `{event, entity_type, entity_id, operation_id, payload, dry_run}` |
+| GET | `/api/v1/automations/runs` | newest first, `?event=&status=&entity_id=&limit<=100` |
+| GET | `/api/v1/automations/runs/stats` | counts over the last 100 runs, success rate from 5 runs, runs needing attention |
+| GET | `/api/v1/automations/runs/{run_id}` | one run |
+| POST | `/api/v1/automations/runs/{run_id}/retry` | `{operation_id}`; failed or abandoned runs only; creates a new run |
+| GET | `/api/v1/jobs` | registered jobs |
+| POST | `/api/v1/jobs/run` | `{jobs?, operation_id?, scheduled?}` |
+
+Errors are always `{code, message}`. Codes: `bad_request`, `unauthorized`,
+`forbidden`, `not_found`, `validation_error`, `upstream_error`,
+`not_configured` (this service lacks its own configuration), `unavailable`
+(a dependency is down now), `internal_error`. No stack trace, URL, key or
+database message ever reaches a response.
+
+No endpoint accepts SQL, a table name or a filter expression. Writes are
+limited to `automation_runs` and one named database function.
+
+## 4. Events
+
+| Event | Dispatched by the Admin | What it does |
+| --- | --- | --- |
+| `project.published` | after `updateProject()` confirmed `editorial_status = PUBLISHED`, and after an approved publish request was applied | confirms the stored row is published, analyses it, checks the live demo (SSRF-safe), records the outcome. Never writes. |
+| `project.completed` | after a save moved the **persisted** `status` into `Live` | closing checklist, publication, documentation, CMS readiness and a read-only ledger review (through the project and its opportunity). Never writes, never charges. |
+| `commercial.opportunity.won` | after `winOpportunity()` saved the win, when the operator asked to open the project | opens the project draft (DRAFT, hidden), records the handoff, links the deal's client and receivables, logs the activity — one idempotent transaction. Never creates a client or a receivable. |
+
+What "completed" means: projects have no COMPLETED state or completion date.
+`status` is the delivery axis (`In Development` … `Live`), `editorial_status`
+the publication axis. A project is complete when its stored status becomes
+`Live`.
+
+Who owns what when a deal is won:
+
+```text
+Admin (synchronous, win dialog)          Automation (afterwards)
+  opportunity -> WON                       project draft, once
+  client: create or reuse (optional)       handoff opportunity -> project
+  receivables, amounts the operator        client and receivables linked to it
+  confirms (optional)                      activity log entry
+                                           what is still missing (ATTENTION)
+```
+
+`commercial.proposal.accepted` is **retired**: nothing has written
+`commercial_proposals` since Commercial moved to `commercial_opportunities`.
+Its earlier runs stay readable; it cannot be dispatched or retried.
+
+### Idempotency
+
+- Every deliberate action carries an `operation_id`; the run key is
+  `event:entity:operation_id` (unique in the table). A double click or a
+  network retry of the same request returns the first run (`deduplicated`).
+  A concurrent identical dispatch that loses the insert race returns the
+  winner's run instead of executing again.
+- Retries are keyed `retry:<run_id>:<operation_id>`.
+- `commercial.opportunity.won` is idempotent **in the database**:
+  `automation_open_project_for_opportunity()` is serialised per opportunity
+  (advisory lock) and the handoff is unique per opportunity, so any number of
+  dispatches — with any operation ids — converge on one project.
+- Scheduled jobs are keyed `job:<name>:<business date>`: one run per job per
+  day however often the schedule fires.
+
+### Run history
+
+`public.automation_runs`, written and read only with the service role:
+`id` (exposed as `run_id`), `event`, `status`, `source` (`admin`, `retry`,
+`dry_run`, `scheduler`, `service`), `entity_type`, `entity_id`, `payload`,
+`steps`, `result` (`summary`, `business_status`, `actions`, `entities`),
+`error`, timings, `retry_of`, `idempotency_key`, `requested_by`,
+`created_at`. A retry is a new row pointing back at the one it repeats; a row
+is never overwritten after it finishes. A run still `RUNNING` after
+`STALE_RUN_MINUTES` was abandoned by its process: it is reported as
+interrupted and may be retried.
+
+Storage failures degrade: the workflow still runs, the response says
+`persisted: false`, and readiness reports the table unreachable.
+
+## 5. Scheduled jobs
+
+Copilot, not actor — they **detect, record and signal**, nothing else:
+
+| Job | Reads | Signals |
+| --- | --- | --- |
+| `financial.overdue_check` | `financial_transactions` (INCOME, PENDING, due before today) | count, total, oldest |
+| `commercial.follow_up_check` | open opportunities with `next_action_at` before today | the deals |
+| `projects.health_check` | published projects whose stored record fails the analysis | the cases |
+
+There is no "overdue project" job: projects have no deadline field. "Today"
+is the business day in `APP_TIMEZONE`.
+
+The scheduler is `.github/workflows/automation-jobs.yml` (daily 08:00
+Brasília): the smallest infrastructure available — no new service, the token
+lives in GitHub's encrypted secrets. A member with `settings.edit` can also run
+them from Settings › Sistema.
+
+## 6. Configuration
+
+| Variable | Required in production | Notes |
+| --- | --- | --- |
+| `APP_ENV` | `production` | |
+| `SUPABASE_URL` | yes | |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes, **secret** | a publishable/anon key here is detected and refused |
+| `ADMIN_ORIGIN` | yes | exact https origin(s) of the Admin; localhost, http and `*` are refused |
+| `API_TOKEN` | for the scheduler | long random value, **secret** |
+| `ADMIN_JWT_AUTH` | keep `true` | |
+| `ADMIN_JWT_CACHE_SECONDS` | optional (30) | |
+| `APP_TIMEZONE` | optional (`America/Sao_Paulo`) | |
+| `STALE_RUN_MINUTES` | optional (15) | |
+| `SUPABASE_TIMEOUT_SECONDS`, `LOG_LEVEL` | optional | |
+
+The service role key belongs to this process only: never a `VITE_` value,
+never in the Admin bundle, never in Git. Production refuses to start without
+the structural values above (a Supabase outage does not stop it: `/ready`
+reports that instead).
+
+## 7. Local development
 
 ```bash
 cd services/automation-api
 python -m venv .venv
+.venv/Scripts/pip install -r requirements.txt     # Windows; .venv/bin/pip elsewhere
+cp .env.example .env                              # fill SUPABASE_SERVICE_ROLE_KEY
+.venv/Scripts/uvicorn app.main:app --reload --port 8000
 ```
 
-Windows:
+Admin side: `VITE_AUTOMATION_API_URL=http://127.0.0.1:8000` in
+`admin/.env.local`, Supabase mode (the service reads the real database, so in
+mock mode the Admin dispatches nothing and the analysis says it does not
+apply).
+
+## 8. Tests
 
 ```bash
-.venv\Scripts\activate
-pip install -r requirements.txt
+cd services/automation-api
+.venv/Scripts/python -m pytest -q
+.venv/Scripts/ruff check .
 ```
 
-macOS / Linux:
+No test touches a network or a database: Supabase is a fake injected through
+FastAPI's dependency override, and the real HTTP client is exercised over a
+mocked transport. The SQL side (migration, function, grants, RLS, the
+permission contract) is tested in the Admin suite against PGlite:
+`admin/tests/automation-v2-migration.test.mjs`.
+
+`scripts/verify_run_storage.py` checks run storage against the **real**
+project with the real key: it writes one probe row, reads it back, proves anon
+cannot see it, and deletes only that probe row.
+
+## 9. Deploy (Render)
+
+Order matters: **migration, then service, then Admin.**
+
+1. Apply `supabase/migrations/20261002233745_automation_v2.sql` to production
+   (`supabase db push` or the SQL editor). It is additive; nothing is dropped
+   or rewritten.
+2. Render › New › Blueprint › this repository, *Blueprint path*
+   `services/automation-api/render.yaml` (or create the web service by hand
+   with the same values: Docker, root `services/automation-api`, branch
+   `main`, health check `/health`, plan Starter).
+3. Set the secret variables in Render: `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_ORIGIN` (the Netlify Admin origin, e.g.
+   `https://<admin-site>.netlify.app`), `API_TOKEN` (random, e.g.
+   `python -c "import secrets; print(secrets.token_urlsafe(48))"`).
+4. Check `/health`, `/api/v1/health`, `/api/v1/ready` (must be 200).
+5. Netlify (Admin): `VITE_AUTOMATION_API_URL=https://space-underground-automation.onrender.com`
+   and redeploy. If the Render URL differs, change `connect-src` in
+   `netlify.toml` to that exact origin first — the CSP blocks any other.
+6. GitHub › Settings › Secrets and variables › Actions: variable
+   `AUTOMATION_API_URL`, secret `AUTOMATION_API_TOKEN` (= `API_TOKEN`).
+
+## 10. Smoke test (production)
 
 ```bash
-source .venv/bin/activate
-pip install -r requirements.txt
+URL=https://space-underground-automation.onrender.com
+curl -s $URL/health                    # {"status":"ok",...}
+curl -s $URL/api/v1/health             # supabase/authentication/automation_storage configured
+curl -s -w '%{http_code}\n' $URL/api/v1/ready      # 200, every check configured
+curl -s -w '%{http_code}\n' $URL/api/v1/automations/runs   # 401 without a credential
 ```
 
-## 4. Configuration
-
-```bash
-cp .env.example .env
-```
-
-| Variable | Required | Notes |
-| --- | --- | --- |
-| `APP_ENV` | no | `development` (default), `staging`, `production` |
-| `APP_HOST` / `APP_PORT` | no | defaults `127.0.0.1:8000` |
-| `SUPABASE_URL` | for data endpoints | project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | for data endpoints | secret, server-side only |
-| `SUPABASE_TIMEOUT_SECONDS` | no | default `10` |
-| `ADMIN_ORIGIN` | yes in production | CORS allowlist, comma-separated. Never `*`, and never localhost in production |
-| `ADMIN_JWT_AUTH` | no | default `true`. Accept a Supabase access token as `Authorization: Bearer` |
-| `ADMIN_JWT_CACHE_SECONDS` | no | default `60`. How long a verified identity is trusted |
-| `API_TOKEN` | no | service-to-service secret, sent as `X-API-Token`. Never given to the Admin |
-| `LOG_LEVEL` | no | default `INFO` |
-
-Without `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` the service still starts
-and `/health` still answers; every data endpoint returns `503 not_configured`
-rather than an empty result.
-
-### The service role key
-
-It belongs to this process and nowhere else. It must never appear in the public
-site, the Admin bundle, any `VITE_*` variable, or Git. `.env` is gitignored.
-
-## 5. Running locally
-
-```bash
-uvicorn app.main:app --reload
-```
-
-- API: http://127.0.0.1:8000
-- Swagger: http://127.0.0.1:8000/docs
-- OpenAPI: http://127.0.0.1:8000/openapi.json
-
-## 6. Endpoints
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/health` | Liveness probe. No auth |
-| GET | `/api/v1/health` | Liveness plus dependency status. No auth |
-| POST | `/api/v1/projects/{project_id}/analyze` | Operational analysis of one project |
-| GET | `/api/v1/reports/overview` | Catalogue-wide operational metrics |
-| GET | `/api/v1/automations` | Registered automations and handlers |
-| POST | `/api/v1/automations/dispatch` | Dispatch an automation event |
-| GET | `/api/v1/automations/runs` | Automation run history |
-| GET | `/api/v1/automations/runs/stats` | Recent run statistics |
-| GET | `/api/v1/automations/runs/{run_id}` | One run |
-| POST | `/api/v1/automations/runs/{run_id}/retry` | Retry a failed run |
-
-`{project_id}` accepts a uuid or a case number, the same identifiers the Admin
-router uses.
-
-## 7. Analysis And Reports
-
-Analysis is deterministic and uses no AI. It is not a port of the Admin's
-`projectHealth`: that function asks "is this form ready to publish?", while
-this one asks "is the stored row coherent?".
-
-Every report number is counted from rows actually read. A metric the current
-schema cannot answer is left out rather than reported as zero.
-
-## 8. Automations
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/v1/automations/dispatch \
-  -H "Content-Type: application/json" \
-  -d '{"event": "project.published", "payload": {"project_id": "1"}}'
-```
-
-`project.published` re-reads the project from the database and analyses it, so
-what is validated is what was actually persisted.
-
-`commercial.proposal.accepted` is the first write-capable business workflow. It
-requires migration `011_business_workflows.sql`, a real accepted proposal, a
-real client, a real service plan and an explicit `project_category`. Missing
-required data stops the run with `FAILED` and `business_status: ATTENTION`.
-When `dry_run: true`, it records the planned project creation without writing.
-When executed, it may create one hidden `DRAFT` project and one private handoff
-link; a second run detects the existing project/link and does not duplicate it.
-
-`project.completed` remains read-only. It reports the closing checklist,
-financial readiness as `SKIPPED` while no ledger table exists, and CMS
-readiness as `READY`, `ATTENTION` or `NOT_ELIGIBLE`.
-
-There is no queue, broker or scheduler: only an event name, a registry and
-handlers. Adding a queue later means changing dispatch, not every handler.
-
-## 9. Run History
-
-Execution history lives in `automation_runs`, created by
-`supabase/migrations/010_automation_runs.sql`. The service works without it:
-workflows still run, and every run reports `persisted: false` so the Admin can
-say history is not being recorded rather than pretend it is.
-
-To make history durable, two things are needed and neither can be faked:
-
-1. Apply `010_automation_runs.sql` to the project.
-2. Put the real service_role / secret key in `.env`.
-
-The table has RLS enabled with no policy, so only `service_role`, which bypasses
-RLS, can read or write it. A publishable key gets nothing by design:
-
-```text
-Admin -> FastAPI -> service_role -> automation_runs
-```
-
-Verify against the real project:
-
-```bash
-.venv/Scripts/python -m scripts.verify_run_storage
-```
-
-It writes one controlled row, reads it back, proves the unique index collapses a
-duplicate dispatch, proves the anon key cannot see run history, and deletes the
-row. It touches no project and never prints the key.
-
-## 10. Business Workflow Schema
-
-`supabase/migrations/011_business_workflows.sql` is the proposed additive Phase
-4 schema. It is not required for the Phase 3 workflows, and this repository does
-not apply it automatically. Review and apply it only when the real project is
-ready for business workflow data.
-
-The migration adds private `clients`, `commercial_proposals` and
-`commercial_project_handoffs` tables. It does not grant anonymous access to
-those tables, and it keeps proposal/client/plan relationships out of public
-project rows. The automation service uses the service role key server-side to
-read those entities and, only for an accepted proposal handoff, to create a
-hidden project draft plus its private handoff link.
-
-## 11. Tests
-
-```bash
-pytest
-ruff check .
-```
-
-Python unit tests do not touch a network or a remote database: the Supabase
-layer is replaced through FastAPI's dependency override. Admin migration tests
-apply SQL files to PGlite, a local Postgres-compatible engine. Coverage includes
-both health endpoints, the analysis rules, the report aggregation, business
-workflow handoffs, dry-runs, duplicate prevention, a missing project, an
-unconfigured service, CORS, and the token guard.
-
-## 12. Security
-
-- The service role key lives only here and is never returned by any endpoint.
-- CORS is an explicit allowlist. `*` is never used.
-- Production requires a credential on every non-health endpoint. Development
-  requires one once `API_TOKEN` is set, and runs open before that -- demanding
-  a credential before there is anywhere to keep one only teaches people to
-  disable the check.
-- All input is validated by Pydantic; identifiers are length-bounded before
-  they can reach a query string.
-- No endpoint accepts SQL. Callers choose a named operation, never a query.
-- Errors are returned as `{ "code", "message" }`. Tracebacks and PostgREST
-  strings go to the log, never to the client.
-
-## 13. Authentication
-
-There are two kinds of caller and they are not given the same credential.
-
-**A person using the Admin.** The Admin is a browser bundle, so it has no
-secret to offer: every `VITE_` value is readable by anyone who opens the
-bundle. Shipping a shared token there would be the appearance of
-authentication, not authentication. So the Admin sends the Supabase access
-token of whoever is signed in:
-
-```http
-Authorization: Bearer <supabase access token>
-```
-
-The service asks Supabase who that token belongs to -- it never decodes the
-token itself, because a signature this process does not verify is not evidence
--- and then requires the user to hold a row in `public.admins`. That is the
-same table `public.is_admin()` consults, so the API and row level security
-agree on who an administrator is by construction rather than by convention.
-
-Authentication and authorisation are answered separately: an unknown token is
-`401`, and a real user without an admin row is `403`. The Admin needs that
-difference to say "your account lacks access" instead of bouncing a correctly
-signed-in operator back to the login screen.
-
-**Another machine.** CI, scripts, technical administration. These can keep a
-secret, so they send `X-API-Token: <API_TOKEN>`. This credential must never
-reach the Admin bundle.
-
-A verified identity is cached for `ADMIN_JWT_CACHE_SECONDS` (default 60), keyed
-by a digest of the token rather than the token itself. Without it a polling
-Dashboard would cost two Supabase round trips per poll for an answer that
-changes rarely; with it, revoking an admin takes effect within the window.
-
-If Supabase cannot be reached, the caller gets `503`, never `403`. A blip must
-not look like a permissions problem.
-
-## 14. Admin Integration
-
-`admin/src/services/automation-api.js` is the Admin's only door to this service.
-It centralises health, analysis, reports, run history, retries and dispatch.
-
-In `admin/.env`:
-
-```env
-VITE_AUTOMATION_API_URL=http://127.0.0.1:8000
-```
-
-There is deliberately no token variable. Leaving the URL empty is a supported
-state: the Admin then reports the automation API as unavailable and behaves
-exactly as it does today; the client fails locally with a `not_configured`
-error and never issues a request. Python is an additional capability, not a
-dependency.
-
-## 15. Health And Readiness
-
-| Endpoint | Auth | Answers |
-| --- | --- | --- |
-| `GET /health` | none | the process is alive. No I/O at all |
-| `GET /api/v1/health` | none | which dependencies are configured, never how |
-| `GET /api/v1/ready` | none | whether the service can actually work right now |
-
-Health is unauthenticated on purpose: a probe that needs a secret stops working
-the moment the secret rotates. None of the three ever returns a URL, a key, a
-key fragment or a traceback.
-
-`/api/v1/ready` answers `503` when configuration is broken or `automation_runs`
-is unreachable, and `200` again once it is not -- by itself, with nobody
-intervening. It is the deploy's gate, while `/health` is the process's.
-
-### Startup
-
-In production the service refuses to start when structural configuration is
-missing or wrong: no `SUPABASE_URL`, no service role key, a public key in the
-service role slot, an empty origin allowlist, or an allowlist that still
-permits `localhost`. Those cannot become correct on their own, so booting would
-only serve broken requests until someone noticed.
-
-Reachability is deliberately *not* checked at startup. Refusing to boot because
-Supabase is briefly down would turn a five-minute blip into an outage that
-needs a human to end it. `/api/v1/ready` reports that instead.
-
-Outside production the same problems are logged as warnings and the service
-starts, because a half-configured local checkout still has to run.
-
-### Request correlation
-
-Every response carries `X-Request-ID`, and every log line emitted while
-handling that request carries the same value. A caller may supply one; it is
-accepted only in a safe shape (`[A-Za-z0-9._:-]`, up to 64 characters) and
-replaced with a generated id otherwise. It is a log label and never a
-credential.
-
-## 16. Deploy
-
-The service is deployed on its own, never inside the Vite build. The Dockerfile
-targets any FastAPI-compatible host; it runs as a non-root user and honours
-`PORT`.
-
-```bash
-docker build -t space-underground-automation .
-docker run --rm -p 8000:8000 --env-file .env space-underground-automation
-```
-
-### Platform
-
-**Render**, configured by `render.yaml` in this directory. The reason is
-recorded because it was a real comparison and not a preference: Render is the
-only candidate that deploys this repository from a GitHub branch with no vendor
-CLI involved, which matters because nothing else in this project uses one.
-Railway and Fly.io both host the container equally well but need their CLI for
-the first deploy and for secrets. Netlify serves the Admin and GitHub Pages the
-public site; neither can host a long-running ASGI process.
-
-Deploys follow the branch: CI validates the change, then Render builds the same
-Dockerfile a developer builds locally. There is no second pipeline, so there is
-no second source of truth for what is running.
-
-### Remote environment
-
-Set these in the Render dashboard. `render.yaml` marks every one of them
-`sync: false`, so none is ever committed:
-
-| Variable | Value |
-| --- | --- |
-| `APP_ENV` | `production` (already in `render.yaml`) |
-| `SUPABASE_URL` | the project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | the secret / service role key |
-| `ADMIN_ORIGIN` | the deployed Admin origin, over HTTPS. No localhost |
-| `API_TOKEN` | only if CI or a script needs server-to-server access |
-
-And in the Admin's deployment (Netlify):
-
-| Variable | Value |
-| --- | --- |
-| `VITE_AUTOMATION_API_URL` | the deployed service origin, over HTTPS |
-
-The service refuses to start in production if `ADMIN_ORIGIN` is missing or
-still allows localhost, so a deployment that forgot it fails loudly at boot
-rather than quietly accepting requests from anywhere.
+Then, signed in to the real Admin as a member with the permissions:
+
+1. Settings › Sistema › Serviço de automação: Online, version, *Pronto*, your
+   session and permissions.
+2. Dashboard: the Automações panel shows recent runs and the last one.
+3. Logs › Automações lists the runs (the earlier production runs included).
+4. Open a stored project: the operational analysis renders.
+5. Publish a project: a `project.published` run appears in Logs › Automações
+   and in `automation_runs` (`requested_by` = you).
+6. Retry a FAILED run: a new run with `retry_of` appears; the original is
+   unchanged.
+7. Win an opportunity with "Abrir o projeto pela automação": one draft
+   project, one handoff; "Concluir fechamento" again does not create another.
+8. Regressions: project/client/commercial/financial CRUD as before; a member
+   without `logs.read` gets *Sem acesso*, not data; MFA and approvals behave
+   as before (the service holds no access of its own).

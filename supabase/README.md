@@ -33,6 +33,7 @@ so older notes and commits stay easy to follow.
 | `20260928031922` | `financial_foundation` | APPLIED (recorded) |
 | `20260928035023` | `commercial_opportunities` | APPLIED (recorded) |
 | `20261002033705` | `security_rbac_approval_foundation` | **APPLIED — 2026-10-02** |
+| `20261002233745` | `automation_v2` | PENDING — apply before deploying the automation service |
 
 Every recorded version and name matches
 `select version, name from supabase_migrations.schema_migrations` exactly and
@@ -87,6 +88,19 @@ column defaults to false and the migration enables CASE 001 and 002.
 `migrations/20260913211045_automation_runs.sql` adds `automation_runs`, the
 workflow engine's run history. RLS is on with no policy: only the automation
 service (service role) reads or writes it.
+
+`migrations/20261002233745_automation_v2.sql` (additive) reintegrates the
+automation service on the current model: `automation_runs.requested_by` and
+explicit revokes for `anon`/`authenticated`; `commercial_project_handoffs`
+keyed by `opportunity_id` (unique, `on delete set null`) with the `run_id`
+that opened it, `proposal_id` now optional and never set together with an
+opportunity; and `automation_open_project_for_opportunity()`, the service's
+one business write. That function is `security definer`, executable by the
+service role only, serialised per opportunity and idempotent: it opens the
+won deal's project draft (DRAFT, hidden), records the handoff, links the
+deal's client and (on request) its non-cancelled ledger entries, and writes
+the activity log. It never creates a client or a receivable and never changes
+an amount, status or date. See `services/automation-api/README.md`.
 
 `migrations/20260914025524_011_business_workflows.sql` adds `clients`,
 `commercial_proposals` and `commercial_project_handoffs`, all admin-only.
@@ -177,9 +191,10 @@ V2 pipeline. Applied in production.
   (moved only by a stage change), `closed_at` (set on `WON`/`LOST`, kept on
   edits, cleared on reopen) and clears `lost_reason` outside `LOST`. A lost
   deal must carry a reason.
-- `commercial_proposals` is not touched: it still requires a client and a plan
-  and stays the contract the automation service reads on
-  `commercial.proposal.accepted`.
+- `commercial_proposals` is not touched: it still requires a client and a plan.
+  Nothing writes it any more; the automation event that read it
+  (`commercial.proposal.accepted`) is retired in favour of
+  `commercial.opportunity.won`, which reads `commercial_opportunities`.
 - Adds `financial_transactions_opportunity_id_fkey` (`on delete set null`):
   deleting a deal keeps its receivables and drops the link. It needs
   `financial_foundation` first, which the version order guarantees.
@@ -259,7 +274,8 @@ RLS is enabled on all CMS tables.
 | `site_content_public_read` | Public visitors may read structured site content. |
 | `site_settings_public_read` | Public visitors may read safe runtime settings. |
 | `activity_log_admin_read` | Only admins can read activity. No anonymous grant exists. |
-| `automation_runs` | RLS enabled with no policy: invisible to `anon` and `authenticated`; only the service role reaches it. |
+| `automation_runs` | RLS enabled with no policy and no grant for `anon`/`authenticated`; only the service role reaches it. The Admin reads it through the automation API, which checks `logs.read` in the database first. |
+| `automation_open_project_for_opportunity()` | Service role only (`EXECUTE` revoked from `public`, `anon`, `authenticated`); refuses any caller that is not a trusted backend. |
 | `clients_admin_*`, `commercial_proposals_admin_*`, `commercial_project_handoffs_admin_*` | Admin-only select/insert/update/delete. `anon` has every grant revoked. |
 | `projects.client_id` / clients lifecycle | Admin-only through the policies above. The Admin never hard-deletes a client: archiving is reversible. |
 
