@@ -108,12 +108,15 @@ def create_app() -> FastAPI:
     # an Authorization header it sets itself, not with a cookie, so it needs no
     # credentialed CORS -- and leaving it off keeps the allowlist from ever
     # being paired with a wildcard by a later edit.
+    #
+    # X-API-Token is deliberately not an allowed header: it is the machines'
+    # secret, and no browser page -- the Admin included -- may ever send it.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "X-API-Token", REQUEST_ID_HEADER],
+        allow_headers=["Content-Type", "Authorization", REQUEST_ID_HEADER],
         expose_headers=[REQUEST_ID_HEADER],
     )
 

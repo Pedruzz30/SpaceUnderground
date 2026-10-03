@@ -88,9 +88,10 @@ onto the permission of the same business effect (`app/core/permissions.py`):
 `admin/tests/automation-v2-migration.test.mjs` pins this against the real
 catalog: every key exists, and each role holds what the tests assume.
 
-Development may run with no credential at all (`APP_ENV=development` and no
-`API_TOKEN`); a member token that *is* sent is still verified. Production
-always requires one.
+Only local development may run with no credential at all
+(`APP_ENV=development` and no `API_TOKEN`); a member token that *is* sent is
+still verified. Production and staging always require one. Browsers can
+never send `X-API-Token`: it is not an allowed CORS header.
 
 ## 3. Endpoints
 

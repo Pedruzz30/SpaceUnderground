@@ -243,6 +243,35 @@ def test_a_member_token_still_works_when_a_service_token_exists(production, make
     assert client.get("/api/v1/automations/runs", headers=BEARER).status_code == 200
 
 
+def test_staging_never_runs_open(make_client, monkeypatch):
+    """A staging deployment is on the internet with the same key: no
+    credential, no access -- the open mode is local development only."""
+    monkeypatch.setenv("APP_ENV", "staging")
+    get_settings.cache_clear()
+
+    client, _ = make_client([project_row()])
+
+    assert client.get("/api/v1/automations/runs").status_code == 401
+    assert client.post("/api/v1/automations/dispatch", json=PUBLISHED).status_code == 401
+    assert client.post("/api/v1/jobs/run", json={}).status_code == 401
+
+
+def test_a_browser_may_not_send_the_service_token(production, make_client):
+    """X-API-Token is the machines' secret: CORS never lets a page send it."""
+    client, _ = member_client(make_client, OWNER)
+
+    preflight = client.options(
+        "/api/v1/automations/runs",
+        headers={
+            "Origin": "https://admin.example.com",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "x-api-token",
+        },
+    )
+
+    assert "x-api-token" not in preflight.headers.get("access-control-allow-headers", "").lower()
+
+
 def test_a_service_token_is_never_accepted_when_none_is_configured(production, make_client):
     client, _ = member_client(make_client, OWNER)
 

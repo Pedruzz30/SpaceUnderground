@@ -21,9 +21,10 @@ There are two kinds of caller:
 * **Another machine.** CI, the scheduler, scripts. These can keep a secret, so
   they send the shared `X-API-Token`, configured on the server only.
 
-Development may run with neither, because requiring a credential before there
-is anywhere to store one only teaches people to disable the check. Production
-may not: with no usable mechanism the guard refuses everything (fail closed).
+Local development may run with neither, because requiring a credential
+before there is anywhere to store one only teaches people to disable the
+check. Every deployed environment (production, staging) may not: with no
+usable mechanism the guard refuses everything (fail closed).
 """
 
 from __future__ import annotations
@@ -119,12 +120,15 @@ def reset_identity_cache() -> None:
 def token_required(settings: Settings) -> bool:
     """Whether a caller must prove anything at all.
 
-    Production always requires a credential. Development requires one only
-    once a shared secret exists to check against -- but a member token that is
-    presented is verified in every environment, so a local service pointed at
-    a real Supabase applies the real permissions.
+    Every deployed environment -- production and staging alike -- always
+    requires a credential: a staging service is reachable from the internet
+    and holds a key that can read every row, so it must never run open. Only
+    local development may skip it, and only until a shared secret exists to
+    check against. A member token that is presented is verified in every
+    environment, so a local service pointed at a real Supabase applies the
+    real permissions.
     """
-    return settings.is_production or bool(settings.api_token)
+    return settings.app_env != "development" or bool(settings.api_token)
 
 
 def _bearer(authorization: str | None) -> str:
