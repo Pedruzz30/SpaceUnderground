@@ -7,7 +7,7 @@
 //
 // SITE_URL sempre com barra no final.
 
-export const SITE_URL = "https://pedruzz30.github.io/SpaceUnderground/";
+export const SITE_URL = "https://spaceunderground.netlify.app/";
 export const SITE_NAME = "SPACE UNDERGROUND";
 export const SITE_TITLE = "SPACE UNDERGROUND — Estúdio Digital Independente";
 export const SITE_DESCRIPTION =
