@@ -1,0 +1,67 @@
+# Render blueprint for the automation API (services/automation-api).
+#
+# Why Render: it takes this repository from a GitHub branch with no CLI, and
+# the Dockerfile is the deployment artefact -- the same image a developer
+# builds locally. Netlify serves the Admin and GitHub Pages the public site;
+# neither can host a long-running ASGI process.
+#
+# This file is not at the repository root, so point the Blueprint at it
+# (Render > New > Blueprint > "Blueprint path": services/automation-api/render.yaml),
+# or create the web service by hand with the same values.
+#
+# Nothing secret is in this file. Every value marked `sync: false` is set in
+# the Render dashboard, once, by a person (README, "Deploy").
+
+services:
+  - type: web
+    name: space-underground-automation
+    runtime: docker
+    # Starter, not free: a free service sleeps, and the first Admin request
+    # after a nap would read as "unavailable" while it cold-starts.
+    plan: starter
+    region: oregon
+    rootDir: services/automation-api
+    dockerfilePath: ./Dockerfile
+
+    # Liveness only: the process answers. Readiness (/api/v1/ready) also needs
+    # Supabase and the automation v2 migration, and a dependency blip must not
+    # make Render restart a healthy process. Check /api/v1/ready after deploy.
+    healthCheckPath: /health
+
+    # Deploys follow main, after review: a pull request runs the service's CI
+    # (.github/workflows/automation-api.yml) before anything reaches main.
+    branch: main
+    autoDeploy: true
+
+    envVars:
+      - key: APP_ENV
+        value: production
+      # Render's native Python runtime may otherwise move to a newer major
+      # version before pinned wheels are available. Keep parity with CI/Docker.
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: LOG_LEVEL
+        value: INFO
+      - key: APP_HOST
+        value: 0.0.0.0
+      # Business days for the scheduled jobs.
+      - key: APP_TIMEZONE
+        value: America/Sao_Paulo
+      # The Admin authenticates as its signed-in member, so this stays on.
+      - key: ADMIN_JWT_AUTH
+        value: "true"
+
+      # Set in the dashboard. SUPABASE_SERVICE_ROLE_KEY and SCHEDULER_TOKEN are
+      # secrets. ADMIN_ORIGIN is not, but it is deployment-specific: the exact
+      # https origin of the Admin on Netlify. The service refuses to start in
+      # production with a localhost, plain-http or wildcard origin.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ADMIN_ORIGIN
+        sync: false
+      # Accepted only by POST /api/v1/jobs/run. Generate at least 32 random
+      # characters; never put it in the Admin.
+      - key: SCHEDULER_TOKEN
+        sync: false

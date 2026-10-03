@@ -43,8 +43,13 @@ describe("security headers", () => {
     assert.equal(HEADERS["X-Frame-Options"], "DENY");
   });
 
-  it("talks only to Supabase", () => {
-    assert.deepEqual(CSP["connect-src"], ["'self'", "https://*.supabase.co", "wss://*.supabase.co"]);
+  it("talks only to Supabase and the automation service", () => {
+    const [self, rest, realtime, ...others] = CSP["connect-src"];
+    assert.deepEqual([self, rest, realtime], ["'self'", "https://*.supabase.co", "wss://*.supabase.co"]);
+    // The automation service is one exact https origin: no wildcard, no path.
+    assert.equal(others.length, 1, "exactly one origin besides Supabase");
+    assert.match(others[0], /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)+$/);
+    assert.doesNotMatch(others[0], /\*/);
   });
 
   it("keeps the transport and content-type protections", () => {

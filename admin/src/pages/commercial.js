@@ -2,7 +2,13 @@ import { confirmModal, openModal } from "../components/modal.js";
 import { bindRowMenus, closeRowMenus } from "../components/row-menu.js";
 import { bindTabs } from "../components/tabs.js";
 import { showToast } from "../components/toast.js";
-import { getLocale, onLocaleChange, plural, t } from "../i18n/index.js";
+import { getLocale, onLocaleChange, plural, statusLabel, t } from "../i18n/index.js";
+import { isSupabaseMode } from "../config/env.js";
+import { CATEGORIES } from "../data/projects.js";
+import { hasPermission } from "../security/access.js";
+import { isAutomationApiAvailable, newOperationId } from "../services/automation-api.js";
+import { dispatchAfterCommit } from "../services/automation-events.js";
+import { FORBIDDEN, stateForError } from "../utils/automation-state.js";
 import { getClients } from "../services/client-service.js";
 import {
   createOpportunity,
@@ -668,6 +674,58 @@ export const commercialPage = {
       });
     }
 
+    // The won deal's project, opened by the automation service after the win
+    // is saved: the Admin keeps the client and the receivables (above), the
+    // service opens the project draft, the handoff and the links, once. Safe
+    // to repeat -- "Finish closing" dispatches again and finds the same
+    // project. Offered only where it can work: a configured service, the real
+    // database, and a member who may create projects.
+    const canOpenProject = () => isAutomationApiAvailable() && isSupabaseMode() && hasPermission("projects.create");
+
+    function winAutomationMarkup() {
+      if (!canOpenProject()) return "";
+      return `
+        <div class="win-automation" data-win-automation>
+          <label class="com-check"><input type="checkbox" name="openProject" checked><span>${escapeHtml(t("automation.win.openProject"))}</span></label>
+          <p class="com-dialog__note">${escapeHtml(t("automation.win.openProjectHint"))}</p>
+          <div class="field" data-project-category-field>
+            <label for="win-category">${escapeHtml(t("automation.win.category"))}</label>
+            <select id="win-category" name="projectCategory">
+              <option value="">${escapeHtml(t("automation.win.chooseCategory"))}</option>
+              ${CATEGORIES.map((category) => `<option value="${escapeAttribute(category)}">${escapeHtml(statusLabel(category))}</option>`).join("")}
+            </select>
+            ${fieldError("projectCategory")}
+          </div>
+        </div>
+      `;
+    }
+
+    // After the win is saved and the dialog closed. Never awaited by the win:
+    // the deal is won whatever the service answers.
+    async function openWonProject(deal, { category, operationId }) {
+      const { run, error, skipped } = await dispatchAfterCommit("commercial.opportunity.won", {
+        entityType: "opportunity",
+        entityId: deal.id,
+        payload: { opportunity_id: deal.id, project_category: category },
+        operationId,
+      });
+      if (skipped) return;
+      if (error) {
+        if (stateForError(error) !== FORBIDDEN) showToast(t("automation.win.unavailable"));
+        return;
+      }
+      const project = (run.result?.actions ?? []).find((action) => action?.action === "project.create");
+      const caseNumber = String(project?.fields?.case_number ?? run.result?.summary?.case_number ?? "").padStart(3, "0");
+      const warnings = (run.result?.summary?.warnings ?? []).filter((item) => typeof item === "string");
+      if (run.status === "FAILED") {
+        showToast(t("automation.win.failed", { detail: run.error || "" }));
+      } else if (warnings.length) {
+        showToast(t("automation.win.attention", { detail: warnings.join(" ") }));
+      } else {
+        showToast(t(project?.status === "executed" ? "automation.win.opened" : "automation.win.alreadyOpen", { caseNumber }));
+      }
+    }
+
     // complete: the deal is already won and the dialog finishes what an
     // earlier win left undone (winOpportunity never repeats a finished step).
     function openWin(deal, { complete = false } = {}) {
@@ -704,6 +762,7 @@ export const commercialPage = {
                 ${fieldError("dueDate")}
               </div>
             </div>
+            ${winAutomationMarkup()}
           </form>
         `,
         actions: [
@@ -716,6 +775,12 @@ export const commercialPage = {
               const form = document.querySelector("[data-win-form]");
               const data = new FormData(form);
               const wantsReceivable = data.get("receivable") === "on";
+              const wantsProject = canOpenProject() && data.get("openProject") === "on";
+              const category = String(data.get("projectCategory") ?? "");
+              if (wantsProject && !CATEGORIES.includes(category)) {
+                showErrors(form, { projectCategory: t("automation.win.categoryRequired") });
+                return false;
+              }
               if (wantsReceivable) {
                 const errors = {};
                 const value = parseAmount(data.get("amount"));
@@ -756,6 +821,9 @@ export const commercialPage = {
                 return false;
               }
               load();
+              // The win is saved; the project follows. One operation id per
+              // confirmed close.
+              if (wantsProject) void openWonProject(deal, { category, operationId: newOperationId() });
               return true;
             },
           },
@@ -766,6 +834,11 @@ export const commercialPage = {
       const fields = form.querySelector("[data-receivable-fields]");
       toggle.addEventListener("change", () => {
         fields.hidden = !toggle.checked;
+      });
+      const projectToggle = form.querySelector("[name=openProject]");
+      const categoryField = form.querySelector("[data-project-category-field]");
+      projectToggle?.addEventListener("change", () => {
+        categoryField.hidden = !projectToggle.checked;
       });
       form.addEventListener("submit", (event) => {
         event.preventDefault();

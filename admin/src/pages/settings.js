@@ -15,6 +15,15 @@ import { checkModules, exportBackup } from "../services/system-service.js";
 import { initials } from "../utils/client-relationship.js";
 import { bindMfaEnroll, mfaEnrollMarkup } from "../components/mfa-enroll.js";
 import { getAccess, hasAnyPermission, hasPermission, isSecurityModelActive } from "../security/access.js";
+import { serviceStatusMarkup, serviceStateNote } from "../components/automation-panel.js";
+import {
+  getAutomationHealth,
+  getAutomationReadiness,
+  getAutomationSession,
+  isAutomationApiAvailable,
+  runAutomationJobs,
+} from "../services/automation-api.js";
+import { LOADING, NOT_CONFIGURED, SUCCESS, stateForError } from "../utils/automation-state.js";
 import { roleLabelKey } from "../security/catalog.js";
 import { loadAccess, recordMfaState } from "../services/access-service.js";
 import { listFactors, removeFactor } from "../services/mfa-service.js";
@@ -537,7 +546,78 @@ function systemMarkup() {
       <div class="integration-grid settings-integration-grid" data-runtime-grid>${runtimeMarkup()}</div>
       <p class="settings-note" data-i18n="settings.noSecrets">${escapeHtml(t("settings.noSecrets"))}</p>
     </section>
+    ${automationPanelMarkup()}
   `;
+}
+
+/* ------------------------------------------------- system: automation */
+
+// The automation service, diagnosed from what the service itself answers:
+// its health (version, environment, accepted callers), its readiness (each
+// check) and its view of this session (who it sees, what they may do
+// there). Nothing here is read from this bundle except whether a URL is set,
+// and no token, key or secret is ever shown -- the service never returns one.
+
+function automationPanelMarkup() {
+  return `
+    <section class="panel settings-panel" data-automation-settings>
+      ${panelHead(
+        "automation.settings.eyebrow",
+        "automation.settings.title",
+        `<div class="settings-health__actions"><span data-automation-service>${serviceStatusMarkup(isAutomationApiAvailable() ? LOADING : NOT_CONFIGURED)}</span><button class="button" type="button" data-automation-recheck data-i18n="automation.settings.recheck">${escapeHtml(t("automation.settings.recheck"))}</button></div>`,
+      )}
+      <p class="settings-copy" data-i18n="automation.settings.intro">${escapeHtml(t("automation.settings.intro"))}</p>
+      <div class="integration-grid settings-integration-grid" data-automation-grid aria-live="polite"></div>
+      <div data-automation-note></div>
+      <section data-automation-readiness hidden>
+        <h4 class="dash-sub" data-i18n="automation.settings.checksTitle">${escapeHtml(t("automation.settings.checksTitle"))}</h4>
+        <ul class="automation-checks" data-automation-checks></ul>
+      </section>
+      <div class="automation-jobs" data-automation-jobs hidden>
+        <p class="settings-copy"><strong data-i18n="automation.settings.jobsTitle">${escapeHtml(t("automation.settings.jobsTitle"))}</strong> · <span data-i18n="automation.settings.jobsIntro">${escapeHtml(t("automation.settings.jobsIntro"))}</span></p>
+        <button class="button" type="button" data-automation-run-jobs data-requires="settings.edit" data-i18n="automation.settings.runJobs">${escapeHtml(t("automation.settings.runJobs"))}</button>
+      </div>
+      <p class="settings-note" data-i18n="automation.settings.noSecrets">${escapeHtml(t("automation.settings.noSecrets"))}</p>
+    </section>
+  `;
+}
+
+const AUTH_MODE_KEYS = { member: "automation.settings.sessionMember", service: "automation.settings.sessionService" };
+const SESSION_KEYS = {
+  member: "automation.settings.sessionMember",
+  service: "automation.settings.sessionService",
+  anonymous: "automation.settings.sessionAnonymous",
+};
+
+function automationGridMarkup(view) {
+  const { health, ready, session } = view;
+  const modes = (health?.auth_modes ?? []).map((mode) => (AUTH_MODE_KEYS[mode] ? t(AUTH_MODE_KEYS[mode]) : mode)).join(" · ");
+  const rows = [
+    ["automation.settings.configured", isAutomationApiAvailable() ? t("common.configured") : t("common.notConfigured")],
+    ["automation.settings.version", health?.version ?? "—"],
+    ["automation.settings.environment", health?.environment ?? "—"],
+    ["automation.settings.authentication", modes || "—"],
+    ["automation.settings.readiness", ready ? t(ready.ready ? "automation.settings.ready" : "automation.settings.notReady") : "—"],
+    ["automation.settings.session", session ? t(SESSION_KEYS[session.kind] ?? "automation.settings.sessionMember") : "—"],
+    ["automation.settings.permissions", session ? session.permissions?.join(", ") || t("automation.settings.noPermissions") : "—"],
+  ];
+  return rows.map(([key, value]) => `<div><span>${escapeHtml(t(key))}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
+}
+
+function automationChecksMarkup(ready) {
+  return (ready?.checks ?? [])
+    .map((check) => {
+      const key = `automation.settings.checks.${String(check.name).replace(/[^a-z_]/gi, "")}`;
+      const label = t(key) === key ? check.name : t(key);
+      return `
+        <li data-automation-check="${escapeAttribute(check.name)}">
+          <span>${escapeHtml(label)}</span>
+          <span class="badge ${check.configured ? "badge--success" : "badge--danger"}">${escapeHtml(t(check.configured ? "automation.settings.ready" : "automation.settings.notReady"))}</span>
+          ${check.configured || !check.detail ? "" : `<p>${escapeHtml(check.detail)}</p>`}
+        </li>
+      `;
+    })
+    .join("");
 }
 
 function sourceLabel() {
@@ -705,6 +785,8 @@ export const settingsPage = {
       health: null,
       healthAt: null,
       checking: null,
+      automation: { status: isAutomationApiAvailable() ? LOADING : NOT_CONFIGURED, health: null, ready: null, session: null },
+      automationLoad: null,
     };
 
     /* ---- tabs: each panel mounts the first time it is shown */
@@ -1209,12 +1291,76 @@ export const settingsPage = {
       }
     }
 
+    function paintAutomation() {
+      const panel = root.querySelector("[data-automation-settings]");
+      if (!panel) return;
+      const view = state.automation;
+      panel.querySelector("[data-automation-service]").innerHTML = serviceStatusMarkup(view.status);
+      panel.querySelector("[data-automation-grid]").innerHTML = automationGridMarkup(view);
+      panel.querySelector("[data-automation-note]").innerHTML = serviceStateNote(view.status, "settings-note settings-note--warning");
+      panel.querySelector("[data-automation-readiness]").hidden = !view.ready?.checks?.length;
+      panel.querySelector("[data-automation-checks]").innerHTML = automationChecksMarkup(view.ready);
+      // Jobs run on the service: nothing to run while it is not ready.
+      panel.querySelector("[data-automation-jobs]").hidden = view.status !== SUCCESS || !view.ready?.ready;
+    }
+
+    // Health first: it is open, and answers "is anything there at all".
+    // Readiness and the session follow; a 401/403 on the session only says
+    // this member has no access there, not that the service is down.
+    function loadAutomation() {
+      if (!isAutomationApiAvailable()) {
+        state.automation = { status: NOT_CONFIGURED, health: null, ready: null, session: null };
+        paintAutomation();
+        return Promise.resolve();
+      }
+      if (state.automationLoad) return state.automationLoad;
+      state.automation = { ...state.automation, status: LOADING };
+      paintAutomation();
+      state.automationLoad = (async () => {
+        try {
+          const health = await getAutomationHealth();
+          const [ready, session] = await Promise.allSettled([getAutomationReadiness(), getAutomationSession()]);
+          state.automation = {
+            status: SUCCESS,
+            health,
+            ready: ready.status === "fulfilled" ? ready.value : null,
+            session: session.status === "fulfilled" ? session.value : null,
+          };
+        } catch (error) {
+          state.automation = { status: stateForError(error), health: null, ready: null, session: null };
+        } finally {
+          state.automationLoad = null;
+        }
+        paintAutomation();
+      })();
+      return state.automationLoad;
+    }
+
     function mountSystem() {
       const panel = root.querySelector("[data-settings-system]");
       panel.innerHTML = systemMarkup();
       panel.querySelector("[data-health-recheck]").addEventListener("click", recheck);
+      panel.querySelector("[data-automation-recheck]").addEventListener("click", () => loadAutomation());
+      panel.querySelector("[data-automation-run-jobs]").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        button.textContent = t("automation.settings.runningJobs");
+        try {
+          const { runs = [] } = await runAutomationJobs();
+          showToast(plural("automation.settings.jobsDone", runs.length));
+        } catch {
+          showToast(t("automation.settings.jobsFailed"));
+        } finally {
+          if (button.isConnected) {
+            button.disabled = false;
+            button.textContent = t("automation.settings.runJobs");
+          }
+        }
+      });
       if (state.health) paintSystem();
       else recheck();
+      paintAutomation();
+      loadAutomation();
     }
 
     /* ---- data */
@@ -1281,6 +1427,7 @@ export const settingsPage = {
       paintAccount();
       paintTeam();
       paintSystem();
+      paintAutomation();
       paintData();
       const source = document.querySelector("[data-settings-source]");
       if (source) source.textContent = sourceLabel();

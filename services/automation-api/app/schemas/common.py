@@ -1,0 +1,88 @@
+"""Shapes shared by more than one endpoint."""
+
+from __future__ import annotations
+
+from enum import Enum
+
+from pydantic import BaseModel, Field
+
+
+class CheckStatus(str, Enum):
+    """Outcome of a single operational check.
+
+    Deliberately three states. `warn` is what makes the analysis usable on a
+    real catalogue: a project that predates a requirement is not broken, and
+    calling it broken trains people to ignore the report.
+    """
+
+    OK = "ok"
+    WARN = "warn"
+    FAIL = "fail"
+
+
+class AnalysisStatus(str, Enum):
+    """Overall verdict.
+
+    The vocabulary matches the Admin's existing health states so both can be
+    rendered by the same UI without a translation table.
+    """
+
+    HEALTHY = "healthy"
+    ATTENTION = "attention"
+    INCOMPLETE = "incomplete"
+
+
+class HealthResponse(BaseModel):
+    status: str = Field(examples=["ok"])
+    service: str = Field(examples=["space-underground-automation"])
+    version: str = Field(examples=["0.1.0"])
+
+
+class DependencyHealth(BaseModel):
+    """Whether a dependency is usable, without leaking how it is configured."""
+
+    name: str
+    configured: bool
+    detail: str | None = None
+
+
+class DetailedHealthResponse(HealthResponse):
+    environment: str
+    dependencies: list[DependencyHealth]
+    # Which caller kinds the service accepts: "member" (a Supabase access
+    # token, permissions checked in the database) and/or "scheduler" (the
+    # jobs-only token). Names only -- never what any credential is.
+    auth_modes: list[str] = Field(default_factory=list)
+
+
+class ReadinessResponse(BaseModel):
+    """Whether the service can actually do its job right now.
+
+    Distinct from health: health says the process is answering, readiness says
+    it is configured and its dependencies are reachable. A load balancer wants
+    the first; a deploy wants the second.
+    """
+
+    ready: bool
+    environment: str
+    checks: list[DependencyHealth]
+
+
+class ErrorResponse(BaseModel):
+    """The only error body this service returns.
+
+    `code` is stable and meant to be branched on; `message` is for humans and
+    never carries a stack trace or a database string.
+    """
+
+    code: str = Field(examples=["not_found"])
+    message: str = Field(examples=["Project not found."])
+
+
+class CallerSession(BaseModel):
+    """The caller as this service proved it. Never carries the token."""
+
+    kind: str = Field(examples=["member", "scheduler", "anonymous"])
+    user_id: str | None = None
+    # The automation-relevant permissions the database granted, as of now.
+    permissions: list[str] = Field(default_factory=list)

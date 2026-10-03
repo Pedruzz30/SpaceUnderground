@@ -62,7 +62,7 @@ const pages = [
   { test: (route) => route === "/content", page: contentPage, any: ["cms.read"] },
   { test: (route) => route === "/cms", page: cmsPage, any: ["cms.read"] },
   // #/activity is the pre-Lab name for this screen; keep the old link working.
-  { test: (route) => route === "/logs" || route === "/activity", page: logsPage, any: ["logs.read"] },
+  { test: (route) => route === "/logs" || route === "/logs/automation" || route === "/activity", page: logsPage, any: ["logs.read"] },
   { test: (route) => route === "/settings", page: settingsPage },
   { test: (route) => route === "/team", page: teamPage, any: ["team.read"], security: true },
   { test: (route) => route === "/team/invite", page: teamInvitePage, any: ["team.invite"], security: true },

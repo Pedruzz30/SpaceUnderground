@@ -1,0 +1,79 @@
+name: Automation jobs
+
+# The scheduler for the automation service's jobs (services/automation-api,
+# app/automations/jobs.py). Chosen as the smallest infrastructure that works:
+#
+#   - GitHub Actions is already where this repository runs CI; nothing new to
+#     host, pay for or monitor
+#   - Render Cron would be a second Render service with its own image
+#   - Supabase Cron would need the service token stored inside the database
+#     (pg_net + Vault) to call out
+#
+# The service never schedules itself: a web process that does runs a job twice
+# when it scales to two instances and never while it sleeps.
+#
+# The jobs only detect and record (business_status ATTENTION on a run when
+# something needs a person). They never send a message, charge anyone or
+# change a record. The call carries "scheduled": true, so a re-run of this
+# workflow on the same day collapses into the runs already recorded.
+#
+# Setup (once, by a person): repository Settings > Secrets and variables >
+# Actions
+#   variable  AUTOMATION_API_URL    https://space-underground-automation.onrender.com
+#   secret    AUTOMATION_SCHEDULER_TOKEN  the SCHEDULER_TOKEN set on Render
+# Until both exist the job reports itself skipped and does nothing.
+
+on:
+  schedule:
+    # 11:00 UTC = 08:00 in Sao Paulo (UTC-03:00, no daylight saving).
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: automation-jobs
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Run scheduled jobs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      AUTOMATION_API_URL: ${{ vars.AUTOMATION_API_URL }}
+      AUTOMATION_SCHEDULER_TOKEN: ${{ secrets.AUTOMATION_SCHEDULER_TOKEN }}
+    steps:
+      - name: Check configuration
+        id: config
+        run: |
+          if [ -z "$AUTOMATION_API_URL" ] || [ -z "$AUTOMATION_SCHEDULER_TOKEN" ]; then
+            echo "AUTOMATION_API_URL / AUTOMATION_SCHEDULER_TOKEN are not configured; nothing to run."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for the service to be ready
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" "${AUTOMATION_API_URL%/}/api/v1/ready" || true)
+            if [ "$status" = "200" ]; then exit 0; fi
+            echo "ready answered $status (attempt $attempt)"; sleep 10
+          done
+          echo "The automation service is not ready."; exit 1
+
+      - name: Run the jobs
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          response=$(curl -sS --fail-with-body --max-time 120 \
+            -X POST "${AUTOMATION_API_URL%/}/api/v1/jobs/run" \
+            -H "Content-Type: application/json" \
+            -H "X-Scheduler-Token: ${AUTOMATION_SCHEDULER_TOKEN}" \
+            -H "X-Request-ID: gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            -d '{"scheduled": true}')
+          # Status per job, never the findings: those stay in the run history,
+          # behind the permissions that guard them.
+          echo "$response" | python3 -c 'import json,sys; [print(r["entity_id"], r["status"], "deduplicated" if r.get("deduplicated") else "") for r in json.load(sys.stdin)["runs"]]'

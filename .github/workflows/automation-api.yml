@@ -1,0 +1,65 @@
+name: Automation API
+
+# Runs only when the Python service changes. The Admin and the public site have
+# their own jobs and are not rebuilt because a handler was edited.
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "services/automation-api/**"
+      - ".github/workflows/automation-api.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/automation-api/**"
+      - ".github/workflows/automation-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests and lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/automation-api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/automation-api/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # No secrets are provided on purpose: the suite touches no network and no
+      # database, and a workflow that needs a real key to pass is a workflow
+      # that stops running the day the key rotates.
+      - name: Lint
+        run: ruff check .
+
+      - name: Tests
+        run: pytest -q
+
+  image:
+    name: Container builds
+    runs-on: ubuntu-latest
+    # Proves the deployment artefact still builds. It is never pushed: Render
+    # builds the same Dockerfile from the branch, so publishing an image here
+    # would create a second source of truth for what is deployed.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t space-underground-automation:ci services/automation-api

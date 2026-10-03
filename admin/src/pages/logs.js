@@ -1,5 +1,11 @@
+import { serviceStatusMarkup, serviceStateNote } from "../components/automation-panel.js";
+import { eventLabel, openRunDetail, runTableMarkup } from "../components/automation-runs.js";
+import { bindTabs } from "../components/tabs.js";
 import { showToast } from "../components/toast.js";
 import { getActivityWithStatus } from "../services/activity-service.js";
+import { getCachedSession } from "../services/auth-service.js";
+import { getAutomationRuns, isAutomationApiAvailable, retryAutomationRun } from "../services/automation-api.js";
+import { FORBIDDEN, LOADING, NOT_CONFIGURED, SUCCESS, stateForError } from "../utils/automation-state.js";
 import { onLocaleChange, plural, t } from "../i18n/index.js";
 import { downloadCsv } from "../utils/csv.js";
 import { escapeAttribute, escapeHtml } from "../utils/html.js";
@@ -150,6 +156,65 @@ function selectMarkup({ labelKey, name, options, keyPrefix }) {
   `;
 }
 
+/* ------------------------------------------------------- automation runs */
+
+// What the automation service ran, read from its own history through the
+// service (which checks logs.read in the database). Kept apart from the
+// activity log on purpose: that one records what a person did ("Pedro
+// published CASE 006"), this one what the engine did ("project.published
+// SUCCESS in 843 ms"). Folding one into the other would make both harder to
+// read and neither trustworthy as an audit trail.
+
+const RUN_LIMIT = 100;
+const RUN_STATUSES = ["SUCCESS", "FAILED", "RUNNING", "SKIPPED"];
+
+function runStatusOptions() {
+  return [
+    `<option value="">${escapeHtml(t("automation.runs.allStatuses"))}</option>`,
+    ...RUN_STATUSES.map((status) => `<option value="${status}">${escapeHtml(t(`automation.runStatus.${status}`))}</option>`),
+  ].join("");
+}
+
+function runEventOptions(runs, selected) {
+  const events = [...new Set(runs.map((run) => run.event).filter(Boolean))].sort();
+  return [
+    `<option value="">${escapeHtml(t("automation.runs.allEvents"))}</option>`,
+    ...events.map((event) => `<option value="${escapeAttribute(event)}"${event === selected ? " selected" : ""}>${escapeHtml(eventLabel(event))}</option>`),
+  ].join("");
+}
+
+function automationPanelMarkup() {
+  return `
+    <div class="automation-runs">
+      <header class="automation-runs__head">
+        <div>
+          <span class="automation-runs__eyebrow" data-i18n="automation.runs.eyebrow">${escapeHtml(t("automation.runs.eyebrow"))}</span>
+          <h3 data-i18n="automation.runs.title">${escapeHtml(t("automation.runs.title"))}</h3>
+          <p data-i18n="automation.runs.intro">${escapeHtml(t("automation.runs.intro"))}</p>
+        </div>
+        <div class="heading-actions">
+          <span data-runs-service>${serviceStatusMarkup(isAutomationApiAvailable() ? LOADING : NOT_CONFIGURED)}</span>
+          <button class="button" type="button" data-runs-refresh data-i18n="automation.runs.refresh">${escapeHtml(t("automation.runs.refresh"))}</button>
+        </div>
+      </header>
+      <div class="automation-filters">
+        <label class="sort-field">
+          <span data-i18n="automation.runs.filterStatus">${escapeHtml(t("automation.runs.filterStatus"))}</span>
+          <select data-runs-status>${runStatusOptions()}</select>
+        </label>
+        <label class="sort-field">
+          <span data-i18n="automation.runs.filterEvent">${escapeHtml(t("automation.runs.filterEvent"))}</span>
+          <select data-runs-event>${runEventOptions([], "")}</select>
+        </label>
+        <p class="ops-count" data-runs-count></p>
+      </div>
+      <div data-runs-body aria-live="polite" aria-busy="true">
+        <p class="empty-inline" data-i18n="automation.runs.loading">${escapeHtml(t("automation.runs.loading"))}</p>
+      </div>
+    </div>
+  `;
+}
+
 function channelTabsMarkup(entries, active) {
   return CHANNELS.map((channel) => {
     const count = channel === "ALL" ? entries.length : entries.filter((entry) => channelFor(entry) === channel).length;
@@ -161,6 +226,111 @@ function channelTabsMarkup(entries, active) {
       </button>
     `;
   }).join("");
+}
+
+// Mounted beside the activity timeline and resolved on its own: the
+// activity log renders whether or not the automation service answers, and the
+// service is only asked once its tab is opened.
+function mountAutomationRuns({ openNow = false } = {}) {
+  const tabs = document.querySelector("[data-logs-tabs]");
+  const panel = document.querySelector("[data-logs-automation]");
+  if (!tabs || !panel) return;
+
+  const heading = document.querySelector(".page-heading .heading-actions");
+  const body = panel.querySelector("[data-runs-body]");
+  const count = panel.querySelector("[data-runs-count]");
+  const statusFilter = panel.querySelector("[data-runs-status]");
+  const eventFilter = panel.querySelector("[data-runs-event]");
+  const refresh = panel.querySelector("[data-runs-refresh]");
+  const service = panel.querySelector("[data-runs-service]");
+
+  let state = { status: isAutomationApiAvailable() ? LOADING : NOT_CONFIGURED, data: null, error: null };
+  let loaded = false;
+
+  const runs = () => (Array.isArray(state.data?.runs) ? state.data.runs : []);
+
+  function paint() {
+    if (!body.isConnected) return;
+    service.innerHTML = serviceStatusMarkup(state.status);
+    refresh.disabled = state.status === LOADING || state.status === NOT_CONFIGURED;
+    body.setAttribute("aria-busy", String(state.status === LOADING));
+
+    const all = runs();
+    eventFilter.innerHTML = runEventOptions(all, eventFilter.value);
+    const visible = all.filter((run) => (!statusFilter.value || run.status === statusFilter.value) && (!eventFilter.value || run.event === eventFilter.value));
+    count.textContent = state.status === SUCCESS ? plural("automation.runs.count", visible.length) : "";
+
+    if (state.status === LOADING) {
+      body.innerHTML = `<p class="empty-inline">${escapeHtml(t("automation.runs.loading"))}</p>`;
+    } else if (state.status !== SUCCESS) {
+      body.innerHTML = serviceStateNote(state.status, "empty-inline");
+    } else if (state.data?.storage_available === false) {
+      // "Nothing has run" and "the history could not be read" look the same
+      // in an empty list; the service says which one it is.
+      body.innerHTML = `<p class="empty-inline log-timeline__error">${escapeHtml(t("automation.runs.storageUnavailable"))}</p>`;
+    } else if (!all.length) {
+      body.innerHTML = `<p class="empty-inline">${escapeHtml(t("automation.runs.empty"))}</p>`;
+    } else if (!visible.length) {
+      body.innerHTML = `<p class="empty-inline">${escapeHtml(t("automation.runs.noMatch"))}</p>`;
+    } else {
+      body.innerHTML = runTableMarkup(visible);
+    }
+  }
+
+  async function load({ toast = false } = {}) {
+    if (!isAutomationApiAvailable()) {
+      state = { status: NOT_CONFIGURED, data: null, error: null };
+      paint();
+      return;
+    }
+    state = { ...state, status: LOADING };
+    paint();
+    try {
+      state = { status: SUCCESS, data: await getAutomationRuns({ limit: RUN_LIMIT }), error: null };
+      if (toast) showToast(t("automation.runs.refreshed"));
+    } catch (error) {
+      state = { status: stateForError(error), data: null, error };
+    }
+    loaded = true;
+    paint();
+  }
+
+  async function retry(run) {
+    try {
+      const next = await retryAutomationRun(run.run_id);
+      showToast(t("automation.detail.retryDone", { status: t(`automation.runStatus.${next.stale ? "STALE" : next.status}`) }));
+      await load();
+    } catch (error) {
+      showToast(stateForError(error) === FORBIDDEN ? t("automation.forbiddenHint") : t("automation.detail.retryFailed"));
+    }
+  }
+
+  body.addEventListener("click", (event) => {
+    const trigger = event.target.closest("[data-run-open]");
+    const run = trigger && runs().find((item) => item.run_id === trigger.dataset.runOpen);
+    if (run) openRunDetail(run, { onRetry: retry, currentUserId: getCachedSession()?.user?.id ?? "" });
+  });
+  statusFilter.addEventListener("change", paint);
+  eventFilter.addEventListener("change", paint);
+  refresh.addEventListener("click", () => load({ toast: true }));
+
+  // The page heading's refresh and export act on the activity log only.
+  tabs.addEventListener("click", (event) => {
+    const tab = event.target.closest('[role="tab"]');
+    if (!tab) return;
+    const automation = tab.dataset.tab === "automation";
+    if (heading) heading.hidden = automation;
+    if (automation && !loaded) load();
+  });
+  bindTabs(tabs.parentElement);
+
+  onLocaleChange(body, () => {
+    statusFilter.innerHTML = runStatusOptions().replace(`value="${statusFilter.value}"`, `value="${statusFilter.value}" selected`);
+    paint();
+  });
+
+  paint();
+  if (openNow) tabs.querySelector('[data-tab="automation"]')?.click();
 }
 
 export const logsPage = {
@@ -179,6 +349,16 @@ export const logsPage = {
       </div>
     </section>
 
+    <div class="tabs logs-tabs" role="tablist" aria-label="${escapeAttribute(t("logs.heading"))}" data-logs-tabs>
+      <button type="button" role="tab" id="logs-tab-activity" data-tab="activity" aria-selected="true" aria-controls="logs-panel-activity" tabindex="0" data-i18n="automation.runs.activityTab">${t("automation.runs.activityTab")}</button>
+      <button type="button" role="tab" id="logs-tab-automation" data-tab="automation" aria-selected="false" aria-controls="logs-panel-automation" tabindex="-1" data-i18n="automation.runs.tab">${t("automation.runs.tab")}</button>
+    </div>
+
+    <section class="logs-tabpanel" id="logs-panel-automation" role="tabpanel" aria-labelledby="logs-tab-automation" hidden data-logs-automation>
+      ${automationPanelMarkup()}
+    </section>
+
+    <section class="logs-tabpanel" id="logs-panel-activity" role="tabpanel" aria-labelledby="logs-tab-activity" data-logs-activity>
     <div class="metric-strip log-metrics" data-log-metrics aria-live="polite"></div>
 
     <div class="log-filters">
@@ -204,8 +384,11 @@ export const logsPage = {
     <div class="log-more">
       <button class="button" type="button" data-log-more hidden data-i18n="logs.loadMore">${t("logs.loadMore")}</button>
     </div>
+    </section>
   `,
-  afterRender: async () => {
+  afterRender: async (params = {}) => {
+    mountAutomationRuns({ openNow: params.id === "automation" });
+
     const table = document.querySelector("[data-log-table]");
     const count = document.querySelector("[data-log-count]");
     const metricRoot = document.querySelector("[data-log-metrics]");

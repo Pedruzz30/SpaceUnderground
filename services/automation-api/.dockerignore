@@ -1,0 +1,29 @@
+# The Dockerfile copies only `app/`, so nothing here is strictly required --
+# but build context is uploaded before the COPY runs, and a .env travelling to
+# a build daemon is a secret leaving the machine even if it never lands in a
+# layer. Everything that is not needed to build stays out.
+
+.env
+.env.*
+!.env.example
+
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+tests/
+scripts/
+*.egg-info/
+dist/
+build/
+
+.git/
+.gitignore
+README.md
