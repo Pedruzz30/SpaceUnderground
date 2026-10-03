@@ -36,6 +36,10 @@ services:
     envVars:
       - key: APP_ENV
         value: production
+      # Render's native Python runtime may otherwise move to a newer major
+      # version before pinned wheels are available. Keep parity with CI/Docker.
+      - key: PYTHON_VERSION
+        value: 3.12.7
       - key: LOG_LEVEL
         value: INFO
       - key: APP_HOST
