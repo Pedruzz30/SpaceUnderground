@@ -15,6 +15,9 @@ export class DataError extends Error {
 }
 
 const UNIQUE_VIOLATION = "23505";
+// A delete refused because another row still points at this one (a project
+// opened from a won opportunity keeps its handoff, for one).
+const FOREIGN_KEY_VIOLATION = "23503";
 
 // Postgres reports unique conflicts by constraint name; map the ones we own
 // back to the form field that caused them.
@@ -74,6 +77,10 @@ export function toDataError(error, fallbackMessage) {
       return new DataError(t("errors.clientCodeInUse"), { code, field, cause: error });
     }
     return new DataError(t("errors.valueInUse"), { code, cause: error });
+  }
+
+  if (code === FOREIGN_KEY_VIOLATION) {
+    return new DataError(t("errors.referenced"), { code: "referenced", cause: error });
   }
 
   if (SECURITY_CODES[code]) {

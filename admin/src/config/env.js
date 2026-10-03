@@ -22,6 +22,26 @@ export const DATA_SOURCE = VALID_DATA_SOURCES.has(requestedDataSource) ? request
 export const SUPABASE_URL = env.VITE_SUPABASE_URL ?? "";
 export const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY ?? "";
 
+// Optional automation service (services/automation-api). The Admin works
+// without it: when the URL is unset every automation feature reports itself
+// "not configured" and nothing else changes, which is why it is absent from
+// configurationProblems below.
+//
+// Only the URL lives here, and it is not a secret. There is deliberately no
+// token: anything shipped to a browser is public, so the Admin authenticates
+// to the service with the signed-in member's Supabase access token instead.
+// The service role key belongs to the Python process alone.
+//
+// Read on each call rather than frozen at module load, so the unit tests can
+// cover the configured and the unconfigured Admin in one process.
+export function automationApiBaseUrl() {
+  return String(readEnv().VITE_AUTOMATION_API_URL ?? "").trim().replace(/\/+$/, "");
+}
+
+export function isAutomationApiConfigured() {
+  return Boolean(automationApiBaseUrl());
+}
+
 const configurationProblems = [];
 
 if (DATA_SOURCE === "invalid") {
