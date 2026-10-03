@@ -123,7 +123,7 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       | `20260928031922` | `financial_foundation` | APPLIED |
       | `20260928035023` | `commercial_opportunities` | APPLIED |
       | `20261002033705` | `security_rbac_approval_foundation` | APPLIED |
-      | `20261002233745` | `automation_v2` | PENDING |
+      | `20261003015032` | `automation_v2` | PENDING |
 
       Recorded versions must never be renamed or repaired. After the normalize,
       production plans read `Max` = `ON_REQUEST`, `Plus` = `AVAILABLE`,
@@ -196,7 +196,7 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       `security_audit_log?select=id&limit=1` are refused, and the public
       project query still returns `200`.
 
-- [ ] `20261002233745_automation_v2.sql` — **pending**. Additive (no drop,
+- [ ] `20261003015032_automation_v2.sql` — **pending**. Additive (no drop,
       rename, delete or rewrite). Apply before deploying the automation
       service: the service's `/api/v1/ready` answers 503 until it is applied.
       Then, as `anon` and as a signed-in member, `automation_runs?select=id`
