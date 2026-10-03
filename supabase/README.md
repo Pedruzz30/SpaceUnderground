@@ -33,7 +33,7 @@ so older notes and commits stay easy to follow.
 | `20260928031922` | `financial_foundation` | APPLIED (recorded) |
 | `20260928035023` | `commercial_opportunities` | APPLIED (recorded) |
 | `20261002033705` | `security_rbac_approval_foundation` | **APPLIED — 2026-10-02** |
-| `20261002233745` | `automation_v2` | PENDING — apply before deploying the automation service |
+| `20261003015032` | `automation_v2` | PENDING — apply before deploying the automation service |
 
 Every recorded version and name matches
 `select version, name from supabase_migrations.schema_migrations` exactly and
@@ -89,7 +89,7 @@ column defaults to false and the migration enables CASE 001 and 002.
 workflow engine's run history. RLS is on with no policy: only the automation
 service (service role) reads or writes it.
 
-`migrations/20261002233745_automation_v2.sql` (additive) reintegrates the
+`migrations/20261003015032_automation_v2.sql` (additive) reintegrates the
 automation service on the current model: `automation_runs.requested_by` and
 explicit revokes for `anon`/`authenticated`; `commercial_project_handoffs`
 keyed by `opportunity_id` (unique, `on delete set null`) with the `run_id`
