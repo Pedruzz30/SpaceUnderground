@@ -84,7 +84,7 @@ class JobRunRequest(BaseModel):
     jobs: list[str] | None = Field(default=None, max_length=20)
     operation_id: str | None = Field(default=None, max_length=100)
     # Sent by the scheduler: at most one run per job per business day, however
-    # many times the schedule fires. Only honoured for the service token.
+    # many times the schedule fires. Only honoured for the scheduler token.
     scheduled: bool = False
 
     @field_validator("operation_id")

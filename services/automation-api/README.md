@@ -21,7 +21,7 @@ app/
 ├── main.py                 app factory: CORS, request ids, error envelope, /health
 ├── core/
 │   ├── config.py           settings; production refuses unsafe configuration
-│   ├── security.py         who is calling (member token / service token) and
+│   ├── security.py         who is calling (member / scheduler) and
 │   │                       what they may do (public.has_permission, as them)
 │   ├── permissions.py      the RBAC key each capability needs
 │   ├── errors.py           stable error codes (not_configured ≠ unavailable)
@@ -60,7 +60,7 @@ Two kinds of caller:
 | Caller | Credential | Used by |
 | --- | --- | --- |
 | member | `Authorization: Bearer <Supabase access token>` | the Admin |
-| service | `X-API-Token: <API_TOKEN>` (server-side only) | the scheduler, CI, scripts |
+| scheduler | `X-Scheduler-Token: <SCHEDULER_TOKEN>` | GitHub Actions, only for `POST /jobs/run` |
 
 For a member, the service asks Supabase Auth whose token it is, then asks the
 **database** — `public.has_permission(key)`, called through PostgREST *with
@@ -88,10 +88,11 @@ onto the permission of the same business effect (`app/core/permissions.py`):
 `admin/tests/automation-v2-migration.test.mjs` pins this against the real
 catalog: every key exists, and each role holds what the tests assume.
 
-Only local development may run with no credential at all
-(`APP_ENV=development` and no `API_TOKEN`); a member token that *is* sent is
-still verified. Production and staging always require one. Browsers can
-never send `X-API-Token`: it is not an allowed CORS header.
+Only local development may run member endpoints with no credential at all. A
+member token that *is* sent is still verified. Production and staging always
+require one. The scheduler identity has no RBAC permissions and is accepted
+only by `POST /api/v1/jobs/run`. Browsers can never send
+`X-Scheduler-Token`: it is not an allowed CORS header.
 
 ## 3. Endpoints
 
@@ -205,7 +206,7 @@ them from Settings › Sistema.
 | `SUPABASE_URL` | yes | |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes, **secret** | a publishable/anon key here is detected and refused |
 | `ADMIN_ORIGIN` | yes | exact https origin(s) of the Admin; localhost, http and `*` are refused |
-| `API_TOKEN` | for the scheduler | long random value, **secret** |
+| `SCHEDULER_TOKEN` | yes | at least 32 characters, **secret**, jobs endpoint only |
 | `ADMIN_JWT_AUTH` | keep `true` | |
 | `ADMIN_JWT_CACHE_SECONDS` | optional (30) | |
 | `APP_TIMEZONE` | optional (`America/Sao_Paulo`) | |
@@ -263,14 +264,15 @@ Order matters: **migration, then service, then Admin.**
    `main`, health check `/health`, plan Starter).
 3. Set the secret variables in Render: `SUPABASE_URL`,
    `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_ORIGIN` (the Netlify Admin origin, e.g.
-   `https://<admin-site>.netlify.app`), `API_TOKEN` (random, e.g.
+   `https://<admin-site>.netlify.app`), `SCHEDULER_TOKEN` (random, e.g.
    `python -c "import secrets; print(secrets.token_urlsafe(48))"`).
 4. Check `/health`, `/api/v1/health`, `/api/v1/ready` (must be 200).
 5. Netlify (Admin): `VITE_AUTOMATION_API_URL=https://space-underground-automation.onrender.com`
    and redeploy. If the Render URL differs, change `connect-src` in
    `netlify.toml` to that exact origin first — the CSP blocks any other.
 6. GitHub › Settings › Secrets and variables › Actions: variable
-   `AUTOMATION_API_URL`, secret `AUTOMATION_API_TOKEN` (= `API_TOKEN`).
+   `AUTOMATION_API_URL`, secret `AUTOMATION_SCHEDULER_TOKEN`
+   (= `SCHEDULER_TOKEN`).
 
 ## 10. Smoke test (production)
 

@@ -156,6 +156,13 @@ describe("events after commit", () => {
     assert.match(review, /operationId: `approval:\$\{request\.id\}`/);
   });
 
+  it("checks completion when an approval moves the stored status into Live", () => {
+    const review = read("pages/approval-review.js");
+    const between = after(review, "await withStepUp(() => approveRequest(request.id", 'dispatchAfterCommit("project.completed"');
+    assert.match(between, /statusChange\?\.old !== "Live" && statusChange\?\.new === "Live"/);
+    assert.match(review, /operationId: `approval:\$\{request\.id\}:completed`/);
+  });
+
   it("opens a won deal's project only after the win is saved", () => {
     const commercial = read("pages/commercial.js");
     const between = after(commercial, "await winOpportunity(deal.id", "openWonProject(deal");
@@ -176,6 +183,6 @@ describe("events after commit", () => {
     // Only the client knows the service's routes; pages call its functions.
     const routes = files.filter((path) => readFileSync(path, "utf8").includes("/api/v1/")).map(relative);
     assert.deepEqual(routes, ["services/automation-api.js"]);
-    assert.ok(files.every((path) => !/X-API-Token/i.test(readFileSync(path, "utf8"))), "the browser never holds the service token");
+    assert.ok(files.every((path) => !/X-Scheduler-Token/i.test(readFileSync(path, "utf8"))), "the browser never holds the scheduler token");
   });
 });

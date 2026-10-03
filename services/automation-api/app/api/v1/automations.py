@@ -49,7 +49,7 @@ def source_for(access: Access, *, dry_run: bool = False) -> str:
         return "dry_run"
     if access.caller.is_member:
         return "admin"
-    return "service" if access.caller.is_service else "api"
+    return "scheduler" if access.caller.is_scheduler else "api"
 
 
 async def can_see(access: Access, permission: str | None) -> bool:

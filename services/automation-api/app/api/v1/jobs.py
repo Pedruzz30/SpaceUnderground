@@ -6,8 +6,8 @@ own work runs it twice when it scales to two instances and never when it
 sleeps. Here there is only an authenticated endpoint that runs the registered
 jobs, once per business day when the call says it is the schedule.
 
-Never open: the service token (the scheduler) or a member holding
-settings.edit (a manual "run now").
+Never open: the scheduler's dedicated token or a member holding settings.edit
+(a manual "run now"). The scheduler identity is rejected everywhere else.
 """
 
 from __future__ import annotations
@@ -49,7 +49,8 @@ async def run_jobs(
     supabase: SupabaseService = Depends(get_supabase_service),
     store: RunStore = Depends(get_store),
 ) -> JobRunResponse:
-    await access.require(*RUN_JOBS)
+    if not access.caller.is_scheduler:
+        await access.require(*RUN_JOBS)
 
     names = request.jobs or list(job_names())
     unknown = [name for name in names if get_job(name) is None]
@@ -61,7 +62,7 @@ async def run_jobs(
     # The schedule's own key: one run per job per business day, however many
     # times the cron fires (a GitHub Actions retry, a manual re-run). A person
     # running it by hand is a separate, deliberate action.
-    scheduled = request.scheduled and access.caller.is_service
+    scheduled = request.scheduled and access.caller.is_scheduler
     window = business_today(get_settings().app_timezone).isoformat()
     source = "scheduler" if scheduled else source_for(access)
 

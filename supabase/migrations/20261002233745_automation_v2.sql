@@ -274,8 +274,13 @@ begin
 
   -- A client linked to the deal after the project was opened reaches it now.
   if v_project.client_id is null and v_opportunity.client_id is not null then
+    select coalesce(nullif(btrim(company), ''), name) into v_client_label
+    from public.clients
+    where id = v_opportunity.client_id;
+
     update public.projects
-    set client_id = v_opportunity.client_id
+    set client_id = v_opportunity.client_id,
+        client = v_client_label
     where id = v_project.id
     returning * into v_project;
     v_client_linked := true;

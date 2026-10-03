@@ -20,7 +20,7 @@ name: Automation jobs
 # Setup (once, by a person): repository Settings > Secrets and variables >
 # Actions
 #   variable  AUTOMATION_API_URL    https://space-underground-automation.onrender.com
-#   secret    AUTOMATION_API_TOKEN  the API_TOKEN set on the Render service
+#   secret    AUTOMATION_SCHEDULER_TOKEN  the SCHEDULER_TOKEN set on Render
 # Until both exist the job reports itself skipped and does nothing.
 
 on:
@@ -43,13 +43,13 @@ jobs:
     timeout-minutes: 5
     env:
       AUTOMATION_API_URL: ${{ vars.AUTOMATION_API_URL }}
-      AUTOMATION_API_TOKEN: ${{ secrets.AUTOMATION_API_TOKEN }}
+      AUTOMATION_SCHEDULER_TOKEN: ${{ secrets.AUTOMATION_SCHEDULER_TOKEN }}
     steps:
       - name: Check configuration
         id: config
         run: |
-          if [ -z "$AUTOMATION_API_URL" ] || [ -z "$AUTOMATION_API_TOKEN" ]; then
-            echo "AUTOMATION_API_URL / AUTOMATION_API_TOKEN are not configured; nothing to run."
+          if [ -z "$AUTOMATION_API_URL" ] || [ -z "$AUTOMATION_SCHEDULER_TOKEN" ]; then
+            echo "AUTOMATION_API_URL / AUTOMATION_SCHEDULER_TOKEN are not configured; nothing to run."
             echo "configured=false" >> "$GITHUB_OUTPUT"
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
@@ -71,9 +71,9 @@ jobs:
           response=$(curl -sS --fail-with-body --max-time 120 \
             -X POST "${AUTOMATION_API_URL%/}/api/v1/jobs/run" \
             -H "Content-Type: application/json" \
-            -H "X-API-Token: ${AUTOMATION_API_TOKEN}" \
+            -H "X-Scheduler-Token: ${AUTOMATION_SCHEDULER_TOKEN}" \
             -H "X-Request-ID: gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             -d '{"scheduled": true}')
           # Status per job, never the findings: those stay in the run history,
           # behind the permissions that guard them.
-          echo "$response" | python3 -c 'import json,sys; [print(r["entity_id"], r["status"], (r.get("result") or {}).get("business_status"), "deduplicated" if r.get("deduplicated") else "") for r in json.load(sys.stdin)["runs"]]'
+          echo "$response" | python3 -c 'import json,sys; [print(r["entity_id"], r["status"], "deduplicated" if r.get("deduplicated") else "") for r in json.load(sys.stdin)["runs"]]'

@@ -16,7 +16,7 @@ const state = await import("../src/utils/automation-state.js");
 const BASE = "http://127.0.0.1:8000";
 
 function configure(url) {
-  globalThis.__SPACE_ADMIN_ENV__ = { VITE_ADMIN_DATA_SOURCE: "mock", VITE_AUTOMATION_API_URL: url, VITE_AUTOMATION_API_TOKEN: "s3cret" };
+  globalThis.__SPACE_ADMIN_ENV__ = { VITE_ADMIN_DATA_SOURCE: "mock", VITE_AUTOMATION_API_URL: url, VITE_AUTOMATION_SCHEDULER_TOKEN: "s3cret" };
 }
 
 let calls = [];
@@ -76,7 +76,7 @@ describe("automation api client", () => {
   it("never sends a shared secret, and no Authorization without a session", async () => {
     await client.getAutomationHealth();
     const { headers } = calls[0].init;
-    assert.equal("X-API-Token" in headers, false);
+    assert.equal("X-Scheduler-Token" in headers, false);
     assert.doesNotMatch(JSON.stringify(headers), /s3cret/);
     // Mock mode has no Supabase session; whether that is acceptable is the
     // service's decision (production refuses it).

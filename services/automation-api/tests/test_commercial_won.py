@@ -45,6 +45,7 @@ def production(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "sb_secret_abc123")
     monkeypatch.setenv("ADMIN_ORIGIN", "https://admin.example.com")
+    monkeypatch.setenv("SCHEDULER_TOKEN", "scheduler-secret-with-more-than-32-characters")
     get_settings.cache_clear()
     reset_identity_cache()
 
@@ -153,6 +154,7 @@ def test_a_client_linked_later_reaches_the_project_on_the_next_run(production, m
 
     assert len(fake.rows) == 1
     assert fake.rows[0]["client_id"] == CLIENT_ID
+    assert fake.rows[0]["client"] == "Aurora Labs Ltda"
 
 
 def test_a_dry_run_plans_without_writing(production, make_client):

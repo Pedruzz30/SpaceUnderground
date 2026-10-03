@@ -18,8 +18,9 @@ There are two kinds of caller:
   `public.admins` is no longer consulted: since the security foundation it is
   history, and a former admin keeps their row there after being suspended.
 
-* **Another machine.** CI, the scheduler, scripts. These can keep a secret, so
-  they send the shared `X-API-Token`, configured on the server only.
+* **The scheduler.** GitHub Actions sends the dedicated
+  `X-Scheduler-Token`. That identity has no member permissions and is accepted
+  only by the jobs runner endpoint.
 
 Local development may run with neither, because requiring a credential
 before there is anywhere to store one only teaches people to disable the
@@ -51,9 +52,9 @@ from app.services.supabase_service import (
 
 logger = get_logger("security")
 
-API_TOKEN_HEADER = "X-API-Token"
+SCHEDULER_TOKEN_HEADER = "X-Scheduler-Token"
 
-SERVICE = "service"
+SCHEDULER = "scheduler"
 MEMBER = "member"
 ANONYMOUS = "anonymous"
 
@@ -76,8 +77,8 @@ class Caller:
         return self.kind == MEMBER
 
     @property
-    def is_service(self) -> bool:
-        return self.kind == SERVICE
+    def is_scheduler(self) -> bool:
+        return self.kind == SCHEDULER
 
 
 # Verified identities and permission answers, held briefly so a polling
@@ -128,7 +129,7 @@ def token_required(settings: Settings) -> bool:
     environment, so a local service pointed at a real Supabase applies the
     real permissions.
     """
-    return settings.app_env != "development" or bool(settings.api_token)
+    return settings.app_env != "development"
 
 
 def _bearer(authorization: str | None) -> str:
@@ -172,20 +173,23 @@ async def _verify_member(token: str, settings: Settings, supabase: SupabaseServi
 
 
 async def verify_caller(
-    x_api_token: str | None = Header(default=None),
+    x_scheduler_token: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
     supabase: SupabaseService = Depends(get_supabase_service),
 ) -> Caller:
     """FastAPI dependency. Proves the caller or refuses the request."""
     settings = get_settings()
 
-    # The shared secret wins when present: it is the cheaper check and it is
-    # what a machine sends. Compared in constant time.
-    if x_api_token is not None and settings.api_token:
-        if hmac.compare_digest(x_api_token.encode("utf-8"), settings.api_token.encode("utf-8")):
-            return Caller(kind=SERVICE)
-        log_event(logger, logging.WARNING, "security.token.rejected")
-        raise unauthorized("Invalid or missing API token.")
+    # This identity is intentionally narrow. Access.can() grants it no RBAC
+    # permission; POST /jobs/run is the only handler that explicitly accepts
+    # it. Comparing in constant time avoids leaking useful prefix information.
+    if x_scheduler_token is not None:
+        if settings.scheduler_token and hmac.compare_digest(
+            x_scheduler_token.encode("utf-8"), settings.scheduler_token.encode("utf-8")
+        ):
+            return Caller(kind=SCHEDULER)
+        log_event(logger, logging.WARNING, "security.scheduler_token.rejected")
+        raise unauthorized("Invalid or missing scheduler token.")
 
     bearer = _bearer(authorization)
     if bearer and settings.admin_jwt_auth:
@@ -198,21 +202,22 @@ async def verify_caller(
     if not token_required(settings):
         return Caller(kind=ANONYMOUS)
 
-    if not settings.api_token and not settings.admin_jwt_auth:
+    if not settings.admin_jwt_auth:
         # Production with nothing configured: refuse rather than run open.
         log_event(logger, logging.ERROR, "security.no_mechanism", env=settings.app_env)
         raise not_configured("No authentication mechanism is configured on the server.")
 
-    log_event(logger, logging.WARNING, "security.credentials.missing", provided=bool(x_api_token))
+    log_event(logger, logging.WARNING, "security.credentials.missing", provided=bool(x_scheduler_token))
     raise unauthorized("Authentication is required.")
 
 
 class Access:
     """The caller plus the permission questions asked on their behalf.
 
-    A machine holding the service token and an unauthenticated development
-    caller are the deployment itself: they pass every check. A member passes
-    exactly what `public.has_permission` grants them.
+    An unauthenticated development caller is the local deployment and passes
+    checks. The scheduler has no RBAC permissions; its one allowed endpoint
+    recognizes it explicitly. A member passes exactly what
+    `public.has_permission` grants them.
     """
 
     def __init__(self, caller: Caller, supabase: SupabaseService, settings: Settings | None = None) -> None:
@@ -230,6 +235,8 @@ class Access:
         `fresh` skips the cache: used before a workflow writes business data,
         so a member revoked a few seconds ago cannot slip one last write in.
         """
+        if self.caller.is_scheduler:
+            return False
         if not self.caller.is_member:
             return True
 

@@ -5,7 +5,7 @@ import { dispatchAutomation, isAutomationApiAvailable, newOperationId } from "./
 // they describe is committed to Supabase:
 //
 //   updateProject() succeeds  ->  project.published / project.completed
-//   approval applied          ->  project.published
+//   approval applied          ->  project.published / project.completed
 //   winOpportunity() closes   ->  commercial.opportunity.won
 //
 // Never the other way round. The save is the Admin's and is already done; the

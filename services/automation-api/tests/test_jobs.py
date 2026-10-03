@@ -19,7 +19,8 @@ from tests.conftest import (
 )
 
 RUN = "/api/v1/jobs/run"
-SERVICE = {"X-API-Token": "sch3dule-s3cret"}
+SCHEDULER_TOKEN = "scheduler-secret-with-more-than-32-characters"
+SCHEDULER = {"X-Scheduler-Token": SCHEDULER_TOKEN}
 
 
 @pytest.fixture
@@ -28,7 +29,7 @@ def production(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "sb_secret_abc123")
     monkeypatch.setenv("ADMIN_ORIGIN", "https://admin.example.com")
-    monkeypatch.setenv("API_TOKEN", "sch3dule-s3cret")
+    monkeypatch.setenv("SCHEDULER_TOKEN", SCHEDULER_TOKEN)
     get_settings.cache_clear()
     reset_identity_cache()
 
@@ -84,24 +85,26 @@ def test_only_jobs_over_real_data_are_registered():
 def test_the_scheduler_runs_every_job_once_and_records_each(production, make_client):
     client, fake = make_client(**data())
 
-    body = client.post(RUN, json={"scheduled": True}, headers=SERVICE).json()
+    body = client.post(RUN, json={"scheduled": True}, headers=SCHEDULER).json()
 
     runs = {run["entity_id"]: run for run in body["runs"]}
+    stored = {run["entity_id"]: run for run in fake.runs.rows}
     assert set(runs) == set(job_names())
     assert all(run["source"] == "scheduler" for run in runs.values())
+    assert all(run["redacted"] for run in runs.values())
     assert len(fake.runs.rows) == 3
 
-    overdue = runs["financial.overdue_check"]
+    overdue = stored["financial.overdue_check"]
     assert overdue["status"] == "SUCCESS"
     assert overdue["result"]["business_status"] == "ATTENTION"
     scan = overdue["steps"][0]["result"]
     assert scan["count"] == 2
     assert scan["total"] == 150.5
 
-    follow_up = runs["commercial.follow_up_check"]["steps"][0]["result"]
+    follow_up = stored["commercial.follow_up_check"]["steps"][0]["result"]
     assert [item["opportunity_id"] for item in follow_up["items"]] == ["cccccccc-3333-4333-8333-000000000002"]
 
-    health = runs["projects.health_check"]["steps"][0]["result"]
+    health = stored["projects.health_check"]["steps"][0]["result"]
     assert health["checked"] == 2
     assert [item["case_number"] for item in health["items"]] == [2]
 
@@ -111,7 +114,7 @@ def test_a_job_only_reads(production, make_client):
     client, fake = make_client(**data())
     before = [dict(row) for row in fake.transactions]
 
-    client.post(RUN, json={"scheduled": True}, headers=SERVICE)
+    client.post(RUN, json={"scheduled": True}, headers=SCHEDULER)
 
     assert fake.transactions == before
     assert fake.activity == []
@@ -121,27 +124,28 @@ def test_a_job_only_reads(production, make_client):
 def test_a_schedule_that_fires_twice_runs_once_per_day(production, make_client):
     client, fake = make_client(**data())
 
-    client.post(RUN, json={"scheduled": True}, headers=SERVICE)
-    again = client.post(RUN, json={"scheduled": True}, headers=SERVICE).json()
+    client.post(RUN, json={"scheduled": True}, headers=SCHEDULER)
+    again = client.post(RUN, json={"scheduled": True}, headers=SCHEDULER).json()
 
     assert len(fake.runs.rows) == 3
     assert all(run["deduplicated"] for run in again["runs"])
 
 
 def test_nothing_found_is_a_quiet_success(production, make_client):
-    client, _ = make_client([])
+    client, fake = make_client([])
 
-    body = client.post(RUN, json={"jobs": ["financial.overdue_check"]}, headers=SERVICE).json()
+    response = client.post(RUN, json={"jobs": ["financial.overdue_check"]}, headers=SCHEDULER).json()
 
-    assert body["runs"][0]["result"]["business_status"] == "SUCCESS"
-    assert body["runs"][0]["result"]["summary"]["signals"] == 0
+    assert response["runs"][0]["redacted"] is True
+    assert fake.runs.rows[0]["result"]["business_status"] == "SUCCESS"
+    assert fake.runs.rows[0]["result"]["summary"]["signals"] == 0
 
 
 def test_the_scheduler_endpoint_is_never_open(production, make_client):
     client, fake = make_client(**data())
 
     assert client.post(RUN, json={}).status_code == 401
-    assert client.post(RUN, json={}, headers={"X-API-Token": "guess"}).status_code == 401
+    assert client.post(RUN, json={}, headers={"X-Scheduler-Token": "guess"}).status_code == 401
     assert fake.runs.rows == []
 
 
@@ -171,14 +175,14 @@ def test_an_owner_runs_a_job_by_hand_and_it_is_not_the_schedule(production, make
 def test_an_unknown_job_is_refused(production, make_client):
     client, _ = make_client(**data())
 
-    response = client.post(RUN, json={"jobs": ["send.invoices"]}, headers=SERVICE)
+    response = client.post(RUN, json={"jobs": ["send.invoices"]}, headers=SCHEDULER)
 
     assert response.status_code == 400
 
 
 def test_a_finance_scan_is_hidden_from_a_reader_without_finance_read(production, make_client):
     client, fake = make_client(**data())
-    run = client.post(RUN, json={"jobs": ["financial.overdue_check"]}, headers=SERVICE).json()["runs"][0]
+    run = client.post(RUN, json={"jobs": ["financial.overdue_check"]}, headers=SCHEDULER).json()["runs"][0]
 
     fake.tokens["good-token"] = "seo-user"
     fake.grants["seo-user"] = SEO

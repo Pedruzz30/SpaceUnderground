@@ -214,6 +214,15 @@ export const approvalReviewPage = {
                 operationId: `approval:${request.id}`,
               });
             }
+            const statusChange = outcome?.changes?.status;
+            if (statusChange?.old !== "Live" && statusChange?.new === "Live") {
+              void dispatchAfterCommit("project.completed", {
+                entityType: "project",
+                entityId: request.resourceId,
+                payload: { project_id: request.resourceId, change_request_id: request.id },
+                operationId: `approval:${request.id}:completed`,
+              });
+            }
             return outcome;
           },
           t(request.action === "project.publish" ? "security.review.approvedPublished" : "security.review.approved"),

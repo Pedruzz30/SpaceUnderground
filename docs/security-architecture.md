@@ -922,7 +922,7 @@ way around RBAC, approvals or MFA. It is not:
 
 - The Admin authenticates to it with the member's own Supabase access token;
   the bundle carries no automation secret (`admin/tests/automation-integration.test.mjs`
-  fails if `X-API-Token` appears in `admin/src`).
+  fails if `X-Scheduler-Token` appears in `admin/src`).
 - The service asks Supabase Auth whose token it is, then calls
   `public.has_permission(key)` **with that token** for the permission each
   endpoint or workflow needs. The answer is the database's — the same function
@@ -938,9 +938,8 @@ way around RBAC, approvals or MFA. It is not:
   trusted backend. Project triggers still stamp versions and write
   `security_audit_log` entries for what it creates; `activity_log` rows are
   authored by the member who triggered the run.
-- The scheduler uses `X-API-Token`, a server-side secret (Render and GitHub
+- The scheduler uses `X-Scheduler-Token`, a jobs-only secret (Render and GitHub
   Actions secrets). It can run jobs, which only read and record.
 - Approvals are not bypassed: the service never publishes. `project.published`
   is dispatched after a publication the database already accepted — directly
   by a member with `projects.publish`, or by `approve_change_request()`.
-

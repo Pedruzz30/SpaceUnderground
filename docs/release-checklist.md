@@ -226,14 +226,14 @@ steps and the production smoke test: `services/automation-api/README.md`
 
 - [ ] Render web service from `services/automation-api/render.yaml`, branch
       `main`; secrets set in Render only: `SUPABASE_SERVICE_ROLE_KEY`,
-      `API_TOKEN`; plus `SUPABASE_URL` and `ADMIN_ORIGIN` (the exact https
+      `SCHEDULER_TOKEN`; plus `SUPABASE_URL` and `ADMIN_ORIGIN` (the exact https
       Admin origin — production refuses localhost, http and `*`).
 - [ ] `/health` 200, `/api/v1/health` shows no value, `/api/v1/ready` 200.
 - [ ] Netlify: `VITE_AUTOMATION_API_URL` set to the Render origin, and that
       exact origin is in `connect-src` (`netlify.toml`). Never a service role
       key or API token in any `VITE_` variable.
 - [ ] GitHub Actions: variable `AUTOMATION_API_URL`, secret
-      `AUTOMATION_API_TOKEN`; run "Automation jobs" once by hand.
+      `AUTOMATION_SCHEDULER_TOKEN`; run "Automation jobs" once by hand.
 - [ ] In the real Admin: Settings › Sistema reads the service as Online and
       Pronto; Logs › Automações lists runs; publishing a project records a
       `project.published` run; retrying a FAILED run creates a new run.

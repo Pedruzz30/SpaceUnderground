@@ -32,8 +32,8 @@ def _auth_detail(settings: Settings) -> str | None:
     mechanisms = []
     if settings.admin_jwt_auth:
         mechanisms.append("member access token (permissions checked in the database)")
-    if settings.api_token:
-        mechanisms.append("service token")
+    if settings.scheduler_token:
+        mechanisms.append("scheduler token (jobs runner only)")
 
     if not mechanisms:
         return "No authentication is configured; requests are unauthenticated."
@@ -53,7 +53,7 @@ async def health(
         ),
         DependencyHealth(
             name="authentication",
-            configured=settings.admin_jwt_auth or bool(settings.api_token),
+            configured=settings.admin_jwt_auth or bool(settings.scheduler_token),
             # Says which mechanisms are on, never what any credential is.
             detail=_auth_detail(settings),
         ),
@@ -91,7 +91,10 @@ async def health(
         dependencies=dependencies,
         auth_modes=[
             mode
-            for mode, enabled in (("member", settings.admin_jwt_auth), ("service", bool(settings.api_token)))
+            for mode, enabled in (
+                ("member", settings.admin_jwt_auth),
+                ("scheduler", bool(settings.scheduler_token)),
+            )
             if enabled
         ],
     )

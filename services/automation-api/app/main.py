@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
 
     available = (
         ("admin_jwt", settings.admin_jwt_auth),
-        ("service_token", bool(settings.api_token)),
+        ("scheduler_token", bool(settings.scheduler_token)),
     )
     mechanisms = [name for name, enabled in available if enabled]
 
@@ -81,7 +81,7 @@ async def lifespan(app: FastAPI):
             logger,
             logging.WARNING,
             "app.startup.unauthenticated",
-            hint="set API_TOKEN or enable ADMIN_JWT_AUTH to require a credential",
+            hint="enable ADMIN_JWT_AUTH to require a member credential",
         )
 
     yield
@@ -109,8 +109,8 @@ def create_app() -> FastAPI:
     # credentialed CORS -- and leaving it off keeps the allowlist from ever
     # being paired with a wildcard by a later edit.
     #
-    # X-API-Token is deliberately not an allowed header: it is the machines'
-    # secret, and no browser page -- the Admin included -- may ever send it.
+    # X-Scheduler-Token is deliberately not an allowed header: it belongs to
+    # GitHub Actions, and no browser page -- the Admin included -- may send it.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,

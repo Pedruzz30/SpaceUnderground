@@ -30,7 +30,7 @@ def test_versioned_health_reports_dependencies(make_client):
     assert body["status"] == "ok"
     assert body["environment"] == "development"
 
-    # Member tokens are always accepted; the service token only once one exists.
+    # Member tokens are always accepted; the scheduler token only once one exists.
     assert body["auth_modes"] == ["member"]
 
     dependencies = {item["name"]: item for item in body["dependencies"]}
@@ -43,7 +43,7 @@ def test_versioned_health_reports_dependencies(make_client):
 
 def test_health_needs_no_token(make_client, monkeypatch):
     """A probe must keep working when the shared secret changes."""
-    monkeypatch.setenv("API_TOKEN", "s3cret")
+    monkeypatch.setenv("SCHEDULER_TOKEN", "scheduler-secret-with-more-than-32-characters")
     get_settings.cache_clear()
 
     client, _ = make_client()
@@ -135,18 +135,19 @@ def test_invalid_identifier_is_rejected_before_supabase(make_client):
     assert fake.calls == []
 
 
-def test_token_is_required_when_configured(make_client, monkeypatch):
-    monkeypatch.setenv("API_TOKEN", "s3cret")
+def test_scheduler_token_does_not_unlock_data_endpoints(make_client, monkeypatch):
+    monkeypatch.setenv("SCHEDULER_TOKEN", "scheduler-secret-with-more-than-32-characters")
     get_settings.cache_clear()
 
     client, _ = make_client([])
 
-    assert client.get("/api/v1/reports/overview").status_code == 401
+    with_token = client.get(
+        "/api/v1/reports/overview",
+        headers={"X-Scheduler-Token": "scheduler-secret-with-more-than-32-characters"},
+    )
+    assert with_token.status_code == 403
 
-    with_token = client.get("/api/v1/reports/overview", headers={"X-API-Token": "s3cret"})
-    assert with_token.status_code == 200
-
-    wrong_token = client.get("/api/v1/reports/overview", headers={"X-API-Token": "nope"})
+    wrong_token = client.get("/api/v1/reports/overview", headers={"X-Scheduler-Token": "nope"})
     assert wrong_token.status_code == 401
 
 

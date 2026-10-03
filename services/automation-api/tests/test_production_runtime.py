@@ -21,6 +21,7 @@ PRODUCTION_ENV = {
     "SUPABASE_URL": "https://example.supabase.co",
     "SUPABASE_SERVICE_ROLE_KEY": "sb_secret_abc123",
     "ADMIN_ORIGIN": "https://admin.example.com",
+    "SCHEDULER_TOKEN": "scheduler-secret-with-more-than-32-characters",
 }
 
 PUBLISHED = {"event": "project.published", "entity_id": "1"}
@@ -220,24 +221,20 @@ def test_auth_me_reports_what_the_member_may_do(production, make_client):
     assert "token" not in str(body).lower()
 
 
-# --- service token -------------------------------------------------------------
+# --- scheduler token -----------------------------------------------------------
 
 
-def test_the_service_token_still_works_for_machines(production, make_client):
-    """CI and the scheduler keep a shared secret; only the browser may not."""
-    production.setenv("API_TOKEN", "s3rv1ce")
-    get_settings.cache_clear()
-
+def test_the_scheduler_token_cannot_read_runs_or_dispatch_workflows(production, make_client):
+    """The GitHub secret proves only the scheduler, never a business operator."""
     client, _ = member_client(make_client, OWNER)
+    scheduler = {"X-Scheduler-Token": PRODUCTION_ENV["SCHEDULER_TOKEN"]}
 
-    assert client.get("/api/v1/automations/runs", headers={"X-API-Token": "s3rv1ce"}).status_code == 200
-    assert client.get("/api/v1/automations/runs", headers={"X-API-Token": "wrong"}).status_code == 401
+    assert client.get("/api/v1/automations/runs", headers=scheduler).status_code == 403
+    assert client.post("/api/v1/automations/dispatch", json=PUBLISHED, headers=scheduler).status_code == 403
+    assert client.get("/api/v1/automations/runs", headers={"X-Scheduler-Token": "wrong"}).status_code == 401
 
 
-def test_a_member_token_still_works_when_a_service_token_exists(production, make_client):
-    production.setenv("API_TOKEN", "s3rv1ce")
-    get_settings.cache_clear()
-
+def test_a_member_token_still_works_when_a_scheduler_token_exists(production, make_client):
     client, _ = member_client(make_client, OWNER)
 
     assert client.get("/api/v1/automations/runs", headers=BEARER).status_code == 200
@@ -256,8 +253,8 @@ def test_staging_never_runs_open(make_client, monkeypatch):
     assert client.post("/api/v1/jobs/run", json={}).status_code == 401
 
 
-def test_a_browser_may_not_send_the_service_token(production, make_client):
-    """X-API-Token is the machines' secret: CORS never lets a page send it."""
+def test_a_browser_may_not_send_the_scheduler_token(production, make_client):
+    """X-Scheduler-Token belongs to GitHub Actions, never a browser."""
     client, _ = member_client(make_client, OWNER)
 
     preflight = client.options(
@@ -265,19 +262,28 @@ def test_a_browser_may_not_send_the_service_token(production, make_client):
         headers={
             "Origin": "https://admin.example.com",
             "Access-Control-Request-Method": "GET",
-            "Access-Control-Request-Headers": "x-api-token",
+            "Access-Control-Request-Headers": "x-scheduler-token",
         },
     )
 
-    assert "x-api-token" not in preflight.headers.get("access-control-allow-headers", "").lower()
+    assert "x-scheduler-token" not in preflight.headers.get("access-control-allow-headers", "").lower()
 
 
-def test_a_service_token_is_never_accepted_when_none_is_configured(production, make_client):
+def test_a_scheduler_token_is_never_accepted_when_none_is_configured(production, make_client):
+    production.delenv("SCHEDULER_TOKEN")
+    get_settings.cache_clear()
     client, _ = member_client(make_client, OWNER)
 
-    response = client.get("/api/v1/automations/runs", headers={"X-API-Token": ""})
+    response = client.post("/api/v1/jobs/run", json={}, headers={"X-Scheduler-Token": "anything"})
 
     assert response.status_code == 401
+
+
+def test_production_requires_a_strong_scheduler_secret(production):
+    production.setenv("SCHEDULER_TOKEN", "too-short")
+    get_settings.cache_clear()
+
+    assert "SCHEDULER_TOKEN must contain at least 32 characters." in get_settings().startup_problems
 
 
 # --- health and readiness ------------------------------------------------------

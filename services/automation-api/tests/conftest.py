@@ -75,7 +75,7 @@ def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "APP_ENV",
         "SUPABASE_URL",
         "SUPABASE_SERVICE_ROLE_KEY",
-        "API_TOKEN",
+        "SCHEDULER_TOKEN",
         "ADMIN_ORIGIN",
         "ADMIN_JWT_AUTH",
         "APP_TIMEZONE",
@@ -251,6 +251,7 @@ class FakeSupabaseService:
                 "status": "In Development",
                 "editorial_status": "DRAFT",
                 "visible": False,
+                "client": opportunity.get("company") or opportunity.get("contact_name"),
                 "client_id": None,
             }
             self.rows.append(project)
@@ -269,6 +270,12 @@ class FakeSupabaseService:
         client_linked = False
         if project.get("client_id") is None and opportunity.get("client_id"):
             project["client_id"] = opportunity["client_id"]
+            client = next(
+                (row for row in self.clients if row.get("id") == opportunity["client_id"]),
+                None,
+            )
+            if client:
+                project["client"] = client.get("company") or client.get("name")
             client_linked = True
 
         linked = 0

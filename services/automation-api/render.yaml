@@ -47,7 +47,7 @@ services:
       - key: ADMIN_JWT_AUTH
         value: "true"
 
-      # Set in the dashboard. SUPABASE_SERVICE_ROLE_KEY and API_TOKEN are
+      # Set in the dashboard. SUPABASE_SERVICE_ROLE_KEY and SCHEDULER_TOKEN are
       # secrets. ADMIN_ORIGIN is not, but it is deployment-specific: the exact
       # https origin of the Admin on Netlify. The service refuses to start in
       # production with a localhost, plain-http or wildcard origin.
@@ -57,7 +57,7 @@ services:
         sync: false
       - key: ADMIN_ORIGIN
         sync: false
-      # For the scheduler (GitHub Actions, automation-jobs.yml) and scripts.
-      # Generate a long random value; never put it in the Admin.
-      - key: API_TOKEN
+      # Accepted only by POST /api/v1/jobs/run. Generate at least 32 random
+      # characters; never put it in the Admin.
+      - key: SCHEDULER_TOKEN
         sync: false

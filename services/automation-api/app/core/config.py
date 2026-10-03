@@ -49,11 +49,10 @@ class Settings(BaseSettings):
         "http://localhost:5174,http://127.0.0.1:5174," "http://localhost:5173,http://127.0.0.1:5173"
     )
 
-    # Optional shared secret, sent as X-API-Token. This is the service-to-service
-    # credential: CI, scripts, technical administration. It is deliberately NOT
-    # what the Admin uses -- a secret shipped in a browser bundle is not a
-    # secret, so the Admin authenticates as its signed-in user instead.
-    api_token: str = ""
+    # Dedicated credential for the external scheduler. It is accepted only by
+    # POST /api/v1/jobs/run; it grants no member permission and cannot dispatch
+    # business workflows or read run history. The Admin never receives it.
+    scheduler_token: str = ""
 
     # When true, a caller may present a Supabase access token as
     # `Authorization: Bearer`. The service asks Supabase who the token belongs
@@ -179,8 +178,13 @@ class Settings(BaseSettings):
         elif self.is_production and any(not origin.startswith("https://") for origin in self.allowed_origins):
             problems.append("ADMIN_ORIGIN must only list https origins in production.")
 
-        if not self.api_token and not self.admin_jwt_auth:
-            problems.append("No authentication is enabled; set API_TOKEN or leave ADMIN_JWT_AUTH on.")
+        if not self.admin_jwt_auth:
+            problems.append("Member authentication is disabled; leave ADMIN_JWT_AUTH on.")
+
+        if self.is_production and not self.scheduler_token:
+            problems.append("SCHEDULER_TOKEN is not set.")
+        elif self.scheduler_token and len(self.scheduler_token) < 32:
+            problems.append("SCHEDULER_TOKEN must contain at least 32 characters.")
 
         return problems
 

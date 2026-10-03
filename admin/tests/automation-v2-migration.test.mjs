@@ -156,7 +156,9 @@ describe("automation v2 migration", () => {
 
     assert.equal(second.project_id, first.project_id);
     assert.equal(second.client_linked, true);
-    assert.equal((await one(db.query("select client_id from public.projects where id = $1", [first.project_id]))).client_id, ids.client);
+    const project = await one(db.query("select client_id, client from public.projects where id = $1", [first.project_id]));
+    assert.equal(project.client_id, ids.client);
+    assert.equal(project.client, "Aurora Labs", "the public label follows the client linked later");
   });
 
   it("finds a free slug instead of failing on a taken one", async () => {

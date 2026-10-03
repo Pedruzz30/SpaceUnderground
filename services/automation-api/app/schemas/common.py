@@ -50,8 +50,8 @@ class DetailedHealthResponse(HealthResponse):
     environment: str
     dependencies: list[DependencyHealth]
     # Which caller kinds the service accepts: "member" (a Supabase access
-    # token, permissions checked in the database) and/or "service" (the
-    # shared token). Names only -- never what any credential is.
+    # token, permissions checked in the database) and/or "scheduler" (the
+    # jobs-only token). Names only -- never what any credential is.
     auth_modes: list[str] = Field(default_factory=list)
 
 
@@ -82,7 +82,7 @@ class ErrorResponse(BaseModel):
 class CallerSession(BaseModel):
     """The caller as this service proved it. Never carries the token."""
 
-    kind: str = Field(examples=["member", "service", "anonymous"])
+    kind: str = Field(examples=["member", "scheduler", "anonymous"])
     user_id: str | None = None
     # The automation-relevant permissions the database granted, as of now.
     permissions: list[str] = Field(default_factory=list)
