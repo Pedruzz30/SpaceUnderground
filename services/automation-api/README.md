@@ -255,7 +255,7 @@ cannot see it, and deletes only that probe row.
 
 Order matters: **migration, then service, then Admin.**
 
-1. Apply `supabase/migrations/20261002233745_automation_v2.sql` to production
+1. Apply `supabase/migrations/20261003015032_automation_v2.sql` to production
    (`supabase db push` or the SQL editor). It is additive; nothing is dropped
    or rewritten.
 2. Render › New › Blueprint › this repository, *Blueprint path*
