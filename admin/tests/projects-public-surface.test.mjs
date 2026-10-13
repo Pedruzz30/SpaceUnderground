@@ -212,12 +212,26 @@ describe("admin", () => {
 });
 
 describe("post-review migration", () => {
-  it("can run again without widening anything", async () => {
+  it("can run again without exposing client_id, and the latest public migration restores newer columns", async () => {
     await db.exec(readMigration("clients_post_review_hardening"));
+
+    // This older migration intentionally reissues the public column grant it
+    // knew at the time. Columns created later are therefore narrowed away,
+    // which is safer than widening access accidentally.
+    const narrowed = await asRole("anon", null, () => failure(PUBLIC_QUERY));
+    assert.equal(narrowed?.code, "42501");
+
+    const privateError = await asRole("anon", null, () => failure("select client_id from public.projects"));
+    assert.equal(privateError?.code, "42501");
+
+    // Replaying the current additive migration restores today's public surface
+    // while keeping the admin-only client link private.
+    await db.exec(readMigration("portfolio_case_studies"));
     const { rows } = await asRole("anon", null, () => db.query(PUBLIC_QUERY));
     assert.equal(rows.length, 1);
-    const error = await asRole("anon", null, () => failure("select client_id from public.projects"));
-    assert.equal(error?.code, "42501");
+
+    const afterRestore = await asRole("anon", null, () => failure("select client_id from public.projects"));
+    assert.equal(afterRestore?.code, "42501");
   });
 
   it("adds a nullable clients.last_contact_at that admins can set and clear", async () => {
