@@ -57,6 +57,13 @@ export function mapProjectFromDatabase(row) {
     name: row.name ?? "",
     slug: row.slug ?? "",
     client: row.client ?? "",
+    caseKind: row.case_kind ?? "Product",
+    caseStudy: {
+      context: row.case_context ?? "",
+      problem: row.case_problem ?? "",
+      solution: row.case_solution ?? "",
+      result: row.case_result ?? "",
+    },
     // Optional owning client record. `client` above stays the public label.
     clientId: row.client_id ?? null,
     category: row.category ?? "Website",
@@ -101,6 +108,13 @@ export function mapProjectToDatabase(model) {
   if (model.name !== undefined) row.name = model.name;
   if (model.slug !== undefined) row.slug = model.slug;
   if (model.client !== undefined) row.client = model.client;
+  if (model.caseKind !== undefined) row.case_kind = model.caseKind || "Product";
+  if (model.caseStudy !== undefined) {
+    row.case_context = model.caseStudy?.context || null;
+    row.case_problem = model.caseStudy?.problem || null;
+    row.case_solution = model.caseStudy?.solution || null;
+    row.case_result = model.caseStudy?.result || null;
+  }
   if (model.clientId !== undefined) row.client_id = model.clientId || null;
   if (model.category !== undefined) row.category = model.category;
   if (model.description !== undefined) row.description = model.description;
