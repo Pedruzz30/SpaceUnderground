@@ -1890,7 +1890,7 @@ export default {
     projectUrl: "URL do projeto",
     projectUrlHint: "URL externa do projeto.",
     previewUrl: "URL de prévia",
-    previewUrlHint: "URL usada no iframe da demonstração ao vivo.",
+    previewUrlHint: "URL http(s) ou caminho local da demo (ex.: ./jarvis-demo/).",
     enableLiveDemo: "Ativar demonstração ao vivo",
     liveDemoStatus: "Status da demonstração",
     testDemo: "Testar demo",
