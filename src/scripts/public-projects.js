@@ -40,6 +40,14 @@ function categoryLabel(row) {
   return (label === key ? value : label).toUpperCase();
 }
 
+function caseKindLabel(row) {
+  const value = text(row?.case_kind);
+  if (!value) return "";
+  const key = `work.caseKinds.${value.toLowerCase().replace(/\s+/g, "")}`;
+  const label = t(key);
+  return (label === key ? value : label).toUpperCase();
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -115,7 +123,14 @@ function projectFromRow(row, signed) {
       name: text(row.name),
       client: text(row.client || row.name).toUpperCase(),
       category: categoryLabel(row),
+      caseKind: caseKindLabel(row),
       description: localized(row, "description"),
+      caseStudy: {
+        context: localized(row, "case_context"),
+        problem: localized(row, "case_problem"),
+        solution: localized(row, "case_solution"),
+        result: localized(row, "case_result"),
+      },
       url: resolvePublicUrl(row.project_url),
       previewUrl,
       hasLivePreview: Boolean(previewUrl),
