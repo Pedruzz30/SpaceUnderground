@@ -136,7 +136,7 @@ function createLivePreview(frame, mobileMedia) {
   const modeButtons = [...frame.querySelectorAll("[data-signal-mode]")];
   const openButtons = [...frame.querySelectorAll("[data-signal-open]")];
 
-  let projectUrl = frame.dataset.projectUrl || iframe?.dataset.src || "";
+  let projectUrl = resolvePublicUrl(frame.dataset.projectUrl || iframe?.dataset.src || "");
   let previewUrl = resolvePublicUrl(frame.dataset.projectPreviewUrl || iframe?.dataset.src);
   let previewOrigin = originOf(previewUrl);
   let posterUrl = frame.dataset.projectPoster || "";
@@ -220,6 +220,11 @@ function createLivePreview(frame, mobileMedia) {
       button.setAttribute("aria-label", hasLivePreview ? availableLabel : unavailableLabel);
       if (!hasLivePreview) button.title = unavailableLabel;
       else button.removeAttribute("title");
+    });
+
+    openButtons.forEach((button) => {
+      button.disabled = !projectUrl;
+      button.toggleAttribute("aria-disabled", !projectUrl);
     });
   };
 
