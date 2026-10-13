@@ -6,6 +6,13 @@ import { contentCompleteness, isLivePreviewUrl, liveDemoState, projectHealth, pu
 const completeProject = (overrides = {}) => ({
   name: "INK Tattoo",
   client: "INK Tattoo",
+  caseKind: "Client",
+  caseStudy: {
+    context: "Contexto",
+    problem: "Problema",
+    solution: "Solução",
+    result: "Resultado",
+  },
   category: "Website",
   description: "Site editorial.",
   editorialStatus: "PUBLISHED",
@@ -27,6 +34,10 @@ const completeProject = (overrides = {}) => ({
       presentation_label: "PORTFOLIO",
       presentation_address: "INK / LIVE",
       presentation_type: "WEBSITE",
+      case_context: "Context",
+      case_problem: "Problem",
+      case_solution: "Solution",
+      case_result: "Result",
     },
   },
   modules: [
@@ -67,7 +78,7 @@ describe("content completeness", () => {
     }));
 
     assert.equal(completeness.pt.percent, 100);
-    assert.equal(completeness.en.percent, 14);
+    assert.equal(completeness.en.percent, 9);
   });
 });
 
@@ -95,6 +106,7 @@ describe("live demo validation", () => {
   it("accepts only http and https iframe URLs", () => {
     assert.equal(isLivePreviewUrl("https://example.com"), true);
     assert.equal(isLivePreviewUrl("http://example.com"), true);
+    assert.equal(isLivePreviewUrl("./termo-digital-demo/?embed=spaceunderground"), true);
     assert.equal(isLivePreviewUrl("data:text/html,test"), false);
     assert.equal(isLivePreviewUrl("file:///tmp/demo.html"), false);
   });
@@ -171,6 +183,10 @@ describe("English completeness covers every field the editor can translate", () 
     "presentation_label",
     "presentation_address",
     "presentation_type",
+    "case_context",
+    "case_problem",
+    "case_solution",
+    "case_result",
   ];
 
   const withTranslations = (translations) =>
