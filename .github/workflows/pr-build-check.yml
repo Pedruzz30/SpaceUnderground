@@ -38,6 +38,32 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run public viewer E2E
+        env:
+          VITE_SUPABASE_URL: https://fixture.supabase.co
+          VITE_SUPABASE_ANON_KEY: fixture-public-key
+          BASE_URL: http://127.0.0.1:5173
+        run: |
+          npm run dev > /tmp/space-underground-vite.log 2>&1 &
+          VITE_PID=$!
+          trap 'kill $VITE_PID 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:5173/ > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat /tmp/space-underground-vite.log
+            exit 1
+          fi
+          npm run test:e2e:viewer
+
   admin:
     name: Admin
     runs-on: ubuntu-latest
