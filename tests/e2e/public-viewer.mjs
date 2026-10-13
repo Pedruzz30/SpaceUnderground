@@ -161,7 +161,9 @@ async function openFixturePage({ width = 1440, height = 1000, locale = "pt-BR" }
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
   );
   await context.route("**/storage/v1/object/sign/project-media", (route) =>
-    route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "fixture media outage" }) }),
+    // A malformed success response simulates a broken signing service without
+    // adding an expected browser-level 5xx console error to unrelated checks.
+    route.fulfill({ status: 200, contentType: "application/json", body: "{malformed-json" }),
   );
   await context.route("https://pedruzz30.github.io/**", (route) => {
     iframeRequests.push(route.request().url());
