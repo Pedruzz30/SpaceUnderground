@@ -136,6 +136,97 @@
   justify-self: end;
 }
 
+.project-case-study {
+  margin-top: clamp(2.5rem, 5vw, 4.5rem);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.project-case-study[hidden] {
+  display: none;
+}
+
+.project-case-study__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.project-case-study__head span {
+  color: var(--muted);
+}
+
+.project-case-study__head strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.project-case-study__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.project-case-study__grid article {
+  min-height: 12rem;
+  padding: clamp(1.3rem, 2.5vw, 2rem);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.project-case-study__grid article:nth-child(2n) {
+  border-right: 0;
+}
+
+.project-case-study__grid article:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.project-case-study__grid article[hidden] {
+  display: none;
+}
+
+.project-case-study__grid span {
+  display: block;
+  margin-bottom: 1.25rem;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.project-case-study__grid p {
+  max-width: 48rem;
+  color: var(--text);
+  font-size: clamp(1rem, 1.35vw, 1.2rem);
+  line-height: 1.6;
+}
+
+@media (max-width: 759px) {
+  .project-case-study__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-case-study__grid article,
+  .project-case-study__grid article:nth-child(2n),
+  .project-case-study__grid article:nth-last-child(-n + 2) {
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .project-case-study__grid article:last-child {
+    border-bottom: 0;
+  }
+}
+
 .project-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
