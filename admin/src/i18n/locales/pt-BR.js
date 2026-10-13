@@ -1962,7 +1962,7 @@ export default {
       statusValid: "Selecione um status de projeto válido.",
       editorialStatusValid: "Selecione um status editorial válido.",
       urlValid: "Informe uma URL válida.",
-      previewUrlValid: "Use uma URL http ou https completa para a demonstração.",
+      previewUrlValid: "Use uma URL http(s) ou um caminho local iniciado por /, ./ ou ../.",
       hexValid: "Informe uma cor hexadecimal válida (ex.: #baff00).",
       moduleTitleRequired: "O título do módulo é obrigatório.",
     },
