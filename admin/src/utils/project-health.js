@@ -7,6 +7,8 @@ export function isLivePreviewUrl(value) {
   const raw = text(value);
   if (!raw) return false;
 
+  if (!/^(https?:\/\/|\/|\.{1,2}\/)/i.test(raw)) return false;
+
   try {
     const url = new URL(raw, "https://spaceunderground.local/");
     return ["http:", "https:"].includes(url.protocol);
