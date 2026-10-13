@@ -14,6 +14,7 @@ const KNOWN_CASES = [1, 2, 3, 4, 5];
 const STRUCTURAL_FIELDS = [
   "name",
   "client",
+  "caseKind",
   "slug",
   "caseNumber",
   "category",
@@ -49,6 +50,23 @@ describe("seeded project translations", () => {
   it("keeps pt-BR as the editorial base", () => {
     for (const seed of projectPresentationSeed) {
       assert.match(seed.description, PORTUGUESE, `case ${seed.caseNumber} base description is Portuguese`);
+    }
+  });
+
+  it("classifies every curated case without pretending every case is client work", () => {
+    assert.equal(seedFor(1).caseKind, "Client");
+    assert.equal(seedFor(2).caseKind, "Client");
+    assert.equal(seedFor(3).caseKind, "Lab");
+    assert.equal(seedFor(4).caseKind, "Product");
+    assert.equal(seedFor(5).caseKind, "Product");
+  });
+
+  it("provides the four case-study blocks in both languages", () => {
+    for (const seed of projectPresentationSeed) {
+      for (const field of ["context", "problem", "solution", "result"]) {
+        assert.ok(seed.caseStudy?.[field], `case ${seed.caseNumber} has base caseStudy.${field}`);
+        assert.ok(seed.translations?.en?.caseStudy?.[field], `case ${seed.caseNumber} has English caseStudy.${field}`);
+      }
     }
   });
 
