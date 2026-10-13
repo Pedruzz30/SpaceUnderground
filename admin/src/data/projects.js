@@ -1,5 +1,7 @@
 export const CATEGORIES = ["Website", "System", "Automation", "AI", "Other"];
 
+export const CASE_KINDS = ["Client", "Product", "Lab"];
+
 export const PROJECT_STATUSES = ["Live", "Prototype", "MVP", "Pilot", "In Development", "Research", "Archived"];
 
 export const EDITORIAL_STATUSES = ["DRAFT", "PUBLISHED", "ARCHIVED"];
@@ -23,6 +25,13 @@ export const seedProjects = [
     slug: "ink-tattoo",
     client: "INK Tattoo",
     clientId: "mock-client-001",
+    caseKind: "Client",
+    caseStudy: {
+      context: "Presença digital para um estúdio de tatuagem com linguagem visual forte e portfólio como elemento central.",
+      problem: "Apresentar identidade, trabalhos e atmosfera da marca sem depender de uma interface genérica.",
+      solution: "Experiência editorial escura com composição visual, movimento e navegação orientada ao portfólio.",
+      result: "O case demonstra direção de arte, interação responsiva e construção de presença digital para uma marca visual.",
+    },
     category: "Website",
     description: "Dark editorial website for a tattoo studio, built around visual depth, motion and brand presence.",
     status: "Live",
@@ -61,6 +70,13 @@ export const seedProjects = [
     slug: "lucas-souza",
     client: "Lucas Souza",
     clientId: "mock-client-002",
+    caseKind: "Client",
+    caseStudy: {
+      context: "Presença digital voltada a nutrição esportiva, performance e construção de credibilidade profissional.",
+      problem: "Organizar a proposta profissional em uma experiência clara que comunique atuação, confiança e próximos passos.",
+      solution: "Site responsivo com narrativa de performance, hierarquia de conteúdo e pontos de conversão distribuídos pela experiência.",
+      result: "O case demonstra estratégia de conteúdo, apresentação de serviço e implementação front-end orientada à conversão.",
+    },
     category: "Website",
     description: "Strategic digital presence for sports nutrition, focused on credibility, performance and conversion.",
     status: "Live",
