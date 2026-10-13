@@ -10,6 +10,12 @@ export const projectPresentationSeed = [
     translations: {
       en: {
         description: "A dark editorial experience built around tattoo culture, movement and visual depth.",
+        caseStudy: {
+          context: "Digital presence for a tattoo studio with a strong visual language and the portfolio at its core.",
+          problem: "Present the brand identity, work and atmosphere without relying on a generic interface.",
+          solution: "A dark editorial experience combining visual composition, motion and portfolio-led navigation.",
+          result: "The case demonstrates art direction, responsive interaction and digital presence work for a visual brand.",
+        },
         presentation: {
           system: "EXPERIENCE SYSTEM / 01",
           label: "PORTFOLIO",
@@ -25,6 +31,13 @@ export const projectPresentationSeed = [
     caseNumber: 1,
     name: "INK Tattoo",
     client: "INK TATTOO",
+    caseKind: "Client",
+    caseStudy: {
+      context: "Presença digital para um estúdio de tatuagem com linguagem visual forte e portfólio como elemento central.",
+      problem: "Apresentar identidade, trabalhos e atmosfera da marca sem depender de uma interface genérica.",
+      solution: "Experiência editorial escura com composição visual, movimento e navegação orientada ao portfólio.",
+      result: "O case demonstra direção de arte, interação responsiva e construção de presença digital para uma marca visual.",
+    },
     category: "Website",
     description: "Uma experiência editorial escura construída em torno da cultura da tatuagem, movimento e profundidade visual.",
     status: "Live",
@@ -54,6 +67,12 @@ export const projectPresentationSeed = [
     translations: {
       en: {
         description: "A strategic digital presence built around performance, credibility and conversion.",
+        caseStudy: {
+          context: "Digital presence focused on sports nutrition, performance and professional credibility.",
+          problem: "Organize the professional offering into a clear experience that communicates expertise, trust and next steps.",
+          solution: "A responsive website with a performance-led narrative, clear content hierarchy and conversion points throughout the experience.",
+          result: "The case demonstrates content strategy, service presentation and conversion-oriented front-end implementation.",
+        },
         presentation: {
           system: "PERFORMANCE SYSTEM / 02",
           label: "PERFORMANCE",
@@ -69,6 +88,13 @@ export const projectPresentationSeed = [
     caseNumber: 2,
     name: "Lucas Souza",
     client: "LUCAS SOUZA",
+    caseKind: "Client",
+    caseStudy: {
+      context: "Presença digital voltada a nutrição esportiva, performance e construção de credibilidade profissional.",
+      problem: "Organizar a proposta profissional em uma experiência clara que comunique atuação, confiança e próximos passos.",
+      solution: "Site responsivo com narrativa de performance, hierarquia de conteúdo e pontos de conversão distribuídos pela experiência.",
+      result: "O case demonstra estratégia de conteúdo, apresentação de serviço e implementação front-end orientada à conversão.",
+    },
     category: "Website",
     description: "Presença digital estratégica criada em torno de performance, credibilidade e conversão.",
     status: "Live",
@@ -98,6 +124,12 @@ export const projectPresentationSeed = [
     translations: {
       en: {
         description: "An intelligent Windows environment combining conversational AI, voice, memory, automation, permission-based security and real-time system control.",
+        caseStudy: {
+          context: "Internal lab exploring an intelligent assistant interface for Windows.",
+          problem: "Combine conversation, voice, memory, automation and system control without removing permission and security boundaries.",
+          solution: "A Python and PyQt6 desktop prototype with an AI layer, automation tools, memory and permission controls.",
+          result: "The prototype demonstrates the integration of conversational AI, local automation and an explicit permission-based security layer.",
+        },
         presentation: {
           system: "INTELLIGENCE SYSTEM / 03",
           label: "AI / AUTOMATION",
@@ -113,6 +145,13 @@ export const projectPresentationSeed = [
     caseNumber: 3,
     name: "JARVIS AI",
     client: "SPACE UNDERGROUND LABS",
+    caseKind: "Lab",
+    caseStudy: {
+      context: "Laboratório interno para explorar uma interface de assistência inteligente no Windows.",
+      problem: "Combinar conversa, voz, memória, automação e controle do sistema sem remover limites de permissão e segurança.",
+      solution: "Protótipo desktop em Python e PyQt6 com camada de IA, ferramentas de automação, memória e controles de permissão.",
+      result: "O protótipo demonstra integração entre IA conversacional, automação local e uma camada explícita de segurança por permissões.",
+    },
     category: "AI",
     description: "Ambiente inteligente para Windows que combina IA conversacional, voz, memória, automação, segurança por permissões e controle do sistema em tempo real.",
     status: "Prototype",
@@ -142,6 +181,12 @@ export const projectPresentationSeed = [
     translations: {
       en: {
         description: "A school inventory management system for kitchen and cleaning supplies, with stock movements, auditing, alerts, spreadsheet syncing and AI-based invoice reading.",
+        caseStudy: {
+          context: "School inventory management system for kitchen and cleaning supplies.",
+          problem: "Centralize stock movements, auditing, alerts and replenishment information that can become scattered across manual controls.",
+          solution: "An inventory flow with inbound and outbound movements, history, alerts, spreadsheet syncing and assisted invoice reading.",
+          result: "The case demonstrates an end-to-end inventory workflow integrating interface, data, automation and AI.",
+        },
         presentation: {
           system: "OPERATIONS SYSTEM / 04",
           label: "MANAGEMENT / AUTOMATION",
@@ -157,6 +202,13 @@ export const projectPresentationSeed = [
     caseNumber: 4,
     name: "Despensa Digital",
     client: "GESTÃO ESCOLAR",
+    caseKind: "Product",
+    caseStudy: {
+      context: "Sistema de gestão de estoque escolar para itens de cozinha e limpeza.",
+      problem: "Centralizar movimentações, auditoria, alertas e informações de reposição que podem ficar dispersas em controles manuais.",
+      solution: "Fluxo de estoque com entradas e saídas, histórico, alertas, sincronização com planilhas e leitura assistida de notas fiscais.",
+      result: "O case demonstra um fluxo operacional completo de estoque e integração entre interface, dados, automação e IA.",
+    },
     category: "System",
     description: "Sistema de gestão de estoque escolar para cozinha e limpeza, com movimentações, auditoria, alertas, sincronização com planilhas e leitura de notas fiscais por IA.",
     status: "Live",
@@ -186,6 +238,12 @@ export const projectPresentationSeed = [
     translations: {
       en: {
         description: "A platform for personal trainers to create versioned digital agreements, send invitations, record acceptances and generate receipts with snapshots and SHA-256 hashes.",
+        caseStudy: {
+          context: "MVP platform for personal trainers to create and manage digital agreements with their clients.",
+          problem: "Record versions, invitations and acceptances with traceability while preserving exactly what was accepted at each point in time.",
+          solution: "A flow for versioned agreements, invitations, acceptance, snapshots, receipts and SHA-256 hashes backed by Supabase.",
+          result: "The MVP demonstrates acceptance traceability, immutable versioning and receipt generation inside a SaaS workflow.",
+        },
         presentation: {
           system: "PRODUCT SYSTEM / 05",
           label: "SAAS / FLOW",
@@ -201,6 +259,13 @@ export const projectPresentationSeed = [
     caseNumber: 5,
     name: "Termo Digital",
     client: "SISTEMA PARA PERSONAL TRAINER",
+    caseKind: "Product",
+    caseStudy: {
+      context: "MVP de plataforma para personal trainers criarem e administrarem termos digitais com seus alunos.",
+      problem: "Registrar versões, convites e aceites de forma rastreável, preservando o conteúdo aceito em cada momento.",
+      solution: "Fluxo de termos versionados, convites, aceite, snapshots, comprovantes e hash SHA-256 apoiado por Supabase.",
+      result: "O MVP demonstra rastreabilidade do aceite, versionamento imutável e geração de comprovantes dentro de um fluxo SaaS.",
+    },
     category: "System",
     description: "Plataforma para personal trainers criarem termos digitais versionados, enviarem convites, registrarem aceites e gerarem comprovantes com snapshots e hash SHA-256.",
     status: "MVP",
