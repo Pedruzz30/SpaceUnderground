@@ -1,6 +1,7 @@
 import { projects, defaultProjectKey } from "./project-registry.js";
 import { subscribeLocaleChange, t } from "./i18n/index.js";
 import { previewScale, RENDER_HEIGHT, RENDER_WIDTH, SCROLLBAR_ALLOWANCE } from "./preview-geometry.js";
+import { resolvePublicUrl } from "./public-url.js";
 
 const LIVE_PREVIEW_SELECTOR = "[data-live-project]";
 const MOBILE_QUERY = "(max-width: 759px)";
@@ -37,19 +38,9 @@ let activePreview = null;
 let viewer = null;
 
 function openProject(url) {
-  window.open(url, "_blank", "noopener,noreferrer");
-}
-
-function resolveUrl(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-
-  try {
-    const resolved = new URL(raw, document.baseURI);
-    return ["http:", "https:"].includes(resolved.protocol) ? resolved.href : "";
-  } catch {
-    return "";
-  }
+  const safeUrl = resolvePublicUrl(url);
+  if (!safeUrl) return;
+  window.open(safeUrl, "_blank", "noopener,noreferrer");
 }
 
 function originOf(url) {
@@ -61,7 +52,7 @@ function originOf(url) {
 }
 
 function hasLivePreviewUrl(url) {
-  return Boolean(resolveUrl(url));
+  return Boolean(resolvePublicUrl(url));
 }
 
 function escapeHtml(value) {
@@ -146,7 +137,7 @@ function createLivePreview(frame, mobileMedia) {
   const openButtons = [...frame.querySelectorAll("[data-signal-open]")];
 
   let projectUrl = frame.dataset.projectUrl || iframe?.dataset.src || "";
-  let previewUrl = resolveUrl(frame.dataset.projectPreviewUrl || iframe?.dataset.src);
+  let previewUrl = resolvePublicUrl(frame.dataset.projectPreviewUrl || iframe?.dataset.src);
   let previewOrigin = originOf(previewUrl);
   let posterUrl = frame.dataset.projectPoster || "";
   let hasLivePreview = hasLivePreviewUrl(previewUrl);
@@ -288,19 +279,19 @@ function createLivePreview(frame, mobileMedia) {
   });
 
   const setSource = ({ url, previewUrl: nextPreviewUrl, poster: nextPoster, posterFallback: fallback, title }) => {
-    const resolvedPreview = resolveUrl(nextPreviewUrl);
+    const resolvedPreview = resolvePublicUrl(nextPreviewUrl);
     // Re-applying the same project -- which is what a locale change does -- must
     // not tear down a preview that is already loaded. Only the surrounding copy
     // changes, so the iframe is left exactly as it is.
     if (resolvedPreview === previewUrl && (nextPoster || "") === posterUrl) {
-      projectUrl = url || "";
+      projectUrl = resolvePublicUrl(url);
       if (iframe && title) iframe.title = title;
       updateLiveControls();
       return;
     }
 
     unload();
-    projectUrl = url || "";
+    projectUrl = resolvePublicUrl(url);
     previewUrl = resolvedPreview;
     previewOrigin = originOf(previewUrl);
     hasLivePreview = hasLivePreviewUrl(previewUrl);
@@ -483,9 +474,10 @@ function createProjectViewer(frame, preview) {
     const project = projects[key];
     if (!project || project.reserved || (key === activeKey && !force)) return;
     activeKey = key;
+    const projectUrl = resolvePublicUrl(project.url);
 
     preview.setSource({
-      url: project.url,
+      url: projectUrl,
       previewUrl: project.previewUrl,
       poster: project.poster,
       // Set when the poster came from Supabase Storage: the bundled artwork
@@ -514,10 +506,18 @@ function createProjectViewer(frame, preview) {
 
     const openLabel = t("work.openNamedTab", { name: project.name });
     fields.links.forEach((link) => {
-      link.href = project.url;
+      if (projectUrl) {
+        link.href = projectUrl;
+        link.removeAttribute("aria-disabled");
+      } else {
+        link.removeAttribute("href");
+        link.setAttribute("aria-disabled", "true");
+      }
       link.setAttribute("aria-label", openLabel);
     });
     fields.open.forEach((button) => {
+      button.disabled = !projectUrl;
+      button.toggleAttribute("aria-disabled", !projectUrl);
       button.setAttribute("aria-label", t("work.openNamed", { name: project.name }));
     });
 
