@@ -1,5 +1,5 @@
 const PRESENTATION_FIELDS = ["system", "label", "address", "type"];
-const TRANSLATION_FIELDS = ["description", "presentation_system", "presentation_label", "presentation_address", "presentation_type"];
+const TRANSLATION_FIELDS = ["description", "presentation_system", "presentation_label", "presentation_address", "presentation_type", "case_context", "case_problem", "case_solution", "case_result"];
 
 const text = (value) => (typeof value === "string" ? value.trim() : "");
 
@@ -8,7 +8,7 @@ export function isLivePreviewUrl(value) {
   if (!raw) return false;
 
   try {
-    const url = new URL(raw);
+    const url = new URL(raw, "https://spaceunderground.local/");
     return ["http:", "https:"].includes(url.protocol);
   } catch {
     return false;
@@ -35,13 +35,17 @@ function moduleCount(modules = [], field, locale = "base") {
 
 export function contentCompleteness(project = {}) {
   const modules = Array.isArray(project.modules) ? project.modules : [];
-  const baseTotal = 5 + modules.length * 2;
+  const baseTotal = 9 + modules.length * 2;
   const baseDone = [
     project.description,
     project.presentation?.system,
     project.presentation?.label,
     project.presentation?.address,
     project.presentation?.type,
+    project.caseStudy?.context,
+    project.caseStudy?.problem,
+    project.caseStudy?.solution,
+    project.caseStudy?.result,
   ].filter(text).length + moduleCount(modules, "title") + moduleCount(modules, "description");
 
   const translations = project.translations?.en ?? {};
