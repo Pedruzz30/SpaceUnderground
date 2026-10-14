@@ -29,7 +29,7 @@ const fixture = [
     presentation_type: "SITE DE PORTFÓLIO",
     origin: "RJ / BR",
     coordinates: ["22°54'S", "43°12'W"],
-    poster_url: "",
+    poster_url: "projects/ink-tattoo/poster/demo.png",
     project_url: "https://pedruzz30.github.io/TattooSite/",
     preview_url: INK_PREVIEW,
     live_preview_enabled: true,
@@ -115,6 +115,31 @@ const fixture = [
     project_gallery: [],
     project_modules: [],
   },
+  {
+    case_number: 5,
+    name: "Termo Digital",
+    slug: "termo-digital",
+    client: "Space Underground",
+    category: "System",
+    description: "Demo local distribuída junto do portfólio.",
+    status: "MVP",
+    year: 2026,
+    accent: "#8b5cf6",
+    tech_stack: ["Next.js", "Supabase"],
+    presentation_system: "SISTEMA DE PRODUTO / 05",
+    presentation_label: "SAAS",
+    presentation_address: "TERMO DIGITAL / MVP",
+    presentation_type: "PLATAFORMA WEB",
+    origin: "RJ / BR",
+    coordinates: ["22°54'S", "43°12'W"],
+    poster_url: "",
+    project_url: "./termo-digital-demo/",
+    preview_url: "./termo-digital-demo/?embed=spaceunderground",
+    live_preview_enabled: true,
+    translations: { en: { description: "Local demo shipped with the portfolio.", presentation_type: "WEB PLATFORM" } },
+    project_gallery: [],
+    project_modules: [],
+  },
 ];
 
 async function openFixturePage({ width = 1440, height = 1000, locale = "pt-BR" } = {}) {
@@ -134,6 +159,11 @@ async function openFixturePage({ width = 1440, height = 1000, locale = "pt-BR" }
   );
   await context.route("**/rest/v1/site_settings*", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+  );
+  await context.route("**/storage/v1/object/sign/project-media", (route) =>
+    // A malformed success response simulates a broken signing service without
+    // adding an expected browser-level 5xx console error to unrelated checks.
+    route.fulfill({ status: 200, contentType: "application/json", body: "{malformed-json" }),
   );
   await context.route("https://pedruzz30.github.io/**", (route) => {
     iframeRequests.push(route.request().url());
@@ -161,6 +191,8 @@ try {
     await page.waitForFunction((url) => document.querySelector("[data-project-viewer] iframe")?.getAttribute("src") === url, INK_PREVIEW);
     check((await page.getAttribute("[data-project-viewer] iframe", "src")) === INK_PREVIEW, "INK preloads before SITE click");
     check(iframeRequests.includes(INK_PREVIEW), "INK iframe request is issued by preload");
+    check((await page.getAttribute("#work", "data-projects-media")) === "degraded", "media signing failure keeps project metadata online");
+    check((await page.getAttribute(".signal-ui__poster", "src"))?.includes("tattoo-preview-poster"), "media signing failure falls back to bundled artwork");
     check(errors.length === 0, "INK preload has no page errors", errors.join(" | "));
     await context.close();
   }
@@ -204,6 +236,18 @@ try {
     check(state === "unavailable", "case without preview_url uses unavailable state", String(state));
     check(title === "Demonstração ao vivo indisponível", "unavailable tooltip is localized in PT", String(title));
     check((await page.textContent("[data-viewer-description]"))?.trim() === "Protótipo de assistente inteligente.", "metadata still renders for case without preview");
+    await context.close();
+  }
+
+  {
+    const { context, page } = await openFixturePage();
+    await page.locator("#work").scrollIntoViewIfNeeded();
+    await page.click('[data-project-slot="case-005"]');
+    const relativePreview = `${BASE_URL.replace(/\/+$/, "")}/termo-digital-demo/?embed=spaceunderground`;
+    await page.waitForFunction((url) => document.querySelector("[data-project-viewer] iframe")?.getAttribute("src") === url, relativePreview);
+    check((await page.getAttribute("[data-project-viewer] iframe", "src")) === relativePreview, "relative preview_url resolves to the bundled demo");
+    const relativeProjectUrl = await page.getAttribute("[data-viewer-link]", "href");
+    check(relativeProjectUrl === `${BASE_URL.replace(/\/+$/, "")}/termo-digital-demo/`, "relative project_url resolves to a safe absolute link", String(relativeProjectUrl));
     await context.close();
   }
 

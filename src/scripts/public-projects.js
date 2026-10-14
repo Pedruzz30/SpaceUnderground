@@ -6,6 +6,7 @@ import { getLocale, subscribeLocaleChange, t } from "./i18n/index.js";
 import { fetchPublishedProjects, isConfigured, signPaths } from "./supabase-public.js";
 import { getActiveProjectKey, refreshProjectViewerSlots, showProject } from "./signal-frame.js";
 import { resolvePoster } from "./project-posters.js";
+import { resolvePublicUrl } from "./public-url.js";
 
 const SOURCE_ATTRIBUTE = "data-projects-source";
 let subscribedToLocale = false;
@@ -55,6 +56,10 @@ function markSection(state) {
   document.querySelector("#work")?.setAttribute(SOURCE_ATTRIBUTE, state);
 }
 
+function markMedia(state) {
+  document.querySelector("#work")?.setAttribute("data-projects-media", state);
+}
+
 function clearRegistry() {
   Object.keys(projects).forEach((key) => {
     delete projects[key];
@@ -70,18 +75,8 @@ function normalizeStatus(row) {
   return (label === key ? status : label).toUpperCase();
 }
 
-function isLivePreviewUrl(value) {
-  try {
-    const url = new URL(text(value));
-    return ["http:", "https:"].includes(url.protocol);
-  } catch {
-    return false;
-  }
-}
-
 function approvedPreviewUrl(row) {
-  const previewUrl = text(row.preview_url);
-  return row.live_preview_enabled === true && isLivePreviewUrl(previewUrl) ? previewUrl : "";
+  return row.live_preview_enabled === true ? resolvePublicUrl(row.preview_url) : "";
 }
 
 function projectFromRow(row, signed) {
@@ -121,7 +116,7 @@ function projectFromRow(row, signed) {
       client: text(row.client || row.name).toUpperCase(),
       category: categoryLabel(row),
       description: localized(row, "description"),
-      url: text(row.project_url),
+      url: resolvePublicUrl(row.project_url),
       previewUrl,
       hasLivePreview: Boolean(previewUrl),
       poster,
@@ -247,11 +242,21 @@ export async function initPublicProjects() {
   if (!isConfigured()) {
     renderUnavailable();
     markSection("unconfigured");
+    markMedia("unavailable");
     return;
   }
 
   try {
-    const rows = await fetchPublishedProjects();
+    let rows;
+    try {
+      rows = await fetchPublishedProjects();
+    } catch (firstError) {
+      // One short retry recovers common cold-start/network hiccups without
+      // keeping the section blocked during a real outage.
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+      rows = await fetchPublishedProjects();
+      console.info("[projects] Recovered after a transient Supabase failure.", firstError);
+    }
 
     const paths = [];
     rows.forEach((row) => {
@@ -262,14 +267,27 @@ export async function initPublicProjects() {
     });
 
     let signed = new Map();
-    if (paths.length) signed = await signPaths(paths);
+    let mediaState = "ready";
+    if (paths.length) {
+      try {
+        signed = await signPaths(paths);
+      } catch (error) {
+        // Project metadata is more important than optional remote artwork.
+        // Keep the portfolio usable and let resolvePoster() fall back to the
+        // bundled artwork/placeholder instead of hiding every published case.
+        mediaState = "degraded";
+        console.warn("[projects] Project media unavailable; using safe fallbacks.", error);
+      }
+    }
 
     lastRows = rows;
     lastSigned = signed;
+    markMedia(mediaState);
     renderFromRows(rows, signed, { preferredKey: getActiveProjectKey() });
   } catch (error) {
     renderUnavailable();
     markSection("unavailable");
+    markMedia("unavailable");
     console.warn("[projects] Supabase unavailable, keeping the viewer neutral.", error);
   }
 }
