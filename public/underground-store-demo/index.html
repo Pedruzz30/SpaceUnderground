@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0a0012">
+  <title>Underground Store — Demo</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0a0012;--panel:#140820;--panel2:#1d0b2d;--line:#2a1341;--pink:#ff6ad5;--pink2:#ffb6ec;--text:#f5edf8;--muted:#9d80ad;--green:#86efac;--warn:#f59e0b;--sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Cascadia Mono",Consolas,monospace}
+    *{box-sizing:border-box}body{margin:0;min-width:320px;background:radial-gradient(circle at 85% 5%,rgba(255,106,213,.09),transparent 32%),var(--bg);color:var(--text);font-family:var(--sans)}button,input,select{font:inherit;color:inherit}a{color:inherit}
+    .shell{min-height:100vh;display:grid;grid-template-rows:auto 1fr auto}
+    .top{display:flex;justify-content:space-between;align-items:center;padding:16px 28px;border-bottom:1px solid var(--line);background:rgba(10,0,18,.78);backdrop-filter:blur(10px);position:sticky;top:0;z-index:5;gap:14px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .brand__mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(255,106,213,.5);background:rgba(255,106,213,.08);font:700 12px var(--mono);color:var(--pink2)}
+    .brand strong{display:block;font-size:14px}.brand small{display:block;color:var(--muted);font:9px var(--mono);letter-spacing:.08em}
+    .search{flex:1;max-width:420px;display:flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid var(--line);background:var(--panel);border-radius:999px;font:11px var(--mono);color:var(--muted)}
+    .search input{flex:1;background:transparent;border:0;outline:0;color:var(--text);font:12px var(--sans)}
+    .cart-btn{display:inline-flex;align-items:center;gap:8px;padding:9px 15px;border:1px solid var(--line);background:var(--panel);border-radius:999px;cursor:pointer;font:11px var(--mono);letter-spacing:.06em}
+    .cart-btn:hover{border-color:var(--pink);color:var(--pink2)}
+    .cart-btn b{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 7px;background:var(--pink);color:#120318;border-radius:999px;font:600 11px var(--sans)}
+    .main{padding:28px;display:grid;gap:22px;max-width:1360px;margin:0 auto;width:100%}
+    .hero{display:grid;grid-template-columns:1.4fr .9fr;gap:18px;align-items:stretch}
+    .hero__copy{padding:34px;border:1px solid var(--line);background:linear-gradient(140deg,rgba(29,11,45,.9),rgba(10,0,18,.9));border-radius:14px;display:flex;flex-direction:column;justify-content:space-between;gap:18px;min-height:260px}
+    .hero__kicker{color:var(--pink2);font:10px var(--mono);letter-spacing:.14em}
+    .hero h1{margin:10px 0 0;font-size:clamp(26px,3.6vw,42px);line-height:1.08;font-weight:700}
+    .hero p{margin:14px 0 0;color:var(--muted);font-size:13px;max-width:520px;line-height:1.6}
+    .hero__cta{display:inline-flex;align-items:center;gap:10px;padding:12px 20px;background:var(--pink);color:#120318;border-radius:999px;font:600 12px var(--sans);text-decoration:none;letter-spacing:.04em;align-self:flex-start}
+    .hero__cta:hover{background:var(--pink2)}
+    .hero__card{padding:28px;border:1px solid var(--line);background:#17082a;border-radius:14px;display:flex;flex-direction:column;gap:12px;justify-content:space-between}
+    .hero__card header{display:flex;justify-content:space-between;color:var(--muted);font:9px var(--mono);letter-spacing:.1em}
+    .hero__card b{font:600 32px var(--sans);color:var(--text)}
+    .hero__card ul{list-style:none;padding:0;margin:0;display:grid;gap:6px;color:var(--muted);font:10px var(--mono)}
+    .hero__card li{display:flex;justify-content:space-between}
+    .filters{display:flex;gap:8px;flex-wrap:wrap;padding:14px 2px}
+    .filter{padding:8px 14px;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;cursor:pointer;font:10px var(--mono);letter-spacing:.08em;text-transform:uppercase}
+    .filter:hover{color:var(--pink2);border-color:rgba(255,106,213,.4)}
+    .filter.is-active{background:var(--pink);color:#120318;border-color:transparent}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+    .card{position:relative;display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid var(--line);background:var(--panel);border-radius:12px;transition:.18s border-color,.18s transform}
+    .card:hover{border-color:rgba(255,106,213,.42);transform:translateY(-2px)}
+    .card__visual{aspect-ratio:4/3;border-radius:9px;background:linear-gradient(135deg,var(--panel2),var(--panel));display:grid;place-items:center;font:600 28px var(--mono);color:var(--pink2);letter-spacing:.08em;overflow:hidden;position:relative}
+    .card__visual::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 30%,rgba(255,106,213,.18),transparent 55%)}
+    .card__tag{position:absolute;top:12px;left:12px;padding:4px 9px;background:rgba(10,0,18,.78);border:1px solid var(--line);border-radius:999px;font:8px var(--mono);letter-spacing:.1em;color:var(--muted)}
+    .card h3{margin:0;font-size:14px;font-weight:600}
+    .card__meta{display:flex;justify-content:space-between;color:var(--muted);font:9px var(--mono);letter-spacing:.08em}
+    .card__price{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+    .card__price b{font:700 18px var(--sans);color:var(--text)}
+    .card__price small{color:var(--muted);font:9px var(--mono)}
+    .card__add{appearance:none;border:1px solid var(--line);background:transparent;color:var(--text);padding:9px 11px;border-radius:8px;cursor:pointer;font:10px var(--mono);letter-spacing:.08em}
+    .card__add:hover{background:var(--pink);color:#120318;border-color:transparent}
+    .footer{padding:20px 28px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;color:var(--muted);font:9px var(--mono);letter-spacing:.08em}
+    /* ---- Drawer (cart) ---- */
+    .drawer{position:fixed;top:0;right:0;height:100vh;width:min(420px,100vw);background:var(--bg);border-left:1px solid var(--line);transform:translateX(100%);transition:transform .22s ease;z-index:10;display:flex;flex-direction:column}
+    .drawer.open{transform:none}
+    .drawer header{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+    .drawer header strong{font-size:13px}
+    .drawer header button{background:transparent;border:0;color:var(--muted);font-size:20px;cursor:pointer}
+    .drawer__body{flex:1;overflow:auto;padding:14px 20px;display:grid;gap:12px}
+    .line-item{display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:center;padding:10px;border:1px solid var(--line);background:var(--panel);border-radius:10px}
+    .line-item__mark{aspect-ratio:1;background:var(--panel2);border-radius:6px;display:grid;place-items:center;font:600 11px var(--mono);color:var(--pink2);letter-spacing:.1em}
+    .line-item h4{margin:0;font-size:12px;font-weight:600}
+    .line-item small{display:block;color:var(--muted);font:9px var(--mono);margin-top:3px}
+    .qty{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:6px}
+    .qty button{background:transparent;border:0;color:var(--muted);padding:0 10px;height:24px;cursor:pointer}
+    .qty button:hover{color:var(--pink2)}
+    .qty span{min-width:22px;text-align:center;font:600 11px var(--mono)}
+    .line-item__price{font:700 13px var(--sans);text-align:right}
+    .line-item__remove{display:block;background:transparent;border:0;color:var(--muted);font:8px var(--mono);text-align:right;margin-top:4px;cursor:pointer}
+    .line-item__remove:hover{color:#fca5a5}
+    .drawer__summary{border-top:1px solid var(--line);padding:16px 20px;display:grid;gap:10px}
+    .sum-row{display:flex;justify-content:space-between;font:10px var(--mono);color:var(--muted);letter-spacing:.08em}
+    .sum-row.total{font:700 15px var(--sans);color:var(--text);text-transform:none}
+    .checkout-btn{appearance:none;border:0;padding:14px;background:var(--pink);color:#120318;border-radius:10px;font:600 13px var(--sans);cursor:pointer;margin-top:4px}
+    .checkout-btn:hover{background:var(--pink2)}
+    .empty{color:var(--muted);text-align:center;padding:30px;font:11px var(--mono)}
+    /* ---- Checkout modal ---- */
+    .modal{position:fixed;inset:0;background:rgba(5,0,10,.78);display:none;align-items:center;justify-content:center;z-index:12;padding:20px}
+    .modal.open{display:flex}
+    .checkout{width:min(540px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px;display:grid;gap:16px}
+    .checkout h2{margin:0;font-size:17px}
+    .checkout__step{display:grid;gap:12px}
+    .checkout label{display:grid;gap:5px;font:9px var(--mono);color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+    .checkout input,.checkout select{appearance:none;background:#140820;border:1px solid var(--line);padding:11px 13px;border-radius:8px;color:var(--text);font:12px var(--sans)}
+    .checkout input:focus,.checkout select:focus{outline:0;border-color:var(--pink)}
+    .checkout .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .pay-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .pay{padding:14px;border:1px solid var(--line);background:#140820;border-radius:10px;cursor:pointer;text-align:left;display:grid;gap:4px}
+    .pay:hover{border-color:rgba(255,106,213,.4)}
+    .pay.is-active{border-color:var(--pink);background:#1a0a2a}
+    .pay strong{font-size:12px}
+    .pay small{color:var(--muted);font:9px var(--mono)}
+    .checkout__actions{display:flex;justify-content:space-between;gap:10px;margin-top:4px}
+    .checkout__actions button{appearance:none;border:1px solid var(--line);background:transparent;color:var(--text);padding:12px 18px;border-radius:999px;font:11px var(--mono);letter-spacing:.08em;cursor:pointer}
+    .checkout__actions .primary{background:var(--pink);color:#120318;border-color:transparent}
+    .pix-box{padding:18px;border:1px dashed rgba(255,106,213,.4);background:#140820;border-radius:10px;text-align:center;display:grid;gap:10px}
+    .pix-box code{display:block;padding:10px;background:#0a0012;font:10px var(--mono);word-break:break-all}
+    .pix-timer{color:var(--pink2);font:10px var(--mono);letter-spacing:.08em}
+    .success{text-align:center;display:grid;gap:14px;padding:10px}
+    .success .mark{width:62px;height:62px;border-radius:50%;border:2px solid var(--pink);display:grid;place-items:center;margin:0 auto;color:var(--pink2);font-size:28px}
+    .toast{position:fixed;right:22px;bottom:22px;max-width:320px;padding:11px 14px;border:1px solid var(--pink);background:#1a0a2a;color:var(--pink2);border-radius:8px;font:10px/1.5 var(--mono);opacity:0;transform:translateY(8px);pointer-events:none;transition:.2s;z-index:14}
+    .toast.show{opacity:1;transform:none}
+    body.embed .top{position:relative}body.embed .footer{display:none}
+    @media(max-width:860px){.hero{grid-template-columns:1fr}.top{padding:12px 14px;flex-wrap:wrap}.search{order:3;flex-basis:100%;max-width:none}.main{padding:16px}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div class="brand"><div class="brand__mark">US</div><div><strong>Underground Store</strong><small>SPACE UNDERGROUND · MERCH</small></div></div>
+    <div class="search" role="search"><span>⌕</span><input id="q" placeholder="Buscar na loja..." aria-label="Buscar produtos"></div>
+    <button class="cart-btn" id="openCart" aria-label="Abrir carrinho">◫ Carrinho <b id="cartCount">0</b></button>
+  </header>
+
+  <main class="main">
+    <section class="hero">
+      <div class="hero__copy">
+        <span class="hero__kicker">UNDERGROUND STORE / COMMERCE 001</span>
+        <h1>Loja virtual pensada para<br>descoberta, não para empurrar.</h1>
+        <p>Catálogo com filtros, carrinho persistente, checkout com Pix e cartão simulados, painel administrativo e estoque conectado. Este é um case ao vivo da Space Underground — todo o fluxo é funcional e roda localmente, sem backend.</p>
+        <a class="hero__cta" href="#catalog">EXPLORAR CATÁLOGO →</a>
+      </div>
+      <aside class="hero__card">
+        <header><span>CASE / COMMERCE</span><span>DEMO</span></header>
+        <div><small style="color:var(--muted);font:9px var(--mono)">PEDIDOS SIMULADOS HOJE</small><b id="orderStats">42</b></div>
+        <ul>
+          <li><span>Checkout médio</span><b style="font-size:11px">R$ 189,00</b></li>
+          <li><span>Taxa de conversão</span><b style="font-size:11px">4,2%</b></li>
+          <li><span>Pix vs. cartão</span><b style="font-size:11px">62% / 38%</b></li>
+          <li><span>Produtos ativos</span><b style="font-size:11px" id="activeCount">—</b></li>
+        </ul>
+      </aside>
+    </section>
+
+    <section id="catalog">
+      <div class="filters" data-filters role="group" aria-label="Filtrar por categoria">
+        <button class="filter is-active" data-cat="all">Todos</button>
+        <button class="filter" data-cat="apparel">Vestuário</button>
+        <button class="filter" data-cat="print">Impressos</button>
+        <button class="filter" data-cat="accessories">Acessórios</button>
+        <button class="filter" data-cat="digital">Digital</button>
+      </div>
+      <div class="grid" id="grid" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>CASE / COMMERCE · DEMONSTRAÇÃO SEM COBRANÇA REAL</span>
+    <span>UNDERGROUND STORE · SPACE UNDERGROUND</span>
+  </footer>
+</div>
+
+<aside class="drawer" id="drawer" aria-label="Carrinho">
+  <header><strong>Seu carrinho</strong><button id="closeCart" aria-label="Fechar">×</button></header>
+  <div class="drawer__body" id="cartBody"></div>
+  <div class="drawer__summary">
+    <div class="sum-row"><span>Subtotal</span><b id="sumSubtotal">R$ 0,00</b></div>
+    <div class="sum-row"><span>Frete estimado</span><b id="sumShipping">—</b></div>
+    <div class="sum-row total"><span>Total</span><b id="sumTotal">R$ 0,00</b></div>
+    <button class="checkout-btn" id="goCheckout">FINALIZAR PEDIDO</button>
+  </div>
+</aside>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="checkoutTitle">
+  <div class="checkout" id="checkoutBox"></div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  const SEED = [
+    { id:"su-hoodie-black", name:"Moletom Monolith", cat:"apparel", price:299.00, tag:"MOLETOM / BLACK", mark:"MLT", stock:12 },
+    { id:"su-tee-static",    name:"Camiseta Static Grid", cat:"apparel", price:139.00, tag:"TEE / CORE",     mark:"TEE", stock:28 },
+    { id:"su-cap-core",      name:"Boné Submerse",         cat:"apparel", price:119.00, tag:"CAP / CORE",     mark:"CAP", stock:17 },
+    { id:"su-mug-ritual",    name:"Caneca Ritual 300ml",   cat:"accessories", price:69.00, tag:"MUG / CERAMIC", mark:"MUG", stock:35 },
+    { id:"su-sticker-pack",  name:"Sticker Pack · 12 un",  cat:"accessories", price:29.00, tag:"PACK / 12",     mark:"STK", stock:120 },
+    { id:"su-poster-signal", name:"Pôster Signal A2",      cat:"print", price:79.00, tag:"PRINT / A2",     mark:"PST", stock:40 },
+    { id:"su-poster-origin", name:"Pôster Origin A3",      cat:"print", price:59.00, tag:"PRINT / A3",     mark:"PST", stock:46 },
+    { id:"su-zine-01",       name:"Zine 001 · Below",      cat:"print", price:49.00, tag:"ZINE / 32P",     mark:"ZIN", stock:18 },
+    { id:"su-digital-wall",  name:"Pack Wallpapers 4K",    cat:"digital", price:19.00, tag:"DIGITAL / 20",  mark:"WLL", stock:999 },
+    { id:"su-digital-mix",   name:"Mixtape Underground",   cat:"digital", price:12.00, tag:"MP3 / FLAC",    mark:"MIX", stock:999 },
+    { id:"su-tote-canvas",   name:"Tote Canvas Grid",      cat:"accessories", price:89.00, tag:"BAG / CANVAS", mark:"BAG", stock:22 },
+    { id:"su-notebook-mono", name:"Caderno Monolith A5",   cat:"print", price:59.00, tag:"NOTE / 128P",   mark:"NTB", stock:30 },
+  ];
+  const CURRENCY = v => "R$ " + v.toFixed(2).replace(".", ",");
+  const KEY_CART = "underground-store/cart/v1";
+  const KEY_ORDERS = "underground-store/orders/v1";
+
+  const $ = s => document.querySelector(s);
+  const grid = $("#grid"), filtersEl = $("[data-filters]"), q = $("#q");
+  const drawer = $("#drawer"), cartBody = $("#cartBody"), modal = $("#modal"), toast = $("#toast");
+  const sumSub = $("#sumSubtotal"), sumShip = $("#sumShipping"), sumTot = $("#sumTotal"), cartCountEl = $("#cartCount");
+
+  const read = (k, fallback) => { try { return JSON.parse(localStorage.getItem(k)) ?? fallback; } catch { return fallback; } };
+  const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+  let cart = read(KEY_CART, []); // [{id, qty}]
+  let filter = "all", query = "", toastTimer;
+
+  const say = (msg) => { toast.textContent = msg; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove("show"), 2000); };
+
+  const matches = (p) => (filter === "all" || p.cat === filter) && (!query || p.name.toLowerCase().includes(query));
+
+  const renderGrid = () => {
+    const items = SEED.filter(matches);
+    grid.innerHTML = items.map(p => `
+      <article class="card" data-cat="${p.cat}">
+        <div class="card__visual" aria-hidden="true"><span class="card__tag">${p.tag}</span>${p.mark}</div>
+        <h3>${p.name}</h3>
+        <div class="card__meta"><span>${p.cat.toUpperCase()}</span><span>${p.stock > 50 ? "EM ESTOQUE" : p.stock > 0 ? "RESTAM " + p.stock : "ESGOTADO"}</span></div>
+        <div class="card__price"><b>${CURRENCY(p.price)}</b><small>À vista no Pix</small></div>
+        <button class="card__add" data-add="${p.id}" ${p.stock === 0 ? "disabled" : ""}>${p.stock === 0 ? "ESGOTADO" : "+ ADICIONAR"}</button>
+      </article>
+    `).join("") || `<p class="empty">Nenhum produto encontrado neste filtro.</p>`;
+    $("#activeCount").textContent = String(items.length);
+  };
+
+  const subtotal = () => cart.reduce((acc, l) => { const p = SEED.find(s => s.id === l.id); return acc + (p ? p.price * l.qty : 0); }, 0);
+  const shipping = () => { const s = subtotal(); return s === 0 ? 0 : s >= 200 ? 0 : 19.90; };
+
+  const renderCart = () => {
+    cartBody.innerHTML = cart.length ? cart.map(l => {
+      const p = SEED.find(s => s.id === l.id);
+      if (!p) return "";
+      return `
+        <div class="line-item" data-line="${p.id}">
+          <div class="line-item__mark">${p.mark}</div>
+          <div>
+            <h4>${p.name}</h4>
+            <small>${p.tag}</small>
+            <div class="qty"><button data-qty="${p.id}:-">−</button><span>${l.qty}</span><button data-qty="${p.id}:+">+</button></div>
+          </div>
+          <div>
+            <div class="line-item__price">${CURRENCY(p.price * l.qty)}</div>
+            <button class="line-item__remove" data-remove="${p.id}">REMOVER</button>
+          </div>
+        </div>`;
+    }).join("") : `<p class="empty">Seu carrinho está vazio.<br>Explore o catálogo acima.</p>`;
+    const sub = subtotal(), ship = shipping();
+    sumSub.textContent = CURRENCY(sub);
+    sumShip.textContent = sub === 0 ? "—" : ship === 0 ? "Grátis" : CURRENCY(ship);
+    sumTot.textContent = CURRENCY(sub + ship);
+    cartCountEl.textContent = String(cart.reduce((a, l) => a + l.qty, 0));
+  };
+
+  const persist = () => { write(KEY_CART, cart); renderCart(); };
+  const addToCart = (id) => { const l = cart.find(x => x.id === id); if (l) l.qty++; else cart.push({ id, qty: 1 }); persist(); say("Adicionado ao carrinho"); };
+  const changeQty = (id, delta) => { const l = cart.find(x => x.id === id); if (!l) return; l.qty += delta; if (l.qty <= 0) cart = cart.filter(x => x.id !== id); persist(); };
+  const removeLine = (id) => { cart = cart.filter(x => x.id !== id); persist(); };
+
+  grid.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-add]"); if (!b || b.disabled) return;
+    addToCart(b.dataset.add);
+  });
+  cartBody.addEventListener("click", (e) => {
+    const q = e.target.closest("[data-qty]");
+    if (q) { const [id, op] = q.dataset.qty.split(":"); return changeQty(id, op === "+" ? 1 : -1); }
+    const r = e.target.closest("[data-remove]");
+    if (r) return removeLine(r.dataset.remove);
+  });
+  filtersEl.addEventListener("click", (e) => {
+    const b = e.target.closest(".filter"); if (!b) return;
+    filtersEl.querySelectorAll(".filter").forEach(x => x.classList.toggle("is-active", x === b));
+    filter = b.dataset.cat;
+    renderGrid();
+  });
+  q.addEventListener("input", () => { query = q.value.trim().toLowerCase(); renderGrid(); });
+  $("#openCart").addEventListener("click", () => drawer.classList.add("open"));
+  $("#closeCart").addEventListener("click", () => drawer.classList.remove("open"));
+
+  // ---- Checkout flow ----
+  let step = "address", pay = "pix", pixTimer, pixSeconds;
+
+  const stepAddress = () => `
+    <h2 id="checkoutTitle">Finalizar pedido</h2>
+    <p style="margin:0;color:var(--muted);font:10px var(--mono)">ETAPA 1 DE 3 · ENTREGA</p>
+    <div class="checkout__step">
+      <label>Nome completo<input id="f-name" placeholder="Como está no seu documento"></label>
+      <div class="row">
+        <label>CEP<input id="f-cep" placeholder="00000-000" maxlength="9"></label>
+        <label>Email<input id="f-email" type="email" placeholder="voce@email.com"></label>
+      </div>
+      <label>Endereço<input id="f-addr" placeholder="Rua, número, complemento"></label>
+      <div class="row">
+        <label>Cidade<input id="f-city" placeholder="Cidade"></label>
+        <label>UF<input id="f-uf" placeholder="UF" maxlength="2"></label>
+      </div>
+    </div>
+    <div class="checkout__actions">
+      <button data-step="close">Voltar</button>
+      <button class="primary" data-step="payment">Continuar</button>
+    </div>`;
+
+  const stepPayment = () => `
+    <h2>Pagamento</h2>
+    <p style="margin:0;color:var(--muted);font:10px var(--mono)">ETAPA 2 DE 3 · PAGAMENTO</p>
+    <div class="pay-opts">
+      <button class="pay ${pay === "pix" ? "is-active" : ""}" data-pay="pix"><strong>Pix</strong><small>Aprovação imediata · 5% off</small></button>
+      <button class="pay ${pay === "card" ? "is-active" : ""}" data-pay="card"><strong>Cartão</strong><small>Até 6× sem juros</small></button>
+    </div>
+    ${pay === "pix" ? `
+      <div class="pix-box">
+        <strong style="font-size:12px">Chave Pix QR Code (simulado)</strong>
+        <code>00020126580014BR.GOV.BCB.PIX01360cfd...simulado-apenas-para-demo</code>
+        <span class="pix-timer">EXPIRA EM <b id="pixT">10:00</b></span>
+      </div>
+    ` : `
+      <div class="checkout__step">
+        <label>Número do cartão<input id="c-num" placeholder="0000 0000 0000 0000" inputmode="numeric" maxlength="19"></label>
+        <div class="row">
+          <label>Validade<input id="c-exp" placeholder="MM/AA" maxlength="5"></label>
+          <label>CVV<input id="c-cvv" placeholder="000" maxlength="4"></label>
+        </div>
+        <label>Nome impresso<input id="c-name" placeholder="Como está no cartão"></label>
+      </div>
+    `}
+    <div class="checkout__actions">
+      <button data-step="address">Voltar</button>
+      <button class="primary" data-step="confirm">${pay === "pix" ? "Já paguei via Pix" : "Pagar com cartão"}</button>
+    </div>`;
+
+  const stepConfirm = (order) => `
+    <div class="success">
+      <div class="mark">✓</div>
+      <h2>Pedido confirmado</h2>
+      <p style="color:var(--muted);font:11px var(--mono)">#${order.id} · ${CURRENCY(order.total)}</p>
+      <p style="color:var(--text);font-size:12px">Enviamos a confirmação para o email cadastrado. O rastreio aparecerá aqui em até 24h.</p>
+    </div>
+    <div class="checkout__actions" style="justify-content:center">
+      <button class="primary" data-step="close">Continuar comprando</button>
+    </div>`;
+
+  const openCheckout = () => {
+    if (!cart.length) { say("Adicione pelo menos um item antes de finalizar."); return; }
+    step = "address"; renderCheckout(); modal.classList.add("open");
+  };
+
+  const renderCheckout = (order) => {
+    const box = $("#checkoutBox");
+    box.innerHTML = step === "address" ? stepAddress() : step === "payment" ? stepPayment() : stepConfirm(order);
+    if (step === "payment" && pay === "pix") startPixTimer();
+    box.querySelectorAll("[data-step]").forEach(b => b.addEventListener("click", (e) => {
+      const next = b.dataset.step;
+      if (next === "close") { modal.classList.remove("open"); stopPixTimer(); return; }
+      if (next === "payment") {
+        const name = $("#f-name")?.value?.trim(), email = $("#f-email")?.value?.trim();
+        if (!name || !email) { say("Preencha nome e email para continuar."); return; }
+        step = "payment"; renderCheckout(); return;
+      }
+      if (next === "address") { stopPixTimer(); step = "address"; renderCheckout(); return; }
+      if (next === "confirm") {
+        if (pay === "card") {
+          const num = $("#c-num")?.value?.replace(/\s+/g,"");
+          if (!num || num.length < 12) { say("Número do cartão inválido (demo)."); return; }
+        }
+        stopPixTimer();
+        const sub = subtotal(), ship = shipping(), total = sub + ship - (pay === "pix" ? sub * 0.05 : 0);
+        const order = { id: "US-" + Date.now().toString().slice(-6), total, items: cart.slice(), pay, when: new Date().toISOString() };
+        const orders = read(KEY_ORDERS, []); orders.unshift(order); write(KEY_ORDERS, orders);
+        cart = []; persist();
+        step = "confirm"; renderCheckout(order);
+        bumpOrderStat();
+      }
+    }));
+    box.querySelectorAll("[data-pay]").forEach(b => b.addEventListener("click", () => { pay = b.dataset.pay; renderCheckout(); }));
+  };
+
+  const startPixTimer = () => {
+    pixSeconds = 600; const el = () => $("#pixT");
+    stopPixTimer();
+    pixTimer = setInterval(() => {
+      pixSeconds--; const m = String(Math.floor(pixSeconds / 60)).padStart(2, "0"), s = String(pixSeconds % 60).padStart(2, "0");
+      const node = el(); if (node) node.textContent = `${m}:${s}`;
+      if (pixSeconds <= 0) stopPixTimer();
+    }, 1000);
+  };
+  const stopPixTimer = () => { if (pixTimer) clearInterval(pixTimer); pixTimer = null; };
+
+  $("#goCheckout").addEventListener("click", openCheckout);
+  modal.addEventListener("click", (e) => { if (e.target === modal) { modal.classList.remove("open"); stopPixTimer(); } });
+
+  const bumpOrderStat = () => {
+    const el = $("#orderStats"); if (!el) return;
+    const n = Number(el.textContent || 0) + 1; el.textContent = String(n);
+  };
+
+  renderGrid(); renderCart();
+  if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embed");
+  try { if (parent !== window) parent.postMessage({ type: "underground-store:ready" }, location.origin); } catch {}
+})();
+</script>
+</body>
+</html>
