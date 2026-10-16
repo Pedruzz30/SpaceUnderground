@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { resolvePublicUrl } from "../src/scripts/public-url.js";
 
-const BASE = "https://spaceunderground.netlify.app/";
+const BASE = "https://pedruzz30.github.io/SpaceUnderground/";
 
 test("resolvePublicUrl accepts absolute HTTPS project URLs", () => {
   assert.equal(
@@ -15,7 +15,7 @@ test("resolvePublicUrl accepts absolute HTTPS project URLs", () => {
 test("resolvePublicUrl resolves bundled relative demos against the public site", () => {
   assert.equal(
     resolvePublicUrl("./termo-digital-demo/?embed=spaceunderground", BASE),
-    "https://spaceunderground.netlify.app/termo-digital-demo/?embed=spaceunderground",
+    "https://pedruzz30.github.io/SpaceUnderground/termo-digital-demo/?embed=spaceunderground",
   );
 });
 
