@@ -162,8 +162,8 @@ for (const seed of seedPlans) {
 /* ----------------------------------------------- projects and their modules */
 
 // Located by case_number, the versioned identity of a known case. Only
-// editorial copy is written: the description and the presentation
-// system/label/type. Name, client, slug, URLs, tech stack, coordinates,
+// editorial copy is written: the description, presentation system/label/type
+// and the structured case-study narrative. Name, client, slug, URLs, tech stack, coordinates,
 // origin, year, accent, status and category are structural and never appear
 // in a translation.
 function curatedProjectTranslation(curated) {
@@ -173,6 +173,11 @@ function curatedProjectTranslation(curated) {
   if (presentation.system) out.presentation_system = presentation.system;
   if (presentation.label) out.presentation_label = presentation.label;
   if (presentation.type) out.presentation_type = presentation.type;
+  const caseStudy = curated.caseStudy ?? {};
+  if (caseStudy.context) out.case_context = caseStudy.context;
+  if (caseStudy.problem) out.case_problem = caseStudy.problem;
+  if (caseStudy.solution) out.case_solution = caseStudy.solution;
+  if (caseStudy.result) out.case_result = caseStudy.result;
   return out;
 }
 

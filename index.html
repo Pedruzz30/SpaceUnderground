@@ -166,7 +166,7 @@
               <p class="section-label"><span>02</span> <span data-i18n="work.label">Projetos Selecionados</span></p>
               <h2 id="work-title" data-i18n-html="work.title">Projetos <em>ao vivo.</em></h2>
             </div>
-            <p class="section-intro" data-i18n="work.intro">Projetos reais de clientes apresentados em um único quadro.</p>
+            <p class="section-intro" data-i18n="work.intro">Projetos de clientes, produtos e experimentos apresentados em um único quadro.</p>
           </header>
 
           <div class="projects">
@@ -240,12 +240,36 @@
               </div>
               <div class="project__details">
                 <div>
-                  <p class="project__meta"><span data-i18n="work.activeProject">PROJETO ATIVO</span> <span data-viewer-year data-i18n="work.yearPending">ANO — --</span></p>
+                  <p class="project__meta"><span data-i18n="work.activeProject">PROJETO ATIVO</span> <span data-viewer-kind data-i18n="work.kindPending">TIPO — --</span> <span data-viewer-year data-i18n="work.yearPending">ANO — --</span></p>
                   <h3 data-viewer-name data-i18n="work.namePending">Projetos Selecionados</h3>
                 </div>
                 <p data-viewer-specs data-i18n="work.statusUnavailable">STATUS — TEMPORARIAMENTE INDISPONÍVEL</p>
                 <a class="text-link" data-viewer-link href="#" target="_blank" rel="noopener noreferrer" aria-label="Ver projeto (abre em uma nova aba)" data-i18n-aria-label="work.viewProjectTab"><span data-i18n="work.viewProject">Ver Projeto</span><i aria-hidden="true"></i></a>
               </div>
+              <section class="project-case-study" data-viewer-case-study hidden aria-label="Estudo de caso" data-i18n-aria-label="work.caseStudyAria">
+                <header class="project-case-study__head">
+                  <span data-i18n="work.caseStudyLabel">CASE / ESTRUTURA</span>
+                  <strong data-viewer-kind>—</strong>
+                </header>
+                <div class="project-case-study__grid">
+                  <article data-case-field="context">
+                    <span data-i18n="work.caseContext">Contexto</span>
+                    <p data-viewer-context></p>
+                  </article>
+                  <article data-case-field="problem">
+                    <span data-i18n="work.caseProblem">Problema</span>
+                    <p data-viewer-problem></p>
+                  </article>
+                  <article data-case-field="solution">
+                    <span data-i18n="work.caseSolution">Solução</span>
+                    <p data-viewer-solution></p>
+                  </article>
+                  <article data-case-field="result">
+                    <span data-i18n="work.caseResult">Resultado demonstrado</span>
+                    <p data-viewer-result></p>
+                  </article>
+                </div>
+              </section>
               <div class="project-gallery" data-viewer-gallery hidden></div>
             </article>
           </div>

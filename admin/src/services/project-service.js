@@ -10,6 +10,13 @@ const PROJECT_DEFAULTS = {
   name: "",
   slug: "",
   client: "",
+  caseKind: "Product",
+  caseStudy: {
+    context: "",
+    problem: "",
+    solution: "",
+    result: "",
+  },
   category: "Website",
   description: "",
   status: "In Development",

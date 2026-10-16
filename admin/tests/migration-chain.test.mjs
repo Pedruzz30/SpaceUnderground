@@ -51,7 +51,7 @@ const HISTORICAL = [
 ];
 
 // Written after the recorded production history and not applied yet.
-const PENDING = ["automation_v2"];
+const PENDING = ["automation_v2", "portfolio_case_studies"];
 
 function toDate(stamp) {
   const [, y, mo, d, h, mi, s] = stamp.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
@@ -236,6 +236,7 @@ describe("fresh database", () => {
       "commercial_opportunities",
       "security_rbac_approval_foundation",
       "automation_v2",
+      "portfolio_case_studies",
     ]) {
       const name = migrationFile(purpose);
       await assert.doesNotReject(() => db.exec(read(name)), `${name} is not idempotent`);

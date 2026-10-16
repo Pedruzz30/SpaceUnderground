@@ -450,7 +450,13 @@ function createProjectViewer(frame, preview) {
     eyebrow: pick("data-viewer-eyebrow"),
     client: pick("data-viewer-client"),
     category: pick("data-viewer-category"),
+    kind: pick("data-viewer-kind"),
     description: pick("data-viewer-description"),
+    caseStudy: pick("data-viewer-case-study", root),
+    context: pick("data-viewer-context", root),
+    problem: pick("data-viewer-problem", root),
+    solution: pick("data-viewer-solution", root),
+    result: pick("data-viewer-result", root),
     address: pick("data-viewer-address"),
     system: pick("data-viewer-system"),
     label: pick("data-viewer-label"),
@@ -467,6 +473,7 @@ function createProjectViewer(frame, preview) {
     open: pick("data-viewer-open"),
     modules: [...article.querySelectorAll("[data-viewer-module]")],
     gallery: [...root.querySelectorAll("[data-viewer-gallery]")],
+    caseBlocks: [...root.querySelectorAll("[data-case-field]")],
   };
 
   const write = (nodes, value) => nodes.forEach((node) => { node.textContent = value; });
@@ -497,7 +504,18 @@ function createProjectViewer(frame, preview) {
     write(fields.eyebrow, t("work.clientIndex", { id: project.id }));
     write(fields.client, project.client || "");
     write(fields.category, project.category || "");
+    write(fields.kind, project.caseKind || "");
     write(fields.description, project.description || "");
+    const narrative = project.caseStudy || {};
+    write(fields.context, narrative.context || "");
+    write(fields.problem, narrative.problem || "");
+    write(fields.solution, narrative.solution || "");
+    write(fields.result, narrative.result || "");
+    const hasCaseStudy = ["context", "problem", "solution", "result"].some((field) => Boolean(narrative[field]));
+    fields.caseStudy.forEach((node) => { node.hidden = !hasCaseStudy; });
+    fields.caseBlocks.forEach((node) => {
+      node.hidden = !narrative[node.dataset.caseField];
+    });
     write(fields.address, project.address || "");
     write(fields.system, project.system || "");
     write(fields.label, project.label || "");

@@ -31,7 +31,7 @@ const token = await signIn();
 const headers = { apikey: ANON_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
 for (const project of projectPresentationSeed) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/projects?select=id,name&case_number=eq.${project.caseNumber}`, { headers });
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/projects?select=id,name,translations&case_number=eq.${project.caseNumber}`, { headers });
   const rows = await response.json();
   if (!response.ok) throw new Error(`Read failed for CASE ${project.caseNumber}: ${JSON.stringify(rows)}`);
   const existing = rows[0];
@@ -40,7 +40,25 @@ for (const project of projectPresentationSeed) {
     continue;
   }
 
+  const englishCaseStudy = project.translations?.en?.caseStudy ?? {};
+  const existingTranslations = existing.translations ?? {};
+  const existingEnglish = existingTranslations.en ?? {};
   const patch = {
+    case_kind: project.caseKind,
+    case_context: project.caseStudy?.context || null,
+    case_problem: project.caseStudy?.problem || null,
+    case_solution: project.caseStudy?.solution || null,
+    case_result: project.caseStudy?.result || null,
+    translations: {
+      ...existingTranslations,
+      en: {
+        ...existingEnglish,
+        case_context: englishCaseStudy.context || existingEnglish.case_context || "",
+        case_problem: englishCaseStudy.problem || existingEnglish.case_problem || "",
+        case_solution: englishCaseStudy.solution || existingEnglish.case_solution || "",
+        case_result: englishCaseStudy.result || existingEnglish.case_result || "",
+      },
+    },
     presentation_system: project.presentation.system,
     presentation_label: project.presentation.label,
     presentation_address: project.presentation.address,

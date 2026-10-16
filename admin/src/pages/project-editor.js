@@ -1,7 +1,7 @@
 import { badge, badgeType } from "../components/badge.js";
 import { showToast } from "../components/toast.js";
 import { confirmModal, openModal } from "../components/modal.js";
-import { CATEGORIES, EDITORIAL_STATUSES, PROJECT_STATUSES } from "../data/projects.js";
+import { CASE_KINDS, CATEGORIES, EDITORIAL_STATUSES, PROJECT_STATUSES } from "../data/projects.js";
 import { logActivity } from "../services/activity-service.js";
 import { describeError, toDataError } from "../services/errors.js";
 import {
@@ -82,6 +82,7 @@ function validate(values) {
   if (!values.name.trim()) errors.name = t("projectEditor.validation.nameRequired");
   if (!values.slug.trim()) errors.slug = t("projectEditor.validation.slugRequired");
   if (!CATEGORIES.includes(values.category)) errors.category = t("projectEditor.validation.categoryRequired");
+  if (!CASE_KINDS.includes(values.caseKind)) errors.caseKind = t("projectEditor.validation.caseKindRequired");
 
   const year = Number(values.year);
   if (!values.year || Number.isNaN(year) || year < 1990 || year > 2100) errors.year = t("projectEditor.validation.yearValid");
@@ -134,6 +135,13 @@ function blankProject(caseNumber) {
     name: "",
     slug: "",
     client: "",
+    caseKind: "Product",
+    caseStudy: {
+      context: "",
+      problem: "",
+      solution: "",
+      result: "",
+    },
     category: "Website",
     description: "",
     status: "In Development",
@@ -403,6 +411,7 @@ function liveDemoMarkup(project) {
 function renderEditor(project, isCreate) {
   const accentValue = project.accent || "#c6ff00";
   const presentation = project.presentation || {};
+  const caseStudy = project.caseStudy || {};
   const coordinates = Array.isArray(presentation.coordinates) ? presentation.coordinates : [];
   const activeTab = isCreate ? "general" : "overview";
 
@@ -438,6 +447,7 @@ function renderEditor(project, isCreate) {
       <div class="tabs" role="tablist" aria-label="${t("projectEditor.sections")}" data-i18n-aria-label="projectEditor.sections">
         ${isCreate ? "" : `<button type="button" role="tab" id="tab-overview" aria-selected="${activeTab === "overview"}" aria-controls="panel-overview" data-tab="overview" tabindex="${activeTab === "overview" ? "0" : "-1"}" data-i18n="projectEditor.overview">${t("projectEditor.overview")}</button>`}
         <button type="button" role="tab" id="tab-general" aria-selected="${activeTab === "general"}" aria-controls="panel-general" data-tab="general" tabindex="${activeTab === "general" ? "0" : "-1"}" data-i18n="projectEditor.general">${t("projectEditor.general")}</button>
+        <button type="button" role="tab" id="tab-case-study" aria-selected="false" aria-controls="panel-case-study" data-tab="case-study" tabindex="-1" data-i18n="projectEditor.caseStudy">${t("projectEditor.caseStudy")}</button>
         <button type="button" role="tab" id="tab-presentation" aria-selected="false" aria-controls="panel-presentation" data-tab="presentation" tabindex="-1" data-i18n="projectEditor.presentation">${t("projectEditor.presentation")}</button>
         <button type="button" role="tab" id="tab-media" aria-selected="false" aria-controls="panel-media" data-tab="media" tabindex="-1" data-i18n="projectEditor.media">${t("projectEditor.media")}</button>
         <button type="button" role="tab" id="tab-live-demo" aria-selected="false" aria-controls="panel-live-demo" data-tab="live-demo" tabindex="-1" data-i18n="projectEditor.liveDemo">${t("projectEditor.liveDemo")}</button>
@@ -485,6 +495,34 @@ function renderEditor(project, isCreate) {
                 <button type="button" class="button" data-tech-add data-i18n="projectEditor.addTechnologyButton">${t("projectEditor.addTechnologyButton")}</button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="panel-case-study" role="tabpanel" aria-labelledby="tab-case-study" hidden>
+        <div class="form-grid">
+          ${selectMarkup({ labelKey: "projectEditor.caseKind", name: "caseKind", value: project.caseKind || "Product", options: CASE_KINDS })}
+          <div class="field field--wide editor-locale-row">
+            <span class="field-label" data-i18n="projectEditor.caseNarrative">${t("projectEditor.caseNarrative")}</span>
+            ${localeTabs("project-case-study")}
+            ${localeHint("project-case-study")}
+          </div>
+          <div class="field field--wide" data-field="caseContext">
+            <label for="field-caseContext" data-i18n="projectEditor.caseContext">${t("projectEditor.caseContext")}</label>
+            <textarea id="field-caseContext" name="caseContext" rows="4">${escapeHtml(caseStudy.context || "")}</textarea>
+          </div>
+          <div class="field field--wide" data-field="caseProblem">
+            <label for="field-caseProblem" data-i18n="projectEditor.caseProblem">${t("projectEditor.caseProblem")}</label>
+            <textarea id="field-caseProblem" name="caseProblem" rows="4">${escapeHtml(caseStudy.problem || "")}</textarea>
+          </div>
+          <div class="field field--wide" data-field="caseSolution">
+            <label for="field-caseSolution" data-i18n="projectEditor.caseSolution">${t("projectEditor.caseSolution")}</label>
+            <textarea id="field-caseSolution" name="caseSolution" rows="4">${escapeHtml(caseStudy.solution || "")}</textarea>
+          </div>
+          <div class="field field--wide" data-field="caseResult">
+            <label for="field-caseResult" data-i18n="projectEditor.caseResult">${t("projectEditor.caseResult")}</label>
+            <textarea id="field-caseResult" name="caseResult" rows="4">${escapeHtml(caseStudy.result || "")}</textarea>
+            <p class="field-hint" data-i18n="projectEditor.caseResultHint">${t("projectEditor.caseResultHint")}</p>
           </div>
         </div>
       </div>
@@ -684,6 +722,10 @@ function mount(project, isCreate) {
     presentationLabel: "presentation_label",
     presentationAddress: "presentation_address",
     presentationType: "presentation_type",
+    caseContext: "case_context",
+    caseProblem: "case_problem",
+    caseSolution: "case_solution",
+    caseResult: "case_result",
   };
   const translationDraft = { ...(project.translations?.[TRANSLATION_LOCALE] ?? {}) };
   const baseDraft = {};
@@ -771,6 +813,13 @@ function mount(project, isCreate) {
       name: (data.name || "").trim(),
       slug: (data.slug || "").trim(),
       client: (data.client || "").trim(),
+      caseKind: data.caseKind,
+      caseStudy: {
+        context: base("caseContext").trim(),
+        problem: base("caseProblem").trim(),
+        solution: base("caseSolution").trim(),
+        result: base("caseResult").trim(),
+      },
       category: data.category,
       description: base("description"),
       status: data.status,

@@ -17,6 +17,11 @@ const fixture = [
     name: "INK Tattoo",
     slug: "ink-tattoo",
     client: "INK Tattoo",
+    case_kind: "Client",
+    case_context: "Contexto do case INK.",
+    case_problem: "Problema do case INK.",
+    case_solution: "Solução do case INK.",
+    case_result: "Resultado demonstrado do case INK.",
     category: "Website",
     description: "Site editorial para tatuagem.",
     status: "Live",
@@ -33,7 +38,14 @@ const fixture = [
     project_url: "https://pedruzz30.github.io/TattooSite/",
     preview_url: INK_PREVIEW,
     live_preview_enabled: true,
-    translations: { en: { description: "Editorial tattoo website.", presentation_type: "PORTFOLIO WEBSITE" } },
+    translations: { en: {
+      description: "Editorial tattoo website.",
+      presentation_type: "PORTFOLIO WEBSITE",
+      case_context: "INK case context.",
+      case_problem: "INK case problem.",
+      case_solution: "INK case solution.",
+      case_result: "INK demonstrated result.",
+    } },
     project_gallery: [],
     project_modules: [
       { code: "01", title: "DIREÇÃO", description: "PROFUNDIDADE", position: 0, translations: { en: { title: "DIRECTION", description: "DEPTH" } } },
@@ -193,6 +205,9 @@ try {
     check(iframeRequests.includes(INK_PREVIEW), "INK iframe request is issued by preload");
     check((await page.getAttribute("#work", "data-projects-media")) === "degraded", "media signing failure keeps project metadata online");
     check((await page.getAttribute(".signal-ui__poster", "src"))?.includes("tattoo-preview-poster"), "media signing failure falls back to bundled artwork");
+    check((await page.textContent("[data-viewer-kind]"))?.trim() === "CLIENTE", "case kind is explicit in PT");
+    check(!(await page.locator("[data-viewer-case-study]").first().isHidden()), "structured case study is visible");
+    check((await page.textContent("[data-viewer-context]"))?.trim() === "Contexto do case INK.", "case context renders from Supabase data");
     check(errors.length === 0, "INK preload has no page errors", errors.join(" | "));
     await context.close();
   }
@@ -282,6 +297,8 @@ try {
     await page.waitForFunction(() => document.documentElement.lang === "en");
     await page.waitForTimeout(250);
     check((await page.textContent("[data-viewer-name]"))?.trim() === "INK Tattoo", "i18n keeps the same project");
+    check((await page.locator("[data-viewer-kind]").first().textContent())?.trim() === "CLIENT", "i18n localizes the case kind");
+    check((await page.textContent("[data-viewer-context]"))?.trim() === "INK case context.", "i18n switches the case narrative");
     check(await page.evaluate(() => document.querySelector("[data-project-viewer]")?.classList.contains("is-view-site")), "i18n keeps SITE mode");
     check((await page.getAttribute("[data-project-viewer] iframe", "src")) === srcBefore, "i18n keeps the iframe src", String(srcBefore));
     await context.close();
