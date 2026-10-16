@@ -464,6 +464,8 @@ function createProjectViewer(frame, preview) {
     year: pick("data-viewer-year"),
     specs: pick("data-viewer-specs"),
     links: pick("data-viewer-link"),
+    ctaLabels: pick("data-viewer-cta-label"),
+    demoLinks: pick("data-viewer-demo-link"),
     open: pick("data-viewer-open"),
     modules: [...article.querySelectorAll("[data-viewer-module]")],
     gallery: [...root.querySelectorAll("[data-viewer-gallery]")],
@@ -519,6 +521,21 @@ function createProjectViewer(frame, preview) {
         link.setAttribute("aria-disabled", "true");
       }
       link.setAttribute("aria-label", openLabel);
+    });
+    // CTA labels fall back to "Ver Projeto" at build time; the per-project
+    // (or per-category) label computed in public-projects.js wins when set.
+    const ctaLabel = project.ctaLabel || t("work.viewProject");
+    fields.ctaLabels.forEach((node) => { node.textContent = ctaLabel; });
+    const demoUrl = resolvePublicUrl(project.demoUrl);
+    fields.demoLinks.forEach((link) => {
+      if (demoUrl && demoUrl !== projectUrl) {
+        link.href = demoUrl;
+        link.hidden = false;
+        link.removeAttribute("aria-disabled");
+      } else {
+        link.hidden = true;
+        link.removeAttribute("href");
+      }
     });
     fields.open.forEach((button) => {
       button.disabled = !projectUrl;

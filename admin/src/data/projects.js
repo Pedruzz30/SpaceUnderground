@@ -1,4 +1,4 @@
-export const CATEGORIES = ["Website", "System", "Automation", "AI", "Other"];
+export const CATEGORIES = ["Website", "Commerce", "System", "Booking", "Automation", "AI", "Other"];
 
 export const PROJECT_STATUSES = ["Live", "Prototype", "MVP", "Pilot", "In Development", "Research", "Archived"];
 

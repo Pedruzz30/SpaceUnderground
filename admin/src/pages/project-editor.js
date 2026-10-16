@@ -157,6 +157,9 @@ function blankProject(caseNumber) {
     projectUrl: "",
     previewUrl: "",
     livePreviewEnabled: false,
+    demoUrl: "",
+    ctaLabel: "",
+    ctaLabelEn: "",
     createdAt: null,
     updatedAt: null,
     publishedAt: null,
@@ -392,6 +395,9 @@ function liveDemoMarkup(project) {
       </fieldset>
       <div class="form-grid">
         ${fieldMarkup({ labelKey: "projectEditor.previewUrl", name: "previewUrl", value: project.previewUrl, type: "url", hintKey: "projectEditor.previewUrlHint" })}
+        ${fieldMarkup({ labelKey: "projectEditor.demoUrl", name: "demoUrl", value: project.demoUrl, type: "url", hintKey: "projectEditor.demoUrlHint" })}
+        ${fieldMarkup({ labelKey: "projectEditor.ctaLabel", name: "ctaLabel", value: project.ctaLabel, hintKey: "projectEditor.ctaLabelHint" })}
+        ${fieldMarkup({ labelKey: "projectEditor.ctaLabelEn", name: "ctaLabelEn", value: project.ctaLabelEn, hintKey: "projectEditor.ctaLabelEnHint" })}
       </div>
       <div class="media-actions">
         <button type="button" class="button" data-editor-action data-action-test-demo ${demo === "live" ? "" : "disabled"} data-i18n="projectEditor.testDemo">${t("projectEditor.testDemo")}</button>
@@ -510,6 +516,7 @@ function renderEditor(project, isCreate) {
             <div>
               <span class="field-label" data-i18n="projectEditor.modules">${t("projectEditor.modules")}</span>
               <h3 id="modules-title" data-i18n="projectEditor.viewerModules">${t("projectEditor.viewerModules")}</h3>
+              <p class="field-hint" data-i18n="projectEditor.moduleCodesHint">${t("projectEditor.moduleCodesHint")}</p>
             </div>
             <button type="button" class="button" data-module-add data-i18n="projectEditor.addModule">${t("projectEditor.addModule")}</button>
           </div>
@@ -779,6 +786,9 @@ function mount(project, isCreate) {
       projectUrl: (data.projectUrl || "").trim(),
       previewUrl: (data.previewUrl || "").trim(),
       livePreviewEnabled: Boolean(form.elements.livePreviewEnabled?.checked),
+      demoUrl: (data.demoUrl || "").trim(),
+      ctaLabel: (data.ctaLabel || "").trim(),
+      ctaLabelEn: (data.ctaLabelEn || "").trim(),
       editorialStatus: data.editorialStatus,
       visible: form.elements.visible.checked,
       featured: form.elements.featured.checked,

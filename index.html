@@ -169,6 +169,16 @@
             <p class="section-intro" data-i18n="work.intro">Projetos reais de clientes apresentados em um único quadro.</p>
           </header>
 
+          <div class="work-filters reveal" data-reveal role="group" aria-label="Filtrar projetos por categoria" data-i18n-aria-label="work.filtersLabel" data-work-filters>
+            <button type="button" class="work-filter is-active" data-filter="all" aria-pressed="true"><span data-i18n="work.filters.all">Todos</span></button>
+            <button type="button" class="work-filter" data-filter="website" aria-pressed="false"><span data-i18n="work.filters.website">Websites</span></button>
+            <button type="button" class="work-filter" data-filter="commerce" aria-pressed="false"><span data-i18n="work.filters.commerce">Commerce</span></button>
+            <button type="button" class="work-filter" data-filter="system" aria-pressed="false"><span data-i18n="work.filters.system">Business Systems</span></button>
+            <button type="button" class="work-filter" data-filter="booking" aria-pressed="false"><span data-i18n="work.filters.booking">Booking</span></button>
+            <button type="button" class="work-filter" data-filter="automation" aria-pressed="false"><span data-i18n="work.filters.automation">Automation</span></button>
+            <button type="button" class="work-filter" data-filter="ai" aria-pressed="false"><span data-i18n="work.filters.ai">AI Systems</span></button>
+          </div>
+
           <div class="projects">
             <article class="project project--featured reveal" data-reveal>
               <div class="project__visual project__visual--signal">
@@ -186,7 +196,7 @@
                         <span class="signal-ui__eyebrow" data-viewer-eyebrow data-i18n="work.clientPending">CLIENTE / --</span>
                         <strong data-viewer-client>SPACE UNDERGROUND</strong>
                         <small data-viewer-category data-i18n="work.categoryPending">VISUALIZADOR DE PROJETO</small>
-                        <p data-viewer-description data-i18n="work.unavailable">Projetos temporariamente indisponíveis.</p>
+                        <p data-viewer-description data-i18n="work.initializing">Inicializando a vitrine.</p>
                         <button class="signal-ui__ghost-cta" type="button" data-signal-open><i aria-hidden="true"></i><span data-i18n="work.viewLive">VER AO VIVO</span></button>
                       </div>
                       <div class="signal-ui__browser">
@@ -196,7 +206,7 @@
                             <button type="button" data-signal-mode="site" aria-label="Modo de visualização: site" data-i18n-aria-label="work.modeSite" aria-pressed="false"><i></i></button>
                             <button type="button" data-signal-mode="detail" aria-label="Modo de visualização: detalhes" data-i18n-aria-label="work.modeDetail" aria-pressed="false"><i></i></button>
                           </span>
-                          <button class="signal-ui__address" type="button" data-signal-open><i aria-hidden="true"></i><span data-viewer-address data-i18n="work.addressPending">AGUARDANDO DADOS</span></button>
+                          <button class="signal-ui__address" type="button" data-signal-open><i aria-hidden="true"></i><span data-viewer-address data-i18n="work.addressPending">CARREGANDO</span></button>
                           <button class="signal-ui__expand" type="button" data-signal-open data-viewer-open aria-label="Abrir projeto em uma nova aba" data-i18n-aria-label="work.openProjectTab"></button>
                         </div>
                         <div class="signal-ui__website-viewport">
@@ -220,7 +230,7 @@
                       <button class="signal-ui__direction signal-ui__module" type="button" data-signal-mode="overview" aria-label="Restaurar visão geral" data-i18n-aria-label="work.restoreOverview" aria-pressed="true">
                         <span data-viewer-system data-i18n="work.systemPending">SISTEMA DO PROJETO</span>
                         <strong data-viewer-client>SPACE UNDERGROUND</strong>
-                        <small data-viewer-label data-i18n="work.labelPending">AGUARDANDO</small>
+                        <small data-viewer-label data-i18n="work.labelPending">CARREGANDO</small>
                       </button>
                       <ol class="signal-ui__pillars">
                         <li><button class="signal-ui__module" type="button" data-signal-mode="detail" data-viewer-module="0" aria-pressed="false" hidden><span>01</span><div><strong></strong><small></small></div></button></li>
@@ -243,8 +253,11 @@
                   <p class="project__meta"><span data-i18n="work.activeProject">PROJETO ATIVO</span> <span data-viewer-year data-i18n="work.yearPending">ANO — --</span></p>
                   <h3 data-viewer-name data-i18n="work.namePending">Projetos Selecionados</h3>
                 </div>
-                <p data-viewer-specs data-i18n="work.statusUnavailable">STATUS — TEMPORARIAMENTE INDISPONÍVEL</p>
-                <a class="text-link" data-viewer-link href="#" target="_blank" rel="noopener noreferrer" aria-label="Ver projeto (abre em uma nova aba)" data-i18n-aria-label="work.viewProjectTab"><span data-i18n="work.viewProject">Ver Projeto</span><i aria-hidden="true"></i></a>
+                <p data-viewer-specs data-i18n="work.statusInitializing">STATUS — CARREGANDO</p>
+                <div class="project__ctas">
+                  <a class="text-link text-link--primary" data-viewer-link href="#" target="_blank" rel="noopener noreferrer" aria-label="Ver projeto (abre em uma nova aba)" data-i18n-aria-label="work.viewProjectTab"><span data-viewer-cta-label data-i18n="work.viewProject">Ver Projeto</span><i aria-hidden="true"></i></a>
+                  <a class="text-link text-link--demo" data-viewer-demo-link href="#" target="_blank" rel="noopener noreferrer" aria-label="Abrir demonstração (abre em uma nova aba)" data-i18n-aria-label="work.openDemoTab" hidden><span data-i18n="work.viewDemo">Ver demonstração</span><i aria-hidden="true"></i></a>
+                </div>
               </div>
               <div class="project-gallery" data-viewer-gallery hidden></div>
             </article>
@@ -258,7 +271,7 @@
             <ol class="case-index__list">
               <li>
                 <span class="case-index__row is-reserved">
-                  <span class="case-index__name" data-i18n="work.unavailable">Projetos temporariamente indisponíveis.</span>
+                  <span class="case-index__name" data-i18n="work.initializing">Inicializando a vitrine.</span>
                 </span>
               </li>
             </ol>
@@ -518,6 +531,18 @@
               <div class="form-field">
                 <label for="project-company" data-i18n="contact.company">Empresa / Marca</label>
                 <input id="project-company" name="company" type="text" autocomplete="organization">
+              </div>
+              <div class="form-field">
+                <label for="project-outcome" data-i18n="contact.outcome">Qual resultado você quer alcançar?</label>
+                <select id="project-outcome" name="desired_outcome">
+                  <option value="" data-i18n="contact.outcomeSelect">Selecione o resultado</option>
+                  <option value="sell_more" data-i18n="contact.outcomeSellMore">Vender mais</option>
+                  <option value="automate" data-i18n="contact.outcomeAutomate">Automatizar processos</option>
+                  <option value="organize" data-i18n="contact.outcomeOrganize">Organizar operação</option>
+                  <option value="schedule" data-i18n="contact.outcomeSchedule">Receber agendamentos</option>
+                  <option value="digital_presence" data-i18n="contact.outcomeDigitalPresence">Criar presença digital</option>
+                  <option value="custom_product" data-i18n="contact.outcomeCustomProduct">Construir produto sob medida</option>
+                </select>
               </div>
               <div class="form-field">
                 <label for="project-need" data-i18n="contact.need">Do que você precisa?</label>
