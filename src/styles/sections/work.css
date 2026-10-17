@@ -10,6 +10,46 @@
   gap: clamp(6rem, 11vw, 11rem);
 }
 
+.work-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin: 2.5rem 0 3rem;
+}
+
+.work-filter {
+  appearance: none;
+  background: transparent;
+  border: 1px solid rgba(242, 242, 238, 0.18);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  padding: 0.55rem 1.05rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.work-filter:hover,
+.work-filter:focus-visible {
+  color: var(--fg);
+  border-color: rgba(242, 242, 238, 0.4);
+  outline: none;
+}
+
+.work-filter.is-active {
+  color: #080808;
+  background: var(--accent, #c6ff00);
+  border-color: transparent;
+}
+
+.signal-ui__slot.is-filtered,
+.case-index__list [data-category].is-filtered {
+  display: none;
+}
+
 .project__visual {
   position: relative;
   display: block;
@@ -134,6 +174,33 @@
 
 .project__details .text-link {
   justify-self: end;
+}
+
+.project__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1.1rem 1.6rem;
+  justify-self: end;
+}
+
+.project__ctas .text-link {
+  justify-self: initial;
+}
+
+.project__ctas .text-link--primary {
+  font-weight: 600;
+}
+
+.project__ctas .text-link--demo {
+  color: var(--muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
+.project__ctas .text-link[hidden] {
+  display: none;
 }
 
 .project-gallery {

@@ -84,6 +84,9 @@ export function mapProjectFromDatabase(row) {
     projectUrl: row.project_url ?? "",
     previewUrl: row.preview_url ?? "",
     livePreviewEnabled: Boolean(row.live_preview_enabled),
+    demoUrl: row.demo_url ?? "",
+    ctaLabel: row.cta_label ?? "",
+    ctaLabelEn: row.cta_label_en ?? "",
     createdAt: row.created_at ?? null,
     updatedAt: row.updated_at ?? null,
     publishedAt: row.published_at ?? null,
@@ -125,6 +128,9 @@ export function mapProjectToDatabase(model) {
   if (model.projectUrl !== undefined) row.project_url = model.projectUrl || null;
   if (model.previewUrl !== undefined) row.preview_url = model.previewUrl || null;
   if (model.livePreviewEnabled !== undefined) row.live_preview_enabled = Boolean(model.livePreviewEnabled);
+  if (model.demoUrl !== undefined) row.demo_url = model.demoUrl || null;
+  if (model.ctaLabel !== undefined) row.cta_label = model.ctaLabel || null;
+  if (model.ctaLabelEn !== undefined) row.cta_label_en = model.ctaLabelEn || null;
   if (model.translations !== undefined) row.translations = model.translations ?? {};
 
   return row;

@@ -4,6 +4,9 @@ import { t } from "./i18n/index.js";
 // they stay the same in both locales. Everything else is marked up and picked
 // up by applyStaticTranslations() on a locale change -- the section is built
 // once and never rebuilt.
+//
+// Order follows the Strategy 001 commercial funnel:
+// Websites → Commerce → Business Systems → Booking → Automation → AI Systems.
 export function initCapabilitiesSection() {
   const services = document.querySelector("#services");
   const work = document.querySelector("#work");
@@ -33,26 +36,44 @@ export function initCapabilitiesSection() {
           <a href="#work"><span data-i18n="capabilities.sitesLink">${t("capabilities.sitesLink")}</span> <b aria-hidden="true">↗</b></a>
         </article>
 
-        <article class="capability-card reveal" data-reveal style="--capability-accent:#22c55e">
+        <article class="capability-card reveal" data-reveal style="--capability-accent:#ff6ad5">
           <div class="capability-card__top"><span>02</span><i aria-hidden="true"></i></div>
+          <p class="capability-card__kicker" data-i18n="capabilities.commerceKicker">${t("capabilities.commerceKicker")}</p>
+          <h3 data-i18n="capabilities.commerceTitle">${t("capabilities.commerceTitle")}</h3>
+          <p data-i18n="capabilities.commerceText">${t("capabilities.commerceText")}</p>
+          <div class="capability-card__cases"><span>UNDERGROUND STORE</span></div>
+          <a href="#work"><span data-i18n="capabilities.commerceLink">${t("capabilities.commerceLink")}</span> <b aria-hidden="true">↗</b></a>
+        </article>
+
+        <article class="capability-card reveal" data-reveal style="--capability-accent:#22c55e">
+          <div class="capability-card__top"><span>03</span><i aria-hidden="true"></i></div>
           <p class="capability-card__kicker" data-i18n="capabilities.systemsKicker">${t("capabilities.systemsKicker")}</p>
           <h3 data-i18n="capabilities.systemsTitle">${t("capabilities.systemsTitle")}</h3>
           <p data-i18n="capabilities.systemsText">${t("capabilities.systemsText")}</p>
-          <div class="capability-card__cases"><span>CASE 004</span><span>CASE 005</span></div>
+          <div class="capability-card__cases"><span>DESPENSA DIGITAL</span><span>STOCKOS</span></div>
           <a href="#work"><span data-i18n="capabilities.systemsLink">${t("capabilities.systemsLink")}</span> <b aria-hidden="true">↗</b></a>
         </article>
 
+        <article class="capability-card reveal" data-reveal style="--capability-accent:#8b5cf6">
+          <div class="capability-card__top"><span>04</span><i aria-hidden="true"></i></div>
+          <p class="capability-card__kicker" data-i18n="capabilities.bookingKicker">${t("capabilities.bookingKicker")}</p>
+          <h3 data-i18n="capabilities.bookingTitle">${t("capabilities.bookingTitle")}</h3>
+          <p data-i18n="capabilities.bookingText">${t("capabilities.bookingText")}</p>
+          <div class="capability-card__cases"><span>SPACE AGENDA</span></div>
+          <a href="#work"><span data-i18n="capabilities.bookingLink">${t("capabilities.bookingLink")}</span> <b aria-hidden="true">↗</b></a>
+        </article>
+
         <article class="capability-card reveal" data-reveal style="--capability-accent:#38bdf8">
-          <div class="capability-card__top"><span>03</span><i aria-hidden="true"></i></div>
+          <div class="capability-card__top"><span>05</span><i aria-hidden="true"></i></div>
           <p class="capability-card__kicker" data-i18n="capabilities.automationKicker">${t("capabilities.automationKicker")}</p>
           <h3 data-i18n="capabilities.automationTitle">${t("capabilities.automationTitle")}</h3>
           <p data-i18n="capabilities.automationText">${t("capabilities.automationText")}</p>
-          <div class="capability-card__cases"><span>CASE 003</span><span>CASE 004</span></div>
+          <div class="capability-card__cases"><span>SPACE AGENT</span></div>
           <a href="#work"><span data-i18n="capabilities.automationLink">${t("capabilities.automationLink")}</span> <b aria-hidden="true">↗</b></a>
         </article>
 
         <article class="capability-card capability-card--featured reveal" data-reveal style="--capability-accent:#f59e0b">
-          <div class="capability-card__top"><span>04</span><i aria-hidden="true"></i></div>
+          <div class="capability-card__top"><span>06</span><i aria-hidden="true"></i></div>
           <p class="capability-card__kicker" data-i18n="capabilities.aiKicker">${t("capabilities.aiKicker")}</p>
           <h3 data-i18n="capabilities.aiTitle">${t("capabilities.aiTitle")}</h3>
           <p data-i18n="capabilities.aiText">${t("capabilities.aiText")}</p>
@@ -63,7 +84,7 @@ export function initCapabilitiesSection() {
 
       <div class="capabilities__statement reveal" data-reveal>
         <span data-i18n="capabilities.statementLabel">${t("capabilities.statementLabel")}</span>
-        <p><b data-i18n="capabilities.sitesTitle">${t("capabilities.sitesTitle")}</b><i>→</i><b data-i18n="capabilities.systemsTitle">${t("capabilities.systemsTitle")}</b><i>→</i><b data-i18n="capabilities.automationTitle">${t("capabilities.automationTitle")}</b><i>→</i><b data-i18n="capabilities.aiTitle">${t("capabilities.aiTitle")}</b></p>
+        <p><b data-i18n="capabilities.sitesTitle">${t("capabilities.sitesTitle")}</b><i>→</i><b data-i18n="capabilities.commerceTitle">${t("capabilities.commerceTitle")}</b><i>→</i><b data-i18n="capabilities.systemsTitle">${t("capabilities.systemsTitle")}</b><i>→</i><b data-i18n="capabilities.bookingTitle">${t("capabilities.bookingTitle")}</b><i>→</i><b data-i18n="capabilities.automationTitle">${t("capabilities.automationTitle")}</b><i>→</i><b data-i18n="capabilities.aiTitle">${t("capabilities.aiTitle")}</b></p>
         <small data-i18n="capabilities.statementNote">${t("capabilities.statementNote")}</small>
       </div>
     </div>
