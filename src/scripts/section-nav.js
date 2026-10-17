@@ -11,6 +11,7 @@ export function initSectionNav() {
     ["philosophy", "about"],
     ["process", "about"],
     ["plans", "plans"],
+    ["recurring", "plans"],
     ["why", "about"],
     ["about", "about"],
     ["contact", "contact"],

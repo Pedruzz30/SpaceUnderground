@@ -1,6 +1,7 @@
 // Ponto de entrada. Cada modulo cuida de uma parte da pagina e se
 // inicializa sozinho; a ORDEM abaixo e a mesma do arquivo original.
 import { initCapabilitiesSection } from "./capabilities-section.js";
+import { initRecurringSection } from "./recurring-section.js";
 import { initPublicContent } from "./public-content.js";
 import { initCommercialPositioning } from "./commercial-positioning.js";
 import { initScrollProgress } from "./scroll-progress.js";
@@ -22,6 +23,10 @@ initI18n();
 // Insere a camada de posicionamento Sites > Sistemas > Automacao > IA antes
 // do sistema de reveal e da navegacao observarem as secoes da pagina.
 initCapabilitiesSection();
+// Injeta a camada de servicos recorrentes (Fase 5 — Monetizacao continua)
+// logo apos os planos para que a reveal e a navegacao de ancora
+// enxerguem a secao desde o primeiro render.
+initRecurringSection();
 initPublicContent();
 
 // Reposiciona a area comercial e expande o formulario antes de dialog/form
