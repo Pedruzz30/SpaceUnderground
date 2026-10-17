@@ -9,33 +9,33 @@
 export const FALLBACK_PROJECTS = [
   {
     case_number: 1,
-    name: "Despensa Digital",
-    slug: "despensa-digital",
-    client: "Gestão Escolar",
+    name: "StockOS",
+    slug: "stockos",
+    client: "Space Underground",
     category: "System",
     description:
-      "Sistema web para controle de estoque, movimentações, fornecedores e relatórios de pequenas operações.",
+      "Sistema web completo de estoque e operação: produtos, movimentações, fornecedores, alertas e relatórios conectados em um único painel.",
     status: "Live",
     year: 2026,
-    accent: "#22c55e",
-    tech_stack: ["Node.js", "Postgres", "Vite"],
-    presentation_system: "SISTEMA DE OPERAÇÃO / 01",
-    presentation_label: "DESPENSA DIGITAL",
-    presentation_address: "despensa.spaceunderground",
+    accent: "#38bdf8",
+    tech_stack: ["JavaScript", "LocalStorage", "SVG"],
+    presentation_system: "BUSINESS SYSTEMS / 01",
+    presentation_label: "STOCKOS",
+    presentation_address: "stockos.spaceunderground",
     presentation_type: "BUSINESS SYSTEMS",
     origin: "BR",
     coordinates: ["23°33' S", "46°38' W"],
     poster_url: "",
-    project_url: "./gestao-escolar-demo/",
-    preview_url: "./gestao-escolar-demo/",
+    project_url: "./stockos-demo/",
+    preview_url: "./stockos-demo/",
     live_preview_enabled: true,
     cta_label: "Quero um sistema assim",
     cta_label_en: "I want a system like this",
-    demo_url: "./gestao-escolar-demo/",
+    demo_url: "./stockos-demo/",
     translations: {
       en: {
         description:
-          "Web system for stock, movements, suppliers and reports built for small operations.",
+          "Full web system for stock and operations: products, movements, suppliers, alerts and reports in a single panel.",
       },
     },
     project_gallery: [],
@@ -45,12 +45,12 @@ export const FALLBACK_PROJECTS = [
         code: "PROBLEM",
         title: "Problema",
         description:
-          "Pequenas operações controlam estoque em planilhas dispersas, com perdas, retrabalho e baixa visibilidade.",
+          "Pequenas operações controlam estoque em planilhas dispersas, com perdas, retrabalho e baixa visibilidade do que repor.",
         translations: {
           en: {
             title: "Problem",
             description:
-              "Small operations rely on scattered spreadsheets and manual entries, losing time and visibility.",
+              "Small operations rely on scattered spreadsheets, losing time and visibility of what to restock.",
           },
         },
       },
@@ -59,26 +59,40 @@ export const FALLBACK_PROJECTS = [
         code: "SOLUTION",
         title: "Solução",
         description:
-          "Sistema centralizado com cadastro de produtos, movimentações, fornecedores, alertas e relatórios.",
+          "Sistema centralizado com cadastro de produtos, movimentações auditáveis, fornecedores vinculados aos SKUs, alertas automáticos e exportação.",
         translations: {
           en: {
             title: "Solution",
             description:
-              "Centralized system covering products, movements, suppliers, alerts and reports.",
+              "Centralized system with product registry, auditable movements, suppliers linked to SKUs, automatic alerts and export.",
           },
         },
       },
       {
         position: 3,
+        code: "FEATURES",
+        title: "Recursos",
+        description:
+          "Dashboard de KPIs, filtros por categoria e status, CRUD completo, geração de pedidos de reposição e export CSV.",
+        translations: {
+          en: {
+            title: "Features",
+            description:
+              "KPI dashboard, filters by category and status, full CRUD, auto-generated reorder requests and CSV export.",
+          },
+        },
+      },
+      {
+        position: 4,
         code: "RESULT",
         title: "Resultado",
         description:
-          "Operação visível em um painel, menos tempo em planilha e reposição previsível.",
+          "Operação visível em um painel, menos tempo em planilha, reposição previsível e histórico auditável de todas as movimentações.",
         translations: {
           en: {
             title: "Result",
             description:
-              "A visible operation on a single dashboard with predictable restocking.",
+              "A visible operation on a single dashboard, less time on spreadsheets, predictable restocking and auditable movement history.",
           },
         },
       },
@@ -86,6 +100,97 @@ export const FALLBACK_PROJECTS = [
   },
   {
     case_number: 2,
+    name: "Underground Store",
+    slug: "underground-store",
+    client: "Space Underground",
+    category: "Commerce",
+    description:
+      "Loja virtual completa: catálogo com filtros, carrinho persistente, checkout com Pix e cartão simulados e painel de pedidos.",
+    status: "Live",
+    year: 2026,
+    accent: "#ff6ad5",
+    tech_stack: ["JavaScript", "LocalStorage", "Vanilla CSS"],
+    presentation_system: "COMMERCE / 01",
+    presentation_label: "UNDERGROUND STORE",
+    presentation_address: "store.spaceunderground",
+    presentation_type: "COMMERCE",
+    origin: "BR",
+    coordinates: ["23°33' S", "46°38' W"],
+    poster_url: "",
+    project_url: "./underground-store-demo/",
+    preview_url: "./underground-store-demo/",
+    live_preview_enabled: true,
+    cta_label: "Criar minha loja",
+    cta_label_en: "Build my store",
+    demo_url: "./underground-store-demo/",
+    translations: {
+      en: {
+        description:
+          "Full online store: filtered catalogue, persistent cart, checkout with simulated Pix and card and an orders panel.",
+      },
+    },
+    project_gallery: [],
+    project_modules: [
+      {
+        position: 1,
+        code: "PROBLEM",
+        title: "Problema",
+        description:
+          "Promessa de e-commerce raramente é provada: cliente precisa ver carrinho, checkout e pagamento rodando, não só telas estáticas.",
+        translations: {
+          en: {
+            title: "Problem",
+            description:
+              "E-commerce promises are rarely proven: clients need to see cart, checkout and payment running, not just static screens.",
+          },
+        },
+      },
+      {
+        position: 2,
+        code: "SOLUTION",
+        title: "Solução",
+        description:
+          "Loja ao vivo com catálogo, filtros por categoria, carrinho em localStorage, checkout com Pix (5% off) ou cartão e confirmação de pedido.",
+        translations: {
+          en: {
+            title: "Solution",
+            description:
+              "Live store with catalogue, category filters, cart in localStorage, checkout with Pix (5% off) or card and order confirmation.",
+          },
+        },
+      },
+      {
+        position: 3,
+        code: "FEATURES",
+        title: "Recursos",
+        description:
+          "Busca em tempo real, frete grátis acima de R$ 200, QR Code Pix simulado, timer de expiração e histórico de pedidos.",
+        translations: {
+          en: {
+            title: "Features",
+            description:
+              "Real-time search, free shipping above R$ 200, simulated Pix QR code, expiry timer and order history.",
+          },
+        },
+      },
+      {
+        position: 4,
+        code: "RESULT",
+        title: "Resultado",
+        description:
+          "Prova viva de capacidade comercial — cliente clica, compra e vê confirmação em um fluxo real, sem backend em produção.",
+        translations: {
+          en: {
+            title: "Result",
+            description:
+              "Live proof of commerce capability — the client clicks, buys and sees confirmation in a real flow, with no production backend.",
+          },
+        },
+      },
+    ],
+  },
+  {
+    case_number: 3,
     name: "Termo Digital",
     slug: "termo-digital",
     client: "Termo Digital",
@@ -162,7 +267,7 @@ export const FALLBACK_PROJECTS = [
     ],
   },
   {
-    case_number: 3,
+    case_number: 4,
     name: "JARVIS",
     slug: "jarvis-ai",
     client: "Space Underground Labs",

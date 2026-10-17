@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#060f1a">
+  <title>StockOS — Demo</title>
+  <style>
+    :root{color-scheme:dark;--bg:#060f1a;--panel:#0b1a2a;--panel2:#0f2338;--line:#1a3350;--blue:#38bdf8;--blue2:#7dd3fc;--text:#eaf4ff;--muted:#7fa0bf;--green:#86efac;--warn:#f59e0b;--red:#fca5a5;--sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Cascadia Mono",Consolas,monospace}
+    *{box-sizing:border-box}body{margin:0;min-width:320px;background:radial-gradient(circle at 85% 10%,rgba(56,189,248,.08),transparent 30%),var(--bg);color:var(--text);font-family:var(--sans)}
+    button,input,select,textarea{font:inherit;color:inherit}
+    .app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+    .side{border-right:1px solid var(--line);background:#07131f;padding:18px 14px;display:flex;flex-direction:column;gap:18px}
+    .brand{display:flex;gap:10px;align-items:center;padding:4px}
+    .brand__mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(56,189,248,.5);background:rgba(56,189,248,.08);font:700 12px var(--mono);color:var(--blue2)}
+    .brand strong{display:block;font-size:13px}.brand small{color:var(--muted);font:9px var(--mono);letter-spacing:.08em}
+    .nav{display:grid;gap:4px}
+    .nav button{border:0;background:transparent;text-align:left;padding:10px 11px;border-radius:8px;color:#9fbdd6;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:10px}
+    .nav button.active,.nav button:hover{background:rgba(56,189,248,.09);color:var(--blue2)}
+    .nav button span.icon{display:inline-block;width:20px;color:var(--blue);text-align:center}
+    .nav button b{margin-left:auto;font:9px var(--mono);background:var(--panel2);padding:2px 7px;border-radius:999px;color:var(--muted);font-weight:400}
+    .sidefoot{margin-top:auto;border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font:9px/1.7 var(--mono)}
+    .main{min-width:0;display:grid;grid-template-rows:auto 1fr}
+    .top{height:68px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;gap:14px;background:rgba(6,15,26,.78);backdrop-filter:blur(10px);position:sticky;top:0;z-index:4}
+    .top h1{margin:0;font-size:16px}.top p{margin:3px 0 0;color:var(--muted);font-size:10px}
+    .user{display:flex;align-items:center;gap:14px}
+    .user .status{display:flex;align-items:center;gap:7px;color:var(--blue2);font:9px var(--mono);letter-spacing:.08em}
+    .user .dot{width:7px;height:7px;border-radius:50%;background:var(--blue);box-shadow:0 0 10px var(--blue)}
+    .user .avatar{width:30px;height:30px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);display:grid;place-items:center;font:600 11px var(--mono);color:var(--blue2)}
+    .content{padding:22px;display:grid;gap:14px;overflow:auto}
+    .section{display:grid;gap:12px}
+    .section.hidden{display:none}
+    .actions{display:flex;flex-wrap:wrap;gap:7px}
+    .actions button{border:1px solid var(--line);background:var(--panel);padding:9px 12px;border-radius:8px;font:9px var(--mono);letter-spacing:.06em;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+    .actions button:hover{border-color:var(--blue);background:rgba(56,189,248,.08);color:var(--blue2)}
+    .actions button.primary{background:var(--blue);color:#02101d;border-color:transparent}
+    .actions button.primary:hover{background:var(--blue2)}
+    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+    .card{border:1px solid var(--line);background:linear-gradient(145deg,rgba(15,35,56,.86),rgba(7,19,31,.92));border-radius:10px;padding:14px}
+    .stat small,.kicker{display:block;color:var(--muted);font:8px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+    .stat strong{display:block;margin:10px 0 5px;font-size:26px;font-weight:600}
+    .stat span{font-size:9px;color:#8daec8}
+    .stat.alert strong{color:#fbbf24}
+    .stat.danger strong{color:var(--red)}
+    .grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(240px,.75fr);gap:12px}
+    .panel{border:1px solid var(--line);background:rgba(11,26,42,.9);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+    .panel .head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px;border-bottom:1px solid var(--line)}
+    .panel .head strong{font-size:12px}
+    .panel .head span{color:var(--muted);font:8px var(--mono)}
+    .panel .head .actions{padding:0}
+    .panel .head .actions button{padding:6px 9px;font-size:8px}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{text-align:left;color:var(--muted);font:8px var(--mono);font-weight:400;letter-spacing:.08em;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(10,24,38,.6);position:sticky;top:0}
+    td{padding:11px 14px;border-bottom:1px solid rgba(26,51,80,.6)}
+    tr:last-child td{border-bottom:0}
+    tr.row-clickable{cursor:pointer}
+    tr.row-clickable:hover td{background:rgba(56,189,248,.05)}
+    .qty{font:600 11px var(--mono)}
+    .badge{display:inline-flex;align-items:center;gap:5px;font:8px var(--mono);padding:4px 7px;border-radius:999px;background:rgba(56,189,248,.1);color:var(--blue2);letter-spacing:.04em}
+    .badge.ok{background:rgba(134,239,172,.1);color:var(--green)}
+    .badge.low{background:rgba(245,158,11,.1);color:#fbbf24}
+    .badge.out{background:rgba(252,165,165,.1);color:var(--red)}
+    .feed{padding:12px;display:grid;gap:9px;overflow:auto;max-height:420px}
+    .event{display:grid;grid-template-columns:8px 1fr;gap:9px}
+    .event i{width:7px;height:7px;margin-top:4px;border-radius:50%;background:var(--blue);box-shadow:0 0 8px rgba(56,189,248,.5)}
+    .event i.in{background:var(--green);box-shadow:0 0 8px rgba(134,239,172,.5)}
+    .event i.out{background:var(--warn);box-shadow:0 0 8px rgba(245,158,11,.5)}
+    .event strong{display:block;font-size:10px}
+    .event small{display:block;margin-top:3px;color:var(--muted);font-size:8px;line-height:1.45}
+    .bars{height:85px;display:flex;align-items:end;gap:6px;padding:0 14px 14px}
+    .bars i{flex:1;min-width:5px;background:linear-gradient(180deg,var(--blue),rgba(56,189,248,.2));height:var(--h);border-radius:3px 3px 0 0}
+    .footer{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font:8px var(--mono);padding:0 2px;letter-spacing:.08em}
+    .toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:14px;border-bottom:1px solid var(--line)}
+    .toolbar input[type=search]{flex:1;min-width:160px;background:var(--panel2);border:1px solid var(--line);padding:9px 12px;border-radius:8px;color:var(--text);font:11px var(--sans);outline:0}
+    .toolbar input[type=search]:focus{border-color:var(--blue)}
+    .toolbar select{background:var(--panel2);border:1px solid var(--line);padding:9px 11px;border-radius:8px;color:var(--text);font:11px var(--sans);outline:0;cursor:pointer}
+    .modal{position:fixed;inset:0;background:rgba(2,8,18,.78);display:none;align-items:center;justify-content:center;z-index:12;padding:20px}
+    .modal.open{display:flex}
+    .modal__box{width:min(520px,100%);max-height:92vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;display:grid;gap:14px}
+    .modal__box h2{margin:0;font-size:16px}
+    .form{display:grid;gap:11px}
+    .form label{display:grid;gap:5px;font:9px var(--mono);color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+    .form input,.form select,.form textarea{appearance:none;background:#071523;border:1px solid var(--line);padding:11px 12px;border-radius:8px;color:var(--text);font:12px var(--sans);outline:0}
+    .form input:focus,.form select:focus,.form textarea:focus{border-color:var(--blue)}
+    .form .row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+    .modal__actions{display:flex;justify-content:flex-end;gap:10px;margin-top:4px}
+    .modal__actions button{appearance:none;border:1px solid var(--line);background:transparent;color:var(--text);padding:11px 18px;border-radius:999px;font:11px var(--mono);letter-spacing:.08em;cursor:pointer}
+    .modal__actions .primary{background:var(--blue);color:#02101d;border-color:transparent}
+    .modal__actions .primary:hover{background:var(--blue2)}
+    .toast{position:fixed;right:18px;bottom:18px;max-width:340px;padding:11px 13px;border:1px solid var(--blue);background:#0a1c2e;color:var(--blue2);border-radius:8px;font:9px/1.5 var(--mono);opacity:0;transform:translateY(8px);pointer-events:none;transition:.2s;z-index:14}
+    .toast.show{opacity:1;transform:none}
+    body.embed .side{display:none}body.embed .app{grid-template-columns:1fr}body.embed .top{position:relative}
+    @media(max-width:980px){.stats{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}}
+    @media(max-width:680px){.side{display:none}.app{grid-template-columns:1fr}.content{padding:14px}.top{padding:0 14px}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="brand__mark">SO</div><div><strong>StockOS</strong><small>ESTOQUE &amp; OPERAÇÃO</small></div></div>
+    <nav class="nav" aria-label="Navegação principal">
+      <button data-view="dashboard" class="active"><span class="icon">◫</span>Dashboard</button>
+      <button data-view="products"><span class="icon">▦</span>Produtos<b data-count-products>0</b></button>
+      <button data-view="movements"><span class="icon">↕</span>Movimentações<b data-count-moves>0</b></button>
+      <button data-view="suppliers"><span class="icon">⌂</span>Fornecedores<b data-count-suppliers>0</b></button>
+      <button data-view="alerts"><span class="icon">◉</span>Alertas<b data-count-alerts>0</b></button>
+    </nav>
+    <div class="sidefoot">STOCKOS · OPERAÇÃO 2026<br>SUPABASE / EDGE FUNCTIONS<br>DEMO DE PORTFÓLIO</div>
+  </aside>
+  <main class="main">
+    <header class="top">
+      <div><h1 id="viewTitle">Painel de operação</h1><p id="viewSub">Estoque, movimentações e alertas em tempo real</p></div>
+      <div class="user">
+        <div class="status"><span class="dot"></span>SISTEMA OPERACIONAL</div>
+        <div class="avatar" title="Operador logado">OP</div>
+      </div>
+    </header>
+    <div class="content">
+      <!-- DASHBOARD -->
+      <section class="section" data-section="dashboard">
+        <div class="actions">
+          <button class="primary" data-action="new-entry">+ Registrar entrada</button>
+          <button data-action="new-exit">− Registrar saída</button>
+          <button data-action="new-product">+ Novo produto</button>
+          <button data-action="new-supplier">+ Novo fornecedor</button>
+          <button data-action="export">⇣ Exportar CSV</button>
+        </div>
+        <div class="stats">
+          <article class="card stat"><small>Produtos ativos</small><strong id="kpi-products">0</strong><span id="kpi-products-sub">SKUs cadastrados</span></article>
+          <article class="card stat"><small>Movimentações do mês</small><strong id="kpi-moves">0</strong><span>Entradas e saídas auditadas</span></article>
+          <article class="card stat alert"><small>Estoque baixo</small><strong id="kpi-low">0</strong><span>SKUs abaixo do mínimo</span></article>
+          <article class="card stat danger"><small>Em falta</small><strong id="kpi-out">0</strong><span>Reposição imediata</span></article>
+        </div>
+        <div class="grid">
+          <article class="panel">
+            <div class="head"><div><span class="kicker">ESTOQUE / TOP 8</span><strong>Monitorados</strong></div><span>ATUALIZAÇÃO EM TEMPO REAL</span></div>
+            <table id="dashTable"><thead><tr><th>SKU</th><th>Produto</th><th>Fornecedor</th><th style="text-align:right">Estoque</th><th>Status</th></tr></thead><tbody></tbody></table>
+            <div class="head"><strong>Movimentação dos últimos 7 dias</strong><span>SAÍDAS</span></div>
+            <div class="bars" aria-label="Movimentação diária"><i style="--h:38%"></i><i style="--h:62%"></i><i style="--h:51%"></i><i style="--h:78%"></i><i style="--h:46%"></i><i style="--h:88%"></i><i style="--h:72%"></i></div>
+          </article>
+          <aside class="panel">
+            <div class="head"><strong>Atividade recente</strong><span>EDGE FUNCTIONS</span></div>
+            <div class="feed" id="feed"></div>
+          </aside>
+        </div>
+        <div class="footer"><span>CASE / BUSINESS SYSTEMS · DEMONSTRAÇÃO SEM DADOS REAIS</span><span>STOCKOS · SPACE UNDERGROUND</span></div>
+      </section>
+
+      <!-- PRODUCTS -->
+      <section class="section hidden" data-section="products">
+        <div class="actions">
+          <button class="primary" data-action="new-product">+ Novo produto</button>
+          <button data-action="new-entry">+ Entrada rápida</button>
+        </div>
+        <article class="panel">
+          <div class="toolbar">
+            <input type="search" id="qProducts" placeholder="Buscar por SKU, nome ou fornecedor...">
+            <select id="fProducts"><option value="all">Todas categorias</option><option value="food">Alimentos</option><option value="beverage">Bebidas</option><option value="cleaning">Limpeza</option><option value="supplies">Suprimentos</option></select>
+            <select id="fStock"><option value="all">Qualquer estoque</option><option value="ok">Normal</option><option value="low">Baixo</option><option value="out">Em falta</option></select>
+          </div>
+          <table id="productsTable"><thead><tr><th>SKU</th><th>Produto</th><th>Categoria</th><th>Fornecedor</th><th style="text-align:right">Estoque</th><th style="text-align:right">Mínimo</th><th>Status</th></tr></thead><tbody></tbody></table>
+        </article>
+      </section>
+
+      <!-- MOVEMENTS -->
+      <section class="section hidden" data-section="movements">
+        <div class="actions">
+          <button class="primary" data-action="new-entry">+ Registrar entrada</button>
+          <button data-action="new-exit">− Registrar saída</button>
+        </div>
+        <article class="panel">
+          <table id="movementsTable"><thead><tr><th>Quando</th><th>Tipo</th><th>Produto</th><th style="text-align:right">Quantidade</th><th>Responsável</th><th>Notas</th></tr></thead><tbody></tbody></table>
+        </article>
+      </section>
+
+      <!-- SUPPLIERS -->
+      <section class="section hidden" data-section="suppliers">
+        <div class="actions"><button class="primary" data-action="new-supplier">+ Novo fornecedor</button></div>
+        <article class="panel">
+          <table id="suppliersTable"><thead><tr><th>Fornecedor</th><th>Contato</th><th>Email</th><th>Telefone</th><th style="text-align:right">SKUs</th></tr></thead><tbody></tbody></table>
+        </article>
+      </section>
+
+      <!-- ALERTS -->
+      <section class="section hidden" data-section="alerts">
+        <article class="panel">
+          <div class="head"><strong>Alertas automáticos</strong><span>MONITORAMENTO</span></div>
+          <table id="alertsTable"><thead><tr><th>Produto</th><th>Fornecedor</th><th style="text-align:right">Estoque</th><th style="text-align:right">Mínimo</th><th>Status</th><th></th></tr></thead><tbody></tbody></table>
+        </article>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal__box" id="modalBox"></div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  const KEY = "stockos/state/v1";
+  const now = () => new Date().toISOString();
+  const uid = () => Math.random().toString(36).slice(2, 8).toUpperCase();
+
+  const seed = () => ({
+    products: [
+      { sku: "SO-0001", name: "Arroz tipo 1", cat: "food",     supplier: "sup-001", stock: 86, min: 20, unit: "kg" },
+      { sku: "SO-0002", name: "Feijão preto", cat: "food",     supplier: "sup-001", stock: 42, min: 15, unit: "kg" },
+      { sku: "SO-0003", name: "Óleo de soja", cat: "food",     supplier: "sup-002", stock:  9, min: 12, unit: "un" },
+      { sku: "SO-0004", name: "Leite integral 1L", cat: "beverage", supplier: "sup-002", stock: 48, min: 24, unit: "un" },
+      { sku: "SO-0005", name: "Café torrado 500g", cat: "beverage", supplier: "sup-003", stock: 22, min: 10, unit: "un" },
+      { sku: "SO-0006", name: "Detergente neutro", cat: "cleaning", supplier: "sup-004", stock:  0, min:  8, unit: "un" },
+      { sku: "SO-0007", name: "Água sanitária 1L", cat: "cleaning", supplier: "sup-004", stock: 14, min:  6, unit: "un" },
+      { sku: "SO-0008", name: "Papel toalha", cat: "cleaning", supplier: "sup-004", stock: 36, min: 15, unit: "pc" },
+      { sku: "SO-0009", name: "Guardanapo 50un", cat: "supplies", supplier: "sup-005", stock: 58, min: 20, unit: "pc" },
+      { sku: "SO-0010", name: "Luva descartável M", cat: "supplies", supplier: "sup-005", stock:  5, min: 20, unit: "cx" },
+      { sku: "SO-0011", name: "Açúcar refinado", cat: "food", supplier: "sup-001", stock: 61, min: 20, unit: "kg" },
+      { sku: "SO-0012", name: "Sabão em pó 1kg", cat: "cleaning", supplier: "sup-004", stock: 11, min: 10, unit: "un" },
+    ],
+    suppliers: [
+      { id: "sup-001", name: "Distribuidora Castelo",       contact: "Marcos",   email: "contato@castelo.com.br",   phone: "(21) 3222-1100" },
+      { id: "sup-002", name: "Nutrimax Alimentos",          contact: "Juliana",  email: "pedidos@nutrimax.com.br",  phone: "(11) 4455-2200" },
+      { id: "sup-003", name: "Café Serrano",                contact: "Rafael",   email: "rafael@cafeserrano.com",   phone: "(32) 3011-7890" },
+      { id: "sup-004", name: "Higiene Total Clean",         contact: "Patrícia", email: "p.contato@htclean.com.br", phone: "(11) 2041-0022" },
+      { id: "sup-005", name: "SP Suprimentos Hospitalares", contact: "Augusto",  email: "vendas@spsup.com",         phone: "(11) 3215-6600" },
+    ],
+    movements: [
+      { id: uid(), when: now(), type: "in",  sku: "SO-0001", qty: 20, who: "OP",  note: "Entrada semanal" },
+      { id: uid(), when: now(), type: "out", sku: "SO-0003", qty:  3, who: "OP",  note: "Baixa manual" },
+      { id: uid(), when: now(), type: "in",  sku: "SO-0005", qty: 10, who: "OP",  note: "Pedido 1842" },
+      { id: uid(), when: now(), type: "out", sku: "SO-0007", qty:  6, who: "OP",  note: "Limpeza matinal" },
+    ],
+    alerts: [],
+  });
+
+  const read = () => { try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); return s || seed(); } catch { return seed(); } };
+  const write = (s) => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} };
+
+  let state = read();
+
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  const toast = $("#toast");
+  let toastTimer;
+  const say = (msg) => { toast.textContent = msg; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove("show"), 2000); };
+
+  const supName = (id) => state.suppliers.find(s => s.id === id)?.name || "—";
+  const prod = (sku) => state.products.find(p => p.sku === sku);
+  const statusOf = (p) => p.stock <= 0 ? "out" : p.stock < p.min ? "low" : "ok";
+  const badge = (p) => `<span class="badge ${statusOf(p)}">${statusOf(p) === "ok" ? "NORMAL" : statusOf(p) === "low" ? "BAIXO" : "EM FALTA"}</span>`;
+
+  const refreshKpis = () => {
+    $("#kpi-products").textContent = String(state.products.length);
+    $("#kpi-products-sub").textContent = `${new Set(state.products.map(p => p.cat)).size} categorias`;
+    const monthMoves = state.movements.length;
+    $("#kpi-moves").textContent = String(monthMoves);
+    const low = state.products.filter(p => statusOf(p) === "low").length;
+    const out = state.products.filter(p => statusOf(p) === "out").length;
+    $("#kpi-low").textContent = String(low);
+    $("#kpi-out").textContent = String(out);
+    $("[data-count-products]").textContent = String(state.products.length);
+    $("[data-count-moves]").textContent = String(state.movements.length);
+    $("[data-count-suppliers]").textContent = String(state.suppliers.length);
+    $("[data-count-alerts]").textContent = String(low + out);
+  };
+
+  const fmtDate = (iso) => {
+    const d = new Date(iso); if (isNaN(d)) return "—";
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const renderDashboard = () => {
+    const top = [...state.products].sort((a, b) => (statusOf(a) === "ok" ? 1 : 0) - (statusOf(b) === "ok" ? 1 : 0) || a.stock - b.stock).slice(0, 8);
+    $("#dashTable tbody").innerHTML = top.map(p => `
+      <tr><td style="font:600 10px var(--mono);color:var(--blue2)">${p.sku}</td><td>${p.name}</td><td>${supName(p.supplier)}</td><td style="text-align:right" class="qty">${p.stock} ${p.unit}</td><td>${badge(p)}</td></tr>
+    `).join("");
+    const feed = state.movements.slice(0, 10).map(m => {
+      const p = prod(m.sku);
+      return `<div class="event"><i class="${m.type === "in" ? "in" : "out"}"></i><div><strong>${m.type === "in" ? "Entrada" : "Saída"} · ${p?.name || m.sku}</strong><small>${m.type === "in" ? "+" : "−"}${m.qty} ${p?.unit || ""} · ${fmtDate(m.when)} · ${m.who}</small></div></div>`;
+    }).join("");
+    $("#feed").innerHTML = feed || `<p style="color:var(--muted);text-align:center;padding:14px;font:10px var(--mono)">Sem movimentações registradas.</p>`;
+  };
+
+  let pq = "", pcat = "all", pstock = "all";
+  const renderProducts = () => {
+    const list = state.products.filter(p => {
+      const matchQ = !pq || p.name.toLowerCase().includes(pq) || p.sku.toLowerCase().includes(pq) || supName(p.supplier).toLowerCase().includes(pq);
+      const matchCat = pcat === "all" || p.cat === pcat;
+      const matchStock = pstock === "all" || statusOf(p) === pstock;
+      return matchQ && matchCat && matchStock;
+    });
+    $("#productsTable tbody").innerHTML = list.length ? list.map(p => `
+      <tr><td style="font:600 10px var(--mono);color:var(--blue2)">${p.sku}</td><td>${p.name}</td><td style="text-transform:uppercase;font:9px var(--mono);color:var(--muted)">${p.cat}</td><td>${supName(p.supplier)}</td><td style="text-align:right" class="qty">${p.stock} ${p.unit}</td><td style="text-align:right;color:var(--muted);font:9px var(--mono)">${p.min}</td><td>${badge(p)}</td></tr>
+    `).join("") : `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--muted);font:10px var(--mono)">Nenhum produto encontrado.</td></tr>`;
+  };
+
+  const renderMovements = () => {
+    $("#movementsTable tbody").innerHTML = state.movements.length ? state.movements.map(m => {
+      const p = prod(m.sku);
+      return `<tr><td style="color:var(--muted);font:9px var(--mono)">${fmtDate(m.when)}</td><td><span class="badge ${m.type === "in" ? "ok" : "low"}">${m.type === "in" ? "ENTRADA" : "SAÍDA"}</span></td><td>${p?.name || m.sku}</td><td style="text-align:right" class="qty">${m.type === "in" ? "+" : "−"}${m.qty} ${p?.unit || ""}</td><td>${m.who}</td><td style="color:var(--muted);font-size:10px">${m.note || "—"}</td></tr>`;
+    }).join("") : `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);font:10px var(--mono)">Sem movimentações.</td></tr>`;
+  };
+
+  const renderSuppliers = () => {
+    $("#suppliersTable tbody").innerHTML = state.suppliers.map(s => {
+      const count = state.products.filter(p => p.supplier === s.id).length;
+      return `<tr><td><strong>${s.name}</strong></td><td>${s.contact}</td><td style="color:var(--muted);font:10px var(--mono)">${s.email}</td><td style="color:var(--muted);font:10px var(--mono)">${s.phone}</td><td style="text-align:right" class="qty">${count}</td></tr>`;
+    }).join("");
+  };
+
+  const renderAlerts = () => {
+    const list = state.products.filter(p => statusOf(p) !== "ok").sort((a, b) => a.stock - b.stock);
+    $("#alertsTable tbody").innerHTML = list.length ? list.map(p => `
+      <tr><td>${p.name}</td><td>${supName(p.supplier)}</td><td style="text-align:right" class="qty">${p.stock} ${p.unit}</td><td style="text-align:right;color:var(--muted);font:9px var(--mono)">${p.min}</td><td>${badge(p)}</td><td><button data-reorder="${p.sku}" class="actions" style="padding:0"><span style="padding:7px 11px;border:1px solid var(--line);border-radius:8px;font:8px var(--mono);letter-spacing:.06em;cursor:pointer">⇣ GERAR PEDIDO</span></button></td></tr>
+    `).join("") : `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--muted);font:10px var(--mono)">Nenhum alerta ativo. Operação saudável.</td></tr>`;
+  };
+
+  const renderAll = () => { refreshKpis(); renderDashboard(); renderProducts(); renderMovements(); renderSuppliers(); renderAlerts(); };
+
+  // ---- Navigation ----
+  const titles = {
+    dashboard: ["Painel de operação", "Estoque, movimentações e alertas em tempo real"],
+    products:  ["Produtos", "Catálogo completo com SKU, fornecedor e estoque mínimo"],
+    movements: ["Movimentações", "Histórico auditável de entradas e saídas"],
+    suppliers: ["Fornecedores", "Rede de fornecedores vinculados aos SKUs"],
+    alerts:    ["Alertas", "SKUs abaixo do mínimo ou em falta"],
+  };
+  const switchView = (view) => {
+    $$(".nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+    $$("[data-section]").forEach(s => s.classList.toggle("hidden", s.dataset.section !== view));
+    const [h, sub] = titles[view] || titles.dashboard;
+    $("#viewTitle").textContent = h; $("#viewSub").textContent = sub;
+  };
+  $$(".nav button").forEach(b => b.addEventListener("click", () => switchView(b.dataset.view)));
+
+  // ---- Modal forms ----
+  const open = (html) => { $("#modalBox").innerHTML = html; $("#modal").classList.add("open"); };
+  const close = () => $("#modal").classList.remove("open");
+  $("#modal").addEventListener("click", (e) => { if (e.target === $("#modal")) close(); });
+
+  const productOptions = (selected) => state.products.map(p => `<option value="${p.sku}" ${selected === p.sku ? "selected" : ""}>${p.sku} · ${p.name} (${p.stock} ${p.unit})</option>`).join("");
+  const supplierOptions = (selected) => state.suppliers.map(s => `<option value="${s.id}" ${selected === s.id ? "selected" : ""}>${s.name}</option>`).join("");
+
+  const formEntry = (type, sku = "") => `
+    <h2>${type === "in" ? "Registrar entrada" : "Registrar saída"}</h2>
+    <div class="form">
+      <label>Produto<select id="m-sku">${productOptions(sku)}</select></label>
+      <div class="row">
+        <label>Quantidade<input id="m-qty" type="number" min="1" value="1"></label>
+        <label>Responsável<input id="m-who" value="OP"></label>
+      </div>
+      <label>Nota (opcional)<input id="m-note" placeholder="Pedido, lote, ocorrência..."></label>
+    </div>
+    <div class="modal__actions"><button data-close>Cancelar</button><button class="primary" data-save>Confirmar</button></div>`;
+
+  const formProduct = () => `
+    <h2>Novo produto</h2>
+    <div class="form">
+      <div class="row">
+        <label>SKU<input id="p-sku" value="SO-${String(state.products.length + 1).padStart(4, "0")}"></label>
+        <label>Nome<input id="p-name" placeholder="Ex: Papel toalha"></label>
+      </div>
+      <div class="row">
+        <label>Categoria<select id="p-cat"><option value="food">Alimentos</option><option value="beverage">Bebidas</option><option value="cleaning">Limpeza</option><option value="supplies">Suprimentos</option></select></label>
+        <label>Unidade<input id="p-unit" value="un" maxlength="4"></label>
+      </div>
+      <label>Fornecedor<select id="p-sup">${supplierOptions()}</select></label>
+      <div class="row">
+        <label>Estoque inicial<input id="p-stock" type="number" min="0" value="0"></label>
+        <label>Estoque mínimo<input id="p-min" type="number" min="0" value="10"></label>
+      </div>
+    </div>
+    <div class="modal__actions"><button data-close>Cancelar</button><button class="primary" data-save-product>Cadastrar</button></div>`;
+
+  const formSupplier = () => `
+    <h2>Novo fornecedor</h2>
+    <div class="form">
+      <label>Razão social / nome<input id="s-name" placeholder="Nome da empresa"></label>
+      <div class="row">
+        <label>Contato<input id="s-contact" placeholder="Nome"></label>
+        <label>Telefone<input id="s-phone" placeholder="(00) 0000-0000"></label>
+      </div>
+      <label>Email<input id="s-email" type="email" placeholder="comercial@fornecedor.com"></label>
+    </div>
+    <div class="modal__actions"><button data-close>Cancelar</button><button class="primary" data-save-supplier>Cadastrar</button></div>`;
+
+  document.body.addEventListener("click", (e) => {
+    const a = e.target.closest("[data-action]"); if (a) {
+      const act = a.dataset.action;
+      if (act === "new-entry")    return open(formEntry("in"));
+      if (act === "new-exit")     return open(formEntry("out"));
+      if (act === "new-product")  return open(formProduct());
+      if (act === "new-supplier") return open(formSupplier());
+      if (act === "export") return exportCsv();
+    }
+    if (e.target.closest("[data-close]")) return close();
+    if (e.target.closest("[data-save]")) return saveMovement();
+    if (e.target.closest("[data-save-product]")) return saveProduct();
+    if (e.target.closest("[data-save-supplier]")) return saveSupplier();
+    const r = e.target.closest("[data-reorder]"); if (r) return reorder(r.dataset.reorder);
+  });
+
+  const saveMovement = () => {
+    const sku = $("#m-sku").value, qty = Number($("#m-qty").value || 0), who = $("#m-who").value.trim() || "OP", note = $("#m-note").value.trim();
+    const title = $("#modalBox h2").textContent;
+    const type = title.toLowerCase().includes("entrada") ? "in" : "out";
+    const p = prod(sku); if (!p || qty <= 0) { say("Produto ou quantidade inválidos."); return; }
+    if (type === "out" && qty > p.stock) { say(`Estoque insuficiente (${p.stock} ${p.unit}).`); return; }
+    p.stock += type === "in" ? qty : -qty;
+    state.movements.unshift({ id: uid(), when: now(), type, sku, qty, who, note });
+    write(state); renderAll(); close(); say(`${type === "in" ? "Entrada" : "Saída"} registrada.`);
+  };
+
+  const saveProduct = () => {
+    const sku = $("#p-sku").value.trim(), name = $("#p-name").value.trim();
+    if (!sku || !name) { say("Informe SKU e nome."); return; }
+    if (state.products.some(p => p.sku === sku)) { say("Este SKU já existe."); return; }
+    state.products.push({ sku, name, cat: $("#p-cat").value, unit: $("#p-unit").value.trim() || "un", supplier: $("#p-sup").value, stock: Number($("#p-stock").value || 0), min: Number($("#p-min").value || 0) });
+    write(state); renderAll(); close(); say("Produto cadastrado.");
+  };
+
+  const saveSupplier = () => {
+    const name = $("#s-name").value.trim(); if (!name) { say("Informe o nome."); return; }
+    state.suppliers.push({ id: "sup-" + uid().toLowerCase(), name, contact: $("#s-contact").value.trim(), email: $("#s-email").value.trim(), phone: $("#s-phone").value.trim() });
+    write(state); renderAll(); close(); say("Fornecedor cadastrado.");
+  };
+
+  const reorder = (sku) => {
+    const p = prod(sku); if (!p) return;
+    const qty = Math.max(p.min * 2 - p.stock, p.min);
+    p.stock += qty;
+    state.movements.unshift({ id: uid(), when: now(), type: "in", sku, qty, who: "AUTO", note: "Pedido de reposição automático" });
+    write(state); renderAll(); say(`Reposição de ${qty} ${p.unit} gerada para ${p.name}.`);
+  };
+
+  const exportCsv = () => {
+    const rows = [["SKU", "Produto", "Categoria", "Fornecedor", "Estoque", "Minimo", "Unidade", "Status"]];
+    state.products.forEach(p => rows.push([p.sku, p.name, p.cat, supName(p.supplier), p.stock, p.min, p.unit, statusOf(p)]));
+    const csv = rows.map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `stockos-produtos-${Date.now()}.csv`; a.click();
+    URL.revokeObjectURL(a.href); say("Export CSV gerado.");
+  };
+
+  // Products filters
+  $("#qProducts").addEventListener("input", (e) => { pq = e.target.value.trim().toLowerCase(); renderProducts(); });
+  $("#fProducts").addEventListener("change", (e) => { pcat = e.target.value; renderProducts(); });
+  $("#fStock").addEventListener("change", (e) => { pstock = e.target.value; renderProducts(); });
+
+  renderAll(); switchView("dashboard");
+  if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embed");
+  try { if (parent !== window) parent.postMessage({ type: "stockos:ready" }, location.origin); } catch {}
+})();
+</script>
+</body>
+</html>

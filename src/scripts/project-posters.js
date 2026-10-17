@@ -26,6 +26,8 @@ export const BUNDLED_POSTERS = {
   "jarvis-ai": { png: "./jarvis-preview-poster-pt.svg", width: 1440, height: 900 },
   "despensa-digital": { png: "./gestao-escolar-poster.svg", width: 1440, height: 900 },
   "termo-digital": { png: "./termo-digital-poster.svg", width: 1440, height: 900 },
+  "stockos": { png: "./stockos-poster.svg", width: 1440, height: 900 },
+  "underground-store": { png: "./underground-store-poster.svg", width: 1440, height: 900 },
 };
 
 const text = (value) => (typeof value === "string" ? value.trim() : "");
