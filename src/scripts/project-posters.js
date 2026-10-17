@@ -28,6 +28,7 @@ export const BUNDLED_POSTERS = {
   "termo-digital": { png: "./termo-digital-poster.svg", width: 1440, height: 900 },
   "stockos": { png: "./stockos-poster.svg", width: 1440, height: 900 },
   "underground-store": { png: "./underground-store-poster.svg", width: 1440, height: 900 },
+  "space-agenda": { png: "./space-agenda-poster.svg", width: 1440, height: 900 },
 };
 
 const text = (value) => (typeof value === "string" ? value.trim() : "");

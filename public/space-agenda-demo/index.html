@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0e0518">
+  <title>Space Agenda — Demo</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0e0518;--panel:#1a0d2a;--panel2:#231038;--line:#2e1949;--purple:#8b5cf6;--purple2:#c4b5fd;--text:#eee6f8;--muted:#9c8fb3;--green:#86efac;--warn:#f59e0b;--red:#fca5a5;--sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Cascadia Mono",Consolas,monospace}
+    *{box-sizing:border-box}body{margin:0;min-width:320px;background:radial-gradient(circle at 85% 10%,rgba(139,92,246,.1),transparent 32%),var(--bg);color:var(--text);font-family:var(--sans)}
+    button,input,select,textarea{font:inherit;color:inherit}a{color:inherit;text-decoration:none}
+    .shell{min-height:100vh;display:grid;grid-template-rows:auto 1fr auto}
+    .top{display:flex;justify-content:space-between;align-items:center;padding:16px 28px;border-bottom:1px solid var(--line);background:rgba(14,5,24,.78);backdrop-filter:blur(10px);position:sticky;top:0;z-index:5;gap:14px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .brand__mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(139,92,246,.5);background:rgba(139,92,246,.08);font:700 12px var(--mono);color:var(--purple2)}
+    .brand strong{display:block;font-size:14px}.brand small{display:block;color:var(--muted);font:9px var(--mono);letter-spacing:.08em}
+    .tabs{display:flex;gap:6px;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:999px}
+    .tab{padding:8px 14px;background:transparent;border:0;color:var(--muted);border-radius:999px;cursor:pointer;font:10px var(--mono);letter-spacing:.08em}
+    .tab:hover{color:var(--purple2)}
+    .tab.is-active{background:var(--purple);color:#160822}
+    .main{padding:28px;display:grid;gap:22px;max-width:1360px;margin:0 auto;width:100%}
+    .section.hidden{display:none}
+    /* ---- Hero ---- */
+    .hero{display:grid;grid-template-columns:1.3fr .9fr;gap:18px}
+    .hero__copy{padding:34px;border:1px solid var(--line);background:linear-gradient(140deg,rgba(35,16,56,.92),rgba(14,5,24,.92));border-radius:14px;display:flex;flex-direction:column;justify-content:space-between;gap:16px;min-height:240px}
+    .hero__kicker{color:var(--purple2);font:10px var(--mono);letter-spacing:.14em}
+    .hero h1{margin:10px 0 0;font-size:clamp(26px,3.4vw,38px);line-height:1.1;font-weight:700}
+    .hero p{margin:12px 0 0;color:var(--muted);font-size:13px;max-width:520px;line-height:1.6}
+    .hero__card{padding:26px;border:1px solid var(--line);background:#1d1030;border-radius:14px;display:grid;gap:12px}
+    .hero__card header{display:flex;justify-content:space-between;color:var(--muted);font:9px var(--mono);letter-spacing:.1em}
+    .hero__card b{font:600 32px var(--sans);color:var(--text)}
+    .hero__card ul{list-style:none;padding:0;margin:0;display:grid;gap:6px;color:var(--muted);font:10px var(--mono)}
+    .hero__card li{display:flex;justify-content:space-between}
+    /* ---- Services ---- */
+    .filters{display:flex;gap:8px;flex-wrap:wrap;padding:14px 2px}
+    .filter{padding:8px 14px;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;cursor:pointer;font:10px var(--mono);letter-spacing:.08em;text-transform:uppercase}
+    .filter:hover{color:var(--purple2);border-color:rgba(139,92,246,.4)}
+    .filter.is-active{background:var(--purple);color:#160822;border-color:transparent}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+    .service{display:flex;flex-direction:column;gap:12px;padding:18px;border:1px solid var(--line);background:var(--panel);border-radius:12px;transition:.18s border-color}
+    .service:hover{border-color:rgba(139,92,246,.45)}
+    .service__kicker{color:var(--muted);font:8px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+    .service__name{margin:0;font-size:15px;font-weight:600}
+    .service__desc{color:var(--muted);font-size:11px;line-height:1.55;margin:0}
+    .service__meta{display:flex;justify-content:space-between;align-items:baseline;color:var(--muted);font:10px var(--mono);letter-spacing:.08em}
+    .service__meta b{color:var(--text);font-size:16px;font-family:var(--sans)}
+    .service__pros{display:flex;align-items:center;gap:6px;color:var(--muted);font:9px var(--mono)}
+    .service__pros .pro{width:22px;height:22px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);display:grid;place-items:center;font:600 9px var(--mono);color:var(--purple2);margin-left:-5px}
+    .service__pros .pro:first-child{margin-left:0}
+    .service__book{appearance:none;border:0;background:var(--purple);color:#160822;padding:11px;border-radius:9px;font:600 11px var(--sans);cursor:pointer;margin-top:4px}
+    .service__book:hover{background:var(--purple2)}
+    /* ---- Booking modal ---- */
+    .modal{position:fixed;inset:0;background:rgba(5,0,10,.78);display:none;align-items:center;justify-content:center;z-index:12;padding:20px}
+    .modal.open{display:flex}
+    .book{width:min(680px,100%);max-height:92vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px;display:grid;gap:16px}
+    .book__head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+    .book__head h2{margin:0;font-size:17px}
+    .book__head p{margin:4px 0 0;color:var(--muted);font:10px var(--mono);letter-spacing:.08em}
+    .book__close{background:transparent;border:0;color:var(--muted);font-size:22px;cursor:pointer}
+    .book__step{display:grid;gap:12px}
+    .book__steps{display:flex;align-items:center;gap:8px;color:var(--muted);font:9px var(--mono);letter-spacing:.08em}
+    .book__steps b{color:var(--purple2)}
+    .book__steps i{flex:1;height:1px;background:var(--line);min-width:12px}
+    .pro-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+    .pro-opt{padding:12px;border:1px solid var(--line);background:#140822;border-radius:10px;cursor:pointer;display:grid;gap:4px;text-align:left}
+    .pro-opt:hover{border-color:rgba(139,92,246,.45)}
+    .pro-opt.is-active{border-color:var(--purple);background:#1f0d33}
+    .pro-opt strong{font-size:12px}
+    .pro-opt small{color:var(--muted);font:9px var(--mono);letter-spacing:.08em}
+    .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+    .cal__day{aspect-ratio:1;border:1px solid var(--line);background:#140822;border-radius:8px;display:grid;place-items:center;cursor:pointer;color:var(--muted);font:10px var(--mono)}
+    .cal__day:hover{border-color:rgba(139,92,246,.4);color:var(--purple2)}
+    .cal__day.is-selected{background:var(--purple);color:#160822;border-color:transparent;font-weight:700}
+    .cal__day.is-disabled{opacity:.35;cursor:not-allowed}
+    .cal__day b{display:block;font-size:14px;font-family:var(--sans);color:inherit}
+    .cal__day small{font-size:7px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+    .cal__day.is-selected small{color:#160822}
+    .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px}
+    .slot{padding:8px;border:1px solid var(--line);background:#140822;color:var(--text);border-radius:8px;cursor:pointer;text-align:center;font:11px var(--mono);letter-spacing:.04em}
+    .slot:hover{border-color:rgba(139,92,246,.4)}
+    .slot.is-selected{background:var(--purple);color:#160822;border-color:transparent;font-weight:700}
+    .slot.is-booked{opacity:.3;cursor:not-allowed;text-decoration:line-through}
+    .form{display:grid;gap:10px}
+    .form label{display:grid;gap:5px;font:9px var(--mono);color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+    .form input{appearance:none;background:#120620;border:1px solid var(--line);padding:10px 12px;border-radius:8px;color:var(--text);font:12px var(--sans);outline:0}
+    .form input:focus{border-color:var(--purple)}
+    .form .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .pay-opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .pay{padding:14px;border:1px solid var(--line);background:#120620;border-radius:10px;cursor:pointer;text-align:left;display:grid;gap:4px}
+    .pay:hover{border-color:rgba(139,92,246,.4)}
+    .pay.is-active{border-color:var(--purple);background:#1d1030}
+    .pay strong{font-size:12px}
+    .pay small{color:var(--muted);font:9px var(--mono)}
+    .pix-box{padding:16px;border:1px dashed rgba(139,92,246,.4);background:#140822;border-radius:10px;text-align:center;display:grid;gap:10px}
+    .pix-box code{display:block;padding:10px;background:#0e0518;font:10px var(--mono);word-break:break-all;color:var(--purple2)}
+    .pix-timer{color:var(--purple2);font:10px var(--mono);letter-spacing:.08em}
+    .summary{padding:14px 16px;border:1px solid var(--line);background:#140822;border-radius:10px;display:grid;gap:7px;color:var(--muted);font:10px var(--mono)}
+    .summary .row{display:flex;justify-content:space-between}
+    .summary .total{color:var(--text);font:600 14px var(--sans);text-transform:none}
+    .book__actions{display:flex;justify-content:space-between;gap:10px;margin-top:4px}
+    .book__actions button{appearance:none;border:1px solid var(--line);background:transparent;color:var(--text);padding:12px 18px;border-radius:999px;font:11px var(--mono);letter-spacing:.08em;cursor:pointer}
+    .book__actions .primary{background:var(--purple);color:#160822;border-color:transparent}
+    .book__actions .primary:hover{background:var(--purple2)}
+    .success{text-align:center;display:grid;gap:14px;padding:10px}
+    .success .mark{width:62px;height:62px;border-radius:50%;border:2px solid var(--purple);display:grid;place-items:center;margin:0 auto;color:var(--purple2);font-size:28px}
+    /* ---- My bookings ---- */
+    .bookings{display:grid;gap:12px}
+    .booking{padding:16px;border:1px solid var(--line);background:var(--panel);border-radius:12px;display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
+    .booking__meta{display:grid;gap:4px}
+    .booking__meta small{color:var(--muted);font:9px var(--mono);letter-spacing:.08em;text-transform:uppercase}
+    .booking__meta strong{font-size:14px}
+    .booking__meta span{color:var(--purple2);font:11px var(--mono)}
+    .booking__status{display:inline-flex;align-items:center;gap:6px;font:9px var(--mono);padding:5px 10px;border-radius:999px;background:rgba(139,92,246,.1);color:var(--purple2);letter-spacing:.06em}
+    .booking__status.cancelled{background:rgba(252,165,165,.1);color:var(--red)}
+    .booking__status.past{background:rgba(255,255,255,.04);color:var(--muted)}
+    .booking__actions{display:flex;flex-direction:column;gap:6px}
+    .booking__actions button{appearance:none;border:1px solid var(--line);background:transparent;color:var(--text);padding:7px 12px;border-radius:999px;font:9px var(--mono);letter-spacing:.08em;cursor:pointer}
+    .booking__actions .danger{color:var(--red);border-color:rgba(252,165,165,.2)}
+    .booking__actions button:hover{border-color:rgba(139,92,246,.4)}
+    .booking__actions .danger:hover{border-color:var(--red)}
+    .empty{text-align:center;padding:34px;color:var(--muted);font:11px var(--mono);border:1px dashed var(--line);border-radius:12px}
+    .footer{padding:20px 28px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;color:var(--muted);font:9px var(--mono);letter-spacing:.08em}
+    .toast{position:fixed;right:22px;bottom:22px;max-width:320px;padding:11px 14px;border:1px solid var(--purple);background:#1d1030;color:var(--purple2);border-radius:8px;font:10px/1.5 var(--mono);opacity:0;transform:translateY(8px);pointer-events:none;transition:.2s;z-index:14}
+    .toast.show{opacity:1;transform:none}
+    body.embed .top{position:relative}body.embed .footer{display:none}
+    @media(max-width:860px){.hero{grid-template-columns:1fr}.top{padding:12px 14px;flex-wrap:wrap}.main{padding:16px}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div class="brand"><div class="brand__mark">SA</div><div><strong>Space Agenda</strong><small>BOOKING &amp; RESERVAS · DEMO</small></div></div>
+    <nav class="tabs" aria-label="Navegação">
+      <button class="tab is-active" data-view="services">Reservar</button>
+      <button class="tab" data-view="mine">Meus agendamentos <b data-count-mine></b></button>
+    </nav>
+  </header>
+
+  <main class="main">
+    <!-- ---- Services view ---- -->
+    <section class="section" data-section="services">
+      <div class="hero">
+        <div class="hero__copy">
+          <span class="hero__kicker">SPACE AGENDA / BOOKING 001</span>
+          <h1>Reserve seu horário<br>em menos de um minuto.</h1>
+          <p>Agenda online para clínicas, estética, beleza e serviços profissionais. Serviços, profissionais, calendário, pagamento, confirmação e reagendamento — tudo em um fluxo. Esta é uma demonstração funcional da Space Underground: todo o estado roda localmente, sem backend.</p>
+        </div>
+        <aside class="hero__card">
+          <header><span>CASE / BOOKING</span><span>DEMO</span></header>
+          <div><small style="color:var(--muted);font:9px var(--mono)">AGENDAMENTOS ESTA SEMANA</small><b id="weekStats">126</b></div>
+          <ul>
+            <li><span>Ticket médio</span><b style="font-size:11px">R$ 220,00</b></li>
+            <li><span>No-show</span><b style="font-size:11px">4,8%</b></li>
+            <li><span>Horários livres hoje</span><b style="font-size:11px" id="freeToday">—</b></li>
+            <li><span>Profissionais ativos</span><b style="font-size:11px">6</b></li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="filters" data-filters role="group" aria-label="Filtrar categorias">
+        <button class="filter is-active" data-cat="all">Todos</button>
+        <button class="filter" data-cat="therapy">Terapias</button>
+        <button class="filter" data-cat="aesthetic">Estética</button>
+        <button class="filter" data-cat="beauty">Beleza</button>
+        <button class="filter" data-cat="consult">Consultas</button>
+      </div>
+
+      <div class="grid" id="services" aria-live="polite"></div>
+    </section>
+
+    <!-- ---- My bookings view ---- -->
+    <section class="section hidden" data-section="mine">
+      <h2 style="margin:0;font-size:17px">Meus agendamentos</h2>
+      <p style="margin:0;color:var(--muted);font:11px var(--mono);letter-spacing:.08em">PRÓXIMOS, PASSADOS E CANCELADOS · ARMAZENAMENTO LOCAL</p>
+      <div class="bookings" id="bookings"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>CASE / BOOKING · DEMONSTRAÇÃO SEM COBRANÇA REAL</span>
+    <span>SPACE AGENDA · SPACE UNDERGROUND</span>
+  </footer>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="bookTitle">
+  <div class="book" id="bookBox"></div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  const KEY = "space-agenda/state/v1";
+  const CURRENCY = v => "R$ " + v.toFixed(2).replace(".", ",");
+  const now = () => new Date();
+  const uid = () => Math.random().toString(36).slice(2, 8).toUpperCase();
+  const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); r.setHours(0,0,0,0); return r; };
+  const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  const fmtDay = d => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
+  const weekday = d => ["DOM","SEG","TER","QUA","QUI","SEX","SÁB"][d.getDay()];
+
+  const SERVICES = [
+    { id:"s-reiki",     name:"Reiki e harmonização",      cat:"therapy",   duration:60, price:180, kicker:"TERAPIA / INTEGRATIVA", desc:"Sessão de 60min com imposição de mãos e harmonização dos sete chakras.", pros:["ANA","LUI","MAR"] },
+    { id:"s-massage",   name:"Massagem relaxante",        cat:"therapy",   duration:50, price:220, kicker:"TERAPIA / RELAX",       desc:"Massagem corporal com óleos essenciais, foco em pescoço, ombros e lombar.", pros:["ANA","MAR"] },
+    { id:"s-face",      name:"Limpeza de pele profunda",  cat:"aesthetic", duration:75, price:260, kicker:"ESTÉTICA / FACIAL",     desc:"Higienização, extração, máscara calmante e hidratação final.", pros:["LUI","CAR"] },
+    { id:"s-botox",     name:"Toxina botulínica",         cat:"aesthetic", duration:40, price:1200, kicker:"ESTÉTICA / INJETÁVEL", desc:"Aplicação em até três áreas: fronte, glabela e periorbicular.", pros:["CAR","MAR"] },
+    { id:"s-cut",       name:"Corte e finalização",       cat:"beauty",    duration:50, price:150, kicker:"BELEZA / CABELO",       desc:"Diagnóstico, corte, lavagem e finalização com produtos profissionais.", pros:["LUI","JUL"] },
+    { id:"s-color",     name:"Coloração + hidratação",    cat:"beauty",    duration:120, price:380, kicker:"BELEZA / COLOR",       desc:"Tonalização, retoque de raiz ou mudança de cor com hidratação premium.", pros:["JUL","CAR"] },
+    { id:"s-nail",      name:"Spa dos pés",               cat:"beauty",    duration:45, price:95,  kicker:"BELEZA / PODO",         desc:"Esfoliação, hidratação, remoção de cutícula e esmaltação em gel.", pros:["ANA","JUL"] },
+    { id:"s-consult",   name:"Consulta nutricional",      cat:"consult",   duration:60, price:340, kicker:"CONSULTA / NUTRI",      desc:"Avaliação clínica, bioimpedância e plano alimentar personalizado.", pros:["MAR"] },
+    { id:"s-psycho",    name:"Consulta psicológica",      cat:"consult",   duration:50, price:260, kicker:"CONSULTA / PSICO",      desc:"Sessão individual, abordagem integrativa com foco em bem-estar.", pros:["ANA","MAR"] },
+  ];
+  const PROS = [
+    { id:"ANA", name:"Ana Lúcia",   role:"Terapeuta" },
+    { id:"LUI", name:"Luiza Prado", role:"Esteticista" },
+    { id:"MAR", name:"Marcos Reis", role:"Clínico" },
+    { id:"CAR", name:"Carla Nunes", role:"Dermato" },
+    { id:"JUL", name:"Júlio Alves", role:"Hair stylist" },
+  ];
+
+  // Hourly slots: 09:00 -> 18:00 at 30min intervals
+  const SLOT_LABELS = (() => { const out = []; for (let h = 9; h <= 18; h++) { out.push(`${String(h).padStart(2,"0")}:00`); if (h < 18) out.push(`${String(h).padStart(2,"0")}:30`); } return out; })();
+
+  const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) ?? { bookings: [] }; } catch { return { bookings: [] }; } };
+  const write = (s) => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} };
+  let state = read();
+
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  const toast = $("#toast"); let toastTimer;
+  const say = (msg) => { toast.textContent = msg; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove("show"), 2200); };
+
+  // Random-but-deterministic "booked" slots so the calendar feels alive without seeding thousands.
+  const slotKey = (serviceId, pro, date, slot) => `${serviceId}|${pro}|${date.toISOString().slice(0,10)}|${slot}`;
+  const isSlotBooked = (serviceId, pro, date, slot) => {
+    // Static pseudo-busy pattern (same date+slot+pro always maps the same): some slots blocked, others free.
+    const hash = [...slotKey(serviceId, pro, date, slot)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+    const busy = hash % 7 === 0; // ~14% of slots look booked
+    if (busy) return true;
+    // Also treat any slot the visitor has already reserved as booked.
+    return state.bookings.some(b => b.status === "scheduled" && b.serviceId === serviceId && b.pro === pro && sameDay(new Date(b.when), date) && b.slot === slot);
+  };
+
+  // ---- Services grid ----
+  let filter = "all";
+  const matchesFilter = s => filter === "all" || s.cat === filter;
+  const renderServices = () => {
+    const grid = $("#services");
+    const list = SERVICES.filter(matchesFilter);
+    grid.innerHTML = list.map(s => `
+      <article class="service">
+        <span class="service__kicker">${s.kicker}</span>
+        <h3 class="service__name">${s.name}</h3>
+        <p class="service__desc">${s.desc}</p>
+        <div class="service__pros">
+          <div>${s.pros.map(p => `<span class="pro">${p}</span>`).join("")}</div>
+          <span style="margin-left:auto">${s.pros.length} ${s.pros.length === 1 ? "profissional" : "profissionais"}</span>
+        </div>
+        <div class="service__meta"><span>${s.duration} MIN</span><b>${CURRENCY(s.price)}</b></div>
+        <button class="service__book" data-book="${s.id}">RESERVAR HORÁRIO</button>
+      </article>
+    `).join("") || `<p class="empty">Nenhum serviço nesta categoria.</p>`;
+    // Free slots today (across all services + pros): quick approximation
+    const t = now(); t.setHours(0,0,0,0);
+    let free = 0;
+    SERVICES.forEach(s => s.pros.forEach(p => SLOT_LABELS.forEach(slot => { if (!isSlotBooked(s.id, p, t, slot)) free++; })));
+    $("#freeToday").textContent = String(free);
+  };
+
+  $("[data-filters]").addEventListener("click", (e) => {
+    const b = e.target.closest(".filter"); if (!b) return;
+    $$(".filter").forEach(x => x.classList.toggle("is-active", x === b));
+    filter = b.dataset.cat; renderServices();
+  });
+
+  // ---- Booking flow ----
+  let active = null; // { service, pro, date, slot, pay, contact }
+
+  const openBooking = (serviceId) => {
+    const svc = SERVICES.find(s => s.id === serviceId); if (!svc) return;
+    active = { service: svc, pro: svc.pros[0], date: addDays(now(), 0), slot: null, pay: "pix", contact: {} };
+    renderStep("pro");
+    $("#modal").classList.add("open");
+  };
+  const close = () => { $("#modal").classList.remove("open"); stopPixTimer(); };
+
+  const stepHeader = (step) => `
+    <div class="book__head">
+      <div>
+        <h2 id="bookTitle">${active.service.name}</h2>
+        <p>${active.service.duration} MIN · ${CURRENCY(active.service.price)}</p>
+      </div>
+      <button class="book__close" data-close aria-label="Fechar">×</button>
+    </div>
+    <div class="book__steps">
+      <b>1 PROFISSIONAL</b><i></i>
+      <${step === "slot" || step === "contact" || step === "payment" ? "b" : "span"}>2 HORÁRIO</${step === "slot" || step === "contact" || step === "payment" ? "b" : "span"}><i></i>
+      <${step === "contact" || step === "payment" ? "b" : "span"}>3 CONTATO</${step === "contact" || step === "payment" ? "b" : "span"}><i></i>
+      <${step === "payment" ? "b" : "span"}>4 PAGAMENTO</${step === "payment" ? "b" : "span"}>
+    </div>`;
+
+  const stepPro = () => `
+    ${stepHeader("pro")}
+    <div class="book__step">
+      <small style="color:var(--muted);font:9px var(--mono);letter-spacing:.08em">ESCOLHA O PROFISSIONAL</small>
+      <div class="pro-list">
+        ${active.service.pros.map(code => {
+          const p = PROS.find(x => x.id === code);
+          return `<button class="pro-opt ${code === active.pro ? "is-active" : ""}" data-pick-pro="${code}"><strong>${p?.name || code}</strong><small>${p?.role || ""}</small></button>`;
+        }).join("")}
+      </div>
+    </div>
+    <div class="book__actions"><button data-close>Cancelar</button><button class="primary" data-step="slot">Continuar</button></div>`;
+
+  const stepSlot = () => {
+    const days = Array.from({ length: 14 }, (_, i) => addDays(now(), i));
+    return `
+      ${stepHeader("slot")}
+      <div class="book__step">
+        <small style="color:var(--muted);font:9px var(--mono);letter-spacing:.08em">ESCOLHA O DIA · 14 DIAS</small>
+        <div class="cal">
+          ${days.map(d => `<button class="cal__day ${sameDay(d, active.date) ? "is-selected" : ""}" data-pick-day="${d.toISOString()}"><small>${weekday(d)}</small><b>${d.getDate()}</b><small>${String(d.getMonth()+1).padStart(2,"0")}</small></button>`).join("")}
+        </div>
+        <small style="color:var(--muted);font:9px var(--mono);letter-spacing:.08em;margin-top:10px">HORÁRIOS DE ${weekday(active.date)} ${fmtDay(active.date)}</small>
+        <div class="slots">
+          ${SLOT_LABELS.map(slot => {
+            const booked = isSlotBooked(active.service.id, active.pro, active.date, slot);
+            return `<button class="slot ${booked ? "is-booked" : ""} ${slot === active.slot ? "is-selected" : ""}" ${booked ? "disabled" : ""} data-pick-slot="${slot}">${slot}</button>`;
+          }).join("")}
+        </div>
+      </div>
+      <div class="book__actions"><button data-step="pro">Voltar</button><button class="primary" data-step="contact" ${active.slot ? "" : "disabled"} style="${active.slot ? "" : "opacity:.5;pointer-events:none"}">Continuar</button></div>`;
+  };
+
+  const stepContact = () => `
+    ${stepHeader("contact")}
+    <div class="form">
+      <label>Nome completo<input id="c-name" value="${active.contact.name || ""}" placeholder="Seu nome como está no documento"></label>
+      <div class="row">
+        <label>Email<input id="c-email" type="email" value="${active.contact.email || ""}" placeholder="voce@email.com"></label>
+        <label>Celular<input id="c-phone" value="${active.contact.phone || ""}" placeholder="(00) 90000-0000"></label>
+      </div>
+      <label>Observações (opcional)<input id="c-note" value="${active.contact.note || ""}" placeholder="Alergias, preferências, mais contexto..."></label>
+    </div>
+    <div class="book__actions"><button data-step="slot">Voltar</button><button class="primary" data-step="payment">Continuar</button></div>`;
+
+  const stepPayment = () => {
+    const sub = active.service.price;
+    const total = active.pay === "pix" ? sub * 0.9 : sub;
+    return `
+      ${stepHeader("payment")}
+      <div class="pay-opts">
+        <button class="pay ${active.pay === "pix" ? "is-active" : ""}" data-pay="pix"><strong>Pix</strong><small>Aprovação imediata · 10% off</small></button>
+        <button class="pay ${active.pay === "card" ? "is-active" : ""}" data-pay="card"><strong>Cartão</strong><small>Até 3× sem juros</small></button>
+      </div>
+      ${active.pay === "pix" ? `
+        <div class="pix-box">
+          <strong style="font-size:12px">Chave Pix QR Code (simulado)</strong>
+          <code>00020126580014BR.GOV.BCB.PIX01360cfd...space-agenda-${active.service.id}</code>
+          <span class="pix-timer">EXPIRA EM <b id="pixT">10:00</b></span>
+        </div>
+      ` : `
+        <div class="form">
+          <label>Número do cartão<input id="card-num" placeholder="0000 0000 0000 0000" inputmode="numeric" maxlength="19"></label>
+          <div class="row">
+            <label>Validade<input id="card-exp" placeholder="MM/AA" maxlength="5"></label>
+            <label>CVV<input id="card-cvv" placeholder="000" maxlength="4"></label>
+          </div>
+        </div>
+      `}
+      <div class="summary">
+        <div class="row"><span>Serviço</span><b style="color:var(--text);font-family:var(--sans)">${active.service.name}</b></div>
+        <div class="row"><span>Profissional</span><b style="color:var(--text);font-family:var(--sans)">${PROS.find(p => p.id === active.pro)?.name || active.pro}</b></div>
+        <div class="row"><span>Quando</span><b style="color:var(--text);font-family:var(--sans)">${fmtDay(active.date)} · ${active.slot}</b></div>
+        <div class="row"><span>Subtotal</span><span>${CURRENCY(sub)}</span></div>
+        ${active.pay === "pix" ? `<div class="row"><span>Desconto Pix</span><span>−${CURRENCY(sub * 0.1)}</span></div>` : ""}
+        <div class="row total"><span>Total</span><b>${CURRENCY(total)}</b></div>
+      </div>
+      <div class="book__actions"><button data-step="contact">Voltar</button><button class="primary" data-confirm>${active.pay === "pix" ? "Já paguei via Pix" : "Pagar e confirmar"}</button></div>`;
+  };
+
+  const stepSuccess = (booking) => `
+    <div class="success">
+      <div class="mark">✓</div>
+      <h2>Reserva confirmada</h2>
+      <p style="color:var(--muted);font:11px var(--mono);letter-spacing:.08em">#${booking.id} · ${fmtDay(new Date(booking.when))} · ${booking.slot}</p>
+      <p style="color:var(--text);font-size:12px">Enviamos a confirmação para <b>${booking.contact.email}</b>. Você pode remarcar ou cancelar em "Meus agendamentos" até 24h antes.</p>
+    </div>
+    <div class="book__actions" style="justify-content:center"><button class="primary" data-close>Voltar aos serviços</button></div>`;
+
+  let pixTimer, pixSeconds;
+  const startPixTimer = () => {
+    pixSeconds = 600;
+    stopPixTimer();
+    pixTimer = setInterval(() => {
+      pixSeconds--;
+      const m = String(Math.floor(pixSeconds / 60)).padStart(2, "0"), s = String(pixSeconds % 60).padStart(2, "0");
+      const el = $("#pixT"); if (el) el.textContent = `${m}:${s}`;
+      if (pixSeconds <= 0) stopPixTimer();
+    }, 1000);
+  };
+  const stopPixTimer = () => { if (pixTimer) clearInterval(pixTimer); pixTimer = null; };
+
+  const renderStep = (step, booking) => {
+    const box = $("#bookBox");
+    stopPixTimer();
+    box.innerHTML = step === "pro" ? stepPro() : step === "slot" ? stepSlot() : step === "contact" ? stepContact() : step === "payment" ? stepPayment() : stepSuccess(booking);
+    if (step === "payment" && active.pay === "pix") startPixTimer();
+  };
+
+  $("#modal").addEventListener("click", (e) => {
+    if (e.target === $("#modal")) return close();
+    if (e.target.closest("[data-close]")) return close();
+    const stepBtn = e.target.closest("[data-step]"); if (stepBtn) return renderStep(stepBtn.dataset.step);
+    const picPro = e.target.closest("[data-pick-pro]"); if (picPro) { active.pro = picPro.dataset.pickPro; active.slot = null; return renderStep("pro"); }
+    const picDay = e.target.closest("[data-pick-day]"); if (picDay) { active.date = new Date(picDay.dataset.pickDay); active.slot = null; return renderStep("slot"); }
+    const picSlot = e.target.closest("[data-pick-slot]"); if (picSlot && !picSlot.disabled) { active.slot = picSlot.dataset.pickSlot; return renderStep("slot"); }
+    const payBtn = e.target.closest("[data-pay]"); if (payBtn) { active.pay = payBtn.dataset.pay; return renderStep("payment"); }
+    if (e.target.closest("[data-confirm]")) return confirmBooking();
+  });
+
+  const confirmBooking = () => {
+    if (active.pay === "card") {
+      const num = $("#card-num")?.value?.replace(/\s+/g, "");
+      if (!num || num.length < 12) { say("Número do cartão inválido (demo)."); return; }
+    }
+    const name = $("#c-name")?.value?.trim() || active.contact.name;
+    const email = $("#c-email")?.value?.trim() || active.contact.email;
+    const phone = $("#c-phone")?.value?.trim() || active.contact.phone;
+    const note = $("#c-note")?.value?.trim() || active.contact.note;
+    if (!name || !email) { say("Preencha nome e email."); return renderStep("contact"); }
+    active.contact = { name, email, phone, note };
+    const when = new Date(active.date);
+    const [hh, mm] = active.slot.split(":").map(Number);
+    when.setHours(hh, mm, 0, 0);
+    const total = active.pay === "pix" ? active.service.price * 0.9 : active.service.price;
+    const booking = {
+      id: "SA-" + Date.now().toString().slice(-6),
+      serviceId: active.service.id,
+      serviceName: active.service.name,
+      pro: active.pro,
+      proName: PROS.find(p => p.id === active.pro)?.name || active.pro,
+      when: when.toISOString(),
+      slot: active.slot,
+      duration: active.service.duration,
+      price: active.service.price,
+      pay: active.pay,
+      total,
+      contact: active.contact,
+      status: "scheduled",
+      createdAt: new Date().toISOString(),
+    };
+    state.bookings.unshift(booking); write(state);
+    renderMine();
+    renderStep("success", booking);
+    say("Reserva confirmada!");
+    const w = $("#weekStats"); if (w) w.textContent = String(Number(w.textContent || 0) + 1);
+  };
+
+  // ---- My bookings ----
+  const renderMine = () => {
+    const el = $("#bookings");
+    const list = [...state.bookings].sort((a, b) => new Date(b.when) - new Date(a.when));
+    el.innerHTML = list.length ? list.map(b => {
+      const when = new Date(b.when);
+      const isPast = when < new Date() && b.status === "scheduled";
+      const status = b.status === "cancelled" ? "cancelled" : isPast ? "past" : "scheduled";
+      const label = status === "cancelled" ? "CANCELADO" : status === "past" ? "CONCLUÍDO" : "AGENDADO";
+      return `
+        <article class="booking">
+          <div class="booking__meta">
+            <small>#${b.id} · ${b.serviceName}</small>
+            <strong>${b.proName}</strong>
+            <span>${fmtDay(when)} · ${b.slot} · ${b.duration} MIN</span>
+            <span class="booking__status ${status}">${label}</span>
+          </div>
+          <div class="booking__actions">
+            ${b.status === "scheduled" && !isPast ? `
+              <button data-resch="${b.id}">⇄ Remarcar</button>
+              <button class="danger" data-cancel="${b.id}">× Cancelar</button>
+            ` : `<button data-rebook="${b.id}">↻ Reagendar igual</button>`}
+          </div>
+        </article>`;
+    }).join("") : `<p class="empty">Você ainda não tem agendamentos.<br>Reserve um serviço na aba "Reservar".</p>`;
+    $("[data-count-mine]").textContent = state.bookings.filter(b => b.status === "scheduled" && new Date(b.when) >= new Date()).length || "";
+  };
+
+  $("#bookings").addEventListener("click", (e) => {
+    const c = e.target.closest("[data-cancel]"); if (c) {
+      const b = state.bookings.find(x => x.id === c.dataset.cancel); if (!b) return;
+      b.status = "cancelled"; write(state); renderMine(); say("Agendamento cancelado."); return;
+    }
+    const r = e.target.closest("[data-resch]"); if (r) {
+      const b = state.bookings.find(x => x.id === r.dataset.resch); if (!b) return;
+      const svc = SERVICES.find(s => s.id === b.serviceId); if (!svc) return;
+      b.status = "cancelled"; write(state); renderMine();
+      active = { service: svc, pro: b.pro, date: addDays(now(), 1), slot: null, pay: "pix", contact: b.contact };
+      renderStep("slot"); $("#modal").classList.add("open");
+      say("Escolha um novo horário.");
+      return;
+    }
+    const rb = e.target.closest("[data-rebook]"); if (rb) {
+      const b = state.bookings.find(x => x.id === rb.dataset.rebook); if (!b) return;
+      const svc = SERVICES.find(s => s.id === b.serviceId); if (!svc) return;
+      active = { service: svc, pro: b.pro, date: addDays(now(), 1), slot: null, pay: "pix", contact: b.contact };
+      renderStep("slot"); $("#modal").classList.add("open"); return;
+    }
+  });
+
+  // ---- Tabs ----
+  $$(".tab").forEach(t => t.addEventListener("click", () => {
+    $$(".tab").forEach(x => x.classList.toggle("is-active", x === t));
+    const view = t.dataset.view;
+    $$("[data-section]").forEach(s => s.classList.toggle("hidden", s.dataset.section !== view));
+    if (view === "mine") renderMine();
+  }));
+
+  document.body.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-book]"); if (b) openBooking(b.dataset.book);
+  });
+
+  renderServices(); renderMine();
+  if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embed");
+  try { if (parent !== window) parent.postMessage({ type: "space-agenda:ready" }, location.origin); } catch {}
+})();
+</script>
+</body>
+</html>
