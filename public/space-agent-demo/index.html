@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#120804">
+  <title>Space Agent — Demo</title>
+  <style>
+    :root{color-scheme:dark;--bg:#120804;--panel:#1f1108;--panel2:#2a160c;--line:#3a1f10;--orange:#fb923c;--orange2:#fdba74;--text:#fdf1e5;--muted:#b3927a;--green:#86efac;--warn:#f59e0b;--red:#fca5a5;--sans:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Cascadia Mono",Consolas,monospace}
+    *{box-sizing:border-box}body{margin:0;min-width:320px;background:radial-gradient(circle at 85% 10%,rgba(251,146,60,.08),transparent 32%),var(--bg);color:var(--text);font-family:var(--sans)}
+    button,input,select,textarea{font:inherit;color:inherit}
+    .shell{display:grid;grid-template-rows:auto 1fr auto;min-height:100vh}
+    .top{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid var(--line);background:rgba(18,8,4,.78);backdrop-filter:blur(10px);position:sticky;top:0;z-index:5;gap:14px;flex-wrap:wrap}
+    .brand{display:flex;gap:12px;align-items:center}
+    .brand__mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(251,146,60,.5);background:rgba(251,146,60,.08);font:700 12px var(--mono);color:var(--orange2)}
+    .brand strong{display:block;font-size:14px}.brand small{display:block;color:var(--muted);font:9px var(--mono);letter-spacing:.08em}
+    .top__meta{display:flex;align-items:center;gap:16px;color:var(--muted);font:10px var(--mono);letter-spacing:.08em}
+    .top__meta b{color:var(--orange2);font-size:12px;font-family:var(--sans);font-weight:600}
+    .modeSwitch{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid var(--line);background:var(--panel);border-radius:999px;cursor:pointer;font:10px var(--mono);letter-spacing:.08em;color:var(--muted)}
+    .modeSwitch.on{color:var(--orange2);border-color:rgba(251,146,60,.4);background:rgba(251,146,60,.06)}
+    .modeSwitch .d{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+    .modeSwitch.on .d{background:var(--orange);box-shadow:0 0 10px var(--orange)}
+    .main{display:grid;grid-template-columns:320px 1fr;gap:0;overflow:hidden;min-height:0}
+    .pane{overflow:auto;padding:18px;display:grid;gap:16px;align-content:start}
+    .pane--side{border-right:1px solid var(--line);background:rgba(18,8,4,.4)}
+    .block{border:1px solid var(--line);background:var(--panel);border-radius:12px;overflow:hidden}
+    .block header{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+    .block header strong{font-size:12px}
+    .block header span{color:var(--muted);font:9px var(--mono);letter-spacing:.08em}
+    .ints{padding:4px}
+    .int{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:10px;padding:10px;border-radius:8px}
+    .int:hover{background:rgba(251,146,60,.05)}
+    .int__mark{width:28px;height:28px;border-radius:7px;background:var(--panel2);border:1px solid var(--line);display:grid;place-items:center;font:700 10px var(--mono);color:var(--orange2)}
+    .int__name{font-size:12px;font-weight:600}
+    .int__meta{color:var(--muted);font:9px var(--mono);letter-spacing:.06em}
+    .int__status{display:inline-flex;align-items:center;gap:6px;color:var(--green);font:8px var(--mono);letter-spacing:.08em}
+    .int__status.off{color:var(--muted)}
+    .int__status .d{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px rgba(134,239,172,.6)}
+    .int__status.off .d{background:var(--muted);box-shadow:none}
+    .flow{display:grid;gap:3px;padding:4px}
+    .flow__item{padding:11px 13px;background:transparent;border:0;color:var(--text);text-align:left;border-radius:8px;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:4px}
+    .flow__item:hover{background:rgba(251,146,60,.06)}
+    .flow__item strong{font-size:12px;font-weight:600;grid-column:1}
+    .flow__item small{color:var(--muted);font:9px var(--mono);letter-spacing:.06em;grid-column:1}
+    .flow__item i{grid-column:2;grid-row:1 / span 2;color:var(--orange2);font-size:14px;align-self:center}
+    .pane--chat{display:grid;grid-template-rows:1fr auto;min-height:0}
+    .log{overflow:auto;padding:22px;display:grid;gap:14px;align-content:end}
+    .msg{display:grid;grid-template-columns:34px 1fr;gap:12px;max-width:860px}
+    .msg__avatar{width:34px;height:34px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);display:grid;place-items:center;font:700 10px var(--mono);color:var(--orange2)}
+    .msg.user{justify-self:end;grid-template-columns:1fr 34px}
+    .msg.user .msg__avatar{grid-column:2;background:#2a160c;color:var(--text)}
+    .msg.user .msg__bubble{grid-column:1}
+    .msg__bubble{padding:12px 15px;border:1px solid var(--line);background:var(--panel);border-radius:12px;font-size:13px;line-height:1.55;overflow:hidden}
+    .msg.user .msg__bubble{background:rgba(251,146,60,.08);border-color:rgba(251,146,60,.2)}
+    .msg__bubble small{display:block;color:var(--muted);font:8px var(--mono);letter-spacing:.1em;margin-bottom:4px;text-transform:uppercase}
+    .msg__bubble pre{margin:8px 0 0;padding:11px 13px;background:#120804;border:1px solid var(--line);border-radius:8px;font:11px/1.6 var(--mono);white-space:pre-wrap;color:var(--orange2)}
+    .msg__bubble .steps{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px}
+    .msg__bubble .steps li{display:grid;grid-template-columns:14px 1fr;gap:9px;font:11px var(--mono);color:var(--muted);letter-spacing:.04em}
+    .msg__bubble .steps li.ok{color:var(--green)}
+    .msg__bubble .steps li i{color:inherit}
+    .msg__bubble table{width:100%;margin-top:8px;border-collapse:collapse;font-size:11px}
+    .msg__bubble th{text-align:left;color:var(--muted);font:9px var(--mono);font-weight:400;letter-spacing:.08em;padding:6px 10px;border-bottom:1px solid var(--line)}
+    .msg__bubble td{padding:7px 10px;border-bottom:1px solid rgba(58,31,16,.6);font-family:var(--mono);font-size:10px}
+    .typing{display:inline-flex;gap:4px;padding:2px 0}
+    .typing i{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite}
+    .typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+    @keyframes blink{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-2px)}}
+    .composer{border-top:1px solid var(--line);padding:16px 22px;background:rgba(18,8,4,.6);backdrop-filter:blur(6px);display:grid;gap:10px}
+    .composer__quick{display:flex;flex-wrap:wrap;gap:6px}
+    .composer__quick button{appearance:none;border:1px solid var(--line);background:transparent;color:var(--muted);padding:7px 11px;border-radius:999px;font:9px var(--mono);letter-spacing:.08em;cursor:pointer}
+    .composer__quick button:hover{color:var(--orange2);border-color:rgba(251,146,60,.4)}
+    .composer__row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}
+    .composer textarea{resize:none;appearance:none;background:var(--panel);border:1px solid var(--line);padding:11px 14px;border-radius:12px;color:var(--text);font:12.5px var(--sans);outline:0;min-height:48px;max-height:120px}
+    .composer textarea:focus{border-color:var(--orange)}
+    .composer__send{appearance:none;border:0;background:var(--orange);color:#180a04;padding:12px 18px;border-radius:12px;cursor:pointer;font:600 12px var(--sans)}
+    .composer__send:hover{background:var(--orange2)}
+    .composer__send:disabled{opacity:.5;cursor:not-allowed}
+    .footer{padding:14px 24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;color:var(--muted);font:9px var(--mono);letter-spacing:.08em}
+    .toast{position:fixed;right:22px;bottom:22px;max-width:320px;padding:11px 14px;border:1px solid var(--orange);background:#2a160c;color:var(--orange2);border-radius:8px;font:10px/1.5 var(--mono);opacity:0;transform:translateY(8px);pointer-events:none;transition:.2s;z-index:14}
+    .toast.show{opacity:1;transform:none}
+    body.embed .top{position:relative}body.embed .footer{display:none}
+    @media(max-width:900px){.main{grid-template-columns:1fr}.pane--side{display:none}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div class="brand"><div class="brand__mark">AG</div><div><strong>Space Agent</strong><small>AI ORCHESTRATOR · DEMO</small></div></div>
+    <div class="top__meta">
+      <span>TAREFAS HOJE <b id="statTasks">124</b></span>
+      <span>TEMPO POUPADO <b id="statSaved">18h 42min</b></span>
+      <span>INTEGRAÇÕES ATIVAS <b id="statInts">4/6</b></span>
+    </div>
+    <button class="modeSwitch on" id="autoMode" aria-pressed="true"><span class="d"></span>MODO AUTOMÁTICO</button>
+  </header>
+
+  <main class="main">
+    <aside class="pane pane--side">
+      <section class="block">
+        <header><strong>Integrações</strong><span>MOCK</span></header>
+        <div class="ints" id="ints"></div>
+      </section>
+
+      <section class="block">
+        <header><strong>Workflows prontos</strong><span>TOCAR PARA RODAR</span></header>
+        <div class="flow" id="flows"></div>
+      </section>
+
+      <section class="block">
+        <header><strong>Execuções recentes</strong><span>ÚLTIMAS 5</span></header>
+        <div class="ints" id="history"></div>
+      </section>
+    </aside>
+
+    <section class="pane pane--chat">
+      <div class="log" id="log"></div>
+      <form class="composer" id="composer" autocomplete="off">
+        <div class="composer__quick" id="quick">
+          <button type="button" data-prompt="Resumo dos pedidos de hoje">↗ Resumo dos pedidos</button>
+          <button type="button" data-prompt="Gerar orçamento para João Silva - landing page institucional">↗ Gerar orçamento</button>
+          <button type="button" data-prompt="Enviar lembrete via WhatsApp para agendamentos de amanhã">↗ Lembretes de amanhã</button>
+          <button type="button" data-prompt="Alertar sobre produtos com estoque baixo">↗ Alertas de estoque</button>
+          <button type="button" data-prompt="Registrar novo lead: Marina Costa - interessada em e-commerce">↗ Capturar lead</button>
+        </div>
+        <div class="composer__row">
+          <textarea id="input" placeholder="Pergunte ao agente ou peça para disparar uma automação..." rows="1" aria-label="Comando para o agente"></textarea>
+          <button class="composer__send" type="submit" id="send">ENVIAR →</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>CASE / AUTOMATION · DEMONSTRAÇÃO SEM INTEGRAÇÕES REAIS</span>
+    <span>SPACE AGENT · SPACE UNDERGROUND</span>
+  </footer>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  const KEY = "space-agent/state/v1";
+  const now = () => new Date();
+  const uid = () => Math.random().toString(36).slice(2, 7).toUpperCase();
+  const timeAgo = (iso) => {
+    const diff = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+    if (diff < 60) return `${diff}s atrás`;
+    if (diff < 3600) return `${Math.round(diff / 60)}min atrás`;
+    return `${Math.round(diff / 3600)}h atrás`;
+  };
+
+  const INTEGRATIONS = [
+    { id:"wa",  name:"WhatsApp",      meta:"Business API",     mark:"WA", on:true  },
+    { id:"em",  name:"Email",         meta:"SMTP / Resend",    mark:"EM", on:true  },
+    { id:"sb",  name:"Supabase",      meta:"Edge Functions",   mark:"SB", on:true  },
+    { id:"mp",  name:"Mercado Pago",  meta:"Pedidos & Pix",    mark:"MP", on:true  },
+    { id:"gd",  name:"Google Drive",  meta:"Documentos",       mark:"GD", on:false },
+    { id:"sl",  name:"Slack",         meta:"Operação interna", mark:"SL", on:false },
+  ];
+
+  const WORKFLOWS = [
+    {
+      id:"orders-today",
+      title:"Resumo diário de pedidos",
+      meta:"PERGUNTA · 1 EXECUÇÃO/DIA",
+      prompt:"Resumo dos pedidos de hoje",
+    },
+    {
+      id:"low-stock",
+      title:"Alertas de estoque baixo",
+      meta:"EVENTO · ATÉ 10/DIA",
+      prompt:"Alertar sobre produtos com estoque baixo",
+    },
+    {
+      id:"booking-reminders",
+      title:"Lembrete de agendamentos",
+      meta:"CRON · 24H ANTES",
+      prompt:"Enviar lembrete via WhatsApp para agendamentos de amanhã",
+    },
+    {
+      id:"quote-gen",
+      title:"Orçamento automático",
+      meta:"GATILHO · POR LEAD",
+      prompt:"Gerar orçamento para João Silva - landing page institucional",
+    },
+    {
+      id:"lead-capture",
+      title:"Capturar lead e abrir pipeline",
+      meta:"GATILHO · POR FORMULÁRIO",
+      prompt:"Registrar novo lead: Marina Costa - interessada em e-commerce",
+    },
+  ];
+
+  const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) ?? { history: [] }; } catch { return { history: [] }; } };
+  const write = (s) => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} };
+  let state = read();
+
+  const $ = s => document.querySelector(s);
+  const log = $("#log"), input = $("#input"), toast = $("#toast");
+  let toastTimer;
+  const say = (msg) => { toast.textContent = msg; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove("show"), 2000); };
+
+  // ---- Rendering ----
+  const renderIntegrations = () => {
+    $("#ints").innerHTML = INTEGRATIONS.map(i => `
+      <div class="int"><div class="int__mark">${i.mark}</div><div><div class="int__name">${i.name}</div><div class="int__meta">${i.meta}</div></div><span class="int__status ${i.on ? "" : "off"}"><span class="d"></span>${i.on ? "ONLINE" : "OFF"}</span></div>
+    `).join("");
+    $("#statInts").textContent = `${INTEGRATIONS.filter(i => i.on).length}/${INTEGRATIONS.length}`;
+  };
+  const renderFlows = () => {
+    $("#flows").innerHTML = WORKFLOWS.map(w => `
+      <button class="flow__item" type="button" data-run="${w.id}"><strong>${w.title}</strong><small>${w.meta}</small><i>▶</i></button>
+    `).join("");
+  };
+  const renderHistory = () => {
+    const list = state.history.slice(0, 5);
+    $("#history").innerHTML = list.length ? list.map(h => `
+      <div class="int"><div class="int__mark" style="color:${h.ok ? "var(--green)" : "var(--red)"}">${h.ok ? "✓" : "×"}</div><div><div class="int__name">${h.title}</div><div class="int__meta">${timeAgo(h.when)} · ${h.flow}</div></div><span class="int__status ${h.ok ? "" : "off"}" style="${h.ok ? "" : "color:var(--red)"}"><span class="d" style="${h.ok ? "" : "background:var(--red);box-shadow:none"}"></span>${h.ok ? "OK" : "FAIL"}</span></div>
+    `).join("") : `<p style="padding:14px;color:var(--muted);font:10px var(--mono);text-align:center">Sem execuções registradas.</p>`;
+  };
+
+  // ---- Append message ----
+  const bubble = (role, html) => {
+    const el = document.createElement("div");
+    el.className = `msg ${role}`;
+    el.innerHTML = `<div class="msg__avatar">${role === "agent" ? "AG" : "VC"}</div><div class="msg__bubble">${html}</div>`;
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+    return el;
+  };
+
+  const bubbleTyping = () => {
+    const el = document.createElement("div");
+    el.className = "msg agent";
+    el.innerHTML = `<div class="msg__avatar">AG</div><div class="msg__bubble"><div class="typing"><i></i><i></i><i></i></div></div>`;
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+    return el;
+  };
+
+  // ---- Scripted agent "intelligence" ----
+  // Pattern matches user input against a few canned workflows. The response is
+  // staged: typing bubble -> agent bubble with steps that mark as "ok" one by
+  // one, then (when applicable) a result table/snippet. Entirely local.
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  const runSteps = async (bubbleEl, steps) => {
+    const ul = document.createElement("ul");
+    ul.className = "steps";
+    bubbleEl.appendChild(ul);
+    for (const step of steps) {
+      const li = document.createElement("li");
+      li.innerHTML = `<i>◯</i><span>${step}</span>`;
+      ul.appendChild(li);
+      log.scrollTop = log.scrollHeight;
+      await sleep(380 + Math.random() * 320);
+      li.classList.add("ok");
+      li.querySelector("i").textContent = "✓";
+    }
+  };
+
+  const runFromCommand = async (text) => {
+    const lower = text.toLowerCase();
+    const typing = bubbleTyping();
+    await sleep(600);
+    typing.remove();
+    const agentBubble = bubble("agent", `<small>Space Agent · ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</small>`);
+    const bubbleBody = agentBubble.querySelector(".msg__bubble");
+
+    let title, flowLabel = "comando", ok = true, extra = "";
+
+    const pedidos = /pedido|pedidos|resumo|hoje/.test(lower);
+    const estoque = /estoque|baixo|alerta|alertar/.test(lower);
+    const lembrete = /lembrete|agendamento|whatsapp|amanh/.test(lower);
+    const orcamento = /or[cç]amento|proposta|cotar/.test(lower);
+    const lead = /lead|capturar|registrar.*lead/.test(lower);
+
+    if (pedidos) {
+      title = "Resumo diário de pedidos";
+      flowLabel = "orders-today";
+      bubbleBody.insertAdjacentHTML("beforeend", `<p style="margin:4px 0 0;color:var(--muted);font-size:12px">Puxando pedidos do Mercado Pago e cruzando com o Supabase...</p>`);
+      await runSteps(bubbleBody, [
+        "Mercado Pago · 14 pedidos aprovados nas últimas 24h",
+        "Supabase · cruzando com clientes e produtos",
+        "Agrupando por categoria e método de pagamento",
+        "Gerando resumo executivo",
+      ]);
+      extra = `
+        <table>
+          <thead><tr><th>Categoria</th><th>Qtd</th><th>Receita</th></tr></thead>
+          <tbody>
+            <tr><td>Commerce (Underground Store)</td><td>9</td><td>R$ 1.842,00</td></tr>
+            <tr><td>Booking (Space Agenda)</td><td>4</td><td>R$ 880,00</td></tr>
+            <tr><td>Assinatura mensal</td><td>1</td><td>R$ 199,00</td></tr>
+          </tbody>
+        </table>
+        <p style="margin:10px 0 0;color:var(--text);font-size:12px"><b>Total hoje:</b> R$ 2.921,00 · <b>Pix:</b> 61% · <b>Cartão:</b> 39%</p>`;
+    } else if (estoque) {
+      title = "Alertas de estoque baixo";
+      flowLabel = "low-stock";
+      bubbleBody.insertAdjacentHTML("beforeend", `<p style="margin:4px 0 0;color:var(--muted);font-size:12px">Varrendo estoque e disparando alertas para quem tem permissão.</p>`);
+      await runSteps(bubbleBody, [
+        "StockOS · 3 SKUs abaixo do mínimo encontrados",
+        "Mapeando responsável de compras por SKU",
+        "WhatsApp · enviando alertas",
+        "Supabase · registrando ocorrência",
+      ]);
+      extra = `
+        <table>
+          <thead><tr><th>SKU</th><th>Produto</th><th>Estoque</th></tr></thead>
+          <tbody>
+            <tr><td>SO-0003</td><td>Óleo de soja</td><td>9 un · mín 12</td></tr>
+            <tr><td>SO-0006</td><td>Detergente neutro</td><td>0 un · mín 8</td></tr>
+            <tr><td>SO-0010</td><td>Luva descartável M</td><td>5 cx · mín 20</td></tr>
+          </tbody>
+        </table>
+        <p style="margin:10px 0 0;color:var(--text);font-size:12px"><b>3 mensagens</b> enviadas por WhatsApp para a Patrícia (compras).</p>`;
+    } else if (lembrete) {
+      title = "Lembretes de agendamentos";
+      flowLabel = "booking-reminders";
+      bubbleBody.insertAdjacentHTML("beforeend", `<p style="margin:4px 0 0;color:var(--muted);font-size:12px">Agente procurando reservas para as próximas 24h.</p>`);
+      await runSteps(bubbleBody, [
+        "Space Agenda · 8 agendamentos entre 09:00 e 18:00 de amanhã",
+        "Montando template personalizado por serviço",
+        "WhatsApp · disparando mensagens em lotes de 3",
+        "Marcando 'lembrete enviado' no registro de cada reserva",
+      ]);
+      extra = `<pre>Olá, {nome}. Lembrete da sua reserva de {serviço}
+amanhã às {hora} com {profissional}.
+Posso reagendar? Responda SIM para confirmar.</pre>
+      <p style="margin:10px 0 0;color:var(--text);font-size:12px"><b>8 mensagens</b> enviadas. Taxa de confirmação histórica: 92%.</p>`;
+    } else if (orcamento) {
+      title = "Orçamento automático";
+      flowLabel = "quote-gen";
+      bubbleBody.insertAdjacentHTML("beforeend", `<p style="margin:4px 0 0;color:var(--muted);font-size:12px">Montando proposta com faixas de preço e prazo.</p>`);
+      await runSteps(bubbleBody, [
+        "Identificado tipo de projeto: Landing Page institucional",
+        "Supabase · consultando faixa do plano Plus",
+        "Gerando PDF com escopo, prazo e condições",
+        "Google Drive · publicando orçamento e gerando link",
+        "Email · enviando ao cliente com cópia para comercial",
+      ]);
+      extra = `<pre>Proposta #SU-${uid()}
+Cliente: João Silva
+Projeto: Landing Page institucional
+Escopo: 1 página, até 6 seções, formulário conectado
+Investimento: R$ 1.800 (à vista) / 3x R$ 650
+Prazo: 2-3 semanas após briefing aprovado
+Validade: 7 dias</pre>`;
+    } else if (lead) {
+      title = "Captura de lead";
+      flowLabel = "lead-capture";
+      bubbleBody.insertAdjacentHTML("beforeend", `<p style="margin:4px 0 0;color:var(--muted);font-size:12px">Agente registrando no pipeline comercial.</p>`);
+      await runSteps(bubbleBody, [
+        "Supabase · criando registro em commercial_opportunities",
+        "Interesse detectado: E-commerce (Underground Store)",
+        "Slack · notificando canal #comercial",
+        "Email · enviando resposta automática com próximos passos",
+      ]);
+      extra = `<p style="margin:0;color:var(--text);font-size:12px"><b>Lead #${uid()}</b> criado em "Qualificação". Primeiro contato agendado para hoje às 15h30 (automático).</p>`;
+    } else {
+      title = "Pergunta ao agente";
+      flowLabel = "ask";
+      bubbleBody.insertAdjacentHTML("beforeend", `<p style="margin:4px 0 0;font-size:12.5px;line-height:1.55">Entendi o pedido. Posso ajudar com <b>pedidos</b>, <b>estoque</b>, <b>agendamentos</b>, <b>orçamentos</b> e <b>captura de leads</b>. Use um dos atalhos abaixo ou descreva com mais detalhes o que você quer que eu dispare.</p>`);
+    }
+
+    if (extra) bubbleBody.insertAdjacentHTML("beforeend", extra);
+    state.history.unshift({ id: uid(), title, flow: flowLabel, when: new Date().toISOString(), ok });
+    state.history = state.history.slice(0, 30);
+    write(state); renderHistory();
+
+    // Bump counters
+    if (title !== "Pergunta ao agente") {
+      const t = $("#statTasks"); t.textContent = String(Number(t.textContent) + 1);
+      const parts = ($("#statSaved").textContent).match(/(\d+)h\s*(\d+)min/) || [, "0", "0"];
+      const minutes = Number(parts[1]) * 60 + Number(parts[2]) + 7;
+      $("#statSaved").textContent = `${Math.floor(minutes / 60)}h ${minutes % 60}min`;
+    }
+  };
+
+  // ---- Events ----
+  $("#composer").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const value = input.value.trim(); if (!value) return;
+    bubble("user", value.replace(/</g, "&lt;"));
+    input.value = ""; input.focus();
+    runFromCommand(value);
+  });
+  $("#quick").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-prompt]"); if (!b) return;
+    input.value = b.dataset.prompt; input.focus();
+  });
+  $("#flows").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-run]"); if (!b) return;
+    const wf = WORKFLOWS.find(w => w.id === b.dataset.run); if (!wf) return;
+    bubble("user", wf.prompt);
+    runFromCommand(wf.prompt);
+    say(`Workflow "${wf.title}" disparado.`);
+  });
+  $("#autoMode").addEventListener("click", () => {
+    const el = $("#autoMode");
+    const on = el.classList.toggle("on");
+    el.setAttribute("aria-pressed", on ? "true" : "false");
+    say(on ? "Modo automático ativado." : "Modo automático desativado.");
+  });
+
+  // ---- Boot ----
+  renderIntegrations(); renderFlows(); renderHistory();
+  bubble("agent", `<small>Space Agent · agora</small>
+    <p style="margin:0;font-size:13px;line-height:1.55">Oi — eu sou o Space Agent da Space Underground. Posso puxar dados, cruzar sistemas e disparar automações.
+    Toque num workflow da coluna da esquerda ou pergunte diretamente abaixo. Tudo nesta demo roda <b>local</b>, sem backend real.</p>`);
+
+  if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embed");
+  try { if (parent !== window) parent.postMessage({ type: "space-agent:ready" }, location.origin); } catch {}
+})();
+</script>
+</body>
+</html>

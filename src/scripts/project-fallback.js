@@ -434,4 +434,95 @@ export const FALLBACK_PROJECTS = [
       },
     ],
   },
+  {
+    case_number: 6,
+    name: "Space Agent",
+    slug: "space-agent",
+    client: "Space Underground",
+    category: "Automation",
+    description:
+      "Orquestrador de automações com IA: puxa dados, cruza sistemas, dispara workflows e conversa com o operador em linguagem natural.",
+    status: "Live",
+    year: 2026,
+    accent: "#fb923c",
+    tech_stack: ["JavaScript", "Edge Functions", "LLM", "Webhooks"],
+    presentation_system: "AUTOMATION / 01",
+    presentation_label: "SPACE AGENT",
+    presentation_address: "agent.spaceunderground",
+    presentation_type: "AUTOMATION",
+    origin: "BR",
+    coordinates: ["23°33' S", "46°38' W"],
+    poster_url: "",
+    project_url: "./space-agent-demo/",
+    preview_url: "./space-agent-demo/",
+    live_preview_enabled: true,
+    cta_label: "Automatizar meu negócio",
+    cta_label_en: "Automate my business",
+    demo_url: "./space-agent-demo/",
+    translations: {
+      en: {
+        description:
+          "AI-powered automation orchestrator: pulls data, bridges systems, fires workflows and talks to the operator in natural language.",
+      },
+    },
+    project_gallery: [],
+    project_modules: [
+      {
+        position: 1,
+        code: "PROBLEM",
+        title: "Problema",
+        description:
+          "Operações crescem com planilhas, mensagens no WhatsApp e tarefas repetidas entre sistemas que não se conversam — tempo da equipe queimado em cola.",
+        translations: {
+          en: {
+            title: "Problem",
+            description:
+              "Operations grow with spreadsheets, WhatsApp messages and repetitive tasks across systems that don't talk — team time burned on glue.",
+          },
+        },
+      },
+      {
+        position: 2,
+        code: "SOLUTION",
+        title: "Solução",
+        description:
+          "Agente central que escuta comandos ou gatilhos, consulta Supabase/Mercado Pago, resolve a tarefa e devolve resposta via WhatsApp, email ou chat.",
+        translations: {
+          en: {
+            title: "Solution",
+            description:
+              "Central agent that listens to commands or triggers, queries Supabase/Mercado Pago, resolves the task and replies via WhatsApp, email or chat.",
+          },
+        },
+      },
+      {
+        position: 3,
+        code: "FEATURES",
+        title: "Recursos",
+        description:
+          "6 integrações mockadas (WhatsApp, Email, Supabase, Mercado Pago, Google Drive, Slack), 5 workflows prontos (pedidos, estoque, lembretes, orçamento, lead) e histórico auditável.",
+        translations: {
+          en: {
+            title: "Features",
+            description:
+              "6 mocked integrations (WhatsApp, Email, Supabase, Mercado Pago, Google Drive, Slack), 5 ready workflows (orders, stock, reminders, quote, lead) and auditable history.",
+          },
+        },
+      },
+      {
+        position: 4,
+        code: "RESULT",
+        title: "Resultado",
+        description:
+          "Diferencial técnico premium: cliente vê o agente puxar pedidos, cruzar com estoque, disparar WhatsApp e registrar execução — em segundos, sem backend em produção.",
+        translations: {
+          en: {
+            title: "Result",
+            description:
+              "Premium technical edge: the client watches the agent pull orders, cross with stock, fire WhatsApp and log the run — in seconds, with no production backend.",
+          },
+        },
+      },
+    ],
+  },
 ];
