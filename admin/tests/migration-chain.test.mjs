@@ -51,7 +51,7 @@ const HISTORICAL = [
 ];
 
 // Written after the recorded production history and not applied yet.
-const PENDING = ["automation_v2"];
+const PENDING = ["automation_v2", "phase1_commercial"];
 
 function toDate(stamp) {
   const [, y, mo, d, h, mi, s] = stamp.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);

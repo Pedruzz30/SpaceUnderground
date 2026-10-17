@@ -214,6 +214,11 @@ describe("admin", () => {
 describe("post-review migration", () => {
   it("can run again without widening anything", async () => {
     await db.exec(readMigration("clients_post_review_hardening"));
+    // Hardening revokes anon privileges wholesale before re-granting its own
+    // canonical column list; later migrations that extend the public surface
+    // (e.g. phase1_commercial) must be replayed afterwards for anon to keep
+    // reading the columns they added.
+    await db.exec(readMigration("phase1_commercial"));
     const { rows } = await asRole("anon", null, () => db.query(PUBLIC_QUERY));
     assert.equal(rows.length, 1);
     const error = await asRole("anon", null, () => failure("select client_id from public.projects"));
