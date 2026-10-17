@@ -191,6 +191,97 @@ export const FALLBACK_PROJECTS = [
   },
   {
     case_number: 3,
+    name: "Space Agenda",
+    slug: "space-agenda",
+    client: "Space Underground",
+    category: "Booking",
+    description:
+      "Agenda online para clínicas, estética, beleza e serviços profissionais com reserva em minutos.",
+    status: "Live",
+    year: 2026,
+    accent: "#8b5cf6",
+    tech_stack: ["JavaScript", "LocalStorage", "SVG"],
+    presentation_system: "BOOKING / 01",
+    presentation_label: "SPACE AGENDA",
+    presentation_address: "agenda.spaceunderground",
+    presentation_type: "BOOKING",
+    origin: "BR",
+    coordinates: ["23°33' S", "46°38' W"],
+    poster_url: "",
+    project_url: "./space-agenda-demo/",
+    preview_url: "./space-agenda-demo/",
+    live_preview_enabled: true,
+    cta_label: "Criar minha agenda",
+    cta_label_en: "Build my booking",
+    demo_url: "./space-agenda-demo/",
+    translations: {
+      en: {
+        description:
+          "Online booking for clinics, aesthetics, beauty and professional services — reservations in minutes.",
+      },
+    },
+    project_gallery: [],
+    project_modules: [
+      {
+        position: 1,
+        code: "PROBLEM",
+        title: "Problema",
+        description:
+          "Agendamento por WhatsApp dispersa cliente e equipe: horário conflita, no-show acontece e a operação depende da memória de alguém.",
+        translations: {
+          en: {
+            title: "Problem",
+            description:
+              "Scheduling over WhatsApp scatters client and staff: slots overlap, no-shows happen and the operation depends on someone's memory.",
+          },
+        },
+      },
+      {
+        position: 2,
+        code: "SOLUTION",
+        title: "Solução",
+        description:
+          "Fluxo em 4 passos: serviço, profissional, horário e pagamento. Pix com 10% off ou cartão. Lembretes, remarcação e histórico por cliente.",
+        translations: {
+          en: {
+            title: "Solution",
+            description:
+              "Four-step flow: service, professional, time slot and payment. Pix with 10% off or card. Reminders, rescheduling and per-client history.",
+          },
+        },
+      },
+      {
+        position: 3,
+        code: "FEATURES",
+        title: "Recursos",
+        description:
+          "Calendário de 14 dias com slots de 30min, filtros por categoria, perfil do profissional, QR Pix com timer e CTA para reagendar/cancelar.",
+        translations: {
+          en: {
+            title: "Features",
+            description:
+              "14-day calendar with 30-minute slots, category filters, professional profile, Pix QR with timer and reschedule/cancel CTAs.",
+          },
+        },
+      },
+      {
+        position: 4,
+        code: "RESULT",
+        title: "Resultado",
+        description:
+          "Reservas sem conflito, agenda cheia visível em tempo real e a equipe focada no atendimento em vez de administrar horários.",
+        translations: {
+          en: {
+            title: "Result",
+            description:
+              "No-conflict bookings, a visible full agenda in real time and the team focused on service instead of managing time slots.",
+          },
+        },
+      },
+    ],
+  },
+  {
+    case_number: 4,
     name: "Termo Digital",
     slug: "termo-digital",
     client: "Termo Digital",
@@ -267,7 +358,7 @@ export const FALLBACK_PROJECTS = [
     ],
   },
   {
-    case_number: 4,
+    case_number: 5,
     name: "JARVIS",
     slug: "jarvis-ai",
     client: "Space Underground Labs",

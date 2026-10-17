@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+<title id="title">Space Agenda</title><desc id="desc">Poster do sistema Space Agenda, agenda digital da Space Underground para clínicas, estética e serviços.</desc>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0e0518"/><stop offset="1" stop-color="#1a0d2a"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<rect width="1440" height="900" fill="url(#bg)"/><g opacity=".12" stroke="#8b5cf6"><path d="M0 110H1440M0 220H1440M0 330H1440M0 440H1440M0 550H1440M0 660H1440M0 770H1440"/><path d="M160 0V900M320 0V900M480 0V900M640 0V900M800 0V900M960 0V900M1120 0V900M1280 0V900"/></g>
+<rect x="52" y="48" width="1336" height="804" rx="18" fill="#1a0d2a" stroke="#2e1949"/>
+<rect x="82" y="82" width="42" height="42" rx="9" fill="#231038" stroke="#8b5cf6"/><text x="103" y="109" text-anchor="middle" font-family="monospace" font-size="15" font-weight="700" fill="#c4b5fd">SA</text><text x="140" y="97" font-family="Arial" font-size="18" font-weight="700" fill="#eee6f8">Space Agenda</text><text x="140" y="116" font-family="monospace" font-size="10" fill="#9c8fb3">BOOKING &amp; RESERVAS · DEMO</text>
+<rect x="880" y="76" width="130" height="36" rx="18" fill="#8b5cf6"/><text x="945" y="100" text-anchor="middle" font-family="monospace" font-size="10" font-weight="700" fill="#160822">RESERVAR</text>
+<rect x="1016" y="76" width="310" height="36" rx="18" fill="#231038" stroke="#2e1949"/><text x="1032" y="100" font-family="monospace" font-size="10" fill="#9c8fb3">MEUS AGENDAMENTOS</text><circle cx="1300" cy="94" r="11" fill="#8b5cf6"/><text x="1300" y="99" text-anchor="middle" font-family="Arial" font-size="11" font-weight="600" fill="#160822">2</text>
+<rect x="82" y="150" width="820" height="236" rx="14" fill="#231038" stroke="#2e1949"/><text x="112" y="194" font-family="monospace" font-size="10" fill="#c4b5fd">SPACE AGENDA / BOOKING 001</text><text x="112" y="246" font-family="Arial" font-size="30" font-weight="700" fill="#eee6f8">Reserve seu horário</text><text x="112" y="282" font-family="Arial" font-size="30" font-weight="700" fill="#eee6f8">em menos de um minuto.</text><text x="112" y="320" font-family="Arial" font-size="12" fill="#9c8fb3">Agenda online para clínicas, estética, beleza e serviços profissionais.</text><text x="112" y="340" font-family="Arial" font-size="12" fill="#9c8fb3">Serviços, profissionais, calendário, pagamento, confirmação, reagendamento.</text>
+<rect x="922" y="150" width="436" height="236" rx="14" fill="#1d1030" stroke="#2e1949"/><text x="952" y="194" font-family="monospace" font-size="9" fill="#9c8fb3">CASE / BOOKING</text><text x="952" y="238" font-family="monospace" font-size="9" fill="#9c8fb3">AGENDAMENTOS ESTA SEMANA</text><text x="952" y="286" font-family="Arial" font-size="36" font-weight="700" fill="#eee6f8">126</text><g font-family="monospace" font-size="10" fill="#9c8fb3"><text x="952" y="326">Ticket médio</text><text x="1288" y="326" text-anchor="end" fill="#eee6f8">R$ 220,00</text><text x="952" y="350">No-show</text><text x="1288" y="350" text-anchor="end" fill="#eee6f8">4,8%</text><text x="952" y="374">Profissionais ativos</text><text x="1288" y="374" text-anchor="end" fill="#eee6f8">6</text></g>
+<g><rect x="82" y="410" width="86" height="28" rx="14" fill="#8b5cf6"/><text x="125" y="429" text-anchor="middle" font-family="monospace" font-size="10" font-weight="700" fill="#160822">TODOS</text><rect x="176" y="410" width="104" height="28" rx="14" fill="#140822" stroke="#2e1949"/><text x="228" y="429" text-anchor="middle" font-family="monospace" font-size="10" fill="#9c8fb3">TERAPIAS</text><rect x="288" y="410" width="100" height="28" rx="14" fill="#140822" stroke="#2e1949"/><text x="338" y="429" text-anchor="middle" font-family="monospace" font-size="10" fill="#9c8fb3">ESTÉTICA</text><rect x="396" y="410" width="92" height="28" rx="14" fill="#140822" stroke="#2e1949"/><text x="442" y="429" text-anchor="middle" font-family="monospace" font-size="10" fill="#9c8fb3">BELEZA</text><rect x="496" y="410" width="108" height="28" rx="14" fill="#140822" stroke="#2e1949"/><text x="550" y="429" text-anchor="middle" font-family="monospace" font-size="10" fill="#9c8fb3">CONSULTAS</text></g>
+<!-- Service cards (3) -->
+<g>
+<rect x="82" y="460" width="406" height="340" rx="12" fill="#1a0d2a" stroke="#2e1949"/>
+<text x="112" y="494" font-family="monospace" font-size="8" fill="#9c8fb3">TERAPIA / RELAX</text>
+<text x="112" y="528" font-family="Arial" font-size="16" font-weight="600" fill="#eee6f8">Massagem relaxante</text>
+<text x="112" y="562" font-family="Arial" font-size="11" fill="#9c8fb3">Massagem corporal com óleos essenciais,</text>
+<text x="112" y="580" font-family="Arial" font-size="11" fill="#9c8fb3">foco em pescoço, ombros e lombar.</text>
+<g transform="translate(112 614)">
+  <circle cx="12" cy="12" r="12" fill="#231038" stroke="#2e1949"/><text x="12" y="16" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="#c4b5fd">ANA</text>
+  <circle cx="30" cy="12" r="12" fill="#231038" stroke="#2e1949"/><text x="30" y="16" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="#c4b5fd">MAR</text>
+</g>
+<text x="400" y="630" text-anchor="end" font-family="monospace" font-size="9" fill="#9c8fb3">2 profissionais</text>
+<text x="112" y="686" font-family="monospace" font-size="10" fill="#9c8fb3">50 MIN</text>
+<text x="400" y="686" text-anchor="end" font-family="Arial" font-size="18" font-weight="700" fill="#eee6f8">R$ 220,00</text>
+<rect x="112" y="710" width="304" height="42" rx="9" fill="#8b5cf6"/>
+<text x="264" y="736" text-anchor="middle" font-family="Arial" font-size="12" font-weight="700" fill="#160822">RESERVAR HORÁRIO</text>
+</g>
+<g>
+<rect x="500" y="460" width="406" height="340" rx="12" fill="#1a0d2a" stroke="#2e1949"/>
+<text x="530" y="494" font-family="monospace" font-size="8" fill="#9c8fb3">ESTÉTICA / FACIAL</text>
+<text x="530" y="528" font-family="Arial" font-size="16" font-weight="600" fill="#eee6f8">Limpeza de pele profunda</text>
+<text x="530" y="562" font-family="Arial" font-size="11" fill="#9c8fb3">Higienização, extração, máscara calmante</text>
+<text x="530" y="580" font-family="Arial" font-size="11" fill="#9c8fb3">e hidratação final.</text>
+<g transform="translate(530 614)">
+  <circle cx="12" cy="12" r="12" fill="#231038" stroke="#2e1949"/><text x="12" y="16" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="#c4b5fd">LUI</text>
+  <circle cx="30" cy="12" r="12" fill="#231038" stroke="#2e1949"/><text x="30" y="16" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="#c4b5fd">CAR</text>
+</g>
+<text x="818" y="630" text-anchor="end" font-family="monospace" font-size="9" fill="#9c8fb3">2 profissionais</text>
+<text x="530" y="686" font-family="monospace" font-size="10" fill="#9c8fb3">75 MIN</text>
+<text x="818" y="686" text-anchor="end" font-family="Arial" font-size="18" font-weight="700" fill="#eee6f8">R$ 260,00</text>
+<rect x="530" y="710" width="304" height="42" rx="9" fill="#8b5cf6"/>
+<text x="682" y="736" text-anchor="middle" font-family="Arial" font-size="12" font-weight="700" fill="#160822">RESERVAR HORÁRIO</text>
+</g>
+<g>
+<rect x="918" y="460" width="440" height="340" rx="12" fill="#1a0d2a" stroke="#2e1949"/>
+<text x="948" y="494" font-family="monospace" font-size="8" fill="#9c8fb3">CONSULTA / NUTRI</text>
+<text x="948" y="528" font-family="Arial" font-size="16" font-weight="600" fill="#eee6f8">Consulta nutricional</text>
+<text x="948" y="562" font-family="Arial" font-size="11" fill="#9c8fb3">Avaliação clínica, bioimpedância e</text>
+<text x="948" y="580" font-family="Arial" font-size="11" fill="#9c8fb3">plano alimentar personalizado.</text>
+<g transform="translate(948 614)">
+  <circle cx="12" cy="12" r="12" fill="#231038" stroke="#2e1949"/><text x="12" y="16" text-anchor="middle" font-family="monospace" font-size="9" font-weight="700" fill="#c4b5fd">MAR</text>
+</g>
+<text x="1324" y="630" text-anchor="end" font-family="monospace" font-size="9" fill="#9c8fb3">1 profissional</text>
+<text x="948" y="686" font-family="monospace" font-size="10" fill="#9c8fb3">60 MIN</text>
+<text x="1324" y="686" text-anchor="end" font-family="Arial" font-size="18" font-weight="700" fill="#eee6f8">R$ 340,00</text>
+<rect x="948" y="710" width="340" height="42" rx="9" fill="#8b5cf6"/>
+<text x="1118" y="736" text-anchor="middle" font-family="Arial" font-size="12" font-weight="700" fill="#160822">RESERVAR HORÁRIO</text>
+</g>
+<text x="82" y="828" font-family="monospace" font-size="10" fill="#9c8fb3">CASE / BOOKING · SERVIÇOS · CALENDÁRIO · PIX &amp; CARTÃO · REAGENDAMENTO</text><text x="1358" y="828" text-anchor="end" font-family="monospace" font-size="10" fill="#8b5cf6">SPACE UNDERGROUND</text>
+</svg>
