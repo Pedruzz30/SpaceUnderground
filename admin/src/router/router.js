@@ -6,27 +6,6 @@ import { loginPage } from "../pages/login.js";
 import { welcomePage } from "../pages/welcome.js";
 import { bindGateSignOut, blockedScreen } from "../pages/access-gate.js";
 import { databaseUpdatePage, forbiddenPage } from "../pages/forbidden.js";
-import { dashboardPage } from "../pages/dashboard.js";
-import { projectsPage } from "../pages/projects.js";
-import { projectEditorPage } from "../pages/project-editor.js";
-import { projectDraftPage } from "../pages/project-draft.js";
-import { clientsPage } from "../pages/clients.js";
-import { clientDetailPage } from "../pages/client-detail.js";
-import { commercialPage } from "../pages/commercial.js";
-import { financialPage } from "../pages/financial.js";
-import { mediaPage } from "../pages/media.js";
-import { servicesPage } from "../pages/services.js";
-import { serviceEditorPage } from "../pages/service-editor.js";
-import { contentPage } from "../pages/content.js";
-import { cmsPage } from "../pages/cms.js";
-import { logsPage } from "../pages/logs.js";
-import { settingsPage } from "../pages/settings.js";
-import { teamPage } from "../pages/team.js";
-import { teamInvitePage } from "../pages/team-invite.js";
-import { teamMemberPage } from "../pages/team-member.js";
-import { approvalsPage, myChangesPage } from "../pages/approvals.js";
-import { approvalReviewPage } from "../pages/approval-review.js";
-import { auditPage } from "../pages/audit.js";
 import { getCachedSession, getSession, hasResolvedSession, logout } from "../services/auth-service.js";
 import { forgetAccess, loadAccess } from "../services/access-service.js";
 import { pendingApprovalCount } from "../services/approval-service.js";
@@ -43,40 +22,42 @@ import { watchPermissionGates } from "../security/gates.js";
 const pages = [
   { test: (route) => route === "/login", page: loginPage },
   { test: (route) => route === "/welcome", page: welcomePage },
-  { test: (route) => route === "/dashboard" || route === "/", page: dashboardPage },
-  { test: (route) => route === "/projects", page: projectsPage, any: ["projects.read", "projects.read_assigned"] },
-  { test: (route) => route === "/projects/new", page: projectEditorPage, any: ["projects.create"] },
+  { test: (route) => route === "/dashboard" || route === "/", load: () => import("../pages/dashboard.js").then((module) => module.dashboardPage) },
+  { test: (route) => route === "/projects", load: () => import("../pages/projects.js").then((module) => module.projectsPage), any: ["projects.read", "projects.read_assigned"] },
+  { test: (route) => route === "/projects/new", load: () => import("../pages/project-editor.js").then((module) => module.projectEditorPage), any: ["projects.create"] },
   // Editors get the editor; members who may only propose changes get drafts.
   {
     test: (route) => /^\/projects\/[^/]+$/.test(route),
-    page: () => (hasPermission("projects.edit") ? projectEditorPage : projectDraftPage),
+    load: (access) => hasPermission("projects.edit", access)
+      ? import("../pages/project-editor.js").then((module) => module.projectEditorPage)
+      : import("../pages/project-draft.js").then((module) => module.projectDraftPage),
     any: ["projects.edit", "projects.read_assigned"],
   },
-  { test: (route) => route === "/clients", page: clientsPage, any: ["clients.read"] },
-  { test: (route) => /^\/clients\/[^/]+$/.test(route), page: clientDetailPage, any: ["clients.read"] },
-  { test: (route) => route === "/commercial", page: commercialPage, any: ["commercial.read"] },
-  { test: (route) => route === "/financial", page: financialPage, any: ["finance.read"] },
-  { test: (route) => route === "/media", page: mediaPage, any: ["cms.read"] },
-  { test: (route) => route === "/services", page: servicesPage, any: ["services.read"] },
-  { test: (route) => /^\/services\/[^/]+$/.test(route), page: serviceEditorPage, any: ["services.read"] },
-  { test: (route) => route === "/content", page: contentPage, any: ["cms.read"] },
-  { test: (route) => route === "/cms", page: cmsPage, any: ["cms.read"] },
+  { test: (route) => route === "/clients", load: () => import("../pages/clients.js").then((module) => module.clientsPage), any: ["clients.read"] },
+  { test: (route) => /^\/clients\/[^/]+$/.test(route), load: () => import("../pages/client-detail.js").then((module) => module.clientDetailPage), any: ["clients.read"] },
+  { test: (route) => route === "/commercial", load: () => import("../pages/commercial.js").then((module) => module.commercialPage), any: ["commercial.read"] },
+  { test: (route) => route === "/financial", load: () => import("../pages/financial.js").then((module) => module.financialPage), any: ["finance.read"] },
+  { test: (route) => route === "/media", load: () => import("../pages/media.js").then((module) => module.mediaPage), any: ["cms.read"] },
+  { test: (route) => route === "/services", load: () => import("../pages/services.js").then((module) => module.servicesPage), any: ["services.read"] },
+  { test: (route) => /^\/services\/[^/]+$/.test(route), load: () => import("../pages/service-editor.js").then((module) => module.serviceEditorPage), any: ["services.read"] },
+  { test: (route) => route === "/content", load: () => import("../pages/content.js").then((module) => module.contentPage), any: ["cms.read"] },
+  { test: (route) => route === "/cms", load: () => import("../pages/cms.js").then((module) => module.cmsPage), any: ["cms.read"] },
   // #/activity is the pre-Lab name for this screen; keep the old link working.
-  { test: (route) => route === "/logs" || route === "/logs/automation" || route === "/activity", page: logsPage, any: ["logs.read"] },
-  { test: (route) => route === "/settings", page: settingsPage },
-  { test: (route) => route === "/team", page: teamPage, any: ["team.read"], security: true },
-  { test: (route) => route === "/team/invite", page: teamInvitePage, any: ["team.invite"], security: true },
-  { test: (route) => /^\/team\/[^/]+$/.test(route), page: teamMemberPage, any: ["team.read"], security: true },
-  { test: (route) => route === "/approvals", page: approvalsPage, any: ["approvals.read_all"], security: true },
-  { test: (route) => /^\/approvals\/[^/]+$/.test(route), page: approvalReviewPage, any: ["approvals.read"], security: true },
-  { test: (route) => route === "/my-changes", page: myChangesPage, any: ["approvals.read"], security: true },
-  { test: (route) => route === "/audit", page: auditPage, any: ["audit.read"], security: true },
+  { test: (route) => route === "/logs" || route === "/logs/automation" || route === "/activity", load: () => import("../pages/logs.js").then((module) => module.logsPage), any: ["logs.read"] },
+  { test: (route) => route === "/settings", load: () => import("../pages/settings.js").then((module) => module.settingsPage) },
+  { test: (route) => route === "/team", load: () => import("../pages/team.js").then((module) => module.teamPage), any: ["team.read"], security: true },
+  { test: (route) => route === "/team/invite", load: () => import("../pages/team-invite.js").then((module) => module.teamInvitePage), any: ["team.invite"], security: true },
+  { test: (route) => /^\/team\/[^/]+$/.test(route), load: () => import("../pages/team-member.js").then((module) => module.teamMemberPage), any: ["team.read"], security: true },
+  { test: (route) => route === "/approvals", load: () => import("../pages/approvals.js").then((module) => module.approvalsPage), any: ["approvals.read_all"], security: true },
+  { test: (route) => /^\/approvals\/[^/]+$/.test(route), load: () => import("../pages/approval-review.js").then((module) => module.approvalReviewPage), any: ["approvals.read"], security: true },
+  { test: (route) => route === "/my-changes", load: () => import("../pages/approvals.js").then((module) => module.myChangesPage), any: ["approvals.read"], security: true },
+  { test: (route) => route === "/audit", load: () => import("../pages/audit.js").then((module) => module.auditPage), any: ["audit.read"], security: true },
 ];
 
-function resolvePage(entry, access) {
+async function resolvePage(entry, access) {
   if (entry.security && !isSecurityModelActive(access)) return databaseUpdatePage;
   if (entry.any && !hasAnyPermission(entry.any, access)) return forbiddenPage;
-  return typeof entry.page === "function" ? entry.page(access) : entry.page;
+  return entry.load ? entry.load(access) : entry.page;
 }
 
 function currentRoute() {
@@ -161,6 +142,7 @@ function bindShell() {
 let navigationGuard = null;
 let navigationCleanup = null;
 let activeRoute = null;
+let activePage = null;
 let renderToken = 0;
 
 // Lets a page block navigation while it has unsaved changes. The cleanup runs
@@ -196,8 +178,8 @@ export function initRouter(root) {
     const breadcrumbNode = root.querySelector("[data-page-breadcrumb]");
     if (!titleNode && !breadcrumbNode) return;
     const requestedRoute = currentRoute();
-    const match = pages.find((entry) => entry.test(requestedRoute));
-    const page = match ? resolvePage(match, getAccess()) : notFoundPage(requestedRoute);
+    const page = requestedRoute === activeRoute ? activePage : null;
+    if (!page) return;
     const title = typeof page.title === "function" ? page.title() : page.title;
     const breadcrumb = typeof page.breadcrumb === "function" ? page.breadcrumb() : page.breadcrumb;
     if (titleNode) titleNode.textContent = title || "";
@@ -235,6 +217,16 @@ export function initRouter(root) {
         return;
       }
       await runNavigationCleanup();
+    }
+
+    // A route chunk may still be downloading. Remove the previous page so its
+    // controls and headings cannot be mistaken for the destination.
+    if (activeRoute && requestedRoute !== activeRoute) {
+      root.innerHTML = statusScreen({
+        title: t("shell.sessionTitle"),
+        heading: t("common.loading"),
+        copy: "",
+      });
     }
 
     const params = routeParams(requestedRoute);
@@ -308,7 +300,23 @@ export function initRouter(root) {
       return;
     }
 
-    const page = match ? resolvePage(match, access) : notFoundPage(requestedRoute);
+    let page;
+    try {
+      page = match ? await resolvePage(match, access) : notFoundPage(requestedRoute);
+    } catch (error) {
+      if (token !== renderToken) return;
+      activeRoute = requestedRoute;
+      activePage = null;
+      root.innerHTML = statusScreen({
+        title: t("errors.generic"),
+        heading: t("errors.generic"),
+        copy: error?.message ?? t("errors.generic"),
+        action: `<button class="button" type="button" data-route-retry>${t("security.states.retry")}</button>`,
+      });
+      root.querySelector("[data-route-retry]")?.addEventListener("click", () => render());
+      return;
+    }
+    if (token !== renderToken) return;
     root.innerHTML = shell(page, requestedRoute, params, session, access);
     bindShell();
     flushPendingToast();
@@ -316,6 +324,7 @@ export function initRouter(root) {
     refreshApprovalsBadge(access);
 
     activeRoute = requestedRoute;
+    activePage = page;
     await page.afterRender?.(params);
     if (token !== renderToken) return;
     document.querySelector(".page")?.focus({ preventScroll: true });

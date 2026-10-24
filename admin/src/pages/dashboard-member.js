@@ -77,10 +77,13 @@ export const memberDashboard = {
     const paint = () => {
       const pending = requests.filter((request) => request.status === "PENDING");
       const drafts = requests.filter((request) => request.status === "DRAFT");
+      const projectsCount = projectsResult.status === "fulfilled" ? projects.length : "—";
+      const pendingCount = requestsResult.status === "fulfilled" ? pending.length : "—";
+      const draftsCount = requestsResult.status === "fulfilled" ? drafts.length : "—";
       metricsEl.innerHTML = [
-        [plural("security.memberDashboard.projects", projects.length), projects.length],
-        [plural("security.memberDashboard.pendingCount", pending.length), pending.length],
-        [plural("security.memberDashboard.drafts", drafts.length), drafts.length],
+        [plural("security.memberDashboard.projects", projects.length), projectsCount],
+        [plural("security.memberDashboard.pendingCount", pending.length), pendingCount],
+        [plural("security.memberDashboard.drafts", drafts.length), draftsCount],
       ]
         .map(([label, value]) => `<div class="project-metric"><strong>${value}</strong><span>${escapeHtml(label)}</span></div>`)
         .join("");
@@ -90,9 +93,13 @@ export const memberDashboard = {
           : projects.length
             ? projects.map((project) => projectCard(project, access)).join("")
             : `<p class="empty-inline">${escapeHtml(t("security.memberDashboard.noProjects"))}</p>`;
-      pendingEl.innerHTML = pending.length ? pending.map((request) => requestRow(request, byKey)).join("") : `<p class="empty-inline">${escapeHtml(t("security.memberDashboard.noPending"))}</p>`;
+      pendingEl.innerHTML = requestsResult.status === "rejected"
+        ? `<p class="empty-inline">${escapeHtml(describeError(requestsResult.reason, t("security.approvals.loadError")))}</p>`
+        : pending.length ? pending.map((request) => requestRow(request, byKey)).join("") : `<p class="empty-inline">${escapeHtml(t("security.memberDashboard.noPending"))}</p>`;
       const recent = requests.filter((request) => request.status !== "PENDING").slice(0, 8);
-      changesEl.innerHTML = recent.length ? recent.map((request) => requestRow(request, byKey)).join("") : `<p class="empty-inline">${escapeHtml(t("security.memberDashboard.noChanges"))}</p>`;
+      changesEl.innerHTML = requestsResult.status === "rejected"
+        ? `<p class="empty-inline">${escapeHtml(describeError(requestsResult.reason, t("security.approvals.loadError")))}</p>`
+        : recent.length ? recent.map((request) => requestRow(request, byKey)).join("") : `<p class="empty-inline">${escapeHtml(t("security.memberDashboard.noChanges"))}</p>`;
       [projectsEl, pendingEl, changesEl].forEach((node) => node.removeAttribute("aria-busy"));
     };
 
