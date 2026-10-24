@@ -564,7 +564,7 @@ function renderSecurity(entries) {
 const SKIPPED = Symbol("skipped");
 const readIf = (allowed, read) => (allowed ? read() : Promise.reject(SKIPPED));
 // true (answered), false (failed) or null (never attempted).
-const readState = (result, ok) => (result.reason === SKIPPED ? null : ok);
+const readState = (result, ok) => (result.status === "pending" || result.reason === SKIPPED ? null : ok);
 
 const canReview = () => isSecurityModelActive() && hasPermission("approvals.read_all");
 const canAudit = () => isSecurityModelActive() && hasPermission("audit.read_all");
@@ -660,9 +660,22 @@ const fullDashboard = {
     </div>
   `;
   },
-  afterRender: async () => {
+  afterRender: () => {
     const financeEl = document.querySelector("[data-finance]");
     const periodEl = document.querySelector("[data-dash-period]");
+    const attentionEl = document.querySelector("[data-attention]");
+    const attentionCountEl = document.querySelector("[data-attention-count]");
+    const pulseEl = document.querySelector("[data-pulse]");
+    const activityEl = document.querySelector("[data-activity]");
+    const healthEl = document.querySelector("[data-health]");
+    const kpisEl = document.querySelector("[data-dash-kpis]");
+    const followUpsEl = document.querySelector("[data-followups]");
+    const pipelineEl = document.querySelector("[data-pipeline]");
+    const approvalsEl = document.querySelector("[data-dash-approvals]");
+    const securityEl = document.querySelector("[data-dash-security]");
+    if (!pulseEl) return;
+    const results = Array.from({ length: 7 }, () => ({ status: "pending" }));
+    const settled = (index) => results[index].status !== "pending";
 
     const paintFinancial = () => {
       if (!financeEl?.isConnected) return;
@@ -674,117 +687,102 @@ const fullDashboard = {
 
     void paintAutomation();
 
-    // One failing query must never blank the Dashboard: each block resolves
-    // independently, and the page renders from whatever answered.
-    const [projectsResult, activityResult, clientsResult, ledgerResult, dealsResult, approvalsResult, auditResult] = await Promise.allSettled([
-      getProjects(),
-      readIf(hasPermission("logs.read"), () => getActivityWithStatus({ limit: RECENT_ACTIVITY })),
-      readIf(hasPermission("clients.read"), () => getClients()),
-      readIf(hasPermission("finance.read"), () => getTransactionsWithStatus()),
-      readIf(hasPermission("commercial.read"), () => getOpportunitiesWithStatus()),
-      // Shared with the sidebar badge (cached there), so this is no new request.
-      readIf(canReview(), () => pendingApprovalCount()),
-      readIf(canAudit(), () => listAuditEntries({ limit: AUDIT_SCAN })),
-    ]);
-
-    const attentionEl = document.querySelector("[data-attention]");
-    const attentionCountEl = document.querySelector("[data-attention-count]");
-    const pulseEl = document.querySelector("[data-pulse]");
-    const activityEl = document.querySelector("[data-activity]");
-    const healthEl = document.querySelector("[data-health]");
-    const kpisEl = document.querySelector("[data-dash-kpis]");
-    const followUpsEl = document.querySelector("[data-followups]");
-    const pipelineEl = document.querySelector("[data-pipeline]");
-    const approvalsEl = document.querySelector("[data-dash-approvals]");
-    const securityEl = document.querySelector("[data-dash-security]");
-    if (!pulseEl?.isConnected) return;
-
-    const projectsOk = projectsResult.status === "fulfilled";
-    const projects = projectsOk ? projectsResult.value : [];
-
-    // Clients need the clients foundation migration. Until it is applied (or
-    // on any failure) the client KPI reads "—" and the relationship list
-    // carries only what the pipeline knows.
-    const clientsOk = clientsResult.status === "fulfilled";
-    const clients = clientsOk ? clientsResult.value : [];
-
-    // The ledger needs the financial foundation migration. Until it is applied
-    // (or on any failure) the financial panel says so and the balance reads "—".
-    const ledger = ledgerResult.status === "fulfilled" ? ledgerResult.value : { items: [], ok: false };
-    const clientNames = new Map(clients.map((client) => [client.id, client.name]));
-    ledgerEntries = ledger.items.map((entry) => ({ ...entry, clientName: clientNames.get(entry.clientId) ?? "" }));
-    // A read skipped for lack of permission is not an outage: its panel is
-    // hidden, and no "unavailable" note is shown for it.
-    ledgerOk = readState(ledgerResult, ledger.ok);
-
-    const deals = dealsResult.status === "fulfilled" ? dealsResult.value : { items: [], ok: false };
-    dealEntries = deals.items.map((deal) => ({ ...deal, clientName: clientNames.get(deal.clientId) ?? "" }));
-    dealsOk = readState(dealsResult, deals.ok);
-
-    // An outage and an empty log are different facts: getActivityWithStatus()
-    // reports the read failure that getActivity() deliberately swallows.
-    const activity = activityResult.status === "fulfilled" ? activityResult.value : { items: [], ok: false };
-    const entries = activity.items.slice(0, RECENT_ACTIVITY);
-
-    // pendingApprovalCount() answers null when the count failed.
-    const approvalCount = approvalsResult.status === "fulfilled" ? approvalsResult.value : null;
-    pendingApprovals = approvalCount;
-    const auditEntries = auditResult.status === "fulfilled" ? auditResult.value : null;
-
-    // What the Operation panel reports: the reads this page made, and how
-    // each one went. A module the member may not read is left out.
-    const reads = [
-      { id: "projects", ok: projectsOk },
-      { id: "clients", ok: readState(clientsResult, clientsOk) },
-      { id: "financial", ok: ledgerOk },
-      { id: "commercial", ok: dealsOk },
-      { id: "logs", ok: readState(activityResult, activity.ok) },
-    ];
-
-    // Everything below renders from the results already in hand. A locale
-    // change replays this, so the Dashboard re-reads in the other language
-    // without issuing a single new query.
     function paintData() {
+      if (!pulseEl.isConnected) return;
+      const [projectsResult, activityResult, clientsResult, ledgerResult, dealsResult, approvalsResult, auditResult] = results;
+      const projectsOk = projectsResult.status === "fulfilled";
+      const projects = projectsOk ? projectsResult.value : [];
+      const clientsOk = clientsResult.status === "fulfilled";
+      const clients = clientsOk ? clientsResult.value : [];
+      const clientNames = new Map(clients.map((client) => [client.id, client.name]));
+      const ledger = ledgerResult.status === "fulfilled" ? ledgerResult.value : { items: [], ok: false };
+      ledgerEntries = ledger.items.map((entry) => ({ ...entry, clientName: clientNames.get(entry.clientId) ?? "" }));
+      ledgerOk = readState(ledgerResult, ledger.ok);
+      const deals = dealsResult.status === "fulfilled" ? dealsResult.value : { items: [], ok: false };
+      dealEntries = deals.items.map((deal) => ({ ...deal, clientName: clientNames.get(deal.clientId) ?? "" }));
+      dealsOk = readState(dealsResult, deals.ok);
+      const activity = activityResult.status === "fulfilled" ? activityResult.value : { items: [], ok: false };
+      const entries = activity.items.slice(0, RECENT_ACTIVITY);
+      const approvalCount = approvalsResult.status === "fulfilled" ? approvalsResult.value : null;
+      pendingApprovals = approvalCount;
+      const auditEntries = auditResult.status === "fulfilled" ? auditResult.value : null;
+
       kpisEl.innerHTML = renderKpis({ projects: projectsOk ? projects : null, clients: clientsOk ? clients : null });
-      followUpsEl.innerHTML =
-        renderQueue(followUps({ clients, opportunities: dealEntries }), t("dashboard.noFollowUps")) +
-        missingModulesNote([!clientsOk && clientsResult.reason !== SKIPPED && t("nav.clients"), dealsOk === false && t("nav.commercial")]);
+      if (settled(2) && settled(4) && followUpsEl) {
+        followUpsEl.innerHTML =
+          renderQueue(followUps({ clients, opportunities: dealEntries }), t("dashboard.noFollowUps")) +
+          missingModulesNote([!clientsOk && clientsResult.reason !== SKIPPED && t("nav.clients"), dealsOk === false && t("nav.commercial")]);
+        followUpsEl.removeAttribute("aria-busy");
+      }
       if (pipelineEl) pipelineEl.innerHTML = renderPipeline();
 
-      const attention = renderAttention(projectsOk ? projectChecks(projects) : [], { projectsFailed: !projectsOk });
-      attentionEl.innerHTML = attention.html;
-      attentionCountEl.textContent = attention.count;
-      attentionCountEl.classList.toggle("is-critical", attention.critical > 0);
-      pulseEl.innerHTML = projectsOk
-        ? renderRecentProjects(projects)
-        : `<p class="dash-note">${escapeHtml(describeError(projectsResult.reason, t("dashboard.loadProjectsError")))}</p>`;
+      if ([0, 3, 4, 5].every(settled)) {
+        const attention = renderAttention(projectsOk ? projectChecks(projects) : [], { projectsFailed: !projectsOk });
+        attentionEl.innerHTML = attention.html;
+        attentionCountEl.textContent = attention.count;
+        attentionCountEl.classList.toggle("is-critical", attention.critical > 0);
+        attentionEl.removeAttribute("aria-busy");
+      }
+      if (settled(0)) {
+        pulseEl.innerHTML = projectsOk
+          ? renderRecentProjects(projects)
+          : `<p class="dash-note">${escapeHtml(describeError(projectsResult.reason, t("dashboard.loadProjectsError")))}</p>`;
+        pulseEl.removeAttribute("aria-busy");
+      }
 
-      if (activityEl) activityEl.innerHTML = renderActivity({ items: entries, ok: activity.ok });
+      if (activityEl && settled(1)) {
+        activityEl.innerHTML = renderActivity({ items: entries, ok: activity.ok });
+        activityEl.removeAttribute("aria-busy");
+      }
 
-      const operation = renderOperation({ reads, projects, projectsOk });
-      healthEl.innerHTML = operation.html;
-      emphasize(healthEl, operation.tone);
+      if ([0, 1, 2, 3, 4].every(settled)) {
+        const reads = [
+          { id: "projects", ok: projectsOk },
+          { id: "clients", ok: readState(clientsResult, clientsOk) },
+          { id: "financial", ok: ledgerOk },
+          { id: "commercial", ok: dealsOk },
+          { id: "logs", ok: readState(activityResult, activity.ok) },
+        ];
+        const operation = renderOperation({ reads, projects, projectsOk });
+        healthEl.innerHTML = operation.html;
+        emphasize(healthEl, operation.tone);
+        healthEl.removeAttribute("aria-busy");
+      }
 
-      if (approvalsEl) {
+      if (approvalsEl && settled(5)) {
         const approvals = renderApprovals(approvalCount);
         approvalsEl.innerHTML = approvals.html;
         emphasize(approvalsEl, approvals.pending ? "accent" : "");
+        approvalsEl.removeAttribute("aria-busy");
       }
-      if (securityEl) {
+      if (securityEl && settled(6)) {
         const security = renderSecurity(auditEntries);
         securityEl.innerHTML = security.html;
         emphasize(securityEl, security.alert ? "warning" : "");
+        securityEl.removeAttribute("aria-busy");
       }
       paintFinancial();
     }
 
-    paintData();
-
     // The selected period is read back from the live control, so switching
-    // locale keeps whatever range the user had chosen.
+    // locale keeps whatever range the user had chosen, without another query.
     onLocaleChange(pulseEl, paintData);
-
-    [attentionEl, pulseEl, activityEl, healthEl, followUpsEl, approvalsEl, securityEl].forEach((node) => node?.removeAttribute("aria-busy"));
+    const reads = [
+      getProjects,
+      () => readIf(hasPermission("logs.read"), () => getActivityWithStatus({ limit: RECENT_ACTIVITY })),
+      () => readIf(hasPermission("clients.read"), getClients),
+      () => readIf(hasPermission("finance.read"), getTransactionsWithStatus),
+      () => readIf(hasPermission("commercial.read"), getOpportunitiesWithStatus),
+      // Shared with the sidebar badge (cached there), so this is no new request.
+      () => readIf(canReview(), pendingApprovalCount),
+      () => readIf(canAudit(), () => listAuditEntries({ limit: AUDIT_SCAN })),
+    ];
+    reads.forEach((read, index) => {
+      Promise.resolve().then(read).then(
+        (value) => { results[index] = { status: "fulfilled", value }; paintData(); },
+        (reason) => { results[index] = { status: "rejected", reason }; paintData(); },
+      );
+    });
   },
 };
 

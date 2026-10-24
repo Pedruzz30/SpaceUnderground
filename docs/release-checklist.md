@@ -108,7 +108,8 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
 
       select version, name from supabase_migrations.schema_migrations order by version;
 
-      Known remote state:
+      Last recorded migration-history snapshot (not rechecked on 2026-10-24;
+      direct access to the production project is still required):
 
       | Version | Name | State |
       | --- | --- | --- |
@@ -123,7 +124,8 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       | `20260928031922` | `financial_foundation` | APPLIED |
       | `20260928035023` | `commercial_opportunities` | APPLIED |
       | `20261002033705` | `security_rbac_approval_foundation` | APPLIED |
-      | `20261003015032` | `automation_v2` | PENDING |
+      | `20261003015032` | `automation_v2` | PENDING in the snapshot; current history unknown |
+      | `20261016120000` | `phase1_commercial` | Current history unknown |
 
       Recorded versions must never be renamed or repaired. After the normalize,
       production plans read `Max` = `ON_REQUEST`, `Plus` = `AVAILABLE`,
@@ -152,13 +154,13 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
 - [x] `20260928031922_financial_foundation.sql` is applied before deploying the
       Admin that reads `public.financial_transactions`. It needs the clients
       migrations first. The public site does not depend on it.
-- [ ] Right after applying it, as `anon` with the publishable key,
+- [x] Rechecked 2026-10-24 as `anon` with the publishable key:
       `financial_transactions?select=id&limit=1` is refused (`401`/`42501`).
 - [x] `20260928035023_commercial_opportunities.sql` is applied before deploying
       the Admin that reads `public.commercial_opportunities`. It needs the clients
       migrations first and leaves `commercial_proposals` untouched. The public
       site does not depend on it.
-- [ ] Right after applying it, as `anon` with the publishable key,
+- [x] Rechecked 2026-10-24 as `anon` with the publishable key:
       `commercial_opportunities?select=id&limit=1` is refused (`401`/`42501`).
 - [x] Applied the two in version order, financial first: the commercial
       migration adds the foreign key behind
@@ -169,12 +171,13 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
 
 - [ ] Signed in as an admin, Settings → System reads every module as
       responding and lists no pending migration.
-- [ ] Right after applying the clients hardening, as `anon` with the publishable key:
+- [x] Rechecked 2026-10-24 as `anon` with the publishable key:
       the public project query above still returns `200`, and
       `projects?select=client_id&limit=1` is refused (`401`/`42501`). A new
       column the public site selects needs its own `grant select (...) on
       public.projects to anon`.
-- [ ] The exact public query returns `200`, run against production with the
+- [x] Rechecked 2026-10-24: the exact public project and plan queries return
+      `200` against production with the
       publishable key:
 
       curl -s -H "apikey: $KEY" \
@@ -194,13 +197,17 @@ Project ref: `zvzfkfvxbuofgqrrogxh`. Never point any of this at another project.
       break-glass account with `bootstrap_member`. Then, as `anon` with the
       publishable key, `team_members?select=ru&limit=1` and
       `security_audit_log?select=id&limit=1` are refused, and the public
-      project query still returns `200`.
+      project query still returns `200`. These three anonymous checks passed
+      again on 2026-10-24; the other migration and Auth checks remain open.
 
-- [ ] `20261003015032_automation_v2.sql` — **pending**. Additive (no drop,
-      rename, delete or rewrite). Apply before deploying the automation
-      service: the service's `/api/v1/ready` answers 503 until it is applied.
-      Then, as `anon` and as a signed-in member, `automation_runs?select=id`
-      is refused, and the function is not executable:
+- [ ] `20261003015032_automation_v2.sql` — migration history still needs a
+      direct check. The service's `/api/v1/ready` answered `200` with
+      `automation_schema` configured on 2026-10-24, and anonymous access to
+      `automation_runs?select=id` was refused (`401`). Confirm the migration
+      version in history and the signed-in member and function permissions.
+      This migration is additive (no drop, rename, delete or rewrite). As a
+      signed-in member, `automation_runs?select=id` must also be refused, and
+      the function must not be executable:
 
       select has_function_privilege('authenticated',
         'public.automation_open_project_for_opportunity(uuid, text, text, text, boolean, uuid, uuid)',
@@ -229,9 +236,11 @@ steps and the production smoke test: `services/automation-api/README.md`
       `SCHEDULER_TOKEN`; plus `SUPABASE_URL` and `ADMIN_ORIGIN` (the exact https
       Admin origin — production refuses localhost, http and `*`).
 - [ ] `/health` 200, `/api/v1/health` shows no value, `/api/v1/ready` 200.
-- [ ] Netlify: `VITE_AUTOMATION_API_URL` set to the Render origin, and that
-      exact origin is in `connect-src` (`netlify.toml`). Never a service role
-      key or API token in any `VITE_` variable.
+- [ ] Netlify Admin: `VITE_AUTOMATION_API_URL` in the root `netlify.toml` is
+      the Render origin and matches `connect-src`. After deploy, confirm the
+      published bundle contains that origin and the Admin reports the service
+      as configured. Never put a service role key or API token in a `VITE_`
+      variable.
 - [ ] GitHub Actions: variable `AUTOMATION_API_URL`, secret
       `AUTOMATION_SCHEDULER_TOKEN`; run "Automation jobs" once by hand.
 - [ ] In the real Admin: Settings › Sistema reads the service as Online and

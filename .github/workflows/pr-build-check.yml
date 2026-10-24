@@ -93,5 +93,30 @@ jobs:
       - name: Build admin
         run: npm run build
         env:
-          VITE_ADMIN_DATA_SOURCE: mock
-          VITE_ADMIN_ALLOW_MOCK_BUILD: "true"
+          VITE_ADMIN_DATA_SOURCE: supabase
+          VITE_SUPABASE_URL: https://fixture.supabase.co
+          VITE_SUPABASE_ANON_KEY: fixture-public-key
+          VITE_AUTOMATION_API_URL: https://space-underground-automation.onrender.com
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Check admin dashboard and route loading
+        run: |
+          npm run dev:mock > /tmp/space-underground-admin-vite.log 2>&1 &
+          VITE_PID=$!
+          trap 'kill $VITE_PID 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:5173/ > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat /tmp/space-underground-admin-vite.log
+            exit 1
+          fi
+          npm run test:e2e:dashboard
+          npm run test:e2e:i18n

@@ -6,6 +6,10 @@
 [build.environment]
   NODE_VERSION = "22"
 
+[context.production.environment]
+  # Public build-time URL. Keep this identical to the CSP connect-src origin.
+  VITE_AUTOMATION_API_URL = "https://space-underground-automation.onrender.com"
+
 # Security headers for the Admin. Every source below is one the Admin really
 # uses (docs/security-architecture.md, "HTTP security headers"):
 #   script-src   only the bundle Vite builds; no inline script, no eval
